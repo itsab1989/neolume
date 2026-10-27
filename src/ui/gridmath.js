@@ -51,6 +51,16 @@
         for (var p = Math.floor(w.first / G.PAGE); p <= Math.floor(last / G.PAGE); p++) out.push(p);
         return out;
       },
+      /* Zeilen ab der Fokuszeile, die GANZ ueber dem Ausblend-Band (y 632) liegen: nur sie bekommen Zeiger-Fokus; die naechste
+       * (angeschnittene) Zeile ist Randzone (TV-Befund 27.10. nachmittags). Liste 5, Gross 1, Mittel 1, Klein 2 */
+      full: function () { return Math.max(1, Math.floor((632 - G.Y0 - G.H) / G.SY) + 1); },
+      /* Ist die angeschnittene Zeile darunter zeigbar? (>= 40 % der Karte ueber dem Band bei y 632: Gross 44 %, Mittel 76 %,
+       * Liste 50 % ja; Klein 22 % nein -> dort Randzone). Zeigen = Fokus nach kurzem Verweilen + EIN Schritt Rollen */
+      part: function () { var top = G.Y0 + G.full() * G.SY; return (632 - top) / G.H >= 0.4; },
+      /* Obergrenze der unteren Randzone: schmales Band ueber der Hinweisleiste (y 604–656) bzw. ab der nicht zeigbaren Zeile */
+      edgeB: function () { var top = G.Y0 + G.full() * G.SY; return G.part() ? 604 : Math.min(604, top); },
+      /* Breite des Rasters (Randzonen) */
+      width: function () { return G.COLS === 1 ? G.W : (G.COLS - 1) * G.SX + G.W; },
       /* Zeiger: Index unter (x, y) (Fokuszeile und die sichtbaren darunter bis zum deckenden Band) */
       hit: function (n, r, x, y) {
         var c = G.COLS === 1 ? (x >= G.X0 && x < G.X0 + G.W ? 0 : -1) : N.hit.list(G.X0, G.SX, G.W, G.COLS, x);

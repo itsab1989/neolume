@@ -3,7 +3,48 @@
 All notable changes to Neolume are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.0.2] - 2026-10-27
+
+### Added
+- **New setting "Accent colour"** (Settings → Interface): pick the colour of the focus, buttons and progress bars from
+  seven colours – Teal (default), Amber, Coral, Rose, Lavender, Sky blue and Mint – per profile, with a colour swatch in
+  the list. It takes effect at once and is applied before the first screen at start, so there is no flash of the old colour.
+  Every colour keeps labels on it readable (contrast at least 4.5:1). Switching costs the TV a single style update: all
+  colour variants are prepared when the app is built.
+- **New setting "Speed up pointer scrolling"** (Settings → Interface, under "Pointer control"): when you rest the Smart
+  Control pointer at the top or bottom edge of a list, scrolling starts slowly and gets faster; turn it off for a steady pace.
+
+### Changed
+- **Titles without a background picture** (for example a movie added minutes ago) now show their poster, softly blurred by
+  your server, behind the home screen, detail pages and "Now Playing" instead of a plain colour.
+- **Screensaver pictures are recognisable again:** the soft mode blurs much less and loads the picture in full TV
+  resolution with higher quality, so smooth colour gradients no longer show blocks. Only titles with a real background
+  picture are shown.
+- **Music and audiobooks:**
+  - "Now Playing" and artist pages stay readable on very bright artwork.
+  - Albums and audiobooks without a cover show a coloured title card instead of a grey square, in grids, home rows,
+    "Now Playing" and the mini player.
+  - Long library names in the side menu wrap onto two lines in the normal font size instead of shrinking.
+  - The mini player no longer covers the A–Z bar or the last entry of a track or chapter list.
+- **The clock follows your Plex server:** if the TV's own clock is wrong (common on TVs that only use HDMI), the clock on
+  the home screen, the screensaver and every "ends at" time now show the correct time.
+- **Shared (friend) accounts are no longer added as profiles;** the setup program only uses your own account and your
+  Plex Home users, and never requests or stores access for other accounts. On a TV that was set up earlier, such
+  profiles no longer appear in the profile picker.
+- **Player controls redesigned:** nothing overlaps any more. The time line is on top, the times below it, and the buttons
+  in one row; Play/Pause is now a slightly larger rounded button like −10/+10, its label sits under the focused button, and
+  the colour-key hints have their own small bar at the bottom right.
+- **Pointer (Smart Control touchpad) in libraries:** pointing at a row no longer makes the list run away. Rows that are
+  mostly visible can be picked directly; rest the pointer in the slim band above the colour keys (or under the buttons at
+  the top) to scroll. The focus ring never covers the hint bar. "Pointer control: off" now really ignores the pointer
+  everywhere, and its explanation says so.
+
+### Fixed
+- The mini player showed the play symbol while music was playing (and pause while paused).
+- Albums with an empty title on the server appeared as blank cards; they now read "Untitled".
+- Resuming an audiobook after a long break rewound by the wrong amount when the TV clock was off.
+
+If you enjoy picking your favourite colour, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
 
 ## [1.0.1] - 2026-10-27
 

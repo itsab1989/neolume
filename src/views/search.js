@@ -417,6 +417,7 @@
       }
       return false;
     };
+    s.pointerSig = function () { return off; };             // Zeiger-Scroll-Sperre (N.pointer)
     s.relabel = function () { buildKeys(); U.setText(recentHeadT, N.t('search.recent')); for (var i = 0; i < slots.length; i++) if (slots[i].model) slots[i].relabel(); };
     return s;
   }; }

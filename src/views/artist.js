@@ -3,23 +3,23 @@
  * Darunter angeschnitten (y 580) die Reihe Alben/Buecher (quadratische Karten, N.ui.Row 'sq'), dann "Beliebte Titel" (PopularLeaves).
  * params: {it: {rk, type:'artist', title, thumb, lib}} */
 (function (N) {
-  var U = N.util, M = N.model, MU = N.music, F = N.fmt, PEEK = 580, POP_Y = PEEK + 316;
+  var U = N.util, M = N.model, MU = N.music, F = N.fmt, MINI_ROOM = 2, PEEK = 580, POP_Y = PEEK + 316;
 
   N.router.define('artist', function (params) {
     var it0 = params.it || {}, book = MU.isBookItem(it0);
     var s = { rail: it0.lib ? 'lib-' + it0.lib : N.ui.rail && N.ui.rail.cur || 'home', wheelKeys: ['LEFT', 'RIGHT'] };
     var root, hero, pg, bar, btns = [], bdefs = [], btnRects = null, row, popHead, pop, ring, sb;
-    var meta = null, albums = [], popular = [], zone = 'btn', bf = 0, off = 0, gen = 0, tasks = [], dead = false, away = false, onTrack = null;
+    var meta = null, albums = [], popular = [], zone = 'btn', bf = 0, off = 0, gen = 0, tasks = [], dead = false, away = false, onTrack = null, onMini = null;
 
     s.create = function (el) {
       root = el;
-      hero = new N.ui.DetHero(root, { square: true });
+      hero = new N.ui.DetHero(root, { square: true, scrim: 'scrim-np.png' });   // Kuenstlerfotos oft hell (F24)
       pg = U.el('div', 'pg', root);
       bar = U.el('div', 'd-btns', pg);
       row = new N.ui.Row(pg, { captions: function () { return true; } });
       row.setTop(PEEK);
       popHead = U.el('div', 'tl-head t-h2 ell', pg, 'top:' + POP_Y + 'px;display:none'); popHead.appendChild(document.createTextNode(''));
-      pop = new N.ui.TrackList(pg, { x: 144, y: POP_Y + 44, w: 992, vis: 7, row: popRow });
+      pop = new N.ui.TrackList(pg, { x: 144, y: POP_Y + 44, w: 992, vis: 7, full: 6, row: popRow });   // 7. Zeile nur angeschnitten
       hero.makeInfo(root);
       var fade = U.el('img', 'fade', root); fade.src = N.assetBase + 'fade-bottom.png';
       ring = new N.ui.Ring(root);
@@ -29,6 +29,8 @@
       buildButtons();
       onTrack = function () { if (!dead) { var c = N.audio.core(); pop.setCurrent(c && c.item ? c.item.rk : ''); } };
       N.evt.on('audio:track', onTrack);
+      onMini = function (on) { pop.setRoom(on ? MINI_ROOM : 0); };   // letzte Titel ueber dem Mini-Player lesbar (F26)
+      onMini(N.ui.mini && N.ui.mini.on); N.evt.on('mini:vis', onMini);
     };
     function track(t) { tasks.push(t); return t; }
     function kinds() { var hc = N.session.homeCache(); return N.hubs.libKinds(hc && (hc.alibs || hc.libs) || []); }
@@ -144,7 +146,7 @@
     s.destroy = function () {
       dead = true; gen++;
       for (var i = 0; i < tasks.length; i++) if (tasks[i]) tasks[i].abort();
-      N.evt.off('audio:track', onTrack);
+      N.evt.off('audio:track', onTrack); N.evt.off('mini:vis', onMini);
       row.clear(); pop.clear(); hero.destroy();
     };
     s.railBlur = function () { leave(); };
@@ -199,15 +201,23 @@
         if (kind === 'click') MU.open(row.item(h));
         return true;
       }
-      if (popular.length && x >= 144 && x < 1136 && y < 632) {
-        var j = pop.hit(py - POP_Y - 44); if (j < 0) return false;
+      if (popular.length && x >= 144 && x < 1136 && y < 656) {
+        var ez = s.pointerEdge(x, y);
+        if (ez) { if (kind === 'click') s.pointerScroll(ez.d); return true; }   // Randzone: rollt, fokussiert nicht
+        var j = pop.hit(py - POP_Y - 44); if (j < 0 || j - pop.sc >= pop.use()) return false;
         if (zone !== 'pop') to('pop');
-        if (j !== pop.f) pop.focusTo(j);
+        if (j !== pop.f) pop.focusTo(j, true);                // still: Liste rollt nicht unter dem Punkt
         if (kind === 'click') playPop(j);
         return true;
       }
       return false;
     };
+    s.pointerSig = function () { return off + ',' + pop.sc; };   // Zeiger-Scroll-Sperre (N.pointer)
+    s.pointerEdge = function (x, y) {                       // Randzonen "Beliebte Titel" wie auf der Albumseite
+      if (sb.on || zone !== 'pop' || x < 144 || x >= 1136) return null;
+      return N.ui.TrackList.edge(pop, POP_Y + 44 - off, x, y);
+    };
+    s.pointerScroll = function (d) { pop.scrollBy(d); };
     s.relabel = function () { paint(); buildButtons(); row.relabel(); };
     return s;
   });

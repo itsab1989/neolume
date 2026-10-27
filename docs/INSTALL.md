@@ -173,7 +173,6 @@ If it is not found, see [Server not found](#server-not-found).
 ### 5.3 Check the profiles
 All profiles of your Plex Home are listed and ticked. Each profile gets its own access to your server – with its own
 libraries and its own watched status.
-- **Friends** (people you share your server with outside Plex Home) are off by default.
 - A profile shows **no access**? In Plex (web app), open **Settings → Users & Sharing**, share your server with that
   profile, then click **Back** on the setup page and choose the server again.
 

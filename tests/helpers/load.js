@@ -35,7 +35,7 @@ function load(opts) {
     ctx.setInterval = function () { return 0; }; ctx.clearInterval = function () {};
     var RealDate = Date;
     ctx.Date = function (v) { return arguments.length ? new RealDate(v) : new RealDate(T.now()); };
-    ctx.Date.now = T.now;
+    ctx.Date.now = T.now; ctx.Date.UTC = RealDate.UTC; ctx.Date.parse = RealDate.parse;
   } else {
     ctx.setTimeout = setTimeout; ctx.clearTimeout = clearTimeout; ctx.setInterval = setInterval; ctx.clearInterval = clearInterval;
   }
@@ -60,6 +60,7 @@ function FakeXHR(script) {
     log.active++; log.maxActive = Math.max(log.maxActive, log.active);
     var r = script(this.method, this.url, log.opened.length, this);
     if (!r || r.hang) return;                        // haengt -> Timeout
+    self._hdrs = r.headers || null;                  // optionale Antwortkoepfe (z. B. Date fuer core/clock.js)
     (r.timers || { setTimeout: setTimeout }).setTimeout(function () { self._respond(r.status, r.body); }, r.delay || 0);
   };
   X.prototype._respond = function (status, body) {
@@ -68,6 +69,7 @@ function FakeXHR(script) {
     this.readyState = 4; this.status = status; this.responseText = typeof body === 'string' ? body : JSON.stringify(body);
     if (this.onreadystatechange) this.onreadystatechange();
   };
+  X.prototype.getResponseHeader = function (k) { return this.readyState >= 2 && this._hdrs && this._hdrs[k] !== undefined ? this._hdrs[k] : null; };
   X.prototype.abort = function () { if (!this._done) { this._done = true; log.active--; log.aborted++; } };
   return { factory: function () { return new X(); }, log: log };
 }

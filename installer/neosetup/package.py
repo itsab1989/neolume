@@ -147,7 +147,8 @@ def app_version(entries):
 
 
 def make_config(client_id, server, uri_list, profiles, computer_ip=None, update_port=None, now=None, reset_pins=False, helper=None):
-    """setup.json content (schema 1, see installer/README.md). Only profiles with include=True and a token.
+    """setup.json content (schema 1, see installer/README.md). Only profiles with include=True and a token,
+    and only the owner and Plex Home users (shared accounts outside Plex Home are never written).
     reset_pins: checkbox "Reset app PINs" -> the app deletes all app PINs once for this setup (otherwise they are kept)."""
     now = now or datetime.datetime.now(datetime.timezone.utc)
     cfg = {
@@ -160,7 +161,7 @@ def make_config(client_id, server, uri_list, profiles, computer_ip=None, update_
         'profiles': [{'id': p['id'], 'uuid': p.get('uuid', ''), 'title': p['title'], 'thumb': p.get('thumb', ''),
                       'kind': p['kind'], 'restricted': bool(p.get('restricted')),
                       'restrictionProfile': p.get('restrictionProfile', ''), 'token': p['token']}
-                     for p in profiles if p.get('include') and p.get('token')],
+                     for p in profiles if p.get('include') and p.get('token') and p.get('kind') in ('owner', 'home')],   # never friends
         'computer': {'address': computer_ip, 'updatePort': update_port} if computer_ip else None,
     }
     if reset_pins: cfg['resetAppPins'] = True

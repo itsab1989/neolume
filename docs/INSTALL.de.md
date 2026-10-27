@@ -131,7 +131,6 @@ Wird er nicht gefunden: Läuft der Server? Ist der Computer im selben Netz? Sieh
 
 ### 6.3 Profile prüfen
 Alle Profile deines Plex Home erscheinen mit Haken. Jedes Profil bekommt einen eigenen Zugang zu deinem Server – mit eigenen Bibliotheken und eigenem Gesehen-Status.
-- **Freunde** (geteilte Server außerhalb von Plex Home) sind standardmäßig aus.
 - Steht bei einem Profil „kein Zugang“: in Plex unter *Einstellungen → Benutzer & Freigaben / Settings → Users & Sharing* den Server für dieses Profil freigeben, dann **Zurück** und den Server erneut wählen.
 
 ### 6.4 Profile wählen und weitere Apps eintragen

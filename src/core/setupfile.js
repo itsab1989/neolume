@@ -3,11 +3,13 @@
  * Ist sie da und gueltig, arbeitet die App im Alltag NUR mit dem PMS (kein plex.tv, kein Proxy): Server-Adresse, machineId,
  * Profile mit server-gebundenem Token je Profil. Tokens bleiben im Paket und im Speicher, sie werden nie in den Store geschrieben.
  * Fehlt sie (Entwicklungs-Paket von tools/dev.py), gilt der alte Ablauf mit plex.tv-PIN-Anmeldung ueber den Proxy.
- * parse(text) -> {ok:true, cfg} | {ok:false, reason}. reason: json|kind|newer|schema|server|uri|profiles|profile|token|dup|owner
+ * parse(text) -> {ok:true, cfg} | {ok:false, reason}. reason: json|kind|newer|schema|server|uri|profiles|profile|token|dup|owner|friend
+ * Freigabe-Konten ausserhalb von Plex Home ("Freunde", kind 'friend' bzw. uuid 'friend-<id>') legte ein aelteres Einrichtungsprogramm
+ * mit an; die App uebernimmt sie nicht mehr (Nutzerentscheidung 27.10.): uebersprungen mit Grund 'friend', Token bleibt ungenutzt.
  * App-PINs gehoeren zum Server (machineIdentifier) und bleiben bei erneuter Einrichtung erhalten; "resetAppPins": true (Kaestchen
  * "App-PINs zuruecksetzen" im Einrichtungsprogramm) loescht sie einmal je Einrichtung (createdAt), Weg bei vergessener Hauptprofil-PIN. */
 (function (N) {
-  var RP = { '': 1, little_kid: 1, older_kid: 1, teen: 1 }, KINDS = { owner: 1, home: 1, friend: 1 };
+  var RP = { '': 1, little_kid: 1, older_kid: 1, teen: 1 }, KINDS = { owner: 1, home: 1 };
   var TOKEN = /^[A-Za-z0-9_.~\-]{8,256}$/, MID = /^[A-Za-z0-9\-]{8,128}$/, UUID = /^[A-Za-z0-9\-]{1,64}$/, CID = /^[A-Za-z0-9._\-]{1,128}$/;
 
   /* nur private IPv4-Adressen im Heimnetz (RFC 1918 + Link-Local, dazu Loopback = das Geraet selbst; Vorschau/Tests):
@@ -46,6 +48,7 @@
     var profiles = [], seen = {}, owners = 0, skipped = [];
     for (i = 0; i < d.profiles.length; i++) {
       var p = d.profiles[i];
+      if (p && typeof p === 'object' && (p.kind === 'friend' || (typeof p.uuid === 'string' && p.uuid.indexOf('friend-') === 0))) { skipped.push('friend'); continue; }
       // fehlerhaftes einzelnes Profil ueberspringen statt die ganze Einrichtung zu verwerfen (TV-Test 27.10.: Freund ohne uuid)
       if (!p || typeof p !== 'object' || typeof p.uuid !== 'string' || !UUID.test(p.uuid) || !KINDS[p.kind] || !str(p.title, 64)) { skipped.push('profile'); continue; }
       if (typeof p.token !== 'string' || !TOKEN.test(p.token)) { skipped.push('token'); continue; }
@@ -89,9 +92,26 @@
    * cb(cfg|null, reason|null): keine Datei -> (null, null); ungueltig -> (null, reason). Nie laenger als ~2 s.
    * P7 27.10.: am TV kostete der erste Start hier 538–646 ms (spaeter ~20 ms). Die Anfrage startet deshalb schon beim Auswerten
    * von app.js (prefetch, Modul steht frueh im Manifest) und laeuft parallel zum restlichen Skript; read() haengt sich an.
-   * timing: {io: Senden->Antwort, early: Vorlauf vor read(), gap: groesste Hauptthread-Luecke waehrend des Wartens} fuers Protokoll. */
-  var pre = null, timing = null;
+   * timing: {io: Senden->Antwort, early: Vorlauf vor read(), gap: groesste Hauptthread-Luecke waehrend des Wartens,
+   * show: Dauer des onShow-Blocks des Laders, falls er ins Warten fiel, sonst -1} fuers Protokoll. */
+  var pre = null, timing = null, shown = null;
   function now() { return new Date().getTime(); }
+  /* TV-Befund 27.10. nachmittags ("setup 506 … warten 500, luecke 500" statt 19): der Lader setzt window.onShow = registerKeys
+   * (21x registKey + 3x unregistKey + SetBannerState, synchrone Plugin-Aufrufe, am TV ~500 ms). Kommt app.js schneller als das
+   * onShow-Ereignis (Dev-Server ~270 ms statt ~900 ms), faellt dieser Block genau in das Warten auf setup.json. Kein Fehler der
+   * App und keine Regression; damit das Protokoll es zeigt, misst eine Huelle um onShow die Dauer (Verhalten unveraendert). */
+  function watchShow() {
+    if (typeof window === 'undefined' || !window.Boot) return;
+    var f = window.onShow;
+    if (typeof f !== 'function' || f._pnWatch) return;
+    var w = function () {
+      var t = now();
+      try { return f.apply(this, arguments); }
+      finally { shown = { at: t, ms: now() - t }; try { if (N.log) N.log('onShow (Tasten registrieren) ' + shown.ms + ' ms'); } catch (e) {} }
+    };
+    w._pnWatch = true;
+    window.onShow = w;
+  }
   function xhrText(factory, fin) {
     var x, ended = false, t;
     function end(text) { if (ended) return; ended = true; clearTimeout(t); if (x) x.onreadystatechange = null; fin(text); }
@@ -131,7 +151,7 @@
       if (fin) return; fin = true;
       if (hb) clearTimeout(hb);
       var t = now(); if (t - last > gap) gap = t - last;
-      timing = { io: t1 - t0, early: Math.max(0, tr - t0), gap: gap, wait: t - tr };
+      timing = { io: t1 - t0, early: Math.max(0, tr - t0), gap: gap, wait: t - tr, show: shown && shown.at >= tr ? shown.ms : -1 };   // show: onShow-Block im Warten
       done(text);
     }
     if (!factory && pre) {
@@ -144,6 +164,7 @@
     xhrText(factory, function (text) { got(text, tr, now()); });
   }
   prefetch();
+  watchShow();
 
-  N.setupFile = { parse: parse, users: users, read: read, lanUri: lanUri, timing: function () { return timing; } };
+  N.setupFile = { parse: parse, users: users, read: read, lanUri: lanUri, timing: function () { return timing; }, _watchShow: watchShow };
 })(N);

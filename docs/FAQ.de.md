@@ -48,6 +48,9 @@ Ja, alle bei der Einrichtung gewählten Plex-Home-Profile. Jedes Profil sieht nu
 ### Warum wird meine Plex-PIN nicht abgefragt?
 Ohne plex.tv kann der Fernseher die Plex-PIN nicht prüfen. Stattdessen kann jedes Profil in Neolume eine eigene **App-PIN** bekommen. Gespeichert wird nur ein gesalzener Hash.
 
+### Kann ich die Farben ändern?
+Ja. Unter **Einstellungen → Oberfläche → Akzentfarbe** stehen sieben Farben für Fokus, Knöpfe und Fortschrittsbalken zur Wahl: Türkis (Standard), Bernstein, Koralle, Rosé, Lavendel, Himmelblau und Mintgrün. Die Wahl gilt je Profil und wirkt sofort. Alle Farben sind auf guten Kontrast geprüft (mindestens 4,5:1 für Schrift auf der Farbe und für die Farbe auf dem dunklen Hintergrund).
+
 ### Was passiert mit meinen anderen selbst installierten Apps?
 Der Fernseher entfernt beim Sync **alle selbst installierten Apps, die nicht in der Liste stehen**. Trage sie im Einrichtungsprogramm unter *Erweitert* ein. Apps aus dem Samsung-Store sind nicht betroffen.
 

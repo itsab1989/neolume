@@ -22,6 +22,51 @@ test('URL in exakter Groesse mit Profil-Token, Pfad kodiert', function () {
   assert.strictEqual(N.img.url('', 'poster'), '');
 });
 
+test('Hintergrund (N.img.bg): Art scharf, ohne Art Poster/Cover unscharf vom Server, Einstellung aus -> keins (TV 27.10.)', function () {
+  var N = setup().N, M = N.model;
+  function q(u) { var o = {}; u.split('?')[1].split('&').forEach(function (kv) { var p = kv.split('='); o[p[0]] = decodeURIComponent(p[1]); }); return o; }
+  // Film mit Art: 1280x720 scharf
+  var b = N.img.bg('/library/metadata/1/art/9', '/library/metadata/1/thumb/9');
+  assert.strictEqual(b.soft, false);
+  H.eq([q(b.url).width, q(b.url).height, q(b.url).url, 'blur' in q(b.url)], ['1280', '720', '/library/metadata/1/art/9', false]);
+  // frisch hinzugefuegter Film ohne Art: Poster nativ 1280 breit (minSize: PMS liefert 1280x1850), maessiger blur + quality vom Server
+  var mv = M.norm({ ratingKey: 2, type: 'movie', title: 'Neu', thumb: '/library/metadata/2/thumb/1' });
+  b = N.img.bg(mv.art, mv.thumb);
+  assert.strictEqual(b.soft, true);
+  H.eq([q(b.url).width, q(b.url).height, q(b.url).minSize, q(b.url).blur, q(b.url).quality, q(b.url).url], ['1280', '720', '1', '12', '90', '/library/metadata/2/thumb/1']);
+  // Folge ohne Serien-Art: Serienposter (nicht das Folgenbild -> kein Spoiler, ruhiger)
+  var ep = M.norm({ ratingKey: 3, type: 'episode', grandparentTitle: 'S', title: 'E', thumb: '/library/metadata/3/thumb/1', grandparentThumb: '/library/metadata/30/thumb/1' });
+  assert.strictEqual(q(N.img.bg(ep.art, ep.thumb).url).url, '/library/metadata/30/thumb/1');
+  // Folge mit Serien-Art: die Art
+  ep = M.norm({ ratingKey: 4, type: 'episode', title: 'E', grandparentArt: '/library/metadata/30/art/1', grandparentThumb: '/library/metadata/30/thumb/1' });
+  assert.strictEqual(N.img.bg(ep.art, ep.thumb).soft, false);
+  // Track ohne Art: Albumcover
+  var tr = M.norm({ ratingKey: 5, type: 'track', title: 'T', thumb: '/t/track', parentThumb: '/library/metadata/50/thumb/1' });
+  assert.strictEqual(q(N.img.bg(tr.art, tr.thumb).url).url, '/library/metadata/50/thumb/1');
+  // gar kein Bild
+  assert.strictEqual(N.img.bg('', ''), null);
+  // Einstellung "Hintergrundbilder" aus: weder Art noch Ersatz
+  N.session.settings = { backgrounds: false };
+  assert.strictEqual(N.img.bg('/a', '/t'), null);
+  N.session.settings = { backgrounds: true };
+  assert.ok(N.img.bg('/a', '/t'));
+});
+
+test('Hintergrund: unscharfes Poster mittig auf 1280x720 beschnitten, nie verzerrt; Art auf CSS-Groesse zurueck', function () {
+  var N = setup().N;
+  H.eq(N.img.cover(1280, 1850, 1280, 720), { x: 0, y: -565, w: 1280, h: 1850 });  // Poster 2:3 (PMS-Antwort gemessen): 1:1, nur verschoben
+  H.eq(N.img.cover(640, 925, 1280, 720), { x: 0, y: -565, w: 1280, h: 1850 });
+  H.eq(N.img.cover(640, 640, 1280, 720), { x: 0, y: -280, w: 1280, h: 1280 });   // Albumcover
+  H.eq(N.img.cover(640, 360, 1280, 720), { x: 0, y: 0, w: 1280, h: 720 });       // 16:9
+  H.eq(N.img.cover(1000, 360, 1280, 720), { x: -360, y: 0, w: 2000, h: 720 });   // breiter als 16:9
+  H.eq(N.img.cover(0, 0, 1280, 720), { x: 0, y: 0, w: 1280, h: 720 });
+  var img = { naturalWidth: 1280, naturalHeight: 1850, style: {} };
+  N.img.fit(img, true);
+  H.eq(img.style, { left: '0px', top: '-565px', width: '1280px', height: '1850px' });
+  N.img.fit(img, false);
+  H.eq(img.style, { left: '', top: '', width: '', height: '' });
+});
+
 test('Lader: max. 4 gleichzeitig, max. 2 neue src pro Frame, LRU-Treffer sofort', function () {
   var s = setup(), N = s.N, T = s.T, imgs = [];
   for (var i = 0; i < 10; i++) { imgs.push(new Img()); N.img.want(imgs[i], 'http://pms/' + i, 0); }

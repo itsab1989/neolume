@@ -1,5 +1,5 @@
 /* N.ui.Hero – Hero-Bereich der Startseite (SPEC 5.6):
- * 2 feste <img> im Wechsel (1280x720, am TV gemessen) + EIN Scrim-PNG, beide ohne translate3d.
+ * 2 feste <img> im Wechsel (1280x720, am TV gemessen; ohne Art das Poster unscharf vom Server) + EIN Scrim-PNG, beide ohne translate3d.
  * Textblock als Dauer-Ebene, Wechsel nach 300 ms Fokus-Ruhe (Aufrufer), Opacity 0 -> 1 in 120 ms.
  * Tausch-Gate: Bild laedt ins versteckte <img>; sichtbar wird es nur, wenn seit >= 300 ms keine Taste kam, allein in einem Frame. */
 (function (N) {
@@ -46,11 +46,11 @@
     } else if (it && it.type === 'movie' && prog > 0) {
       U.setText(this.ep, '');
       U.show(this.mp, true); this.mpI.style.width = Math.round(160 * prog) + 'px';
-      U.setText(this.mt, N.t('home.hero.movieLeft', { time: N.fmt.dur(M.remaining(it)), clock: N.fmt.clock(new Date(U.now() + M.remaining(it))) }));
+      U.setText(this.mt, N.t('home.hero.movieLeft', { time: N.fmt.dur(M.remaining(it)), clock: N.fmt.clock(new Date(N.clock.now() + M.remaining(it))) }));
     } else { U.setText(this.ep, ''); U.show(this.mp, false); U.setText(this.mt, ''); }
     if (!stripOn) this.strip.render({ mode: 'none' });
     if (U.hasCls(t, 'out')) U.raf(function () { U.cls(t, 'out', false); });
-    this.load(it ? it.art : '');
+    this.load(it);
   };
   Hero.prototype.paintOv = function () { U.setText(this.ov, this.item ? M.overline(this.item) : ''); };
   Hero.prototype.setStrip = function (lay) { this.strip.render(lay); };
@@ -66,9 +66,10 @@
     if (it.rating) parts.push(N.fmt.rating(it.rating));
     return N.fmt.join(parts);
   };
-  Hero.prototype.load = function (path) {
-    var self = this;
-    var url = path && (!N.comfort || N.comfort.backgrounds()) ? N.img.url(path, 'hero') : '';   // set.backgrounds aus: einfarbig
+  /* Hintergrund: Art scharf, ohne Art Poster/Cover unscharf vom Server (N.img.bg); Hintergrundbilder aus: einfarbig */
+  Hero.prototype.load = function (it) {
+    var self = this, b = it ? N.img.bg(it.art, it.thumb) : null;
+    var url = b ? b.url : '', soft = !!(b && b.soft);
     if (url === this.url) return;
     this.url = url;
     var gen = ++this.gen;
@@ -78,11 +79,12 @@
     next.onload = function () {
       next.onload = next.onerror = null;
       if (gen !== self.gen) return;
+      N.img.fit(next, soft);                 // im verdeckten Puffer: unscharfes Poster mittig beschneiden bzw. Art zuruecksetzen
       self._trySwap(gen, next);
     };
     next.onerror = function () { next.onload = next.onerror = null; };
     // Gleiche URL im verdeckten Puffer (z. B. Titel zuvor schon gezeigt): kein neues onload -> direkt tauschen (TV-Befund 26.10.)
-    if (next.src === url && next.complete && next.naturalWidth) { next.onload = next.onerror = null; this._trySwap(gen, next); return; }
+    if (next.src === url && next.complete && next.naturalWidth) { next.onload = next.onerror = null; N.img.fit(next, soft); this._trySwap(gen, next); return; }
     next.src = url;
   };
   Hero.prototype._trySwap = function (gen, next) {
@@ -103,7 +105,7 @@
   Hero.prototype.refresh = function () {
     var self = this, img = this.cur >= 0 ? this.imgs[this.cur] : null;
     if (!this.url) return;
-    if (!img || !img.complete || !img.naturalWidth) { this.url = ''; this.load(this.item ? this.item.art : ''); return; }   // laeuft noch bzw. verworfen
+    if (!img || !img.complete || !img.naturalWidth) { this.url = ''; this.load(this.item); return; }   // laeuft noch bzw. verworfen
     var gen = this.gen;
     U.vis(img, true);
     img.style.opacity = '0.99';

@@ -28,7 +28,7 @@
   Row.prototype._make = function () {
     var e = {}, s = this.strip;
     e.card = U.el('div', 'card card-land', s, 'display:none');
-    e.ph = U.txt('div', 'ph', e.card, '');
+    e.ph = U.txt('div', 'ph', e.card, ''); e.phEl = e.ph.parentNode; e.phc = 'ph';
     e.img = U.el('img', '', e.card);
     e.img.src = N.img.BLANK;
     e.badge = U.el('div', 'bdg', e.card);
@@ -100,6 +100,8 @@
     if (e.x !== x) { e.x = x; e.card.style.left = x; e.cap.style.left = x; }
     var src = land ? it.still : it.thumb;
     U.setText(e.ph, it.title);
+    var phc = !src && g.kind !== 'cast' ? 'ph fb ' + N.ui.fbClass(it) : 'ph';   // ohne Bild: farbige Titelkarte (F28), nie grau
+    if (e.phc !== phc) { e.phc = phc; e.phEl.className = phc; }
     N.img.want(e.img, src ? N.img.url(src, tier) : '', prio);
     var b = M.badge(it), bc = b.b ? 'bdg ' + b.b : 'bdg';
     if (e.bc !== bc) { e.bc = bc; e.badge.className = bc; }

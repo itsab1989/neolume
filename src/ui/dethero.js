@@ -2,7 +2,7 @@
  * Album/Hoerbuch/Kuenstler (M4):
  * Hintergrund (Art 1280x720 scharf + Scrim; ohne Art das Cover unscharf; ohne jedes Bild Farbflaeche je Titel), Cover fest links
  * (blendet in den Abschnitten aus), Info-Block fest (erster Bildschirm unten neben dem Cover, in den Abschnitten oben).
- * square = quadratisches Cover. Elemente werden VOR dem Seiten-Container angelegt, der Info-Block (makeInfo) danach.
+ * square = quadratisches Cover; scrim = andere Abdunklung (Kuenstlerseite: scrim-np.png, Fotos oft hell, F24). Elemente werden VOR dem Seiten-Container angelegt, der Info-Block (makeInfo) danach.
  * Einstellung "Hintergrundbilder" aus (N.comfort.backgrounds): kein Bild, ruhige Farbflaeche je Titel (wie ohne jedes Bild). */
 (function (N) {
   var U = N.util, HERO_X = 208, HERO_Y = 188, REST = 300;
@@ -11,7 +11,7 @@
     this.sq = !!o.square; this.on = true; this.needBg = true; this.dead = false; this.chipEls = [];
     this.bgc = U.el('div', 'full', root, 'display:none');
     this.bg = U.el('img', 'full', root); this.bg.src = N.img.BLANK; this.bg.style.visibility = 'hidden';
-    var scrim = U.el('img', 'full', root); scrim.src = N.assetBase + 'scrim-det.png';   // kraeftiger hinter dem Text (F5/F17)
+    var scrim = U.el('img', 'full', root); scrim.src = N.assetBase + (o.scrim || 'scrim-det.png');   // kraeftiger hinter dem Text (F5/F17; Kuenstler F24)
     this.pc = U.el('div', this.sq ? 'd-poster sq' : 'd-poster', root);
     this.poster = U.el('img', '', this.pc); this.poster.src = N.img.BLANK;
     this.pfb = U.el('div', 'd-pfb', this.pc, 'display:none'); this.pfbT = document.createTextNode(''); this.pfb.appendChild(this.pfbT);
@@ -46,11 +46,12 @@
     if (!path && !thumb) return;
     this.needBg = false;
     if (N.comfort && !N.comfort.backgrounds()) { this.solid(title !== undefined ? title : this.title); return; }
-    var self = this, url = path ? N.img.url(path, 'hero') : N.img.url(thumb, 'backdrop', { blur: 12 });
+    var self = this, b = N.img.bg(path, thumb);    // Art scharf, sonst Cover unscharf (640 breit, blur vom Server, mittig beschnitten)
+    if (!b) return;
     setTimeout(function () {
       if (self.dead) return;
-      self.bg.onload = function () { self.bg.onload = null; if (!self.dead) U.raf(function () { self.bg.style.visibility = 'visible'; }); };
-      self.bg.src = url;
+      self.bg.onload = function () { self.bg.onload = null; if (!self.dead) { N.img.fit(self.bg, b.soft); U.raf(function () { self.bg.style.visibility = 'visible'; }); } };
+      self.bg.src = b.url;
     }, N.idle.restFor() < REST ? REST : 0);
   };
   P.setPoster = function (thumb, title) {

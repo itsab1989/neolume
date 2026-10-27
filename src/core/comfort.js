@@ -31,7 +31,7 @@
           var r = rows[i], pri = r.id === 'cw' || /^new-/.test(String(r.id));
           if (pass === 0 && !pri) continue;
           for (j = 0; r.items && j < r.items.length && out.length < max; j++) {
-            var it = r.items[j], art = it.art || it.still || '';
+            var it = r.items[j], art = it.art || '';   // nur echte Hintergrundbilder (TV 27.10.: Poster als Ersatz = Farbbrei)
             if (!art || seen[art]) continue;
             seen[art] = 1;
             out.push({ art: art, title: it.title || '', sub: it.type === 'episode' ? N.t('ss.saver.ep', { s: it.s, e: it.e }) : '' });
@@ -108,7 +108,8 @@
   /* Standardwerte der P5-Einstellungen (SPEC 10.4); fehlende Werte beim Profilwechsel ergaenzen (Kinderprofil: 1 Std.) */
   C.DEFAULTS = { screensaver: 5, saverBlur: true, clock: true, backgrounds: true, spoiler: false, resumeRewind: 0, passthrough: true, audioBoost: 100,
     stillTime: 2, sleepDefault: 'off', lowerOffer: true, subColor: 'white', subDelay: 0,
-    animeDetect: 'normal', animeShow: true, animeAudio: 'ja', animeSubs: 'deen', animeSigns: false };
+    animeDetect: 'normal', animeShow: true, animeAudio: 'ja', animeSubs: 'deen', animeSigns: false,
+    accent: N.brand.accent };   // Akzentfarbe (N.accent): Standard = Farbe der Marke
   C.applyDefaults = function (st, kid) {
     if (!st) return st;
     for (var k in C.DEFAULTS) if (Object.prototype.hasOwnProperty.call(C.DEFAULTS, k) && st[k] === undefined) st[k] = k === 'stillTime' && kid ? 1 : C.DEFAULTS[k];

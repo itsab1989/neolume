@@ -662,6 +662,7 @@
       }
       return false;
     };
+    s.pointerSig = function () { return off; };             // Zeiger-Scroll-Sperre (N.pointer)
     s.relabel = function () { if (d) buildButtons(d.it); if (seasons.length) buildTabs(); if (infoFor) paintInfo(infoFor); };
     return s;
   });

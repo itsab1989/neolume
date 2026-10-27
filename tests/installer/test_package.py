@@ -15,7 +15,7 @@ SERVER = {'machineIdentifier': H.MID, 'name': 'Home Server'}
 PROFILES = [
     {'id': 1, 'uuid': 'u-owner', 'title': 'Owner', 'thumb': '', 'kind': 'owner', 'restricted': False, 'token': H.OWNER_TOK, 'include': True},
     {'id': 2, 'uuid': 'u-kid', 'title': 'Kid', 'thumb': '', 'kind': 'home', 'restricted': True, 'restrictionProfile': 'little_kid', 'token': H.KID_TOK, 'include': True},
-    {'id': 77, 'uuid': '', 'title': 'buddy', 'thumb': '', 'kind': 'friend', 'restricted': False, 'token': H.FRIEND_TOK, 'include': False},
+    {'id': 77, 'uuid': 'friend-77', 'title': 'buddy', 'thumb': '', 'kind': 'friend', 'restricted': False, 'token': H.FRIEND_TOK, 'include': True},
     {'id': 4, 'uuid': 'u-new', 'title': 'NoShare', 'thumb': '', 'kind': 'home', 'restricted': False, 'token': None, 'include': True},
 ]
 
@@ -32,7 +32,8 @@ class Config(unittest.TestCase):
         self.assertEqual(c['kind'], 'plexneo-setup')
         self.assertEqual(c['createdAt'], '2026-10-26T12:00:00Z')
         self.assertEqual(c['server'], {'machineIdentifier': H.MID, 'name': 'Home Server', 'uris': ['http://192.0.2.20:32400']})
-        self.assertEqual([p['title'] for p in c['profiles']], ['Owner', 'Kid'])    # excluded + tokenless dropped
+        self.assertEqual([p['title'] for p in c['profiles']], ['Owner', 'Kid'])    # friend (even if included) + tokenless dropped
+        self.assertNotIn(H.FRIEND_TOK, json.dumps(c))
         self.assertEqual(c['profiles'][1]['token'], H.KID_TOK)
         self.assertEqual(c['profiles'][1]['restrictionProfile'], 'little_kid')
         self.assertEqual(c['computer'], {'address': '192.0.2.10', 'updatePort': 32499})

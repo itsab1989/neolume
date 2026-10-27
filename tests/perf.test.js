@@ -135,6 +135,28 @@ test('setup.json: read() meldet io/vorab/warten/luecke fuers Startprotokoll', fu
   assert.ok(t.gap >= 10 && t.gap <= 15, 'Herzschlag alle 10 ms: ' + t.gap);
 });
 
+test('setup.json: onShow-Block des Laders (registKey) im Warten wird als "davon onShow" gemessen (TV 27.10.: luecke 500)', function () {
+  var ctx = H.load({ fakeTimers: true }), N = ctx.N, T = ctx.timers, x = null, calls = 0, logs = [];
+  function X() { x = this; } X.prototype.open = function () {}; X.prototype.send = function () {};
+  ctx.Boot = {}; ctx.onShow = function () { calls++; T.tick(480); };   // Lader: window.onShow = registerKeys (blockiert)
+  N.log = function (m) { logs.push(m); };
+  N.setupFile._watchShow(); N.setupFile._watchShow();                  // zweimal: keine doppelte Huelle
+  N.setupFile.read({}, function () {}, function () { return new X(); });
+  T.tick(5);
+  ctx.onShow();                                                        // Plattform ruft onShow waehrend des Wartens
+  assert.strictEqual(calls, 1);
+  x.readyState = 4; x.status = 404; x.responseText = ''; x.onreadystatechange();
+  var t = N.setupFile.timing();
+  assert.strictEqual(t.show, 480);
+  assert.deepStrictEqual(logs, ['onShow (Tasten registrieren) 480 ms']);
+  // ohne onShow im Warten: -1
+  var c2 = H.load({ fakeTimers: true }), y = null;
+  function Y() { y = this; } Y.prototype.open = function () {}; Y.prototype.send = function () {};
+  c2.N.setupFile.read({}, function () {}, function () { return new Y(); });
+  c2.timers.tick(20); y.readyState = 4; y.status = 404; y.onreadystatechange();
+  assert.strictEqual(c2.N.setupFile.timing().show, -1);
+});
+
 test('Raster: ankommende Seite (refresh) fuellt sichtbare Zeilen sofort, Puffer in Haeppchen', function () {
   var s = setup(), N = s.N, G = N.GridMath.make('S'), g = new N.ui.Grid(s.doc.createElement('div'));
   var sparse = s.items.slice(0, 18);                                   // nur 2 Zeilen geladen, Gesamtzahl 200

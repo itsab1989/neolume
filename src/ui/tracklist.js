@@ -2,14 +2,14 @@
  * EIN translate3d an der Liste; Fokus-Anker: ab der 3. sichtbaren Zeile bleibt der Fokus stehen und die Liste rollt.
  * Pro Fokusschritt nur alte + neue Zeile umklassen, kein innerHTML, keine Geometrie-Abfragen.
  * Zeile: Nummer (bzw. Ton-Symbol beim laufenden Titel) · Titel · Unterzeile · Dauer rechts · optional Fortschritt (Hoerbuch).
- * opts: {x, y, w, vis (sichtbare Zeilen), row(it, i) -> {n, t, s, d, p (0..1), done}} */
+ * opts: {x, y, w, vis (sichtbare Zeilen), row(it, i) -> {n, t, s, d, p (0..1), done}}; setRoom(k): k Zeilen unten frei (Mini-Player) */
 (function (N) {
   var U = N.util, H = 56;
   function TrackList(parent, opts) {
-    this.o = opts; this.vis = opts.vis || 6; this.poolN = this.vis + 4;
+    this.o = opts; this.vis = opts.vis || 6; this.full = opts.full || this.vis; this.poolN = this.vis + 4;
     this.clip = U.el('div', 'tl-clip', parent, 'left:' + opts.x + 'px;top:' + opts.y + 'px;width:' + opts.w + 'px;height:' + (this.vis * H) + 'px');
     this.list = U.el('div', 'tl-list', this.clip);
-    this.pool = []; this.items = []; this.f = 0; this.sc = 0; this.byIdx = {}; this.focused = false; this.cur = '';
+    this.pool = []; this.items = []; this.f = 0; this.sc = 0; this.byIdx = {}; this.focused = false; this.cur = ''; this.room = 0;
     for (var i = 0; i < this.poolN; i++) {
       var e = { r: U.el('div', 'tl-row', this.list, 'display:none;width:' + opts.w + 'px') };
       e.nEl = U.el('div', 'tl-n', e.r); e.n = document.createTextNode(''); e.nEl.appendChild(e.n); e.ic = N.ui.icon(e.r, 'audio', '', 'left:8px;top:12px;display:none');
@@ -21,12 +21,24 @@
   }
   var T = TrackList.prototype;
   T.count = function () { return this.items.length; };
+  /* Zeilen, die Fokus bekommen duerfen: ganz sichtbar (opts.full, ueber dem Ausblend-Band) und nicht unter dem Mini-Player.
+   * Die Zeile darunter wird nur angeschnitten gezeigt (TV-Befund 27.10.: Fokus dort ragte in Band und Hinweisleiste) */
+  T.use = function () { return Math.max(1, Math.min(this.full, this.vis - this.room)); };
   T.item = function (i) { return this.items[i] || null; };
   /* Scroll-Index nach der Anker-Regel */
+  /* Zeiger-Randzonen (TV-Befund 27.10. nachmittags): oben 32 px ueber der ersten Zeile, unten ab der ersten nicht fokussierbaren
+   * (angeschnittenen) Zeile bis zur Hinweisleiste (y 656). top = Bildschirm-y der ersten sichtbaren Zeile. -> {d, x, y} | null */
+  TrackList.edge = function (tl, top, x, y) {
+    if (x < tl.o.x || x >= tl.o.x + tl.o.w) return null;
+    var cx = tl.o.x + tl.o.w / 2, b = top + tl.use() * H;
+    if (y >= top - 32 && y < top && tl.canScroll(-1)) return { d: -1, x: cx, y: top - 16 };
+    if (y >= Math.min(b, 604) && y < 656 && tl.canScroll(1)) return { d: 1, x: cx, y: 628 };   // Band mind. 52 px ueber der Hinweisleiste
+    return null;
+  };
   TrackList.scroll = function (n, f, vis) { return Math.max(0, Math.min(f - 2, n - vis)); };
   T.setItems = function (items, f) {
     this.items = items || []; this.f = U.clamp(f || 0, 0, Math.max(0, this.items.length - 1));
-    this.sc = TrackList.scroll(this.items.length, this.f, this.vis);
+    this.sc = TrackList.scroll(this.items.length, this.f, this.use());
     for (var i = 0; i < this.poolN; i++) this._free(this.pool[i]);
     this.byIdx = {};
     this.list.style.webkitTransition = 'none'; U.tf(this.list, 0, -this.sc * H);
@@ -60,11 +72,13 @@
   T.refresh = function () { for (var k in this.byIdx) this._fill(this.byIdx[k], Number(k)); };
   /* laufender Titel (rk) markieren */
   T.setCurrent = function (rk) { if (rk === this.cur) return; this.cur = rk || ''; this.refresh(); };
-  T.focusTo = function (i) {
+  /* still (Zeiger): sichtbare Zeile -> Liste bleibt stehen (keine Rueckkopplung Hover -> Rollen -> Hover) */
+  T.focusTo = function (i, still) {
     var n = this.items.length;
     if (!n) return;
     i = U.clamp(i, 0, n - 1);
-    var old = this.byIdx[this.f], sc = TrackList.scroll(n, i, this.vis);
+    var keep = still && i >= this.sc && i < this.sc + this.use();
+    var old = this.byIdx[this.f], sc = keep ? this.sc : TrackList.scroll(n, i, this.use());
     this.f = i;
     if (sc !== this.sc) { this.sc = sc; this.render(); N.fx.move(this.list); U.tf(this.list, 0, -sc * H); }
     var cur = this.byIdx[i];
@@ -72,6 +86,25 @@
       if (old && old !== cur && old.foc) { U.cls(old.r, 'is-focus', false); old.foc = false; }
       if (cur && !cur.foc) { U.cls(cur.r, 'is-focus', true); cur.foc = true; }
     }
+  };
+  /* Zeiger-Randzone: eine Zeile rollen, Fokus bleibt im sichtbaren Bereich */
+  T.canScroll = function (d) { var v = this.use(); return d < 0 ? this.sc > 0 : this.sc < this.items.length - v; };
+  T.scrollBy = function (d) {
+    var n = this.items.length, v = this.use(), sc = U.clamp(this.sc + d, 0, Math.max(0, n - v));
+    if (sc === this.sc) return;
+    this.sc = sc; this.render(); N.fx.move(this.list); U.tf(this.list, 0, -sc * H);
+    var f = U.clamp(this.f, sc, Math.min(n - 1, sc + v - 1));
+    if (f !== this.f) {
+      var old = this.byIdx[this.f]; this.f = f;
+      if (this.focused) { if (old && old.foc) { U.cls(old.r, 'is-focus', false); old.foc = false; } var cur = this.byIdx[f]; if (cur && !cur.foc) { U.cls(cur.r, 'is-focus', true); cur.foc = true; } }
+    }
+  };
+  /* Platz unten frei halten (k Zeilen, z. B. unter dem Mini-Player, F26): die letzten Eintraege rollen entsprechend hoeher */
+  T.setRoom = function (k) {
+    if (k === this.room) return;
+    this.room = k;
+    var sc = TrackList.scroll(this.items.length, this.f, this.use());
+    if (sc !== this.sc) { this.sc = sc; this.render(); N.fx.move(this.list); U.tf(this.list, 0, -sc * H); }
   };
   T.setFocused = function (on) {
     this.focused = on;

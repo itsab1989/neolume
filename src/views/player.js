@@ -10,7 +10,7 @@
  * - Gelb Kapitel, Blau Sleep-Timer, INFO Technik, Gruen/SUBTITLE Ton & UT. Zeiger: Bewegung zeigt das OSD, alles anklickbar.
  * N.player.play(item, how) ist der Einstieg (Fortsetzen-Frage nach Einstellung). */
 (function (N) {
-  var U = N.util, F = N.fmt, O = N.osd, BAR_X = 96, BAR_W = 1088, BAR_Y = 583, OSD_MS = 5000, START_MS = 3000, MH_Y = 594;
+  var U = N.util, F = N.fmt, O = N.osd, BAR_X = 96, BAR_W = 1088, BAR_Y = O.BAR_Y, OSD_MS = 5000, START_MS = 3000, MH_Y = 650, MH_H = 40, SKIP_Y = 398;
   function hms(ms) {
     var s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60;
     return (h ? h + ':' + U.pad2(m) : m) + ':' + U.pad2(s % 60);
@@ -53,7 +53,7 @@
       tm0 = U.txt('div', 'pl-tm0', bot, ''); tm1 = U.txt('div', 'pl-tm1', bot, '');
       skl = U.txt('div', 'pl-skl', bot, '');
       chn = U.txt('div', 'pl-chn ell', bot, '');
-      mh = U.el('div', 'pl-mh', bot, 'display:none');                   // Mini-Hinweisleiste in der Pause (SPEC 7.10)
+      mh = U.el('div', 'pl-isl pl-mh', root, 'display:none');           // Mini-Hinweisleiste in der Pause (SPEC 7.10): eigene Insel unter der Bedien-Insel
       for (var i = 0; i < 4; i++) {
         var e = { root: U.el('span', 'hint', mh) };
         e.k = U.el('span', 'k', e.root); e.kT = document.createTextNode(''); e.k.appendChild(e.kT);
@@ -61,7 +61,7 @@
         mhItems.push(e);
       }
       for (i = 0; i < O.BTNS.length; i++) {
-        var b = O.BTNS[i], be = U.el('div', 'pl-b' + (b.w > 48 ? ' lg' : ''), bot, 'left:' + b.x + 'px;top:' + b.y + 'px');
+        var b = O.BTNS[i], be = U.el('div', 'pl-b' + (b.w > 48 ? ' lg' : ''), bot, 'left:' + b.x + 'px;top:' + b.y + 'px');   // Groesse per CSS (.pl-b / .pl-b.lg)
         if (b.id === 'back' || b.id === 'fwd') { var nm = U.txt('div', 'num', be, ''); if (b.id === 'back') numB = nm; else numF = nm; }
         else { var ic = N.ui.icon(be, { pp: 'pause', next: 'next', chap: 'chapters', tracks: 'audio', more: 'more' }[b.id]); if (b.id === 'pp') ppIc = ic; }
         btnEl[b.id] = be;
@@ -281,7 +281,7 @@
       played.style.width = w + 'px';
       U.tf(head, BAR_X - 64 + w - 12, 0);
       U.setText(tm0, hms(pos)); U.setText(tm1, d ? '-' + hms(d - pos) : '');   // ASCII-Minus: U+2212 fehlt in der TV-Schrift (Regel 10)
-      var now = new Date(), ends = d ? N.t('pl.endsAt', { time: F.clock(new Date(now.getTime() + d - pos)) }) : '';
+      var now = N.clock.date(), ends = d ? N.t('pl.endsAt', { time: F.clock(new Date(now.getTime() + d - pos)) }) : '';
       U.setText(clk, cfg().clock === false ? ends : N.comfort.clock(now, N.config.fixedClock) + (ends ? ' · ' + ends : ''));   // P5 set.clock
       var k = O.chapterAt(chs, pos);
       if (k !== chI) { chI = k; U.setText(chn, k < 0 ? '' : O.chapterNamed(chs[k]) ? N.t('pl.chapter', { n: k + 1, t: chs[k].t }) : N.t('pl.chapterN', { n: k + 1 })); }
@@ -342,7 +342,7 @@
     function showOsd(ms) {
       if (errOn) return;
       if (!osd) {
-        osd = true; U.show(top, true); U.show(bot, true); U.cls(sub, 'up', true);
+        osd = true; U.show(top, true); U.show(bot, true); U.cls(sub, 'up', true); U.cls(root, 'pl-osd', true);
         if (pb) paint(pb.t);
         paused();
         setZone(zone, true);
@@ -357,7 +357,7 @@
       if (osdT) clearTimeout(osdT); osdT = 0;
       // waehrend Spulen oder offenem Panel (Ton & UT, Mehr, Kapitel …) bleibt das OSD stehen
       if (!osd || (force !== true && (acc.active() || N.router.hasOverlay()))) { if (osd) osdT = setTimeout(hideOsd, OSD_MS); return; }
-      osd = false; U.show(top, false); U.show(bot, false); U.show(thumb, false); U.show(lbl, false); U.cls(sub, 'up', false);
+      osd = false; U.show(top, false); U.show(bot, false); U.show(thumb, false); U.show(lbl, false); U.cls(sub, 'up', false); U.cls(root, 'pl-osd', false);
       U.cls(skip, 'is-focus', false); U.cls(btnEl[fb], 'is-focus', false); U.cls(bot, 'foc', false);
       zone = 'btn'; fb = 'pp'; quick = false;                   // naechstes Einblenden: Fokus Play/Pause
       N.router.refreshHints();
@@ -387,8 +387,10 @@
       if (!osd || zone !== 'btn') { U.show(lbl, false); return; }
       var t = fb === 'pp' ? (pb && pb.state === 'paused' ? 'pl.btn.play' : 'pl.btn.pause') : 'pl.btn.' + { back: 'back', fwd: 'fwd', next: 'next', chap: 'chapters', tracks: 'tracks', more: 'more' }[fb];
       U.setText(lblT, N.t(t, { n: Number(cfg().seekArrows) || 10 }));
-      lbl.style.left = (O.center(fb) - 150) + 'px';
       U.show(lbl, true);
+      // Label mittig UNTER dem Knopf, aber nie ueber den Innenrand der Insel hinaus (rechte Knoepfe, lange Texte)
+      var c = O.center(fb), w = lblT.parentNode.offsetWidth || 0, x = U.clamp(c - w / 2, O.ISL_X + 32, O.ISL_X + 1152 - 32 - w);
+      lbl.style.left = Math.round(x + w / 2 - 150) + 'px';
     }
     function activate(id) {
       var n = (Number(cfg().seekArrows) || 10) * 1000;
@@ -421,7 +423,7 @@
       U.show(mh, true);
       U.raf(function () {                                        // Rechtecke einmal messen (nie im Tastenpfad)
         var r = [];
-        for (var j = 0; j < mh.list.length; j++) r.push({ x: 64 + mh.offsetLeft + mhItems[j].root.offsetLeft, w: mhItems[j].root.offsetWidth, k: MH_KEYS[mh.list[j].k] });
+        for (var j = 0; j < mh.list.length; j++) r.push({ x: mh.offsetLeft + mhItems[j].root.offsetLeft, w: mhItems[j].root.offsetWidth, k: MH_KEYS[mh.list[j].k] });
         mhRects = r;
       });
     }
@@ -918,13 +920,14 @@
         return true;
       }
       if (errOn) return sb.pointer(x, y, kind);
-      if (cdOn && x >= 816 && y >= 588 && y < 636) {
+      var cy = osd ? 382 : 588;                              // Countdown-/Letzte-Folge-Karte: bei sichtbarem OSD ueber der Bedien-Insel
+      if (cdOn && x >= 816 && y >= cy && y < cy + 48) {
         var i = x < 1016 ? 0 : 1;
         if (i !== upF) setUpF(i);
         if (kind === 'click') upAct(i);
         return true;
       }
-      if (lastOn && x >= 816 && y >= 588 && y < 636) {
+      if (lastOn && x >= 816 && y >= cy && y < cy + 48) {
         var li = x < 1016 ? 0 : 1;
         if (li === 1 && lastBtns[1].style.display === 'none') return true;
         if (li !== lastF) setLastF(li);
@@ -933,7 +936,7 @@
       }
       var was = osd;
       showOsd();
-      if (btnKind && x >= 856 && x < 1216 && y >= 452 && y < 500) { if (zone !== 'skip') setZone('skip'); if (kind === 'click') doSkip(); return true; }
+      if (btnKind && x >= 856 && x < 1216 && y >= SKIP_Y && y < SKIP_Y + 48) { if (zone !== 'skip') setZone('skip'); if (kind === 'click') doSkip(); return true; }
       if (!was && kind === 'click') return true;           // erster Klick blendet nur ein
       var b = O.hit(ids, x, y);
       if (b) { if (zone !== 'btn' || b !== fb) setZone('btn', false, b); if (kind === 'click') activate(b); return true; }
@@ -942,10 +945,10 @@
         if (kind === 'click') seekTo(dur() * U.clamp((x - BAR_X) / BAR_W, 0, 1), true);
         return true;
       }
-      if (mhRects && mh.style.display !== 'none' && y >= MH_Y - 6 && y < MH_Y + 34) {
+      if (mhRects && mh.style.display !== 'none' && y >= MH_Y && y < MH_Y + MH_H) {
         for (var j = 0; j < mhRects.length; j++) if (x >= mhRects[j].x - 8 && x < mhRects[j].x + mhRects[j].w + 8) { if (kind === 'click') N.router.key(mhRects[j].k); return true; }
       }
-      if (kind === 'click' && (y < 556 || y >= 684)) { if (pb) pb.toggle(); showOsd(); }   // freie Flaeche: Pause/Weiter
+      if (kind === 'click' && (y < O.ISL_Y || y >= O.ISL_Y + O.ISL_H)) { if (pb) pb.toggle(); showOsd(); }   // freie Flaeche: Pause/Weiter
       return true;
     };
     return s;

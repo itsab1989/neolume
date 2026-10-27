@@ -39,6 +39,26 @@ test('Hoerbuch fortsetzen: juengster Track mit Offset, gehoert -> naechster, all
   assert.strictEqual(MU.rewind(60000, 1000, 1000 + 60), 60000);
 });
 
+test('Hoerbuch-Zurueckspulen: Pause gegen die Server-Uhr (N.clock), nicht die TV-Uhr', function () {
+  var N2 = H.load().N, M2 = N2.music, C = N2.clock, t = { now: 0 };
+  N2.util.now = function () { return t.now; };
+  C._reset();
+  var SRV = Date.UTC(2026, 9, 27, 15, 0, 0), lv = SRV / 1000 - 600;   // vor 10 min (Serverzeit) zuletzt gehoert
+  t.now = SRV - 3 * 3600 * 1000;                                     // TV-Uhr geht 3 h nach (Orsay ohne Sendezeit)
+  // ohne Korrektur: TV-Uhr liegt VOR lastViewedAt -> kein Zurueckspulen; mit falscher Vorgabe +3 h waere es eins
+  assert.strictEqual(M2.rewind(60000, lv), 60000);
+  for (var i = 0; i < 3; i++) { assert.ok(C.sample(new Date(SRV + i * 1000).toUTCString(), t.now - 50, t.now + 50)); t.now += 1000; }
+  assert.ok(Math.abs(C.offset() - 3 * 3600 * 1000) < 5000);
+  assert.strictEqual(M2.rewind(60000, lv), 60000);                   // Server: 10 min Pause -> bleibt
+  t.now += 3600 * 1000;                                              // 1 h spaeter (beide Uhren laufen gleich)
+  assert.strictEqual(M2.rewind(60000, lv), 55000);                   // > 1 h nach Serverzeit -> 5 s zurueck
+  // TV-Uhr 3 h VOR: ohne Korrektur faelschlich zurueckgespult, mit Korrektur nicht
+  C._reset(); t.now = SRV + 3 * 3600 * 1000;
+  assert.strictEqual(M2.rewind(60000, lv), 55000);
+  for (i = 0; i < 3; i++) { C.sample(new Date(SRV + i * 1000).toUTCString(), t.now - 50, t.now + 50); t.now += 1000; }
+  assert.strictEqual(M2.rewind(60000, lv), 60000);
+});
+
 test('Kapitel: Namen saeubern, eingebettete (M4B) vs. Tracks, Kapitel zur Zeit', function () {
   assert.strictEqual(MU.chapterName('01 Begrüßung.mp3', 0), 'Begrüßung');
   assert.strictEqual(MU.chapterName('Kapitel 01', 4), 'Kapitel 5');

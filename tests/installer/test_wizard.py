@@ -53,11 +53,12 @@ class Flow(unittest.TestCase):
         profiles = self.w.choose_server(H.MID)
         self.assertEqual(self.w.uris[0], 'http://192.0.2.20:32400')
         libs = dict((p['title'], p['libraries']) for p in profiles)
-        self.assertEqual(libs, {'Owner': 4, 'Kid': 2, 'Teen': 3, 'NoShare': None, 'buddy': 4})
+        self.assertEqual(libs, {'Owner': 4, 'Kid': 2, 'Teen': 3, 'NoShare': None})   # friend "buddy" never offered
+        self.assertNotIn(H.FRIEND_TOK, repr(self.w.profiles))                     # nor its token kept in memory
         self.assert_no_secrets(self.w.public_state())
 
-        self.w.set_profiles([1, 2, 77, 4])            # NoShare has no token -> stays out
-        self.assertEqual([p['title'] for p in self.w.profiles if p['include']], ['Owner', 'Kid', 'buddy'])
+        self.w.set_profiles([1, 2, 77, 4])            # NoShare has no token -> stays out; 77 (friend) does not exist
+        self.assertEqual([p['title'] for p in self.w.profiles if p['include']], ['Owner', 'Kid'])
         with self.assertRaises(StepError): self.w.set_profiles([])
         with self.assertRaises(StepError): self.w.set_profiles(['1'])
 
@@ -65,12 +66,14 @@ class Flow(unittest.TestCase):
         self.assertTrue(info['resetPins'])
         with zipfile.ZipFile(io.BytesIO(self.w.package)) as z: self.assertIs(json.loads(z.read('setup.json'))['resetAppPins'], True)
         info = self.w.build()
-        self.assertEqual(info['profiles'], 3)
+        self.assertEqual(info['profiles'], 2)
         with zipfile.ZipFile(io.BytesIO(self.w.package)) as z: cfg = json.loads(z.read('setup.json'))
         self.assertNotIn('resetAppPins', cfg)                         # default keeps the PINs
         self.assertEqual(cfg['server']['uris'], ['http://192.0.2.20:32400'])
         self.assertEqual(dict((p['title'], p['token']) for p in cfg['profiles']),
-                         {'Owner': H.OWNER_TOK, 'Kid': H.KID_TOK, 'buddy': H.FRIEND_TOK})
+                         {'Owner': H.OWNER_TOK, 'Kid': H.KID_TOK})
+        self.assertNotIn(H.FRIEND_TOK, json.dumps(cfg))              # friends are never written to the TV
+        self.assertNotIn('friend', [p['kind'] for p in cfg['profiles']])
         self.assertEqual(cfg['computer']['address'], '192.0.2.10')
         self.assertNotIn(H.ACCOUNT_TOK, json.dumps(cfg))              # only server-bound tokens on the TV
         self.assertIn(b'http://192.0.2.10/Neolume.zip', self.w.widgetlist)

@@ -10,9 +10,10 @@ Branding is a build-time setting. One JSON file per profile:
 | `repo` | GitHub repository (`owner/name`) for issue links |
 | `wordmark` | Two parts of the wordmark on the start/sign-in screen; the second part is drawn in the accent colour |
 | `description` | Widget description in `config.xml` |
-| `accent`, `accentPress` | Accent colour of the UI (focus, buttons, progress; `@accent@` in `src/css/app.css`) and the pressed pointer colour. Dark text `#141414` must reach ≥ 4.5:1 on it, and it ≥ 4.5:1 on `#121316`. |
+| `accent`, `accentPress` | Default accent colour of the UI (focus, buttons, progress; `@accent@` in `src/css/app.css`) and the pressed pointer colour. Dark text `#141414` must reach ≥ 4.5:1 on it, and it ≥ 4.5:1 on `#121316`. |
+| `accentId` | Palette entry (`src/core/accent.js`: amber, coral, rose, violet, blue, teal, green) that `accent` stands for. Users can pick any palette colour in *Settings → Interface → Accent colour*; `tools/build.js` writes one `.ac-<id>` variant per other colour for every `@accent@`/`@pointer@` rule, the brand colour stays the unscoped base. `accent` replaces the palette value of this entry. |
 | `softLight`, `softDark` | Tinted note background of the setup page (light / dark mode), matching the accent |
-| `pointer` | Base name of the Smart Control pointer images in `src/assets/` (`<pointer>.png`, `<pointer>-press.png`, drawn by `tools/make_assets.js` in `accent`/`accentPress`) |
+| `pointer` | Base name of the Smart Control pointer images in `src/assets/` (`<pointer>.png`, `<pointer>-press.png`, drawn by `tools/make_assets.js` in `accent`/`accentPress`). The other palette colours use `pointer-<id>.png` / `pointer-<id>-press.png`. |
 | `icons` | Icon sets from `loader-icons/` this brand may use; `defaultIcon` is used without `--icon` |
 | `extraApps` | Other user apps that must stay in the TV's sync list (`local.json` `extraApps` overrides) |
 

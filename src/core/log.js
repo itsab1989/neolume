@@ -87,7 +87,7 @@
     send: function (cb) {
       D.flush();
       var head = '# ' + N.config.product + ' ' + N.config.version + ' | ' + N.config.device + ' ' + (N.config.model || '') + ' | ' + new Date(U.now()).toISOString() +
-        ' | lang=' + (N.i18n ? N.i18n.lang() : '') + ' | src=' + (N.app && N.app.source ? N.app.source : '');
+        (N.clock ? ' | clock ' + N.clock.info() : '') + ' | lang=' + (N.i18n ? N.i18n.lang() : '') + ' | src=' + (N.app && N.app.source ? N.app.source : '');
       var body = head + '\n' + D.redact(D.dump() || D.ring.join('\n'));
       if (!N.config.validHost(N.config.logHost)) { cb(false, { type: 'config' }); return null; }   // nur an den konfigurierten Host
       return N.http.request({ method: 'POST', url: 'http://' + N.config.logHost + '/log', body: body, json: false, retries: 0, timeout: 10000,

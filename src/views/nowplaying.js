@@ -9,7 +9,7 @@
   var U = N.util, MU = N.music, F = N.fmt, X0 = 600, BY = 488, BAR_X = 600, BAR_W = 536, BAR_Y = 404;
   N.router.define('nowplaying', function () {
     var s = { rail: N.ui.rail && N.ui.rail.cur || 'home', wheelKeys: ['LEFT', 'RIGHT'] };   // Seitenleiste sichtbar (Feedback-Regel 3)
-    var root, bg, cover, ovT, tiT, arT, alT, chT, nxT, stT, tm0, tm1, barI, lbl, lblT, btnEl = {}, ids = [], fb = 'pp', ppIc, repIc, dots = {}, timer = 0;
+    var root, bg, cover, cfb, cfbT, ovT, tiT, arT, alT, chT, nxT, stT, tm0, tm1, barI, lbl, lblT, btnEl = {}, ids = [], fb = 'pp', ppIc, repIc, dots = {}, timer = 0;
     var shown = { art: null, rk: null }, lastSec = -1, hs = [];
     function C() { return N.audio.core(); }
     function book() { var c = C(); return !!(c && c.book); }
@@ -18,8 +18,9 @@
     s.create = function (el) {
       root = el;
       bg = U.el('img', 'full', root); bg.src = N.img.BLANK; bg.style.visibility = 'hidden';
-      var scrim = U.el('img', 'full', root); scrim.src = N.assetBase + 'scrim.png';
+      var scrim = U.el('img', 'full', root); scrim.src = N.assetBase + 'scrim-np.png';   // kraeftiger: Text rechts auch auf hellen Bildern lesbar (F24)
       var cv = U.el('div', 'np-cover', root);
+      cfb = U.el('div', 'np-fb', cv, 'display:none'); cfbT = document.createTextNode(''); cfb.appendChild(cfbT);   // ohne Cover: farbige Titelkarte (F28)
       cover = U.el('img', '', cv); cover.src = N.img.BLANK;
       ovT = U.txt('div', 'np-ov t-label cacc ell', root, '');
       tiT = U.txt('div', 'np-ti t-h1', root, '');
@@ -100,14 +101,20 @@
       U.setText(alT, c.book ? (c.q.size() > 1 ? it.title : '') : it.album);
       if (shown.rk !== it.rk) {
         shown.rk = it.rk;
-        N.img.want(cover, it.thumb ? N.img.url(it.thumb, 'coverL') : '', 0);
-        var art = it.art || '', url = !N.comfort.backgrounds() ? '' : art ? N.img.url(art, 'hero') : it.thumb ? N.img.url(it.thumb, 'backdrop', { blur: 12 }) : '';   // Einstellung Hintergrundbilder
+        coverFb(it, !it.thumb);
+        N.img.want(cover, it.thumb ? N.img.url(it.thumb, 'coverL') : '', 0, function (ok) { if (!ok && shown.rk === it.rk) coverFb(it, true); });
+        var b = N.img.bg(it.art, it.thumb), url = b ? b.url : '', soft = !!(b && b.soft);   // Art scharf, sonst Albumcover unscharf; Einstellung Hintergrundbilder
         if (url !== shown.art) {
           shown.art = url; bg.style.visibility = 'hidden';
-          if (url) { bg.onload = function () { bg.onload = null; U.raf(function () { bg.style.visibility = 'visible'; }); }; bg.src = url; }
+          if (url) { bg.onload = function () { bg.onload = null; N.img.fit(bg, soft); U.raf(function () { bg.style.visibility = 'visible'; }); }; bg.src = url; }
         }
       }
       lastSec = -1; tick(true); onQueue(); paintToggles();
+    }
+    /* Titelkarte wie auf der Albumseite: Album- bzw. Buchtitel, Farbe je Titel */
+    function coverFb(it, on) {
+      if (on) { cfb.className = 'np-fb ' + N.ui.fbClass(it); U.setText(cfbT, it.album || it.title || ''); }
+      U.show(cfb, on);
     }
     function onState() { paintToggles(); tick(true); }
     function onQueue() {

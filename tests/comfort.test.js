@@ -38,6 +38,9 @@ test('Schoner: Bilder aus dem Home-Cache – Weiterschauen + Neu zuerst, je Bild
   assert.strictEqual(it[0].sub, 'S1 · F5');
   eq(C.saverItems({ rows: [{ id: 'hub-1-x', items: [{ title: 'Nur Hub', art: '/a/h' }] }] }).length, 1);
   eq(C.saverItems(null), []);
+  // TV 27.10. nachmittags: Titel ohne Art (frisch hinzugefuegt) nicht ueber das Poster (still) -> uebersprungen
+  eq(C.saverItems({ rows: [{ id: 'cw', items: [{ title: 'Ohne Art', still: '/library/metadata/1/thumb/1', art: '' }, { title: 'Mit Art', art: '/a/m' }] }] })
+    .map(function (x) { return x.title; }), ['Mit Art']);
 });
 test('Schoner: Pausen-Text "Pausiert · Serie S1 · F5" (DE/EN)', function () {
   assert.strictEqual(C.pausedText({ type: 'episode', title: 'Nordlicht', s: 1, e: 5 }), 'Pausiert · Nordlicht S1 · F5');

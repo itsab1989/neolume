@@ -12,7 +12,7 @@
   N.router.define('library', function (params) {
     var lib = params.lib || { id: 0, title: '', type: 'movie' }, coll = params.coll || null;
     // Seitenleiste markiert die Bibliothek auch in Sammlung/Personenfilter (TV-Befund 26.10.); sub: RETURN geht dort zurueck
-    var sub = !!(coll || params.actor), s = { rail: lib.id ? 'lib-' + lib.id : null, wheelKeys: ['UP', 'DOWN'] };
+    var sub = !!(coll || params.actor), s = { rail: lib.id ? 'lib-' + lib.id : null, wheelKeys: ['UP', 'DOWN'], miniX: REG_X - 16 - 360 };   // Mini-Player links neben A–Z (F26)
     var G = N.GridMath, root, titleT, statT, chipBar, chips = [], chipRects = null, grid, ring, sb, regDivs = [], regCur = -1, regFoc = false, regHas = '', bubble, bubbleT, skel, fade;
     var prefs = null, items = [], n = -1, total = -1, chars = [], pages = {}, gen = 0, tasks = [], collN = -1;
     // M4 Musik/Hoerbuecher: Reiter 'lib' = Kuenstler (Musik) bzw. Buecher (Hoerbuecher), 'alt' = Alben bzw. Autoren; quadratische Karten
@@ -520,15 +520,45 @@
         return true;
       }
       if (n <= 0) return false;
+      var ez = s.pointerEdge(x, y);
+      if (ez) { if (kind === 'click') s.pointerScroll(ez.d); return true; }   // Randzone: rollt (Verweilen/Klick), fokussiert nicht
       var j = G.hit(n, grid.r, x, y);
-      if (j < 0) return false;
-      if (zone !== 'grid') toGrid();
-      if (j !== grid.f) {
-        if (G.row(j) === grid.r) { N.fx.step(true); placeRing(grid.focusTo(j)); afterMove(); }
-        else moveTo(j);
+      if (j < 0) { N.pointer.holdCancel(); return false; }
+      if (G.row(j) - grid.r >= grid.hitRows()) {                          // angeschnittene, aber zeigbare Zeile (G.part)
+        if (kind === 'click') { reveal(j); open(grid.item(j)); return true; }
+        N.pointer.hold(function () { if (!dead && G.hit(n, grid.r, N.pointer.x, N.pointer.y) === j) reveal(j); });   // ~250 ms: Vorbeiziehen loest nichts aus
+        return true;
       }
+      N.pointer.holdCancel();
+      if (zone !== 'grid') toGrid();
+      if (j !== grid.f) { N.fx.step(true); placeRing(grid.focusTo(j, true)); afterMove(); }   // still: Liste rollt nicht unter dem Punkt
       if (kind === 'click') open(grid.item(j));
       return true;
+    };
+    /* Zeiger-Rollen nur ueber Randzonen (TV-Befund 27.10. nachmittags): oben Streifen y 154–196 (unter den Chips, oberer Rand der
+     * Fokuszeile), unten schmales Band y 604–656 ueber der Hinweisleiste (bzw. ab einer nicht zeigbaren Zeile, G.edgeB), jeweils
+     * ueber der Rasterbreite; Anzeige-Pille mittig in der Zone */
+    /* angeschnittene Zeile per Zeiger: EINE Zeile rollen, dann fokussieren (Ring erst jetzt, nie ueber Band/Hinweisleiste);
+     * danach Zeiger-Sperre (Inhalt ist unter dem Punkt gewandert) -> keine Rueckkopplung */
+    function reveal(j) {
+      if (zone !== 'grid') toGrid();
+      N.fx.step(true);
+      grid.scrollBy(1);
+      placeRing(grid.focusTo(j, true)); afterMove();
+      N.pointer.scrolled();
+    }
+    s.pointerSig = function () { return grid.r; };
+    s.pointerEdge = function (x, y) {
+      if (n <= 0 || (sb.on && zone === 'state') || zone === 'reg' || railOpen) return null;
+      var w = G.width(), cx = G.X0 + Math.round(w / 2);
+      if (x < G.X0 || x >= G.X0 + w) return null;
+      if (y >= 154 && y < G.Y0 + 20 && grid.canScroll(-1)) return { d: -1, x: cx, y: 176 };
+      if (y >= G.edgeB() && y < 656 && grid.canScroll(1)) return { d: 1, x: cx, y: 628 };
+      return null;
+    };
+    s.pointerScroll = function (d) {
+      if (zone !== 'grid') toGrid();
+      placeRing(grid.scrollBy(d)); afterMove();
     };
     s.relabel = function () { buildChips(); paintStatus(); };
     return s;

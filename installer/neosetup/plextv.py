@@ -109,9 +109,11 @@ class PlexTV(object):
     def home_users(self, token):
         return parse_home_users(self._json('GET', '/api/v2/home/users', token=token))
 
-    def shared_servers(self, token, machine_id):
+    def shared_servers(self, token, machine_id, user_ids):
+        """Server tokens of the Plex Home users (user_ids) for this server. plex.tv answers with every account the server is
+        shared with; entries of other accounts (friends outside Plex Home) are dropped right here, their tokens are never kept."""
         if not valid_machine_id(machine_id): raise ValueError('machine id')
-        return parse_shared_servers(self._xml('GET', '/api/servers/%s/shared_servers' % machine_id, token=token))
+        return parse_shared_servers(self._xml('GET', '/api/servers/%s/shared_servers' % machine_id, token=token), user_ids)
 
     def switch_home_user(self, token, user_id):
         """plex.tv token of a Plex Home profile WITHOUT a Plex PIN (POST /api/home/users/<id>/switch, as python-plexapi
@@ -185,12 +187,14 @@ def parse_home_users(d):
     return out
 
 
-def parse_shared_servers(root):
-    """XML <MediaContainer><SharedServer userID= username= accessToken= .../></MediaContainer> -> list."""
+def parse_shared_servers(root, user_ids):
+    """XML <MediaContainer><SharedServer userID= username= accessToken= .../></MediaContainer> -> list, only entries whose
+    userID is in user_ids (Plex Home users). Shared accounts outside Plex Home ("friends") are never returned."""
+    allowed = set(user_ids or ())
     out = []
     for s in root.iter('SharedServer'):
         uid, tok = _int(s.get('userID')), s.get('accessToken')
-        if uid is None or not valid_token(tok): continue
+        if uid is None or uid not in allowed or not valid_token(tok): continue
         out.append({'userID': uid, 'username': s.get('username') or '', 'token': tok,
                     'allLibraries': _bool(s.get('allLibraries')), 'accepted': bool(s.get('acceptedAt'))})
     return out
@@ -198,8 +202,8 @@ def parse_shared_servers(root):
 
 def build_profiles(account, home_users, shared, owner_token):
     """Profiles for the TV: owner (server token from resources) + every Home user with a shared-server token.
-    Friends (shared but not in Home) are returned too, with include=False. Home users without a token are
-    returned with token=None so the UI can explain why they are missing."""
+    Home users without a token are returned with token=None so the UI can explain why they are missing.
+    Shared accounts outside Plex Home ("friends") never become profiles, even if `shared` contains them."""
     profiles, seen = [], set()
     by_uid = dict((s['userID'], s) for s in shared)
     admin = None
@@ -215,11 +219,6 @@ def build_profiles(account, home_users, shared, owner_token):
         s = by_uid.get(u['id'])
         profiles.append(_profile(u, s['token'] if s else None, 'home', bool(s)))
         seen.add(u['id'])
-    for s in shared:
-        if s['userID'] in seen: continue
-        profiles.append(_profile({'id': s['userID'], 'uuid': 'friend-%d' % s['userID'], 'title': s['username'] or '?', 'thumb': ''},
-                                 s['token'], 'friend', False))
-        seen.add(s['userID'])
     return profiles
 
 

@@ -2,17 +2,19 @@
  * Label-Mitte), Kapitel zur Zeit, Mehr-Menue-Eintraege, Sleep-Timer-Rest, Untertitel-Verzoegerung als Text, Qualitaetsstufen.
  * Ohne DOM, in Node getestet. Koordinaten absolut im 1280x720-Raster. */
 (function (N) {
-  var ISL_X = 64, ISL_Y = 556;
-  /* Bedien-Insel x 64, y 556, 1152 x 128; Knoepfe Insel-y 68 (48 hoch), Play/Pause 64 rund bei Insel-y 60, Mitte x = 640 */
+  var ISL_X = 64, ISL_Y = 458, ISL_H = 180;
+  /* Bedien-Insel x 64, y 458, 1152 x 180 (TV-Befund 27.10. nachmittags: nichts ueberlappt mehr). Zeilen (Insel-y):
+   * Balken 24 (Mitte 27) · Zeiten 42–68 · Knopfreihe 80–128 (Mitte 104; Play/Pause 64 x 56 eckig-rund bei 76) · Fokus-Label 140–166.
+   * Farbtasten-Hinweise (Pause) stehen ausserhalb der Insel an der Stelle der Hinweisleiste (y 650). Mitte x = 640 */
   var BTNS = [
-    { id: 'back', x: 480, y: 68, w: 48 }, { id: 'pp', x: 544, y: 60, w: 64 }, { id: 'fwd', x: 624, y: 68, w: 48 }, { id: 'next', x: 688, y: 68, w: 48 },
-    { id: 'chap', x: 944, y: 68, w: 48 }, { id: 'tracks', x: 1008, y: 68, w: 48 }, { id: 'more', x: 1072, y: 68, w: 48 }
+    { id: 'back', x: 480, y: 80, w: 48, h: 48 }, { id: 'pp', x: 544, y: 76, w: 64, h: 56 }, { id: 'fwd', x: 624, y: 80, w: 48, h: 48 }, { id: 'next', x: 688, y: 80, w: 48, h: 48 },
+    { id: 'chap', x: 944, y: 80, w: 48, h: 48 }, { id: 'tracks', x: 1008, y: 80, w: 48, h: 48 }, { id: 'more', x: 1072, y: 80, w: 48, h: 48 }
   ];
   var BY = {};
   for (var i = 0; i < BTNS.length; i++) BY[BTNS[i].id] = BTNS[i];
   var QS = ['20', '12', '8', '4'];
   var O = {
-    BTNS: BTNS, ISL_X: ISL_X, ISL_Y: ISL_Y,
+    BTNS: BTNS, ISL_X: ISL_X, ISL_Y: ISL_Y, ISL_H: ISL_H, BAR_Y: ISL_Y + 27, LBL_Y: ISL_Y + 140,
     btn: function (id) { return BY[id]; },
     /* sichtbare Knoepfe: f {next: naechster Eintrag da (nur Folgen), chap: Kapitel vorhanden} */
     visible: function (f) {
@@ -36,7 +38,7 @@
     hit: function (ids, x, y) {
       for (var i = 0; i < ids.length; i++) {
         var b = BY[ids[i]], bx = ISL_X + b.x, by = ISL_Y + b.y;
-        if (x >= bx - 8 && x < bx + b.w + 8 && y >= by - 8 && y < by + b.w + 8) return ids[i];
+        if (x >= bx - 8 && x < bx + b.w + 8 && y >= by - 8 && y < by + b.h + 8) return ids[i];
       }
       return null;
     },

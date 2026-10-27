@@ -8,6 +8,7 @@
     "Neo",
     "lume"
   ],
+  "accentId": "teal",
   "accent": "#2EC4B6",
   "accentPress": "#6FD9CF",
   "pointer": "pointer-teal",

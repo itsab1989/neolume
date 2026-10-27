@@ -5,8 +5,8 @@
   var U = N.util, STEP = 208, W = 168, Y = 232, MAXROW = 6;
   N.router.define('profiles', function (params) {
     var s = {}, tiles = [], users = [], f = 0, ring, other = null, onOther = false, busy = false, x0 = 0, rows = 1, seq = 0, dead = false, subRow = [true, true];
-    /* Unterzeile: Hauptkonto/Kind/Jugendlich; Freund-Profil aus setup.json (src 'friend') = "Freigabe" (F20) */
-    function subKey(u) { return u.kind ? 'prof.sub.' + u.kind : u.src === 'friend' ? 'prof.sub.friend' : ''; }
+    /* Unterzeile: Hauptkonto/Kind/Jugendlich */
+    function subKey(u) { return u.kind ? 'prof.sub.' + u.kind : ''; }
     function pos(i) {
       var row = Math.floor(i / MAXROW), inRow = Math.min(MAXROW, users.length - row * MAXROW);
       var start = Math.round((1280 - (inRow * STEP - (STEP - W))) / 2);

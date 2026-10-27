@@ -116,7 +116,7 @@
       if (M.isLeaf(it) && M.progress(it) > 0) {
         left = M.remaining(it);
         p.push(N.t('det.left', { time: F.dur(left) }));
-        p.push(N.t('det.meta.endsAt', { clock: F.clock(new Date((now || U.now()) + left)) }));
+        p.push(N.t('det.meta.endsAt', { clock: F.clock(new Date((now || N.clock.now()) + left)) }));
       }
       if (it.type === 'show' && d && d.ondeck) {
         var od = d.ondeck;

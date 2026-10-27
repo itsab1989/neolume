@@ -1,12 +1,14 @@
-/* N.ui.mini – Mini-Player beim Stoebern (M4, research 3.2): Leiste unten rechts ueber der Hinweisleiste (Cover 48, Titel,
- * Interpret, duenner Balken, Taste B = Jetzt laeuft). Sichtbar, solange N.audio aktiv ist und weder Jetzt-laeuft noch der Video-Player
- * oben liegt. Aktualisierung hoechstens 1x/s und nur in Tastenruhe (keine DOM-Arbeit im Tastenpfad). Klick = Jetzt laeuft.
+/* N.ui.mini – Mini-Player beim Stoebern (M4, research 3.2): Leiste unten rechts ueber der Hinweisleiste (Cover 48 bzw. Farbfeld,
+ * Titel, Interpret, Play/Pause-Symbol wie in Jetzt laeuft, duenner Balken, Taste B = Jetzt laeuft). Ansichten mit A–Z-Leiste setzen
+ * s.miniX (F26); Ein-/Ausblenden meldet 'mini:vis' (Listen schaffen Platz). Sichtbar, solange N.audio aktiv ist und weder Jetzt-laeuft
+ * noch der Video-Player oben liegt. Aktualisierung hoechstens 1x/s und nur in Tastenruhe (keine DOM-Arbeit im Tastenpfad). Klick = Jetzt laeuft.
  * Ausserdem globale Hinweise zur Ton-Wiedergabe (Sleep-Timer, Fehler) und Stop beim Profilwechsel (Token gehoert zum Profil). */
 (function (N) {
   var U = N.util, MU = N.music, X = 856, Y = 572, W = 360, H = 64, HIDE = { nowplaying: 1, player: 1, login: 1, profiles: 1, start: 1 };
-  var M = { el: null, on: false, rk: '', timer: 0, w: -1 };
+  var M = { el: null, on: false, rk: '', timer: 0, w: -1, x: X, ic0: '' };
   M.init = function (parent) {
     var e = M.el = U.el('div', 'mini', parent, 'display:none');
+    M.fb = U.el('div', 'mini-fb', e, 'display:none'); M.fbT = document.createTextNode(''); M.fb.appendChild(M.fbT);   // ohne Cover: Farbfeld + Initiale (F28)
     M.img = U.el('img', '', e); M.img.src = N.img.BLANK;
     M.t1 = U.txt('div', 'mini-t1 ell', e, ''); M.t2 = U.txt('div', 'mini-t2 ell', e, '');
     M.ic = N.ui.icon(e, 'pause', 's1', 'left:252px;top:16px');
@@ -38,8 +40,9 @@
     if (!M.el) return;
     var c = N.audio.core(), top = N.router.topName(), act = N.audio.active();
     if (act && top === 'profiles') { N.audio.stop('Profilwechsel'); act = false; }
-    var show = act && !HIDE[top];
-    if (show !== M.on) { M.on = show; U.show(M.el, show); force = true; }
+    var show = act && !HIDE[top], scr = N.router.top(), x = scr && scr.miniX || X;
+    if (show && x !== M.x) { M.x = x; M.el.style.left = x + 'px'; }   // Bibliothek: links neben der A–Z-Leiste (F26)
+    if (show !== M.on) { M.on = show; U.show(M.el, show); force = true; N.evt.emit('mini:vis', show); }   // Ansichten schaffen Platz unten (F26)
     if (!show) { if (M.timer) { clearInterval(M.timer); M.timer = 0; } return; }   // Takt nur, solange sichtbar
     M.arm();
     if (!force && N.idle.restFor() < 300) return;
@@ -47,14 +50,22 @@
     if (it && it.rk !== M.rk) {
       M.rk = it.rk;
       U.setText(M.t1, it.title); U.setText(M.t2, c.book && c.ctx && c.ctx.title ? c.ctx.title : it.artist);
-      N.img.want(M.img, it.thumb ? N.img.url(it.thumb, 'listSq') : '', 1);
+      var rk = it.rk;
+      fallback(it, !it.thumb);
+      N.img.want(M.img, it.thumb ? N.img.url(it.thumb, 'listSq') : '', 1, function (ok) { if (!ok && M.rk === rk) fallback(it, true); });
     }
-    N.ui.setIcon(M.ic, c.state === 'paused' ? 'pause' : 'play');
+    var st = c.state, ic = st === 'paused' || st === 'done' || st === 'stopped' || st === 'error' ? 'play' : 'pause';   // wie Jetzt laeuft: Symbol = Aktion (F29)
+    if (ic !== M.ic0) { M.ic0 = ic; N.ui.setIcon(M.ic, ic); }
     var d = c.dur(), w = d ? Math.round(W * U.clamp(c.t / d, 0, 1)) : 0;
     if (w !== M.w) { M.w = w; M.bar.style.width = w + 'px'; }
   };
+  /* Farbfeld wie die Titelkarte (gleiche Farbe wie Albumseite/Raster) */
+  function fallback(it, on) {
+    if (on) { M.fb.className = 'mini-fb ' + N.ui.fbClass(it); U.setText(M.fbT, N.ui.initial(it.album || it.title)); }
+    U.show(M.fb, on);
+  }
   M.pointer = function (x, y, kind) {
-    if (!M.on || x < X || x >= X + W || y < Y || y >= Y + H) return false;
+    if (!M.on || x < M.x || x >= M.x + W || y < Y || y >= Y + H) return false;
     if (kind === 'click') N.router.push('nowplaying');
     return true;
   };

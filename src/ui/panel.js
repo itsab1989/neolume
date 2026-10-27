@@ -1,7 +1,7 @@
 /* N.ui.panel – rechtes Auswahl-Panel (SPEC 5.19) und Hilfe-Panel (INFO, SPEC 10.6). Deckend, ohne Animation. */
 (function (N) {
   var U = N.util, X = 840, TOP = 112, STEP = 72, H = 64;
-  /* select: o {title, entries:[{id, t, s (Unterzeile, optional), img (URL, nur mit images)}], selected, focus (Index, optional),
+  /* select: o {title, entries:[{id, t, s (Unterzeile, optional), img (URL, nur mit images), sw (Farbfeld .sw-<sw>, optional)}], selected, focus (Index, optional),
    * images (Bild-Spalte statt Haken), onSelect(id), onCancel()}.
    * Mehr als 8 Eintraege: Liste scrollt per translate3d (Anker 4. Zeile); Zeiger scrollt nicht unter dem Punkt weg. */
   var VIS = 8;
@@ -12,7 +12,8 @@
     U.txt('div', 'pt t-h2', p, o.title);
     var clip = U.el('div', 'tp-clip', p, 'top:' + TOP + 'px;height:' + (VIS * STEP) + 'px'), list = U.el('div', 'tp-list', clip);
     for (var i = 0; i < o.entries.length; i++) {
-      var d = o.entries[i], e = U.el('div', 'pe' + (d.id === o.selected ? ' sel' : '') + (d.s ? ' two' : '') + (o.images ? ' im' : ''), list, 'top:' + (i * STEP) + 'px');
+      var d = o.entries[i], e = U.el('div', 'pe' + (d.id === o.selected ? ' sel' : '') + (d.s ? ' two' : '') + (o.images ? ' im' : '') + (d.sw ? ' has-sw' : ''), list, 'top:' + (i * STEP) + 'px');
+      if (d.sw) U.el('span', 'sw sw-' + d.sw, e);
       if (o.images) {                                 // Bild statt Haken (Kapitelbilder, 96 x 54), sichtbare zuerst laden
         var im = U.el('img', '', e); im.src = N.img.BLANK;
         if (d.img) N.img.want(im, d.img, i < VIS ? 0 : 2);

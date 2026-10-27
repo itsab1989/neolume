@@ -560,6 +560,7 @@
       if (kind === 'click') openItem(sl.item(i), false);
       return true;
     };
+    s.pointerSig = function () { return pageY(); };          // Zeiger-Scroll-Sperre (N.pointer): Reihenwechsel rollt die Seite
     s.pointerArrows = function () {
       if (!rows.length || sb.on || railOpen) return null;
       var sl = slotFor(R);

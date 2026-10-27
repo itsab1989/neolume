@@ -34,7 +34,7 @@
         it.still = m.art || '';
         it.art = m.art || m.parentArt || '';
       } else {
-        it.title = m.title || '';
+        it.title = String(m.title || '') || (t === 'album' || t === 'artist' ? N.t('mu.untitled') : '');   // verwaiste Alben ohne Titel (F27)
         it.showRk = t === 'show' ? it.rk : '';
         it.thumb = m.thumb || m.composite || '';          // Playlists: Collage
         if (t === 'track') { it.artist = m.originalTitle || m.grandparentTitle || ''; it.album = m.parentTitle || ''; it.albumRk = m.parentRatingKey ? String(m.parentRatingKey) : ''; it.lv = num(m.lastViewedAt); it.thumb = m.parentThumb || m.thumb || m.grandparentThumb || ''; }   // M4

@@ -63,18 +63,25 @@
         N.ui.icon(e.ri, e.icon);
         e.ni = U.el('div', 'ni', R.panel, 'top:' + e.y + 'px');
         N.ui.icon(e.ni, e.icon);
-        e.lbT = U.txt('div', R.longLabel(e.label || N.t(e.t)) ? 'lb lb2' : 'lb', e.ni, e.label || N.t(e.t));
+        var lt = e.label || N.t(e.t);
+        e.lbT = U.txt('div', R.longLabel(lt) ? 'lb lb2 clamp' : 'lb', e.ni, '');
+        U.clampText(e.lbT, lt);
       }
     }
     R.entries = list;
     R.f = 0;
     R.markCur();
   };
-  /* Passt nicht in eine Zeile (168 px bei 20 px Schrift, ca. 15 Zeichen)? -> zwei Zeilen in kleinerer Schrift, einmal beim Aufbau
-   * (TV-Test 27.10., F6: "Hörbücher & Hör…") */
+  /* Passt nicht in eine Zeile (168 px bei 20 px Schrift, ca. 15 Zeichen)? -> bis zu zwei Zeilen in normaler Schrift, danach "…",
+   * einmal beim Aufbau (TV-Test 27.10., F6: "Hörbücher & Hör…"; F25: nicht mehr verkleinern) */
   R.longLabel = function (t) { return String(t || '').length > 15; };
   R.libIcon = function (lib) { return KIND_ICON[lib.kind === 'anime' && N.anime && !N.anime.showCat() ? lib.type : lib.kind] || 'film'; };
-  R.relabel = function () { for (var i = 0; i < R.entries.length; i++) { var e = R.entries[i]; if (e.t) { U.setText(e.lbT, N.t(e.t)); U.cls(e.lbT, 'lb2', R.longLabel(N.t(e.t))); } } };
+  R.relabel = function () {
+    for (var i = 0; i < R.entries.length; i++) {
+      var e = R.entries[i], lt = e.t && N.t(e.t);
+      if (e.t) { e.lbT.parentNode.className = R.longLabel(lt) ? 'lb lb2 clamp' : 'lb'; U.clampText(e.lbT, lt); }   // lbT ist der Textknoten
+    }
+  };
   R.setData = function (profile, libs) { R.profile = profile; R.libs = libs || []; if (R.el) R.build(); };
   R.markCur = function () {
     for (var i = 0; i < R.entries.length; i++) {

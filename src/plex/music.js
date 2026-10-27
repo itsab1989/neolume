@@ -65,8 +65,8 @@
       return MU.stripNum(b).replace(/^\s+|\s+$/g, '');
     },
     stripNum: function (s) { var t = String(s || '').replace(/^\s*(?:cd\s*\d+\s*[-_.]\s*)?\d{1,3}(?:\s*[-_.)]\s*|\s+)/i, ''); return t || String(s || ''); },
-    /* Track (type 10) -> schlankes Objekt */
-    track: function (m) {
+    /* Track (type 10) -> schlankes Objekt; at = Cover des Albums (Albumseite: Tracks ohne parentThumb sonst mit dem Autorenbild, F30) */
+    track: function (m, at) {
       var md = m.Media && m.Media[0], part = md && md.Part && md.Part[0];
       var t = {
         rk: String(m.ratingKey), type: 'track', lib: num(m.librarySectionID),
@@ -75,15 +75,15 @@
         albumRk: m.parentRatingKey ? String(m.parentRatingKey) : '', artistRk: m.grandparentRatingKey ? String(m.grandparentRatingKey) : '',
         idx: num(m.index), disc: num(m.parentIndex) || 1, dur: num(m.duration) || num(part && part.duration) || num(md && md.duration),
         off: num(m.viewOffset), vc: num(m.viewCount), lv: num(m.lastViewedAt), added: num(m.addedAt),
-        thumb: m.parentThumb || m.thumb || m.grandparentThumb || '', art: m.art || m.grandparentArt || '',
+        thumb: m.parentThumb || m.thumb || at || m.grandparentThumb || '', art: m.art || m.grandparentArt || '',
         chs: m.chapterSource === 'media' ? 1 : 0, codec: String(md && md.audioCodec || ''), container: String(md && md.container || ''),
         year: num(m.parentYear || m.year), vleaf: 0, leaf: 0, child: 0
       };
       return t;
     },
-    tracks: function (json) {
+    tracks: function (json, at) {
       var list = json && json.MediaContainer && json.MediaContainer.Metadata || [], out = [];
-      for (var i = 0; i < list.length; i++) if (list[i] && list[i].ratingKey && (list[i].type === 'track' || !list[i].type)) out.push(MU.track(list[i]));
+      for (var i = 0; i < list.length; i++) if (list[i] && list[i].ratingKey && (list[i].type === 'track' || !list[i].type)) out.push(MU.track(list[i], at));
       return out;
     },
     isAudio: function (it) { return !!it && (it.type === 'artist' || it.type === 'album' || it.type === 'track'); },
@@ -140,8 +140,13 @@
       else { for (var i = 0; i < r.i && i < tracks.length; i++) pos += tracks[i].dur || 0; pos += r.off || 0; }
       return { pos: pos, total: total, frac: total ? Math.min(1, pos / total) : 0, left: Math.max(0, total - pos) };
     },
-    /* Zurueckspulen beim Fortsetzen nach > 1 h Pause: 5 s (Kontext), research 3.3 */
-    rewind: function (off, lv, nowSec) { return off > 0 && lv > 0 && nowSec - lv > 3600 ? Math.max(0, off - 5000) : off; },
+    /* Zurueckspulen beim Fortsetzen nach > 1 h Pause: 5 s (Kontext), research 3.3. lv = lastViewedAt des Servers (s), daher
+     * Vergleich mit der server-korrigierten Uhr (N.clock), nicht mit der TV-Uhr: die geht am Orsay teils Stunden falsch.
+     * nowSec optional (Tests); ohne -> N.clock.now() */
+    rewind: function (off, lv, nowSec) {
+      if (nowSec === undefined) nowSec = Math.floor(N.clock.now() / 1000);
+      return off > 0 && lv > 0 && nowSec - lv > 3600 ? Math.max(0, off - 5000) : off;
+    },
     /* Kapitelname saeubern: "01 Begrüßung.mp3" -> "Begrüßung", "Kapitel 01"/leer -> "Kapitel n" (App-Sprache) */
     chapterName: function (t, i) {
       var s = String(t || '').replace(EXT, '').replace(/^\s+|\s+$/g, ''), c = MU.stripNum(s);

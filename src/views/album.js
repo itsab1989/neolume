@@ -7,14 +7,14 @@
  * - Gelb (Hoerbuch): als gehoert/ungehoert markieren (Scrobble des Albums). Gruen: Jetzt laeuft (global, N.audio.key). Blau: Suche.
  * params: {it: album (normalisiert, type 'album')} */
 (function (N) {
-  var U = N.util, MU = N.music, F = N.fmt, PEEK = 580, LIST_Y = 624, ANCHOR_OFF = PEEK - 236;
+  var U = N.util, MU = N.music, F = N.fmt, MINI_ROOM = 2, PEEK = 580, LIST_Y = 624, ANCHOR_OFF = PEEK - 236;
 
   N.router.define('album', function (params) {
     var it0 = params.it || {}, book = MU.isBookItem(it0);
     var s = { rail: it0.lib ? 'lib-' + it0.lib : N.ui.rail && N.ui.rail.cur || 'home', wheelKeys: ['UP', 'DOWN'] };
     var root, hero, pg, bar, btns = [], bdefs = [], btnRects = null, blbl, blblT, headT, cntT, list, sb;
     var meta = null, tracks = [], chs = [], rows = [], kind = 'tracks', res = null, zone = 'btn', bf = 0, off = 0, gen = 0, tasks = [], dead = false, away = false;
-    var onTrack = null, jump = { d: '', t: 0 };
+    var onTrack = null, onMini = null, jump = { d: '', t: 0 };
 
     s.create = function (el) {
       root = el;
@@ -24,7 +24,7 @@
       blbl = U.el('div', 'blbl', pg, 'display:none'); blblT = document.createTextNode(''); blbl.appendChild(blblT);
       var hd = U.el('div', 'tl-head t-h2 ell', pg, 'top:' + PEEK + 'px');
       headT = document.createTextNode(N.t(book ? 'mu.row.chapters' : 'mu.row.tracks')); hd.appendChild(headT); cntT = U.txt('span', 'cnt', hd, '');
-      list = new N.ui.TrackList(pg, { x: 144, y: LIST_Y, w: 992, vis: 7, row: rowView });
+      list = new N.ui.TrackList(pg, { x: 144, y: LIST_Y, w: 992, vis: 7, full: 6, row: rowView });   // 7. Zeile nur angeschnitten (Band ab y 632)
       hero.makeInfo(root);
       var fade = U.el('img', 'fade', root); fade.src = N.assetBase + 'fade-bottom.png';
       sb = new N.ui.StateBlock(root);
@@ -33,6 +33,8 @@
       buildButtons();
       onTrack = function () { if (!dead) { var c = N.audio.core(); list.setCurrent(c && c.item ? c.item.rk : ''); } };
       N.evt.on('audio:track', onTrack); N.evt.on('audio:state', onTrack);
+      onMini = function (on) { list.setRoom(on ? MINI_ROOM : 0); };   // letzte Titel/Kapitel ueber dem Mini-Player lesbar (F26)
+      onMini(N.ui.mini && N.ui.mini.on); N.evt.on('mini:vis', onMini);
     };
 
     /* ---------- Daten ---------- */
@@ -44,7 +46,7 @@
         if (g !== gen || dead) return;
         if (!m) { if (!tracks.length) onError(err); return; }
         meta = { sum: String(m.summary || ''), year: Number(m.year) || 0, artist: String(m.parentTitle || it0.artist || ''), artistRk: m.parentRatingKey ? String(m.parentRatingKey) : '',
-          art: m.art || '', thumb: m.thumb || it0.thumb || '', title: String(m.title || it0.title || ''), lib: Number(m.librarySectionID) || it0.lib || 0,
+          art: m.art || '', thumb: m.thumb || it0.thumb || '', title: String(m.title || it0.title || '') || N.t('mu.untitled'), lib: Number(m.librarySectionID) || it0.lib || 0,
           genres: [], vc: Number(m.viewCount) || 0 };
         for (var i = 0; m.Genre && i < m.Genre.length && i < 3; i++) meta.genres.push(N.fmt.genre(m.Genre[i].tag));
         if (meta.lib && s.rail !== 'lib-' + meta.lib) { s.rail = 'lib-' + meta.lib; if (N.router.top() === s) N.ui.rail.attach(s.rail); }
@@ -55,7 +57,7 @@
       track(N.plex.get('/library/metadata/' + it0.rk + '/children', { 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 500, excludeElements: 'Image,UltraBlurColors,Guid,Mood' }, { timeout: 12000 }, function (err, d) {
         if (g !== gen || dead) return;
         if (err) { onError(err); return; }
-        tracks = MU.tracks(d);
+        tracks = MU.tracks(d, d && d.MediaContainer && d.MediaContainer.thumb || it0.thumb);   // Cover des Albums statt Autorenbild (F30)
         if (book && tracks.length === 1 && tracks[0].chs) loadChapters(g); else build();
       }));
     }
@@ -194,7 +196,7 @@
       if (!book) { playFrom(0, 0, false); return; }
       if (fromStart || !res || res.state === 'done' || res.state === 'new') { playFrom(0, 0); return; }
       var t = tracks[res.i] || tracks[0];
-      playFrom(res.i, MU.rewind(res.off, t.lv, Math.floor(U.now() / 1000)));
+      playFrom(res.i, MU.rewind(res.off, t.lv));
     }
     function playRow(i) {
       var x = rows[i];
@@ -264,7 +266,7 @@
     s.destroy = function () {
       dead = true; gen++;
       for (var i = 0; i < tasks.length; i++) if (tasks[i]) tasks[i].abort();
-      N.evt.off('audio:track', onTrack); N.evt.off('audio:state', onTrack);
+      N.evt.off('audio:track', onTrack); N.evt.off('audio:state', onTrack); N.evt.off('mini:vis', onMini);
       if (jump.t) clearTimeout(jump.t);
       list.clear(); hero.destroy();
     };
@@ -312,16 +314,25 @@
         }
         return false;
       }
-      if (x >= 144 && x < 1136 && y < 632) {
+      if (x >= 144 && x < 1136 && y < 656) {
+        var ez = s.pointerEdge(x, y);
+        if (ez) { if (kind0 === 'click') s.pointerScroll(ez.d); return true; }   // Randzone: rollt (Verweilen/Klick), fokussiert nicht
         var j = list.hit(py - LIST_Y);
-        if (j < 0) return false;
+        if (j < 0 || j - list.sc >= list.use()) return false;               // nur ganz sichtbare Zeilen
         if (zone !== 'list') toList();
-        if (j !== list.f) { N.fx.step(true); list.focusTo(j); }
+        if (j !== list.f) { N.fx.step(true); list.focusTo(j, true); }   // still: Liste rollt nicht unter dem Punkt
         if (kind0 === 'click') playRow(j);
         return true;
       }
       return false;
     };
+    s.pointerSig = function () { return off + ',' + list.sc; };   // Zeiger-Scroll-Sperre (N.pointer)
+    /* Zeiger-Randzonen der Titelliste (N.ui.TrackList.edge): Streifen ueber der ersten Zeile, angeschnittene Zeile unten bis zur Hinweisleiste */
+    s.pointerEdge = function (x, y) {
+      if (sb.on || zone !== 'list' || x < 144 || x >= 1136) return null;
+      return N.ui.TrackList.edge(list, LIST_Y - off, x, y);
+    };
+    s.pointerScroll = function (d) { list.scrollBy(d); };
     s.relabel = function () { paint(); list.refresh(); };
     return s;
   });
@@ -333,9 +344,9 @@
     for (var i = 0; i < l.length; i++) if (l[i].id === Number(id)) return l[i];
     return null;
   }
-  function children(rk, cb) {
+  function children(rk, cb, at) {
     N.plex.get('/library/metadata/' + rk + '/children', { 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 500, excludeElements: 'Image,UltraBlurColors,Guid,Mood' }, { timeout: 12000 }, function (err, d) {
-      cb(err ? [] : MU.tracks(d), err);
+      cb(err ? [] : MU.tracks(d, d && d.MediaContainer && d.MediaContainer.thumb || at), err);
     });
   }
   function failed() { N.ui.toast.show(N.t('toast.actionFailed')); }
@@ -381,11 +392,11 @@
         busy = 0;
         if (!tr.length) { failed(); return; }
         var i = 0, off = 0, k;
-        if (it.type === 'track') { for (k = 0; k < tr.length; k++) if (tr[k].rk === it.rk) i = k; off = book ? MU.rewind(N.audio.bookOff(tr[i]), tr[i].lv, Math.floor(U.now() / 1000)) : 0; }   // Weiterhoeren: wie "Fortsetzen" (5 s zurueck nach > 1 h)
-        else if (book) { var r = MU.resume(tr); if (r.state !== 'done') { i = r.i; off = MU.rewind(r.off, tr[i].lv, Math.floor(U.now() / 1000)); } }
+        if (it.type === 'track') { for (k = 0; k < tr.length; k++) if (tr[k].rk === it.rk) i = k; off = book ? MU.rewind(N.audio.bookOff(tr[i]), tr[i].lv) : 0; }   // Weiterhoeren: wie "Fortsetzen" (5 s zurueck nach > 1 h)
+        else if (book) { var r = MU.resume(tr); if (r.state !== 'done') { i = r.i; off = MU.rewind(r.off, tr[i].lv); } }
         N.audio.play(tr, i, { book: book, off: off, ctx: { title: it.type === 'album' ? it.title : it.album || '', rk: albumRk, lib: it.lib, thumb: it.thumb } });
         N.router.push('nowplaying');
-      });
+      }, it.thumb);
       return true;
     },
     /* Bibliothek: Alle abspielen / Zufall (max. 200 Titel, Zufall vom Server gemischt; keine Play-Queue) */

@@ -100,6 +100,11 @@ No, by design. Neolume only uses server addresses on your home network, so no ac
   Only a salted hash is stored. Forgot it? The main profile can reset other PINs under **Settings → Profile & account**;
   for the main profile's own PIN, run the setup again with **Reset app PINs** ticked.
 
+### Can I change the colours?
+Yes. **Settings → Interface → Accent colour** offers seven colours for the focus, buttons and progress bars: Teal
+(the default), Amber, Coral, Rose, Lavender, Sky blue and Mint. The choice is saved per profile and takes effect at once.
+Every colour is checked for good contrast: labels on it and the colour itself on the dark background reach at least 4.5:1.
+
 ### What happens to my other self-installed apps?
 During the sync the TV **removes every self-installed app that is not on the sync list**. That is how the TV works, not a
 Neolume decision. Add your other apps in the setup program under **Advanced** before you sync. Apps from the Samsung store

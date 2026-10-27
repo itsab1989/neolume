@@ -3,12 +3,12 @@
  * Uhr 1x pro Minute, Schoner-Bild + Insel-Ecke alle 30 s (harter Wechsel, keine Animation grosser Flaechen).
  * - Faellig nach "Bildschirmschoner nach" (Aus/5/10/15/30 Min., Standard 5) ohne Taste/Zeiger; nie waehrend ein Video laeuft,
  *   in der Pause fruehestens nach 10 Min. mit "Pausiert · Serie S1 · F5".
- * - Bilder aus dem Home-Cache des aktiven Profils (0 Anfragen ausser den Bildern, 640x360 blur=24, gestreckt; Einstellung
- *   "Schoner-Bilder unscharf" aus: 1280x720 scharf); ohne Profil
+ * - Bilder aus dem Home-Cache des aktiven Profils (0 Anfragen ausser den Bildern; nur Titel mit echter Art,
+ *   1280x720 blur=8 quality=95; Einstellung "Schoner-Bilder unscharf" aus: 1280x720 scharf); ohne Profil
  *   (Anmeldung/Profilwahl) nur die Uhr.
  * - Jede Taste und jeder Zeiger-Klick beendet ihn OHNE die normale Funktion (App.onKey fragt saver.key zuerst). */
 (function (N) {
-  var U = N.util, C = N.comfort, TICK = 1000;
+  var U = N.util, C = N.comfort, TICK = 1000, SAVER_BLUR = 8, SAVER_Q = 95;   // weicher Schoner (s. cycle)
   var S = { on: false }, root = null, timer = 0, lastAct = 0, lastMin = '', homeT0 = 0;
   var hc, hcT, el, img, isl, ck, ti, sb, kind = '', items = [], idx = -1, cyc = 0, nextAt = 0;
 
@@ -20,10 +20,11 @@
     if (!N.session || !N.session.profile) return 5;                  // Anmeldung/Profilwahl: Standard (nur Uhr)
     return s && s.screensaver !== undefined ? Number(s.screensaver) || 0 : 5;
   }
-  function clockText() { return C.clock(new Date(), N.config.fixedClock); }
+  function clockText() { return C.clock(N.clock.date(), N.config.fixedClock); }   // korrigierte Wanduhr (core/clock.js)
   function act() { lastAct = now(); }
   /* Zeiger: beendet den Schoner und wird geschluckt (Capture-Phase am #root, vor N.pointer) */
   function onPointer(e) {
+    if (N.pointer && N.pointer.enabled && !N.pointer.enabled()) return;   // Zeiger-Steuerung aus: Zeiger wirkt nirgends (auch nicht hier)
     act();
     if (!S.on) return;
     if (e.type === 'mousemove') return;                              // nur Bewegung: Schoner bleibt bis zum Klick/zur Taste
@@ -82,7 +83,7 @@
     if (kind === 'art' && !items.length) kind = 'clock';
     if (kind === 'paused') {
       var it = ps.item || {};
-      items = [{ art: it.art || it.still || '', title: C.pausedText(it), sub: '' }];
+      items = [{ art: it.art || '', title: C.pausedText(it), sub: '' }];   // ohne Art kein Bild (kein Poster-Ersatz)
     }
     S.on = true; idx = -1; cyc = N.config.fixedClock ? -1 : Math.floor(Math.random() * 4);   // Tests: feste Ecke/Bildfolge
     U.show(hc, false);
@@ -102,9 +103,10 @@
     idx = kind === 'paused' ? 0 : C.nextIndex(items.length, idx, N.config.fixedClock ? 0 : undefined);
     var x = items[idx];
     U.setText(ti, x.title); U.setText(sb, x.sub || '');
-    // F21: unscharf (640x360 blur 24, gestreckt) oder scharf (1280x720 wie der Hero, ohne Skalierung)
+    // F21: weich oder scharf (beide 1280x720 wie der Hero, ohne Skalierung). TV 27.10. nachmittags: 640x360 blur 24 gestreckt war ein
+    // unkenntlicher Farbbrei mit JPEG-Bloecken -> nativ, blur 8 (ruhig, Motiv erkennbar), quality 95 (Block-Kennzahl 2,38 -> 1,15; ~150 KB)
     var sharp = settings() && settings().saverBlur === false;
-    if (x.art) N.img.want(img, sharp ? N.img.url(x.art, 'hero') : N.img.url(x.art, 'backdrop', { blur: 24 }), 0); else N.img.drop(img);
+    if (x.art) N.img.want(img, sharp ? N.img.url(x.art, 'hero') : N.img.url(x.art, 'hero', { blur: SAVER_BLUR, quality: SAVER_Q }), 0); else N.img.drop(img);
   }
   S.stop = function () {
     if (!S.on) return;

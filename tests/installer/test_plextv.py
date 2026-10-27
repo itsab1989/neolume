@@ -53,7 +53,7 @@ class PinFlow(unittest.TestCase):
     def test_only_fixed_api_paths(self):
         p = PlexTV('plexneo-test0001', fetch=H.FakeFetch())
         with self.assertRaises(ValueError): p._call('GET', 'https://evil.example/')
-        with self.assertRaises(ValueError): p.shared_servers(H.ACCOUNT_TOK, '../../api/v2/user')
+        with self.assertRaises(ValueError): p.shared_servers(H.ACCOUNT_TOK, '../../api/v2/user', [2])
 
 
 class Parsing(unittest.TestCase):
@@ -79,31 +79,48 @@ class Parsing(unittest.TestCase):
         self.assertTrue(u[4]['guest'])
 
     def test_shared_servers(self):
-        s = plextv.parse_shared_servers(ET.fromstring(H.SHARED_XML.encode()))
+        s = plextv.parse_shared_servers(ET.fromstring(H.SHARED_XML.encode()), [2, 3, 4, 78])
         self.assertEqual([(x['userID'], x['token']) for x in s],
-                         [(2, H.KID_TOK), (3, H.TEEN_TOK), (77, H.FRIEND_TOK)])   # invalid token / missing userID dropped
+                         [(2, H.KID_TOK), (3, H.TEEN_TOK)])   # invalid token / missing userID dropped
+
+    def test_shared_servers_never_friends(self):
+        # shared accounts outside Plex Home ("friends", userID 77) are dropped while parsing: their token is never kept
+        s = plextv.parse_shared_servers(ET.fromstring(H.SHARED_XML.encode()), [2, 3])
+        self.assertNotIn(77, [x['userID'] for x in s])
+        self.assertNotIn(H.FRIEND_TOK, repr(s))
+        self.assertEqual(plextv.parse_shared_servers(ET.fromstring(H.SHARED_XML.encode()), []), [])
+        self.assertEqual(plextv.parse_shared_servers(ET.fromstring(H.SHARED_XML.encode()), None), [])
 
     def test_shared_servers_request(self):
         f = H.FakeFetch()
-        s = PlexTV('plexneo-test0001', fetch=f).shared_servers(H.ACCOUNT_TOK, H.MID)
-        self.assertEqual(len(s), 3)
+        s = PlexTV('plexneo-test0001', fetch=f).shared_servers(H.ACCOUNT_TOK, H.MID, [2, 3])
+        self.assertEqual(len(s), 2)
         self.assertEqual(f.calls[0][1], 'https://plex.tv/api/servers/%s/shared_servers' % H.MID)
         self.assertEqual(f.calls[0][2]['Accept'], 'application/xml')
 
     def test_build_profiles(self):
         acc = plextv.parse_user(H.USER_JSON)
         home = plextv.parse_home_users(H.HOME_JSON)
-        shared = plextv.parse_shared_servers(ET.fromstring(H.SHARED_XML.encode()))
+        shared = plextv.parse_shared_servers(ET.fromstring(H.SHARED_XML.encode()), [u['id'] for u in home])
         p = plextv.build_profiles(acc, home, shared, H.OWNER_TOK)
         by = dict((x['title'], x) for x in p)
-        self.assertEqual([x['title'] for x in p], ['Owner', 'Kid', 'Teen', 'NoShare', 'buddy'])
+        self.assertEqual([x['title'] for x in p], ['Owner', 'Kid', 'Teen', 'NoShare'])
         self.assertEqual(by['Owner']['kind'], 'owner'); self.assertEqual(by['Owner']['token'], H.OWNER_TOK)
         self.assertTrue(by['Kid']['include']); self.assertEqual(by['Kid']['token'], H.KID_TOK)
         self.assertEqual(by['Kid']['restrictionProfile'], 'little_kid')
         self.assertIsNone(by['NoShare']['token']); self.assertFalse(by['NoShare']['include'])
-        self.assertEqual(by['buddy']['kind'], 'friend'); self.assertFalse(by['buddy']['include'])   # friends opt-in
         self.assertNotIn('Guest', by)
         self.assertEqual(by['Teen']['thumb'], '')            # non-plex.tv / http avatar dropped
+
+    def test_build_profiles_never_friends(self):
+        # even if a friend's entry reaches build_profiles (unfiltered list), it never becomes a profile
+        acc = plextv.parse_user(H.USER_JSON)
+        home = plextv.parse_home_users(H.HOME_JSON)
+        shared = [{'userID': 77, 'username': 'buddy', 'token': H.FRIEND_TOK, 'allLibraries': True, 'accepted': True}]
+        p = plextv.build_profiles(acc, home, shared, H.OWNER_TOK)
+        self.assertNotIn('buddy', [x['title'] for x in p])
+        self.assertNotIn('friend', [x['kind'] for x in p])
+        self.assertNotIn(H.FRIEND_TOK, repr(p))
 
     def test_build_profiles_without_home(self):
         acc = plextv.parse_user(H.USER_JSON)

@@ -6,9 +6,13 @@
  * - rail.png       120x720 (Rail-Hintergrund, #0E0F11 -> transparent)
  * - qr.png         264x264 QR-Code fuer https://plex.tv/link (Inhalt ist fest -> kein QR-Code zur Laufzeit)
  * - scrim.png      wird aus app/scrim.png uebernommen (am TV abgestimmte Ueberblendmaske)
- * - <pointer>[-press].png  Smart-Control-Zeiger je Marke (siehe unten; --pointers erzeugt nur diese)
+ * - <pointer>[-press].png  Smart-Control-Zeiger je Marke und pointer-<id>[-press].png je Akzentfarbe der Palette
+ *                  (src/core/accent.js; siehe unten; --pointers erzeugt nur diese). Einziges Bild in der Akzentfarbe:
+ *                  icons.png, rail.png, fade/scrims und qr.png sind farbneutral (Icons auf dem Akzent: Zeile on-accent #141414).
  * - scrim-det.png  1280x720 Detailseiten (DetHero): scrim.png + kraeftigere Abdunklung hinter Titel/Infos/Beschreibung
  *                  (TV-Test 27.10., F5/F17: Text auf hellen Hintergruenden lesbar); eine Ebene statt zwei
+ * - scrim-np.png   1280x720 Jetzt laeuft + Kuenstlerseite: scrim-det.png + gleichmaessige Abdunklung (F24: weisse Fotos hinter weissem Text)
+ *                  Nur die Scrims neu erzeugen: node tools/make_assets.js --scrims
  * Braucht: rsvg-convert (Homebrew librsvg) fuer den Sprite, npm-Paket qrcode.
  */
 'use strict';
@@ -16,16 +20,26 @@ var fs = require('fs'), path = require('path'), zlib = require('zlib'), cp = req
 var ROOT = path.join(__dirname, '..'), OUT = path.join(ROOT, 'src', 'assets');
 fs.mkdirSync(OUT, { recursive: true });
 
-/* ---------- Zeiger (Smart Control): Pfeil in der Akzentfarbe der Marke, 2 px dunkle Kontur, Spitze bei (4,4) ----------
- * Je Marken-Profil (brand/*.json: pointer, accent, accentPress) <pointer>.png + <pointer>-press.png.
+/* ---------- Zeiger (Smart Control): Pfeil in der Akzentfarbe, 2 px dunkle Kontur, Spitze bei (4,4) ----------
+ * Je Palettenfarbe pointer-<id>.png + pointer-<id>-press.png (gedrueckt: 30 % zu Weiss aufgehellt), danach je Marken-Profil
+ * (brand/*.json: pointer, accent, accentPress) <pointer>.png + <pointer>-press.png fuer ihre Standardfarbe (ueberschreibt
+ * gleichnamige Palettenbilder, z. B. pointer-teal).
  * Nur die Zeiger neu erzeugen: node tools/make_assets.js --pointers */
 function arrowSvg(fill) {
   return '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><path d="M4 4 L4 26 L10 20.5 L14.2 29.5 L18.6 27.5 L14.4 18.6 L22 18.6 Z" ' +
     'fill="' + fill + '" stroke="#0E0F11" stroke-width="2" stroke-linejoin="round"/></svg>';
 }
+function lighten(hex, f) {
+  return '#' + [1, 3, 5].map(function (i) { var v = parseInt(hex.substr(i, 2), 16); return ('0' + Math.round(v + (255 - v) * f).toString(16)).slice(-2); }).join('').toUpperCase();
+}
+var ptrs = [];
+require('./build.js').loadPalette().forEach(function (p) { ptrs.push(['pointer-' + p.id, p.color, lighten(p.color, 0.3)]); });
 fs.readdirSync(path.join(ROOT, 'brand')).filter(function (f) { return /\.json$/.test(f); }).forEach(function (f) {
   var b = JSON.parse(fs.readFileSync(path.join(ROOT, 'brand', f), 'utf8'));
-  [[b.pointer + '.png', b.accent], [b.pointer + '-press.png', b.accentPress]].forEach(function (p) {
+  ptrs.push([b.pointer, b.accent, b.accentPress]);
+});
+ptrs.forEach(function (b) {
+  [[b[0] + '.png', b[1]], [b[0] + '-press.png', b[2]]].forEach(function (p) {
     var t = path.join(require('os').tmpdir(), 'neo-' + p[0] + '.svg');
     fs.writeFileSync(t, arrowSvg(p[1]));
     try { cp.execFileSync('rsvg-convert', ['-o', path.join(OUT, p[0]), t]); } catch (e) { console.error('rsvg-convert fehlt – ' + p[0]); }
@@ -49,6 +63,8 @@ function png(w, h, pixel) {   // pixel(x,y) -> [r,g,b,a]
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
 }
 var BG = [0x0E, 0x0F, 0x11];
+
+if (process.argv.indexOf('--scrims') >= 0) { scrimDet(); scrimNp(); process.exit(0); }
 
 /* fade-bottom: Bild beginnt bei y=632; transparent bei 0, deckend ab 20 (y=652) */
 fs.writeFileSync(path.join(OUT, 'fade-bottom.png'), png(1280, 88, function (x, y) {
@@ -129,12 +145,24 @@ function scrimDet() {
   }));
 }
 
+/* ---------- scrim-np: zusaetzlich ueberall 0.45 (Text rechts in Jetzt laeuft, Kuenstler-Fotos), eine Ebene ----------
+ * Ergebnis mindestens ca. 0.6 hinter jedem Text; das Bild bleibt als Stimmung sichtbar. */
+function scrimNp() {
+  var src = path.join(OUT, 'scrim-det.png');
+  if (!fs.existsSync(src)) return;
+  var S = require('./visual.js').readPng(src);
+  fs.writeFileSync(path.join(OUT, 'scrim-np.png'), png(S.w, S.h, function (x, y) {
+    var o = (y * S.w + x) * 4, a = S.px[o + 3] / 255;
+    return [S.px[o], S.px[o + 1], S.px[o + 2], Math.round(255 * (1 - (1 - a) * 0.55))];
+  }));
+}
+
 /* ---------- QR ---------- */
 var QR = require('qrcode');
 QR.toFile(path.join(OUT, 'qr.png'), 'https://plex.tv/link', { errorCorrectionLevel: 'M', margin: 0, width: 264, color: { dark: '#0E0F11', light: '#FFFFFF' } }, function (err) {
   if (err) console.error('QR-Fehler', err);
   var scrimSrc = path.join(ROOT, 'app', 'scrim.png');
   if (!fs.existsSync(path.join(OUT, 'scrim.png')) && fs.existsSync(scrimSrc)) fs.copyFileSync(scrimSrc, path.join(OUT, 'scrim.png'));
-  scrimDet();
+  scrimDet(); scrimNp();
   fs.readdirSync(OUT).forEach(function (f) { console.log(f, fs.statSync(path.join(OUT, f)).size + ' B'); });
 });

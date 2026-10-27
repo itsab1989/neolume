@@ -381,11 +381,11 @@ test('Knopfreihe: sichtbare Knoepfe, ◀▶ ohne Umlauf, Zeiger-Treffer, Label-M
   assert.strictEqual(O.nav(film, 'back', 'LEFT'), 'back');
   assert.strictEqual(O.nav(film, 'next', 'LEFT'), 'pp', 'ausgeblendeter Knopf -> Play/Pause');
   assert.strictEqual(O.center('pp'), 640, 'Play/Pause mittig auf x = 640');
-  assert.strictEqual(O.hit(film, 640, 648), 'pp');
-  assert.strictEqual(O.hit(film, 1160, 640), 'more');
-  assert.strictEqual(O.hit(film, 1032, 640), null, 'Kapitel ausgeblendet');
-  assert.strictEqual(O.hit(all, 1032, 640), 'chap');
-  assert.strictEqual(O.hit(all, 300, 640), null);
+  assert.strictEqual(O.hit(film, 640, 562), 'pp');
+  assert.strictEqual(O.hit(film, 1160, 562), 'more');
+  assert.strictEqual(O.hit(film, 1032, 562), null, 'Kapitel ausgeblendet');
+  assert.strictEqual(O.hit(all, 1032, 562), 'chap');
+  assert.strictEqual(O.hit(all, 300, 562), null);
 });
 test('Kapitel: sortiert, Kapitel zur Zeit', function () {
   var c = N.osd.chapters([{ tag: 'B', index: 2, startTimeOffset: 600000 }, { tag: 'A', index: 1, startTimeOffset: 0 }]);

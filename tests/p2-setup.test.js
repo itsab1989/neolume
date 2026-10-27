@@ -38,7 +38,8 @@ test('setup.json: gueltige Datei -> Server, Profile, Kinder-/Hauptprofil-Kennzei
   assert.strictEqual(r.cfg.id, '2026-10-26T12:00:00Z|0123456789abcdef0123456789abcdef01234567');
   var u = N.setupFile.users(r.cfg, function () { return false; });
   H.eq(u.map(function (x) { return [x.uuid, x.kind, x.admin]; }),
-    [['aaaa1111', 'main', true], ['bbbb2222', 'kid', false], ['cccc3333', 'teen', false], ['dddd4444', '', false], ['eeee5555', '', false]]);
+    [['aaaa1111', 'main', true], ['bbbb2222', 'kid', false], ['cccc3333', 'teen', false], ['dddd4444', '', false]]);   // Freund (eeee5555) uebersprungen
+  H.eq(r.cfg.skipped, ['friend']);
   assert.strictEqual(u[0].thumb, 'https://plex.tv/users/aaaa1111/avatar?c=1');
 });
 
@@ -46,7 +47,7 @@ test('setup.json: kaputte Dateien werden abgelehnt (Grund fuer die Meldung)', fu
   var N = H.load().N;
   function why(t) { var r = N.setupFile.parse(t); assert.strictEqual(r.ok, false); return r.reason; }
   // einzelnes fehlerhaftes Profil: uebersprungen (Grund in cfg.skipped), die uebrigen Profile gelten (TV-Test 27.10.)
-  function skip(t) { var r = N.setupFile.parse(t); assert.ok(r.ok, r.reason); assert.strictEqual(r.cfg.profiles.length, 4); return r.cfg.skipped[0]; }
+  function skip(t) { var r = N.setupFile.parse(t); assert.ok(r.ok, r.reason); assert.strictEqual(r.cfg.profiles.length, 3); return r.cfg.skipped[0]; }
   assert.strictEqual(why('{kaputt'), 'json');
   assert.strictEqual(why(''), 'json');
   assert.strictEqual(why('[]'), 'kind');
@@ -62,8 +63,8 @@ test('setup.json: kaputte Dateien werden abgelehnt (Grund fuer die Meldung)', fu
   assert.strictEqual(skip(txt(function (o) { o.profiles[1].kind = 'admin'; })), 'profile');
   assert.strictEqual(skip(txt(function (o) { o.profiles[1].title = ''; })), 'profile');
   assert.strictEqual(skip(txt(function (o) { o.profiles[1].uuid = 'aaaa1111'; })), 'dup');
-  assert.strictEqual(skip(txt(function (o) { o.profiles[4].uuid = ''; })), 'profile');        // Freund ohne uuid (aelteres Einrichtungsprogramm)
-  assert.strictEqual(why(txt(function (o) { o.profiles = [o.profiles[4]]; o.profiles[0].uuid = ''; })), 'profile');   // kein gueltiges Profil uebrig
+  assert.strictEqual(skip(txt(function (o) { o.profiles[3].uuid = ''; })), 'profile');        // Profil ohne uuid: nur dieses faellt weg
+  assert.strictEqual(why(txt(function (o) { o.profiles = [o.profiles[3]]; o.profiles[0].uuid = ''; })), 'profile');   // kein gueltiges Profil uebrig
   assert.strictEqual(why(txt(function (o) { o.profiles[1].kind = 'owner'; })), 'owner');
 });
 
@@ -100,7 +101,7 @@ test('setup.json lesen: Vorschau-Text, Datei fehlt (404/leer/Timeout), file:// (
   H.eq(out, [['null', null, null]]);
   return new Promise(function (resolve) {
     setTimeout(function () {
-      H.eq(res, { s404: [null, null], s0: [5, null], empty: [null, null], bad: [null, 'newer'] });
+      H.eq(res, { s404: [null, null], s0: [4, null], empty: [null, null], bad: [null, 'newer'] });
       resolve();
     }, 20);
   });
@@ -323,6 +324,31 @@ test('Startprofil (Regel 9) mit setup.json: Standard Hauptprofil auch mit App-PI
   T2.state.pinSwitch = false;
   assert.strictEqual(T2.startRoute().route, 'profiles');                               // mit PIN -> Profilwahl
   assert.ok(String(t.disk['state.json'] || '').indexOf('TOKEN') < 0);                 // Tokens nie im Store
+});
+
+test('Alte setup.json mit Freund-Profilen: Freunde werden nie uebernommen (kind friend oder uuid friend-*), Rest bleibt gueltig', function () {
+  var N = H.load().N;
+  var r = N.setupFile.parse(txt(function (o) {
+    o.profiles.push({ id: 77, uuid: 'friend-77', title: 'Buddy', thumb: '', kind: 'home', restricted: false, restrictionProfile: '', token: 'FRIENDTOKEN000000077' });
+    o.profiles.push({ id: 78, title: 'NoUuid', kind: 'friend', token: 'FRIENDTOKEN000000078' });   // aelteres Programm: ohne uuid
+  }));
+  assert.ok(r.ok, r.reason);
+  H.eq(r.cfg.profiles.map(function (p) { return p.uuid; }), ['aaaa1111', 'bbbb2222', 'cccc3333', 'dddd4444']);
+  H.eq(r.cfg.skipped, ['friend', 'friend', 'friend']);
+  assert.strictEqual(JSON.stringify(r.cfg).indexOf('FRIENDTOKEN'), -1);              // Token der Freunde nicht im Speicher
+  // nur Freunde -> keine gueltige Einrichtung
+  var only = N.setupFile.parse(txt(function (o) { o.profiles = [o.profiles[4]]; }));
+  assert.strictEqual(only.ok, false); assert.strictEqual(only.reason, 'friend');
+  // zuletzt genutztes Profil war der Freund: nach dem Laden vergessen, Start wie ueblich (Hauptprofil), PINs unberuehrt
+  var s = setup({ 'state.json': JSON.stringify({ v: 1, clientId: 'c', account: null, server: null, users: null, usersTs: 0, profiles: {},
+    lastProfile: 'eeee5555', lang: 'de', pinSwitch: null, protectRemindAt: 0, firstPicker: false, startProfile: 'last' }) }), S = s.N.session;
+  S.load(pkg(s.N));
+  assert.strictEqual(S.user('eeee5555'), null);
+  assert.strictEqual(S.state.lastProfile, null);
+  assert.strictEqual(S.users().length, 4);
+  assert.strictEqual(S.startRoute().route, 'profiles');                                // "Zuletzt" ohne letztes Profil -> Profilwahl
+  S.state.startProfile = 'main';
+  assert.strictEqual(S.startRoute().user.uuid, 'aaaa1111');
 });
 
 

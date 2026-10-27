@@ -55,7 +55,7 @@
       N.setupFile.read(ctx, function (pkg, why) {
         mark('setup');
         var st = N.setupFile.timing();   // P7: Datei-Lesen vs. blockierter Hauptthread unterscheiden (docs/P7-TV-TEST.md)
-        if (st) marks.push('(setup: io ' + st.io + ', vorab ' + st.early + ', warten ' + st.wait + ', luecke ' + st.gap + ')');
+        if (st) marks.push('(setup: io ' + st.io + ', vorab ' + st.early + ', warten ' + st.wait + ', luecke ' + st.gap + (st.show >= 0 ? ', davon onShow ' + st.show : '') + ')');
         A.boot(pkg, why, t0);
       });
     },
@@ -65,6 +65,7 @@
       A.setupError = why || null;
       mark('session');
       N.i18n.set(st.lang || tvLanguage());
+      N.accent.apply(st.accent);                       // zuletzt genutzte Akzentfarbe vor dem ersten Bild (kein Farbsprung)
       mark('i18n');
       N.ui.hints.init(chrome);
       N.ui.toast.init(chrome);
@@ -74,6 +75,7 @@
       N.pointer.init(root, chrome);
       N.pointer.setCursorMode(N.config.cursorMode);
       N.pointer.setEnabled(st.pointer !== false);
+      N.pointer.setAccel(st.ptrAccel !== false);         // Randzonen-Rollen beschleunigen (Standard an)
       mark('chrome');
       if (N.devperf) N.devperf.init(root, ctx);         // dev/-Module fehlen im Release-Build (app.min.js)
       N.ui.saver.init(root, chrome);                  // P5: Bildschirmschoner, Uhr auf der Startseite, Willkommenskarte

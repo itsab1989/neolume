@@ -2,7 +2,7 @@
  * Netz-Standards sind im Repo leer: tools/build.js setzt die lokalen Werte aus local.json (git-ignoriert) ins gebaute app.js. */
 (function (N) {
   var C = {
-    version: '1.0.1',
+    version: '1.0.2',
     product: N.brand.name,
     platform: 'Samsung',
     platformVersion: 'Orsay 2014',
@@ -34,6 +34,7 @@
       if (o.cursor === 'A' || o.cursor === 'B' || o.cursor === 'system') C.cursorMode = o.cursor;
       if (o.sefFake === 'still') C.sefFake = 'still';                 // Vorschau/visuelle Tests: stehendes Bild
       if (Number(o.seekDelay) > 0) C.seekDelay = Number(o.seekDelay);  // nur Tests: Sammel-Sprung haelt an
+      if (Number(o.ptrEdgeDwell) > 0) C.ptrEdgeDwell = Number(o.ptrEdgeDwell);   // nur Tests: Zeiger-Randzone zeigt nur die Pille
       if (o.hlsFast === true) C.hls = { wait: 0, startBitrate: 5000000, offset: true, eac3: true, incomplete: true, buf: null };
       var H = C.hls;
       if (o.hlsWait !== undefined && Number(o.hlsWait) >= 0) H.wait = Number(o.hlsWait);

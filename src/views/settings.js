@@ -14,13 +14,14 @@
       var S = st(), c = S.hubCatalog(), hc = S.homeCache(), libs = hc && hc.libs || [];
       return N.homeRows.enabled(S.settings && S.settings.homeRows || null, N.homeRows.avail(libs, c)).length;
     }
-    /* Auswahlzeile: Wert aus den Einstellungen, OK oeffnet das Auswahl-Panel */
+    /* Auswahlzeile: Wert aus den Einstellungen, OK oeffnet das Auswahl-Panel. opts: [wert, text, farbfeld (optional, .sw-<id>)] */
     function choice(id, opts, label) {
       var S = st();
       function cur() { var v = S.settings ? S.settings[id] : null; for (var i = 0; i < opts.length; i++) if (String(opts[i][0]) === String(v)) return opts[i]; return opts[0]; }
       return { id: id, type: 'list', label: 'set.' + id, desc: 'set.' + id + '.desc', val: function () { return cur()[1]; },
+        sw: opts[0][2] ? function () { return cur()[2]; } : null,
         open: function () {
-          var e = []; for (var i = 0; i < opts.length; i++) e.push({ id: String(opts[i][0]), t: opts[i][1] });
+          var e = []; for (var i = 0; i < opts.length; i++) e.push({ id: String(opts[i][0]), t: opts[i][1], sw: opts[i][2] });
           N.ui.panel.select({ title: N.t('set.' + id), selected: String(cur()[0]), entries: e, onSelect: function (v) {
             for (var j = 0; j < opts.length; j++) if (String(opts[j][0]) === v) S.setSetting(id, opts[j][0]);
             paintAll();
@@ -76,6 +77,13 @@
       var det = choice('animeDetect', vals(['normal', 'strict', 'off'])), show = dimOff(toggle('animeShow')), rules = dimOff(toggle('anime'));
       return [det, show, rules, dim(choice('animeAudio', vals(['ja', 'de', 'same']))), dim(choice('animeSubs', vals(['deen', 'de', 'off']))),
         dim(toggle('animeSigns'))];
+    }
+    /* Akzentfarbe (N.accent): Palette mit Farbfeld, Standardfarbe der Marke zuerst; wirkt sofort (settings:changed) */
+    function accentRow() {
+      var o = [], ids = N.accent.ids(), b = N.accent.base();
+      for (var i = 0; i < ids.length; i++) o.push([ids[i], v('ac_' + ids[i]), ids[i]]);
+      for (i = 0; i < o.length; i++) if (o[i][0] === b) o.unshift(o.splice(i, 1)[0]);   // Standard zuerst
+      return choice('accent', o);
     }
     function displayRows(S) {
       var out = [toggle('backgrounds'), toggle('spoiler'), toggle('clock')];
@@ -148,7 +156,11 @@
         { id: 'rm', type: 'toggle', label: 'set.reduceMotion', desc: 'set.reduceMotion.desc',
           get: function () { return !!(S.settings && S.settings.reduceMotion); }, set: function (v) { S.setSetting('reduceMotion', v); N.fx.setReduced(v); } },
         { id: 'ptr', type: 'toggle', label: 'set.pointer', desc: 'set.pointer.desc',
-          get: function () { return S.state.pointer !== false; }, set: function (v) { S.state.pointer = v; S.save(); N.pointer.setEnabled(v); } }
+          get: function () { return S.state.pointer !== false; }, set: function (v) { S.state.pointer = v; S.save(); N.pointer.setEnabled(v); } },
+        // TV-Befund 27.10. nachmittags: Randzonen-Rollen erst langsam, dann schneller; nur mit Zeiger-Steuerung (sonst ausgegraut)
+        { id: 'ptracc', type: 'toggle', label: 'set.ptrAccel', desc: 'set.ptrAccel.desc', ddesc: 'set.ptrAccel.off.desc',
+          disabled: function () { return S.state.pointer === false; },
+          get: function () { return S.state.ptrAccel !== false; }, set: function (v) { S.state.ptrAccel = v; S.save(); N.pointer.setAccel(v); } }
       ] });
       // "Startseite anpassen" (SPEC 7.3.1) – nicht in Kinderprofilen (7.13)
       if (!S.isKid()) list[1].rows.splice(1, 0, { id: 'homerows', type: 'action', label: 'set.homeRows', desc: 'set.homeRows.desc',
@@ -156,6 +168,7 @@
         // W1 "Seitenleiste anpassen": Eintraege umsortieren/ausblenden (Start + Einstellungen bleiben), gleiche Liste wie oben
         { id: 'railitems', type: 'action', label: 'set.railItems', desc: 'set.railItems.desc',
           val: function () { return N.tn('set.railItems.val', N.ui.rail.order().length); }, run: function () { N.router.push('railitems'); } });
+      list[1].rows.splice(S.isKid() ? 1 : 3, 0, accentRow());   // Akzentfarbe hinter Sprache bzw. "Seitenleiste anpassen"
       // P5: Oberflaeche ergaenzen, "Ton & Untertitel" und "Anime" als eigene Kategorien hinter "Wiedergabe" (SPEC 10.4)
       list[1].rows = list[1].rows.concat(displayRows(S));
       list.splice(1, 0, { id: 'subs', rows: subsRows() }, { id: 'anime', rows: animeRows() });
@@ -206,6 +219,7 @@
         re.lb = U.txt('div', 'lb', re.el, '');
         re.val = U.txt('div', 'val', re.el, '');
         re.tg = U.el('div', 'toggle', re.el); U.el('i', '', re.tg);
+        re.sw = U.el('span', 'sw', re.el);              // Farbfeld (nur Zeilen mit sw, z. B. Akzentfarbe)
         U.el('div', 'sep', re.el);
         rowEls.push(re);
       }
@@ -227,6 +241,8 @@
       U.show(re.tg, d.type === 'toggle');
       if (d.type === 'toggle') U.cls(re.tg, 'on', d.get());
       U.setText(re.val, d.type === 'toggle' ? '' : (d.val ? d.val() : ''));
+      var sw = d.sw ? d.sw() : '';
+      if (re.swc !== sw) { re.swc = sw; re.sw.className = sw ? 'sw sw-' + sw : 'sw'; U.cls(re.el, 'has-sw', !!sw); }
       U.cls(re.el, 'dis', !!(d.disabled && d.disabled()));
     }
     function showCat(i) {
@@ -260,7 +276,7 @@
     function activate() {
       var d = rowsOf()[r];
       if (d.disabled && d.disabled()) return;
-      if (d.type === 'toggle') { d.set(!d.get()); paintRow(r); setDesc(); }
+      if (d.type === 'toggle') { d.set(!d.get()); paintAll(); setDesc(); }   // alle Zeilen: abhaengige (z. B. Zeiger-Scrollen) aendern ihren Zustand
       else if (d.type === 'list') d.open();
       else if (d.type === 'action') d.run();
     }

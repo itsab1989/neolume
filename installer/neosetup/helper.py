@@ -403,7 +403,7 @@ class Helper(object):
         return self.discover(uuid, lst, q_choice(q, 'type', {'movie': 1, 'show': 2}, None, required=True), q_int(q, 'size', 20, 1, 30))
 
     def _need_profile(self, uuid):
-        if not self.store.token(uuid): raise HelperError(404, 'profile')     # e.g. profile with Plex PIN, or a friend
+        if not self.store.token(uuid): raise HelperError(404, 'profile')     # e.g. profile with a Plex PIN
 
 
 # ---------------------------------------------------------------- LAN check + parameter validation

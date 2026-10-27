@@ -12,14 +12,140 @@ var errors = [];
 function fail(msg) { errors.push(msg); }
 
 /* ---------- CSS ---------- */
-/* Marken-Tokens: @accent@ (Akzentfarbe) und @pointer@ (Zeiger-Bilder) aus brand/<id>.json (Standard: oeffentliche Marke). */
-var BRAND_CSS = { accent: '#2EC4B6', pointer: 'pointer-teal' };
+/* Marken-Tokens: @accent@ (Akzentfarbe) und @pointer@ (Zeiger-Bilder) aus brand/<id>.json (Standard: oeffentliche Marke).
+ * Akzentfarbe waehlbar (src/core/accent.js): Die Grundregeln tragen die Standardfarbe der Marke; fuer jede andere
+ * Palettenfarbe entsteht aus jeder Regel mit Token eine Variante ".ac-<id> <selektor>{nur die Token-Deklarationen}".
+ * Die App schaltet nur die Klasse am <html> um. Weil die Varianten eine Klasse spezifischer sind, werden Regeln ohne Token,
+ * die eine Token-Deklaration in der Grundfassung ueberstimmen koennten (gleiche Eigenschaft, gleiche Klasse im letzten
+ * Selektor-Glied, mindestens gleich spezifisch), mit allen Farbklassen in Quellreihenfolge mitkopiert. */
+var BRAND_CSS = { accent: '#2EC4B6', pointer: 'pointer-teal', accentId: 'teal' };
+/* Palette aus src/core/accent.js (eine Quelle fuer App, Build, make_assets.js und Tests) */
+function loadPalette() {
+  var ctx = { N: undefined };
+  vm.createContext(ctx);
+  ['core/ns.js', 'core/accent.js'].forEach(function (f) { vm.runInContext(fs.readFileSync(path.join(SRC, f), 'utf8'), ctx, { filename: f }); });
+  return ctx.N.accent.PALETTE.map(function (p) { return { id: p[0], color: p[1] }; });
+}
+/* Palette fuer eine Marke: ihre Standardfarbe (accentId) mit dem Markenwert und ihren Zeiger-Bildern, die anderen mit pointer-<id> */
+function brandPalette(brand) {
+  var b = brand || BRAND_CSS;
+  return loadPalette().map(function (p) {
+    var own = p.id === b.accentId;
+    return { id: p.id, color: own ? b.accent : p.color, pointer: own ? b.pointer : 'pointer-' + p.id, base: own };
+  });
+}
+function cssRules(css) {                 // kompaktes CSS (ohne Kommentare) -> [{sel, decls:[[prop, value]]} | {raw}]
+  var out = [], i = 0, n = css.length;
+  while (i < n) {
+    var o = css.indexOf('{', i);
+    if (o < 0) break;
+    var sel = css.slice(i, o).trim();
+    if (sel.charAt(0) === '@') {         // @-webkit-keyframes … : unveraendert (verschachtelte Klammern)
+      var d = 0, j = o;
+      for (; j < n; j++) { if (css[j] === '{') d++; else if (css[j] === '}' && --d === 0) break; }
+      out.push({ raw: css.slice(i, j + 1) }); i = j + 1; continue;
+    }
+    var c = css.indexOf('}', o), decls = [];
+    css.slice(o + 1, c).split(';').forEach(function (x) {
+      var k = x.indexOf(':');
+      if (k > 0) decls.push([x.slice(0, k).trim(), x.slice(k + 1).trim()]);
+    });
+    out.push({ sel: sel.split(',').map(function (x) { return x.trim(); }), decls: decls });
+    i = c + 1;
+  }
+  return out;
+}
+function specificity(sel) {
+  var s = sel.replace(/::?[a-z-]+\([^)]*\)/g, ' .p ').replace(/::[a-z-]+/g, ' ');
+  var a = (s.match(/#[\w-]+/g) || []).length, b = (s.match(/\.[\w-]+|\[[^\]]*\]|:[a-z-]+/g) || []).length;
+  var c = (s.replace(/#[\w-]+|\.[\w-]+|\[[^\]]*\]|:[a-z-]+/g, ' ').match(/(^|[\s>+~])[a-zA-Z][\w-]*/g) || []).length;
+  return a * 10000 + b * 100 + c;
+}
+/* letztes Selektor-Glied: Klassen und Elementname ("*"/fehlend = beliebig) */
+function lastPart(sel) {
+  var a = sel.split(/[\s>+~]+/), p = a.pop(), t = /^[a-zA-Z][\w-]*/.exec(p);
+  return { cls: p.match(/[.#][\w-]+/g) || [], tag: t ? t[0].toLowerCase() : '', up: a.join(' ').match(/[.#][\w-]+/g) || [] };
+}
+/* Teil-Eigenschaften, die eine Deklaration setzt (nur die, die eine Akzent-Deklaration betreffen koennen) */
+function parts(prop) {
+  var p = prop.replace(/^-webkit-/, '');
+  if (p === 'background') return ['bg-color', 'bg-image'];
+  if (p === 'background-color') return ['bg-color'];
+  if (p === 'background-image') return ['bg-image'];
+  if (/^border(-(top|right|bottom|left))?(-color)?$/.test(p)) return ['border-color'];
+  if (p === 'color' || p === 'cursor') return [p];
+  return [];
+}
+function hasToken(v) { return /@(accent|pointer)@/.test(v); }
+function accentCss(css, pal) {
+  var rules = cssRules(css), base = null, vars = [], tok = [];
+  pal.forEach(function (p) { if (p.base) base = p; else vars.push(p); });
+  if (!base) { fail('CSS: Standardfarbe der Marke fehlt in der Palette (accentId)'); return css; }
+  function fill(v, p) { return v.replace(/@accent@/g, p.color).replace(/@pointer@/g, p.pointer); }
+  rules.forEach(function (r, ri) {
+    if (r.raw) { if (hasToken(r.raw)) fail('CSS: Marken-Token in @-Regel'); return; }
+    r.decls.forEach(function (d) { if (hasToken(d[1])) tok.push({ ri: ri, parts: parts(d[0]), sel: r.sel }); });
+    r.sel.forEach(function (s) { if (hasToken(r.decls.map(function (d) { return d[1]; }).join(';')) && /^(html|body)\b/.test(s)) fail('CSS: Token-Regel auf html/body: ' + s); });
+  });
+  function overlaps(sa, sb) {             // koennen beide Selektoren dasselbe Element treffen? (Klassen-Muster dieses CSS)
+    var a = lastPart(sa), b = lastPart(sb), i;
+    if (a.cls.length && b.cls.length) { for (i = 0; i < a.cls.length; i++) if (b.cls.indexOf(a.cls[i]) >= 0) return !(a.tag && b.tag && a.tag !== b.tag); return false; }
+    if (!a.cls.length && !b.cls.length) {   // nur Elemente (".np-bar i"): gleiche Vorfahren-Klasse noetig
+      if (a.tag && b.tag && a.tag !== b.tag) return false;
+      if (!a.up.length || !b.up.length) return true;
+      for (i = 0; i < a.up.length; i++) if (b.up.indexOf(a.up[i]) >= 0) return true;
+      return false;
+    }
+    var t = a.cls.length ? b : a;         // ein Glied nur mit Element: trifft nur, wenn es beliebig ist ("*"/leer)
+    return !t.tag;
+  }
+  function conflicts(ri, sel, prop) {     // koennte diese Deklaration eine Token-Deklaration ueberstimmen?
+    var f = parts(prop);
+    return tok.some(function (t) {
+      if (t.ri === ri || !t.parts.some(function (x) { return f.indexOf(x) >= 0; })) return false;
+      return t.sel.some(function (sa) { return sel.some(function (sb) { return overlaps(sa, sb) && specificity(sb) >= specificity(sa); }); });
+    });
+  }
+  function scoped(sels, list) { var o = []; list.forEach(function (p) { sels.forEach(function (s) { o.push('.ac-' + p.id + ' ' + s); }); }); return o.join(','); }
+  function block(decls) { return '{' + decls.map(function (d) { return d[0] + ':' + d[1]; }).join(';') + '}'; }
+  /* Eintraege in Quellreihenfolge: je Token-Regel einer pro Farbe, je Begleitregel einer fuer alle Farben ('*').
+   * Gleiche Deklarationen einer Farbe werden zusammengefasst (an die erste Stelle), sofern keine Regel dazwischen dasselbe
+   * Element und dieselbe Teil-Eigenschaft treffen kann – die Kaskade bleibt also gleich, das CSS waechst weniger. */
+  var head = [], ents = [], copies = 0;
+  function partsOf(decls) { var o = []; decls.forEach(function (d) { o = o.concat(parts(d[0])); }); return o; }
+  rules.forEach(function (r, ri) {
+    if (r.raw) { head.push(r.raw); return; }
+    head.push(r.sel.join(',') + block(r.decls.map(function (d) { return [d[0], fill(d[1], base)]; })));
+    var t = r.decls.filter(function (d) { return hasToken(d[1]); });
+    if (t.length) vars.forEach(function (p) { ents.push({ c: p.id, sel: r.sel.slice(), b: block(t.map(function (d) { return [d[0], fill(d[1], p)]; })), parts: partsOf(t) }); });
+    else {
+      var c = r.decls.filter(function (d) { return conflicts(ri, r.sel, d[0]); });
+      if (c.length && vars.length) { ents.push({ c: '*', sel: r.sel.slice(), b: block(c), parts: partsOf(c) }); copies++; }
+    }
+  });
+  function clash(x, y) {
+    if (!x.parts.some(function (q) { return y.parts.indexOf(q) >= 0; })) return false;
+    return x.sel.some(function (sa) { return y.sel.some(function (sb) { return overlaps(sa, sb); }); });
+  }
+  var out = [];
+  ents.forEach(function (e) {
+    for (var i = out.length - 1; i >= 0; i--) {
+      var o = out[i];
+      if (o.c === e.c && o.b === e.b) { o.sel = o.sel.concat(e.sel); o.parts = o.parts.concat(e.parts); return; }
+      if ((o.c === e.c || o.c === '*' || e.c === '*') && clash(o, e)) break;
+    }
+    out.push(e);
+  });
+  var extra = out.map(function (e) { return scoped(e.sel, e.c === '*' ? vars : [{ id: e.c }]) + e.b; });
+  pal.forEach(function (p) { extra.push('.sw-' + p.id + '{background:' + p.color + '}'); });   // Farbfelder (Einstellung, Auswahl)
+  accentCss.stats = { variants: vars.length, tokenRules: rules.filter(function (r) { return !r.raw && r.decls.some(function (d) { return hasToken(d[1]); }); }).length, copies: copies, bytes: extra.join('').length };
+  return head.join('') + extra.join('');
+}
 function buildCss(cssText, brand) {
   var css = cssText !== undefined ? cssText : fs.readFileSync(path.join(SRC, 'css', 'app.css'), 'utf8');
   var b = brand || BRAND_CSS;
-  css = css.replace(/@accent@/g, b.accent).replace(/@pointer@/g, b.pointer);
-  if (/@[a-z]+@/.test(css.replace(/\/\*[\s\S]*?\*\//g, ''))) fail('CSS: unbekannter Marken-Token ' + css.match(/@[a-z]+@/)[0]);
   var code = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  if (/@[a-z]+@/.test(code.replace(/@(accent|pointer)@/g, ''))) fail('CSS: unbekannter Marken-Token ' + code.replace(/@(accent|pointer)@/g, '').match(/@[a-z]+@/)[0]);
   var bad = [[/gradient/i, 'gradient'], [/box-shadow/i, 'box-shadow'], [/text-shadow/i, 'text-shadow'], [/(^|[^-\w])filter\s*:/i, 'filter'],
     [/display\s*:\s*(-webkit-)?flex/i, 'flex'], [/calc\(/i, 'calc()'], [/\d(vw|vh)\b/i, 'vw/vh'], [/var\(/i, 'var()']];
   bad.forEach(function (b) { if (b[0].test(code)) fail('CSS verboten: ' + b[1]); });
@@ -29,7 +155,8 @@ function buildCss(cssText, brand) {
     var r = new RegExp('(^|[;{\\s])' + p + '\\s*:', 'g');
     if (r.test(code)) fail('CSS ohne -webkit--Praefix: ' + p);
   });
-  return code.replace(/\s+/g, ' ').replace(/\s*([{};:,])\s*/g, '$1').replace(/;}/g, '}').trim();
+  code = code.replace(/\s+/g, ' ').replace(/\s*([{};:,])\s*/g, '$1').replace(/;}/g, '}').trim();
+  return accentCss(code, brandPalette(b));
 }
 
 /* ---------- i18n ---------- */
@@ -72,7 +199,9 @@ function brandConfig() {
   if (typeof b.name !== 'string' || !b.name || !b.wordmark || b.wordmark.length !== 2) { fail('brand/' + id + '.json: name/wordmark fehlen'); return null; }
   console.log('Marke: ' + id + ' (' + b.name + ')');
   if (!/^#[0-9A-Fa-f]{6}$/.test(b.accent || '') || !/^[a-z0-9-]+$/.test(b.pointer || '')) { fail('brand/' + id + '.json: accent/pointer fehlen'); return null; }
-  return { id: id, name: b.name, wordmark: [String(b.wordmark[0]), String(b.wordmark[1])], accent: b.accent, pointer: b.pointer };
+  var ids = loadPalette().map(function (p) { return p.id; });
+  if (ids.indexOf(b.accentId) < 0) { fail('brand/' + id + '.json: accentId muss eine Palettenfarbe sein (' + ids.join(', ') + ')'); return null; }
+  return { id: id, name: b.name, wordmark: [String(b.wordmark[0]), String(b.wordmark[1])], accent: b.accent, pointer: b.pointer, accentId: b.accentId };
 }
 
 /* ---------- JS ---------- */
@@ -134,6 +263,7 @@ function build() {
   var manifest = JSON.parse(fs.readFileSync(path.join(SRC, 'manifest.json'), 'utf8'));
   var brand = brandConfig();
   var css = buildCss(undefined, brand);
+  var cssStats = accentCss.stats;
   var keys = checkI18n();
   var local = localConfig();
   var parts = ['/* gebaut aus src/ (tools/build.js). Nicht von Hand bearbeiten. */'], rel = [];
@@ -144,7 +274,7 @@ function build() {
     parts.push(chunk);
     if (!/^dev\//.test(f)) rel.push(chunk);                // Release (minifiziert): ohne Entwicklungs-Module
     var extra = i === 0 ? 'N.CSS = ' + JSON.stringify(css) + ';' : f === 'core/config.js' && Object.keys(local).length ? 'N.config.apply(' + JSON.stringify(local) + ');   /* aus local.json */' :
-      f === 'core/brand.js' && brand ? 'N.brand = ' + JSON.stringify({ id: brand.id, name: brand.name, wordmark: brand.wordmark }) + ';   /* brand/' + brand.id + '.json */' : '';
+      f === 'core/brand.js' && brand ? 'N.brand = ' + JSON.stringify({ id: brand.id, name: brand.name, wordmark: brand.wordmark, accent: brand.accentId }) + ';   /* brand/' + brand.id + '.json */' : '';
     if (extra) { parts.push(extra); rel.push(extra); }
   });
   // nicht im Manifest gelistete Quelldateien melden
@@ -175,14 +305,17 @@ function build() {
     var previous = fs.existsSync(appPath) ? fs.readFileSync(appPath) : null, prevMin = fs.existsSync(minPath) ? fs.readFileSync(minPath) : null;
     fs.writeFileSync(appPath, code);
     if (min !== null) fs.writeFileSync(minPath, min);
-    // Zeiger-Bilder nur der gewaehlten Marke (<pointer>.png, <pointer>-press.png); fremde aus app/ entfernen
-    var mine = [brand.pointer + '.png', brand.pointer + '-press.png'];
+    // Zeiger-Bilder der Palette fuer diese Marke (Standardfarbe: <pointer>.png der Marke, sonst pointer-<id>.png, je mit -press); fremde aus app/ entfernen
+    var mine = [];
+    brandPalette(brand).forEach(function (p) { mine.push(p.pointer + '.png', p.pointer + '-press.png'); });
+    mine.forEach(function (f) { if (!fs.existsSync(path.join(SRC, 'assets', f))) fail('Zeiger-Bild fehlt: src/assets/' + f + ' (node tools/make_assets.js --pointers)'); });
+    if (errors.length) { console.error('BUILD FEHLGESCHLAGEN:\n  - ' + errors.join('\n  - ')); process.exit(1); }
     function isPtr(f) { return /^pointer.*\.png$/.test(f); }
     var assets = fs.readdirSync(path.join(SRC, 'assets')).filter(function (f) { return /\.(png|gif)$/.test(f) && (!isPtr(f) || mine.indexOf(f) >= 0); });
     fs.readdirSync(OUT).forEach(function (f) { if (isPtr(f) && mine.indexOf(f) < 0) fs.unlinkSync(path.join(OUT, f)); });
     assets.forEach(function (f) { fs.copyFileSync(path.join(SRC, 'assets', f), path.join(OUT, f)); });
     var gz = require('zlib');
-    console.log('app/app.js: ' + kb(code.length) + ' KB lesbar (' + manifest.length + ' Module, CSS ' + kb(css.length) + ' KB, ' + keys + ' Texte je Sprache), ' +
+    console.log('app/app.js: ' + kb(code.length) + ' KB lesbar (' + manifest.length + ' Module, CSS ' + kb(css.length) + ' KB davon Akzent-Varianten ' + kb(cssStats.bytes) + ' KB (' + cssStats.variants + ' Farben x ' + cssStats.tokenRules + ' Regeln, ' + cssStats.copies + ' Begleitregeln), ' + keys + ' Texte je Sprache), ' +
       'Startdateien: 1 (CSS eingebettet), Bilder: ' + assets.join(', ') + ' – ' + (Date.now() - t0) + ' ms');
     if (min !== null) {
       console.log('app/app.min.js: ' + kb(min.length) + ' KB minifiziert, ' + kb(gz.gzipSync(min).length) + ' KB gzip (Release-Paket, ohne dev/)');
@@ -206,6 +339,9 @@ if (require.main === module) build();
 module.exports = {
   es5Errors: function (code) { errors = []; es5Gate(code); return errors.slice(); },
   cssErrors: function (css) { errors = []; buildCss(css); return errors.slice(); },
+  /* Akzent-Varianten (tests/accent.test.js): CSS (Rohtext) + Marke -> {css, errors, stats} */
+  css: function (css, brand) { errors = []; var out = buildCss(css, brand); return { css: out, errors: errors.slice(), stats: accentCss.stats }; },
+  brandPalette: brandPalette, loadPalette: loadPalette, specificity: specificity,
   escapeNonAscii: escapeNonAscii,
   minify: minify
 };

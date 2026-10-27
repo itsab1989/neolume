@@ -32,7 +32,7 @@
   Grid.prototype._make = function () {
     var e = {}, s = this.pg;
     e.card = U.el('div', this.cardCls || 'card', s, 'display:none');
-    e.ph = U.txt('div', 'ph', e.card, '');
+    e.ph = U.txt('div', 'ph', e.card, ''); e.phEl = e.ph.parentNode; e.phc = 'ph';
     e.img = U.el('img', '', e.card); e.img.src = N.img.BLANK;
     e.badge = U.el('div', 'bdg', e.card); e.badgeT = document.createTextNode(''); e.badge.appendChild(e.badgeT);
     e.prog = U.el('div', 'prog', e.card); e.progI = U.el('i', '', e.prog);
@@ -83,6 +83,8 @@
     if (e.it !== it) {
       e.it = it;
       U.setText(e.ph, it && G.size !== 'list' ? it.title : '');
+      var phc = it && !it.thumb ? 'ph fb ' + N.ui.fbClass(it) : 'ph';   // ohne Bild: farbige Titelkarte (F28), nie grau
+      if (e.phc !== phc) { e.phc = phc; e.phEl.className = phc; }
       N.img.want(e.img, it && it.thumb ? N.img.url(it.thumb, G.TIER) : '', prio);
       var b = it ? M.badge(it) : { b: '', n: '' }, bc = b.b ? 'bdg ' + b.b : 'bdg';
       if (e.bc !== bc) { e.bc = bc; e.badge.className = bc; }
@@ -131,11 +133,16 @@
     for (var i = a; i <= b; i++) { var e = this.byIdx[i]; if (e) { e.it = undefined; e.st = true; } }
     this.render(0, 1);
   };
-  /* Fokusschritt: alte + neue Karte, ggf. EIN Transform am Seiten-Container. Rueckgabe: Ringziel (Bildschirm) */
-  Grid.prototype.focusTo = function (i) {
+  /* Zeilen ab der Scroll-Zeile r, die Zeiger-Fokus bekommen duerfen (ganz ueber dem Ausblend-Band, N.GridMath.full) */
+  Grid.prototype.hitRows = function () { return this.G.full(); };
+  /* Fokusschritt: alte + neue Karte, ggf. EIN Transform am Seiten-Container. Rueckgabe: Ringziel (Bildschirm).
+   * still (Zeiger, TV-Befund 27.10. nachmittags): liegt die Zeile im sichtbaren Bereich, bleibt die Scroll-Zeile r stehen –
+   * der Fokus wandert unter den Punkt, die Liste rollt NICHT (keine Rueckkopplung Hover -> Rollen -> Hover). */
+  Grid.prototype.focusTo = function (i, still) {
     if (!this.n) return null;
     i = U.clamp(i, 0, this.n - 1);
-    var old = this.byIdx[this.f], r = this.G.row(i), moved = r !== this.r;
+    var ri = this.G.row(i), keep = still && ri >= this.r && ri < this.r + this.hitRows();
+    var old = this.byIdx[this.f], r = keep ? this.r : ri, moved = r !== this.r;
     this.f = i; this.r = r;
     if (moved) this.render(0, 1);
     var cur = this.byIdx[i];
@@ -146,7 +153,25 @@
     if (moved) { N.fx.move(this.pg); U.tf(this.pg, 0, this.G.offset(r)); }
     return this.ringPos();
   };
-  Grid.prototype.ringPos = function () { var G = this.G; return { x: G.X0 + G.col(this.f) * G.SX, y: G.Y0, shape: G.CLS, noScale: G.NO_SCALE }; };
+  /* Zeiger-Randzone: Scroll-Zeile um d verschieben, Fokus in den sichtbaren Bereich klemmen (gleiche Spalte) */
+  Grid.prototype.scrollBy = function (d) {
+    if (!this.n) return null;
+    var G = this.G, last = G.row(this.n - 1), r = U.clamp(this.r + d, 0, last), c = G.col(this.f), fr = G.row(this.f), h = this.hitRows();
+    if (r === this.r) return this.ringPos();
+    if (fr < r) fr = r; else if (fr > r + h - 1) fr = r + h - 1;
+    var i = Math.min(this.n - 1, fr * G.COLS + c), old = this.byIdx[this.f];
+    this.f = i; this.r = r;
+    this.render(0, 1);
+    var cur = this.byIdx[i];
+    if (this.focused) {
+      if (old && old !== cur && old.foc) { old.card.className = this.cardCls; old.cap.className = this.capCls; old.foc = false; }
+      if (cur && !cur.foc) { cur.card.className = this.cardCls + ' is-focus'; cur.cap.className = this.capCls + ' is-focus'; cur.foc = true; }
+    }
+    N.fx.move(this.pg); U.tf(this.pg, 0, G.offset(r));
+    return this.ringPos();
+  };
+  Grid.prototype.canScroll = function (d) { return d < 0 ? this.r > 0 : this.n > 0 && this.r < this.G.row(this.n - 1); };
+  Grid.prototype.ringPos = function () { var G = this.G; return { x: G.X0 + G.col(this.f) * G.SX, y: G.Y0 + (G.row(this.f) - this.r) * G.SY, shape: G.CLS, noScale: G.NO_SCALE }; };
   Grid.prototype.setFocused = function (on) {
     this.focused = on;
     var e = this.byIdx[this.f];

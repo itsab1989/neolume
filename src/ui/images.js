@@ -25,10 +25,40 @@
     if (!path) return '';
     var sz = TIERS[tier] || TIERS.poster, q = { width: sz[0], height: sz[1], minSize: 1, upscale: 1, format: (opts && opts.format) || 'jpeg' };
     if (opts && opts.blur) q.blur = opts.blur;
+    if (opts && opts.quality) q.quality = opts.quality;   // PMS: JPEG-Qualitaet 1..100 (Standard ~75; s. SOFT_Q)
     else if (N.comfort && N.comfort.isSpoiler(path)) q.blur = 30;   // Spoilerschutz (SPEC 5.3): ungesehene Folgen unscharf
     q.url = path;
     q['X-Plex-Token'] = (opts && opts.token) || N.plex.token || '';
     return ((opts && opts.base) || N.plex.base) + '/photo/:/transcode?' + U.qs(q);
+  }
+
+  /* Vollbild-Hintergrund eines Titels (Startseiten-Hero, Detailseiten, "Jetzt laeuft"), TV-Befund 27.10. nachmittags (neu
+   * hinzugefuegter Film ohne Art: Hero einfarbig). Art scharf in 1280x720 (am TV gemessen, s. TIERS.hero); ohne Art das
+   * Poster/Cover (N.model: Folge -> Serienposter, Track -> Albumcover) vom PMS unscharf gerechnet, der TV blurrt nichts.
+   * PMS 27.10. geprueft (read-only): blur=N wirkt (Radius in Ausgabe-Pixeln), quality=1..100 wirkt, minSize=1 schneidet NICHT zu
+   * (Poster 2:3 in 1280x720 -> 1280x1850). TV-Befund Schoner: 640x360 blur 24 + 2x CSS = Farbbrei mit Bloecken/Stufen. Daher
+   * nativ 1280 breit (keine CSS-Vergroesserung, mittig beschnitten), maessiger blur 12 (Stimmung erkennbar, Text ueber Scrims
+   * lesbar) und quality 90: Block-Kennzahl (Kanten an 8er-Grenzen / innen) 1,64 -> 1,27, ~230 KB statt 139 KB (Standardqualitaet).
+   * -> {url, soft} | null (kein Bild bzw. Einstellung "Hintergrundbilder" aus) */
+  var SOFT_BLUR = 12, SOFT_Q = 90;
+  function bg(art, thumb) {
+    if (N.comfort && !N.comfort.backgrounds()) return null;
+    if (art) return { url: url(art, 'hero'), soft: false };
+    if (thumb) return { url: url(thumb, 'hero', { blur: SOFT_BLUR, quality: SOFT_Q }), soft: true };
+    return null;
+  }
+  /* Bild (nw x nh) fuellt W x H ohne Verzerrung, mittig beschnitten -> {x, y, w, h} */
+  function cover(nw, nh, W, H) {
+    if (!(nw > 0 && nh > 0)) return { x: 0, y: 0, w: W, h: H };
+    var k = Math.max(W / nw, H / nh), w = Math.round(nw * k), h = Math.round(nh * k);
+    return { x: Math.round((W - w) / 2), y: Math.round((H - h) / 2), w: w, h: h };
+  }
+  /* nach onload (Bild noch verdeckt): unscharfes Ersatzbild mittig auf 1280x720 legen (1:1, nur verschoben), Art auf die CSS-Groesse zurueck */
+  function fit(img, soft) {
+    var st = img.style;
+    if (!soft || !img.naturalWidth) { st.left = st.top = st.width = st.height = ''; return; }
+    var c = cover(img.naturalWidth, img.naturalHeight, 1280, 720);
+    st.left = c.x + 'px'; st.top = c.y + 'px'; st.width = c.w + 'px'; st.height = c.h + 'px';
   }
 
   function detach(img) { img.onload = img.onerror = null; }
@@ -105,7 +135,7 @@
   var seq = 0;
 
   N.img = {
-    BLANK: BLANK, TIERS: TIERS, url: url,
+    BLANK: BLANK, TIERS: TIERS, url: url, bg: bg, cover: cover, fit: fit, SOFT_BLUR: SOFT_BLUR, SOFT_Q: SOFT_Q,
     /* Bild fuer ein <img> anfordern; prio 0 sichtbar, 1 Puffer, 2 Vorladen. done(ok) optional */
     want: function (img, u, prio, done) {
       if (!u) { N.img.drop(img); if (done) done(false); return; }

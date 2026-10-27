@@ -1,5 +1,6 @@
 /* N.http – XHR mit eigenem Timeout (setTimeout + abort), JSON, Retries fuer GET (Netzfehler/Timeout/5xx: nach 500 und 1500 ms),
  * Dedupe gleicher laufender GETs (URL + Token), max. 3 parallel, 401 -> Ereignis auth:expired (SPEC 14.8).
+ * Liefert nebenbei Proben fuer die Uhr-Korrektur (Date-Kopf -> N.clock.sample).
  * cb(err, data, meta) ; err = {type:'timeout'|'network'|'http'|'parse', status} ; Rueckgabe task {abort()} */
 (function (N) {
   var U = N.util, active = 0, MAX = 3, queue = [], inflight = {};
@@ -15,7 +16,14 @@
 
   /* ein einzelner Versuch */
   function attempt(o, done) {
-    var x = factory(), fin = false, t;
+    var x = factory(), fin = false, t, sent = 0, dated = false;
+    /* Uhr-Korrektur (core/clock.js): Date-Kopf der ohnehin laufenden Anfrage, sobald die Koepfe da sind (readyState 2,
+     * sonst 4). Ohne getResponseHeader/lesbaren Kopf (CORS im Browser) einfach nichts. */
+    function clockSample() {
+      dated = true;
+      if (!sent || !N.clock || !x.getResponseHeader) return;
+      try { var dh = x.status ? x.getResponseHeader('Date') : null; if (dh) N.clock.sample(dh, sent, U.now()); } catch (eh) {}
+    }
     function end(err, data, status) {
       if (fin) return; fin = true;
       timers.clear(t);
@@ -25,6 +33,7 @@
     }
     t = timers.set(function () { try { x.abort(); } catch (e) {} end({ type: 'timeout', status: 0 }, null, 0); }, o.timeout || 8000);
     x.onreadystatechange = function () {
+      if (!dated && x.readyState >= 2 && !fin) clockSample();
       if (x.readyState !== 4 || fin) return;
       var st = x.status, txt = x.responseText, data = null;
       if (st === 0) { end({ type: 'network', status: 0 }, null, 0); return; }
@@ -39,6 +48,7 @@
       x.open(o.method || 'GET', o.url, true);
       var h = o.headers || {};
       for (var k in h) if (Object.prototype.hasOwnProperty.call(h, k)) x.setRequestHeader(k, h[k]);
+      sent = U.now();
       x.send(o.body === undefined ? null : o.body);
     } catch (e) { end({ type: 'network', status: 0 }, null, 0); }
     return { abort: function () { if (fin) return; try { x.abort(); } catch (e) {} end({ type: 'aborted', status: 0 }, null, 0); } };

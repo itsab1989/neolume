@@ -42,7 +42,7 @@ class Wizard(object):
             self.helper_store, self.helper_remember = None, True
         self.helper_wanted = self.helper_store is not None
         self.helper_address = ''               # other device (NAS) running the helper; '' = this computer
-        self.helper_skipped = []               # profile titles without watchlist (Plex PIN / friend)
+        self.helper_skipped = []               # profile titles without watchlist (Plex PIN)
         self.helper = None
         self.reset()
 
@@ -116,7 +116,8 @@ class Wizard(object):
         if not uri: raise StepError('unreachable')
         home = self.plex.home_users(self.token)
         self.home = home
-        shared = self.plex.shared_servers(self.token, machine_id)
+        # only Plex Home users: tokens of other shared accounts (friends) are dropped while parsing, never kept
+        shared = self.plex.shared_servers(self.token, machine_id, [u['id'] for u in home if not u['guest']])
         self.server = srv
         self.uris = [uri] + [u for u in srv['uris'] if u != uri]
         self.profiles = self._check_profiles(uri, build_profiles(self.account, home, shared, srv['token']))
@@ -239,7 +240,7 @@ class Wizard(object):
 
     def _prepare_helper(self, ip):
         """Collect the plex.tv tokens for the helper: owner = this sign-in; Plex Home profiles WITHOUT a Plex PIN via
-        switch (the setup never asks for PINs); friends never. Key stays the same on re-setup (TVs keep working)."""
+        switch (the setup never asks for PINs). Key stays the same on re-setup (TVs keep working)."""
         old = self.helper_store
         store = helpermod.Store(old.key if old else None, allow=self.tv_address)
         protected = dict((u['id'], u.get('protected')) for u in self.home)

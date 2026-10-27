@@ -15,5 +15,7 @@
     for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 0xffff;
     return 'av' + (h % 8);
   };
+  /* Titelkarte ohne Bild (F28): Farbe je Titel aus demselben 8er-Satz; Titel bzw. Album eines Tracks (gleiche Farbe wie die Albumseite) */
+  N.ui.fbClass = function (it) { return N.ui.avatarClass(it ? (it.type === 'track' && it.album) || it.title || '' : ''); };
   N.ui.initial = function (name) { return String(name || '?').charAt(0).toUpperCase(); };
 })(N);

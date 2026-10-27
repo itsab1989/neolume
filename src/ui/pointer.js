@@ -7,12 +7,42 @@
  * - Langes Druecken auf das Touchpad (>= 800 ms) = TOOLS (Optionen) fuer das Element unter dem Punkt; der Klick danach entfaellt.
  * - Letzte Eingabe gewinnt: nach einer Taste werden Zeiger-Bewegungen ignoriert, bis sich der Punkt deutlich bewegt (> 16 px).
  * - Klick = OK auf dem Element unter dem Punkt. Blaetter-Pfeile an der fokussierten Reihe nur bei aktivem Zeiger.
- * - Mausrad (falls geliefert) -> Tasten der Zone (Reihe: LINKS/RECHTS, Liste: HOCH/RUNTER).
+ * - Mausrad (falls geliefert) -> Tasten der Zone (Reihe: LINKS/RECHTS, Liste: HOCH/RUNTER), hoechstens alle 150 ms.
+ * - TV-Befund 27.10. nachmittags ("Liste scrollt wild"): Hover darf nie eine Rueckkopplung ausloesen (Fokus -> Liste rollt ->
+ *   anderes Element unter dem stehenden Punkt -> Fokus …). Darum:
+ *   a) Zitterschwelle: Bewegungen < JITTER px gegenueber der zuletzt ausgewerteten Position werden nicht ausgewertet;
+ *      Ereignisse mit unveraenderter Position (WebKit feuert mousemove, wenn Inhalt unter dem Punkt wandert) ohnehin nicht.
+ *   b) Scroll-Sperre: hat eine Zeiger-Bewegung den Inhalt verschoben (pointerSig() vorher != nachher), wertet der Zeiger erst
+ *      wieder aus, wenn SCROLL_COOL ms vergangen sind UND der Punkt sich um >= SCROLL_MOVE px von der Stelle entfernt hat.
+ *   c) Listen/Raster fokussieren per Zeiger "still" (ohne zu rollen); geblaettert wird ueber Randzonen (pointerEdge: erst nach
+ *      EDGE_DWELL ms Verweilen, dann ein Schritt je P.edgeDelay: beschleunigt 400 ms -> 120 ms bzw. gleichmaessig EDGE_RATE ms,
+ *      Einstellung "Zeiger-Scrollen beschleunigen") oder Mausrad. Nur ganz sichtbare Zeilen bekommen sofort Zeiger-Fokus;
+ *      eine angeschnittene, aber zu >= 40 % sichtbare Zeile nach HOLD ms Verweilen (EIN Schritt Rollen, dann Sperre).
+ *   d) Lebenszeichen: Liegt der Finger auf dem Touchpad, kommen laufend kleinste Bewegungen (auch unter JITTER). Bleibt LIVE ms
+ *      jedes Roh-Ereignis mit neuer Position aus, ist der Finger weg (der Punkt bleibt am TV stehen) -> Randzonen-Rollen endet.
+ *      Ereignisse mit gleicher Position zaehlen nicht (WebKit schickt sie, wenn Inhalt unter dem Punkt wandert). Liefert ein TV
+ *      im Stillstand gar keine Ereignisse, braucht das Rollen fortlaufende (auch winzige) Bewegung. Dev: "ptr raw n/med/p90/max"
+ *      im Protokoll zeigt die Abstaende je Randzonen-Lauf.
  * Ziel-Schnittstelle (Bildschirm/Overlay/Rail): pointer(x, y, kind:'move'|'click', target) -> bool,
- *   optional pointerArrows() -> {y, h, left, right} | null, pointerPage(dir), wheelKeys ['LEFT','RIGHT'] */
+ *   optional pointerArrows() -> {y, h, left, right} | null, pointerPage(dir), wheelKeys ['LEFT','RIGHT'],
+ *   pointerSig() -> Zahl/Text der aktuellen Scroll-Lage, pointerEdge(x, y) -> {d: -1|1, x, y} | null (Randzone, Anzeige-Mitte),
+ *   pointerScroll(d) (einen Schritt rollen, Fokus bleibt sichtbar) */
 (function (N) {
   var U = N.util, THROTTLE = 40, IDLE = 3000, KEY_GUARD = 16, LONG = 800;
-  var P = { on: true, root: null, x: -1, y: -1, pend: false, timer: 0, lastMove: 0, keyT: 0, ax: -1, ay: -1, idleT: 0, arrows: null, arrowsOn: false };
+  var JITTER = 4, SCROLL_COOL = 450, SCROLL_MOVE = 40, EDGE_DWELL = 400, EDGE_RATE = 300, WHEEL_RATE = 150, EDGE_SLOW = 400, EDGE_FAST = 120, LIVE = 1000, HOLD = 250;   // LIVE: am TV ruhender Finger mit Luecken bis ~0,7 s (Log 27.10.)
+  var P = { on: true, root: null, x: -1, y: -1, pend: false, timer: 0, lastMove: 0, keyT: 0, ax: -1, ay: -1, idleT: 0, arrows: null, arrowsOn: false,
+    rx: -1e4, ry: -1e4, rawT: 0, holdT: 0, gaps: [], lockT: 0, lx: 0, ly: 0, edge: null, edgeT: 0, edgeEl: null, wheelT: 0 };
+  P.accel = true;
+  /* Takt der Randzone (rein, getestet): Wartezeit vor Schritt k+1, nachdem k Schritte gelaufen sind (k >= 1).
+   * Beschleunigt: 3 Schritte im Abstand von 400 ms, dann je Schritt x0,8 bis 120 ms; aus: gleichmaessig 300 ms */
+  P.edgeDelay = function (k, accel) {
+    if (!accel) return EDGE_RATE;
+    if (k < 3) return EDGE_SLOW;
+    return Math.max(EDGE_FAST, Math.round(EDGE_SLOW * Math.pow(0.8, k - 2)));
+  };
+  P.setAccel = function (on) { P.accel = on !== false; };
+  P.LIVE = LIVE; P.HOLD = HOLD;
+  P.JITTER = JITTER; P.SCROLL_COOL = SCROLL_COOL; P.SCROLL_MOVE = SCROLL_MOVE; P.EDGE_DWELL = EDGE_DWELL; P.EDGE_RATE = EDGE_RATE;
 
   function owner() {
     var R = N.router;
@@ -57,18 +87,89 @@
     this.cancel = function () { if (timer) { (t.clear || clearTimeout)(timer); timer = 0; } };
   }
   P.Throttle = Throttle;
+  /* Ziel fuer Scroll-Lage/Randzonen: Overlay > offene Rail (nichts) > Bildschirm */
+  function scrollOwner() {
+    var ov = owner();
+    if (ov) return ov;
+    if (N.ui.rail && N.ui.rail.isOpen && N.ui.rail.isOpen()) return null;
+    return N.router.top();
+  }
+  function sig(t) { return t && t.pointerSig ? String(t.pointerSig()) : ''; }
+  /* Scroll-Sperre aktiv? (Inhalt hat sich durch den Zeiger bewegt; erst Zeit UND Weg) */
+  P.locked = function (x, y) {
+    if (!P.lockT) return false;
+    if (U.now() - P.lockT >= SCROLL_COOL && Math.abs(x - P.lx) + Math.abs(y - P.ly) >= SCROLL_MOVE) { P.lockT = 0; return false; }
+    return true;
+  };
+  P.scrolled = function () { P.lockT = U.now(); P.lx = P.x; P.ly = P.y; };
   function process() {
     if (!P.pend) return;
     P.pend = false;
+    var x = P.x, y = P.y;
+    if (P.locked(x, y)) { edgeCheck(scrollOwner()); return; }   // gesperrt: kein Hover-Fokus, Randzone aber weiter (Wiedereintritt)
+    if (Math.abs(x - P.rx) + Math.abs(y - P.ry) < JITTER) return;   // Zittern des Luftmaus-Punkts
+    P.rx = x; P.ry = y;
+    var t = scrollOwner(), before = sig(t);
     N.fx.step(true);                                 // Zeiger: Ring/Karten springen ohne Gleiten
-    route(P.x, P.y, 'move', null);
+    route(x, y, 'move', null);
+    if (t && t === scrollOwner() && sig(t) !== before) P.scrolled();   // Inhalt ist unter dem Punkt gewandert -> Sperre
+    edgeCheck(t);
     P.syncArrows();
   }
+  /* ---- Randzonen: Verweilen -> gedrosselt rollen; Anzeige-Pille ---- */
+  function edgeAt(t, x, y) { return t && t.pointerEdge ? t.pointerEdge(x, y) : null; }
+  function edgeStop() {
+    if (P.edgeT) { clearTimeout(P.edgeT); P.edgeT = 0; }
+    if (P.gaps.length && N.devperf) {                // Dev: Abstaende der Roh-Ereignisse (stimmt die LIVE-Schwelle am TV?)
+      var g = P.gaps.slice().sort(function (a, b) { return a - b; });
+      N.log('ptr raw n=' + g.length + ' med=' + g[g.length >> 1] + ' p90=' + g[Math.floor(g.length * 0.9)] + ' max=' + g[g.length - 1]);
+    }
+    P.gaps = [];
+    P.edge = null;
+    if (P.edgeEl && P.edgeEl.style.display !== 'none') P.edgeEl.style.display = 'none';
+  }
+  P.edgeStop = edgeStop;
+  /* Verweilen auf einem Element (z. B. angeschnittene Zeile): fn nach ms, wenn bis dahin keine Taste/kein Klick/kein neues
+   * Verweilen kam. fn prueft selbst, ob der Punkt (P.x/P.y) noch dort ist. */
+  P.hold = function (fn, ms) {
+    P.holdCancel();
+    P.holdT = setTimeout(function () { P.holdT = 0; if (P.on && !P.keyT) fn(); }, ms || HOLD);
+  };
+  P.holdCancel = function () { if (P.holdT) { clearTimeout(P.holdT); P.holdT = 0; } };
+  function edgeCheck(t) {
+    var e = edgeAt(t, P.x, P.y);
+    if (!e) { if (P.edge) edgeStop(); return; }
+    if (P.edge && P.edge.d === e.d && P.edgeT) return;
+    edgeStop();
+    P.edge = e;
+    if (P.edgeEl) {
+      P.edgeEl.className = e.d < 0 ? 'pedge up' : 'pedge dn';   // '‹' per CSS gedreht (gleiche Glyphe wie die Blaetter-Pfeile)
+      P.edgeEl.style.cssText = 'left:' + (e.x - 20) + 'px;top:' + (e.y - 20) + 'px;display:block';
+    }
+    var k = 0;                                       // Schritte seit Betreten der Zone (Verlassen = neu ab 0)
+    P.edgeT = setTimeout(function step() {
+      P.edgeT = 0;
+      var tt = scrollOwner(), cur = edgeAt(tt, P.x, P.y);
+      // Lebenszeichen: Finger auf dem Touchpad = laufend kleinste Bewegungen (auch unter der Zitterschwelle). Kommt LIVE ms
+      // nichts, ist der Finger weg (der Punkt bleibt am TV stehen) -> Rollen endet (TV-Befund 27.10. nachmittags)
+      if (!P.edge || !cur || cur.d !== P.edge.d || !P.on || P.keyT || U.now() - P.rawT > LIVE) { edgeStop(); return; }
+      N.fx.step(true);
+      tt.pointerScroll(cur.d);
+      P.scrolled();                                 // Inhalt wandert: Hover-Auswertung bis zur naechsten deutlichen Bewegung aus
+      P.syncArrows();
+      k++;
+      if (edgeAt(tt, P.x, P.y)) P.edgeT = setTimeout(step, P.edgeDelay(k, P.accel)); else edgeStop();
+    }, (N.config && N.config.ptrEdgeDwell) || EDGE_DWELL);
+  }
   var thr = new Throttle(THROTTLE, process);
-  function onMove(e) {
+  function onMove(e) { P.move(e.clientX, e.clientY); }
+  /* echte Bewegung (rein, getestet): gleiche Position = kuenstliches Ereignis (Inhalt bewegt sich unter dem Punkt) -> ignorieren */
+  P.move = function (x, y) {
     if (!P.on) return;
-    var x = e.clientX, y = e.clientY;
-    if (x === P.x && y === P.y) return;
+    if (x === P.x && y === P.y) return;                 // gleiche Stelle: kuenstlich (Inhalt wanderte) -> kein Lebenszeichen
+    var now = U.now();
+    if (P.edge && P.rawT && P.gaps.length < 200) P.gaps.push(now - P.rawT);
+    P.rawT = now;                                       // Lebenszeichen VOR der Zitterschwelle (Randzone, s. edgeCheck)
     P.x = x; P.y = y;
     moveCursor();
     // letzte Eingabe gewinnt: nach Tastendruck erst bei deutlicher Bewegung uebernehmen
@@ -78,8 +179,8 @@
     P.pend = true;
     thr.hit();
     if (P.idleT) clearTimeout(P.idleT);
-    P.idleT = setTimeout(function () { P.idleT = 0; P.hideArrows(); }, IDLE);
-  }
+    P.idleT = setTimeout(function () { P.idleT = 0; P.hideArrows(); edgeStop(); }, IDLE);
+  };
   /* ---- eigener Pfeil (Variante B): ein Element, rAF-gedrosselt, nach 2 s ohne Bewegung bzw. bei Tasten weg ---- */
   var curEl = null, curRaf = false, curHideT = 0, curVis = false;
   function drawCursor() {
@@ -109,8 +210,8 @@
     P.refocus();
   }
   P.click = function (x, y, target) {
-    P.x = x; P.y = y; P.keyT = 0; P.lastMove = U.now();
-    thr.cancel(); P.pend = false;
+    P.x = x; P.y = y; P.keyT = 0; P.lastMove = U.now(); P.lockT = 0; P.rx = x; P.ry = y;   // Klick ist eindeutig: Sperre aus
+    thr.cancel(); P.pend = false; edgeStop(); P.holdCancel();
     if (P.longDone) { P.longDone = false; return; }  // langer Druck hat schon TOOLS ausgeloest
     var hk = hintKey(x, y);
     if (hk) { N.router.key(hk); return; }            // Klick auf die Hinweisleiste = diese Taste
@@ -140,10 +241,19 @@
     var d = e.wheelDelta ? -e.wheelDelta : (e.detail || 0);
     if (!d) return;
     if (e.preventDefault) e.preventDefault();
+    P.wheel(d);
+  }
+  /* Mausrad/Touchpad-Wischen -> Taste, gedrosselt (ein Schritt je WHEEL_RATE ms; schnelle Raeder liefern Dutzende Ereignisse) */
+  P.wheel = function (d) {
+    if (!P.on) return false;
+    var now = U.now();
+    if (now - P.wheelT < WHEEL_RATE) return false;
+    P.wheelT = now;
     var ov = owner(), t = ov || (N.ui.rail && N.ui.rail.isOpen() ? N.ui.rail : N.router.top());
     var keys = (t && t.wheelKeys) || ['UP', 'DOWN'];
     N.router.key(d > 0 ? keys[1] : keys[0]);
-  }
+    return true;
+  };
 
   /* Tasten kommen nur ueber onkeydown von #anchor (loader/index.html). WebKit verschiebt den Fokus beim mousedown ->
    * mousedown ohne Standardaktion, nach jedem Klick und bei jedem blur/onfocus den Anker wieder fokussieren. */
@@ -180,12 +290,14 @@
     P.arrows = [U.el('div', 'parr', chrome, 'display:none'), U.el('div', 'parr', chrome, 'display:none')];
     P.arrows[0].appendChild(document.createTextNode('‹'));
     P.arrows[1].appendChild(document.createTextNode('›'));
+    P.edgeEl = U.el('div', 'pedge', chrome, 'display:none');
+    P.edgeEl.appendChild(document.createTextNode('‹'));
   };
   /* Einstellung "Zeiger-Steuerung" (Standard An). Aus: Zeiger-Ereignisse werden ignoriert; Punkt ausblenden ist
    * nur per CSS cursor:none versucht (am TV unbestaetigt, siehe docs/ARCHITEKTUR.md). */
   P.setEnabled = function (on) {
     P.on = !!on;
-    if (!P.on) P.hideArrows();
+    if (!P.on) { P.hideArrows(); edgeStop(); P.holdCancel(); }
     if (typeof document !== 'undefined' && document.body) U.cls(document.body, 'nocursor', !P.on);
     P.applyCursor();
   };
@@ -207,7 +319,9 @@
   P.active = function () { return P.on && P.lastMove > 0 && U.now() - P.lastMove < IDLE; };
   /* Router meldet jede Taste: Pfeile weg, Zeiger-Bewegungen bis zur naechsten deutlichen Bewegung ignorieren */
   P.keyUsed = function () {
-    P.keyT = U.now(); P.ax = P.x; P.ay = P.y; P.lastMove = 0; P.pend = false; thr.cancel();
+    P.keyT = U.now(); P.ax = P.x; P.ay = P.y; P.lastMove = 0; P.pend = false; thr.cancel(); P.lockT = 0; P.rx = P.ry = -1e4;
+    if (P.edge) edgeStop();
+    P.holdCancel();
     if (P.arrowsOn) P.hideArrows();
     hideCursor();
   };
