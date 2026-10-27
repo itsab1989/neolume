@@ -1,0 +1,290 @@
+# Setup program releases (installer/BUILD.md): standalone one-file binaries (PyInstaller) for Windows/macOS/Linux,
+# a pure-Python .pyz, SHA256SUMS -> GitHub Release; multi-arch helper image -> ghcr.io/<owner>/<APP_SLUG>-setup.
+#   - push of a tag v*            : build everything, publish release + image (version = tag without "v")
+#   - manual run on a tag          : same (re-publish; existing release files are replaced)
+#   - manual run on a branch       : build + smoke-test only, artifacts attached to the workflow run, nothing published
+# No secrets besides the automatic GITHUB_TOKEN. No network access to plex.tv or any Plex server during the build.
+name: release-setup
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version for a test build on a branch (e.g. 0.3.0-rc.1); ignored on tags'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-setup-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # File/image name prefix (APP_SLUG), app name and repo come from the brand profile (brand/<id>.json, see
+  # brand/README.md): job "prepare" reads them with `installer/build.py brand`; the other jobs take its outputs.
+  PYTHON_VERSION: '3.12'
+  PYINSTALLER_VERSION: '6.22.3'
+
+jobs:
+  prepare:
+    name: payload + .pyz + tests
+    runs-on: ubuntu-22.04   # Python 3.8 (oldest supported) is still available here
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      publish: ${{ steps.v.outputs.publish }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+      slug: ${{ steps.brand.outputs.slug }}
+      appname: ${{ steps.brand.outputs.appname }}
+      repo: ${{ steps.brand.outputs.repo }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Brand (name, artifact prefix)
+        id: brand
+        run: |
+          python3 installer/build.py brand | tee -a "$GITHUB_OUTPUT"
+          echo "APP_SLUG=$(python3 installer/build.py slug)" >> "$GITHUB_ENV"
+      - name: Version
+        id: v
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [ "$REF_TYPE" = "tag" ]; then
+            v="${REF_NAME#v}"; publish=true
+          else
+            v="${INPUT_VERSION:-0.0.0-dev.${SHA:0:7}}"; v="${v#v}"; publish=false
+          fi
+          if ! printf '%s' "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'; then
+            echo "::error::bad version '$v' (expected e.g. 1.2.3 or 1.2.3-rc.1)"; exit 1
+          fi
+          case "$v" in *-*) pre=true ;; *) pre=false ;; esac
+          { echo "version=$v"; echo "publish=$publish"; echo "prerelease=$pre"; } >> "$GITHUB_OUTPUT"
+          echo "version $v, publish $publish, prerelease $pre"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build the TV app (gates + minified release build)
+        run: npm run build
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Installer unit tests
+        run: python -m unittest discover -s tests/installer
+      - name: App payload + .pyz
+        run: |
+          python installer/build.py payload --version "${{ steps.v.outputs.version }}"
+          python installer/build.py pyz --out dist-setup
+      - name: Smoke test .pyz
+        run: python installer/smoke_test.py python3 "dist-setup/${APP_SLUG}-setup.pyz"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.8'
+      - name: Smoke test .pyz with Python 3.8 (oldest supported)
+        run: python3.8 installer/smoke_test.py python3.8 "dist-setup/${APP_SLUG}-setup.pyz"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: payload
+          path: |
+            installer/neosetup/payload/app.zip
+            installer/neosetup/payload/brand.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v5
+        with:
+          name: setup-pyz
+          path: dist-setup/*.pyz
+          if-no-files-found: error
+
+  binaries:
+    name: binary ${{ matrix.target }}
+    needs: prepare
+    env:
+      APP_SLUG: ${{ needs.prepare.outputs.slug }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: windows-x64, runner: windows-latest }
+          - { target: windows-arm64, runner: windows-11-arm }
+          - { target: macos-arm64, runner: macos-15 }
+          - { target: macos-x64, runner: macos-15-intel }
+          # Ubuntu 22.04 = glibc 2.35: the binaries also run on Debian 12 / Raspberry Pi OS 12 / older NAS distros
+          - { target: linux-x64, runner: ubuntu-22.04 }
+          - { target: linux-arm64, runner: ubuntu-22.04-arm }
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: payload
+          path: installer/neosetup/payload
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Check runner CPU
+        run: |
+          got="$(python installer/build.py target)"
+          echo "building $got"
+          [ "$got" = "${{ matrix.target }}" ] || { echo "::error::runner is $got, expected ${{ matrix.target }}"; exit 1; }
+      - run: python -m pip install "pyinstaller==${PYINSTALLER_VERSION}"
+      - name: Build one-file binary
+        run: python installer/build.py exe --version "${{ needs.prepare.outputs.version }}" --out dist-setup
+      - name: Smoke test
+        run: |
+          base="dist-setup/${APP_SLUG}-setup-${{ matrix.target }}"
+          case "${{ matrix.target }}" in
+            windows-*) python installer/smoke_test.py "$base.exe" ;;
+            macos-*) mkdir smoke && unzip -q "$base.zip" -d smoke && python installer/smoke_test.py "smoke/${APP_SLUG}-setup" ;;
+            *) chmod +x "$base" && python installer/smoke_test.py "$base" ;;
+          esac
+      - uses: actions/upload-artifact@v5
+        with:
+          name: setup-${{ matrix.target }}
+          path: dist-setup/*
+          if-no-files-found: error
+
+  docker:
+    name: helper image (amd64, arm64, arm/v7)
+    needs: prepare
+    env:
+      APP_SLUG: ${{ needs.prepare.outputs.slug }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Image name
+        id: img
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: echo "name=ghcr.io/${OWNER,,}/${APP_SLUG}-setup" >> "$GITHUB_OUTPUT"
+      - name: Stamp version (the helper reports it in /neo-helper)
+        run: python3 installer/build.py stamp --version "${{ needs.prepare.outputs.version }}"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build for the smoke test (amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: installer
+          load: true
+          tags: neo-smoke:latest
+          build-args: |
+            VERSION=${{ needs.prepare.outputs.version }}
+            APP_NAME=${{ needs.prepare.outputs.appname }}
+            APP_REPO=${{ needs.prepare.outputs.repo }}
+      - name: Smoke test (dummy helper.json, no plex.tv access)
+        run: |
+          mkdir -p smoke && chmod 755 smoke
+          python3 -I - <<'PY'
+          import sys; sys.path.insert(0, 'installer')
+          from neosetup.helper import Store
+          s = Store(); s.add('u-owner', 'dummyToken-0000000000', 'Owner', 'owner'); s.save('smoke/helper.json')
+          PY
+          chmod 644 smoke/helper.json
+          docker run -d --name neo-smoke --net=host -v "$PWD/smoke:/data:ro" neo-smoke:latest
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:32499/neo-helper; then echo; break; fi; sleep 1
+          done
+          curl -fsS http://127.0.0.1:32499/neo-helper | grep -q '"version": "${{ needs.prepare.outputs.version }}"'
+          code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:32499/watchlist)"
+          [ "$code" = 401 ] || { echo "::error::expected 401 without key, got $code"; exit 1; }
+          [ "$(docker inspect -f '{{.Config.User}}' neo-smoke)" = "65534:65534" ]
+          sleep 25; docker inspect -f '{{.State.Health.Status}}' neo-smoke
+          docker logs neo-smoke
+          docker rm -f neo-smoke
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ steps.img.outputs.name }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=${{ needs.prepare.outputs.version }}
+            type=raw,value=latest,enable=${{ needs.prepare.outputs.prerelease == 'false' }}
+      - uses: docker/login-action@v3
+        if: needs.prepare.outputs.publish == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build all platforms (push only for tags)
+        uses: docker/build-push-action@v6
+        with:
+          context: installer
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: ${{ needs.prepare.outputs.publish == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ needs.prepare.outputs.version }}
+            APP_NAME=${{ needs.prepare.outputs.appname }}
+            APP_REPO=${{ needs.prepare.outputs.repo }}
+
+  release:
+    name: GitHub release
+    needs: [prepare, binaries]
+    env:
+      APP_SLUG: ${{ needs.prepare.outputs.slug }}
+    if: needs.prepare.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: setup-*
+          path: dist-setup
+          merge-multiple: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: SHA256SUMS
+        run: python installer/build.py sums --out dist-setup && ls -l dist-setup
+      - name: Release notes
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          {
+            echo "## Setup program $VERSION"
+            echo
+            echo "| Your computer | Download |"
+            echo "|---|---|"
+            echo "| Windows (most PCs) | \`${APP_SLUG}-setup-windows-x64.exe\` |"
+            echo "| Windows on ARM (e.g. Surface Pro X, Snapdragon laptops) | \`${APP_SLUG}-setup-windows-arm64.exe\` |"
+            echo "| Mac with Apple chip (M1 or newer) | \`${APP_SLUG}-setup-macos-arm64.zip\` |"
+            echo "| Mac with Intel chip | \`${APP_SLUG}-setup-macos-x64.zip\` |"
+            echo "| Linux PC (x86-64) | \`${APP_SLUG}-setup-linux-x64\` |"
+            echo "| Linux ARM 64-bit (e.g. Raspberry Pi 4/5 with 64-bit OS) | \`${APP_SLUG}-setup-linux-arm64\` |"
+            echo "| Any computer with Python 3.8+ | \`${APP_SLUG}-setup.pyz\` |"
+            echo "| NAS (Docker, helper only) | \`ghcr.io/${OWNER,,}/${APP_SLUG}-setup:$VERSION\` |"
+            echo
+            echo "Check downloads with \`SHA256SUMS\`. The programs are not code-signed: see installer/README.md for the macOS Gatekeeper and Windows SmartScreen notes."
+            echo
+            if [ -f .github/release-footer.md ]; then cat .github/release-footer.md; fi
+          } > release-notes.md
+          cat release-notes.md
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+        run: |
+          pre=""; [ "$PRERELEASE" = "true" ] && pre="--prerelease"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --notes-file release-notes.md $pre
+            gh release upload "$TAG" dist-setup/* --clobber
+          else
+            gh release create "$TAG" dist-setup/* --verify-tag --title "$TAG" --notes-file release-notes.md $pre
+          fi
