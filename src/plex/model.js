@@ -14,6 +14,9 @@
         sum: U.trim(m.summary || '', 420), added: num(m.addedAt)
       };
       it.kind = libKinds && libKinds[it.lib] || '';
+      // Weitere Server: Antwort eines fremden Servers (Kontext aus N.plex.pms) -> Eintrag traegt seinen Server, Bilder die Marke
+      var sv = N.srv ? N.srv.cur() : '';
+      if (sv) it.srv = sv;
       if ((t === 'movie' || t === 'episode') && m.Media && m.Media.length > 1) it.nv = m.Media.length;   // mehrere Dateien -> "Version wählen"
       if (t === 'episode') {
         it.title = m.grandparentTitle || m.title || '';
@@ -24,7 +27,7 @@
         it.thumb = m.grandparentThumb || m.parentThumb || m.thumb || '';
         it.still = m.thumb || m.grandparentArt || m.art || '';
         it.art = m.grandparentArt || m.art || '';
-        if (N.comfort && m.thumb) N.comfort.markSpoiler(m.thumb, N.comfort.spoilerItem(it));   // Spoilerschutz: N.img.url zeichnet es unscharf
+        if (N.comfort && m.thumb) N.comfort.markSpoiler(sv ? N.srv.tag(sv, m.thumb) : m.thumb, N.comfort.spoilerItem(it));   // Spoilerschutz: N.img.url zeichnet es unscharf
       } else if (t === 'season') {
         it.title = m.parentTitle || m.title || '';
         it.s = num(m.index);
@@ -42,6 +45,7 @@
         it.still = m.art || m.thumb || '';
         it.art = m.art || '';
       }
+      if (sv) { it.thumb = N.srv.tag(sv, it.thumb); it.still = N.srv.tag(sv, it.still); it.art = N.srv.tag(sv, it.art); }
       return it;
     },
     /* libId: Bibliothek des Containers (Bibliotheksseiten tragen librarySectionID nur am MediaContainer, nicht je Eintrag) */

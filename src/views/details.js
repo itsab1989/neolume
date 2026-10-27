@@ -17,7 +17,13 @@
     var showRk = it0.type === 'show' ? it0.rk : it0.showRk || it0.rk;
     // Seitenleiste auch hier (Nutzer-Feedback 26.10.: links nicht leer, LEFT aus der ersten Spalte erreicht sie); markiert die Bibliothek
     // ohne Bibliothek am Eintrag: bisherige Markierung halten, nach dem Laden die Bibliothek der Metadaten (TV-Befund 26.10.)
-    var s = { rail: it0.lib ? 'lib-' + it0.lib : N.ui.rail && N.ui.rail.cur || 'home', wheelKeys: ['LEFT', 'RIGHT'] };
+    // Weitere Server (N.srv): Titel eines fremden Servers -> alle Anfragen dorthin, Herkunft in der Ueberzeile
+    var srv = it0.srv || '';
+    function get(path, q, o, cb) { return N.plex.get(path, q, N.srv.o(srv, o), cb); }
+    function railId(lib) { return N.railRows.libId({ id: lib, srv: srv }); }
+    function ovl(t) { return srv ? t + ' · ' + N.srv.name(srv) : t; }
+    function ak(k) { return N.srv.skey(srv, k); }          // Anime-Signale: Schluessel je Server
+    var s = { rail: it0.lib ? railId(it0.lib) : N.ui.rail && N.ui.rail.cur || 'home', wheelKeys: ['LEFT', 'RIGHT'] };
     var root, hero, pg, bar, btns = [], bdefs = [], btnRects = null, blbl, blblT;
     var tclip, tstrip, tabEls = [], tabX = [], strip, stripT, sbar, segs = [], epRow = null, rows = [], ring, sb, bubble, bubbleT;
     var d = null, seasons = [], sIdx = 0, tabF = 0, eps = [], epsTotal = 0, epPages = {}, seasonCache = new N.LRU(10), gen = 0, tasks = [];
@@ -66,7 +72,7 @@
       var ep = x.type === 'episode' && isShow;
       var media = ep ? (epMeta.get(x.rk) || {}).media : d && d.it === x ? d.media : null;
       // Spoilerschutz (P5): ungesehene Folge -> Hinweis statt Beschreibung (INFO zeigt den Text)
-      hero.paint(ep ? D.overline(x) : D.overline(x, d), ep ? N.t('det.epTitle', { e: x.e, title: x.epTitle }) : x.title,
+      hero.paint(ovl(ep ? D.overline(x) : D.overline(x, d)), ep ? N.t('det.epTitle', { e: x.e, title: x.epTitle }) : x.title,
         D.meta(x, ep ? epMeta.get(x.rk) || null : d), ep ? N.comfort.summary(x) : d ? d.sum : x.sum,
         { small: ep, chips: media ? D.chips(media, vIndex(x.rk, media)) : [] });
     }
@@ -90,10 +96,10 @@
     function prefetchEp(x) {
       if (!x.rk || epMeta.get(x.rk)) return;
       var g = gen;
-      track(N.plex.get('/library/metadata/' + x.rk, { includeMarkers: 1, excludeElements: 'Role,Director,Writer,Producer,Country,Genre' }, null, function (err, dd) {
+      track(get('/library/metadata/' + x.rk, { includeMarkers: 1, excludeElements: 'Role,Director,Writer,Producer,Country,Genre' }, null, function (err, dd) {
         var m = !err && dd && dd.MediaContainer && dd.MediaContainer.Metadata && dd.MediaContainer.Metadata[0];
         if (!m || g !== gen) return;
-        if (x.showRk) N.anime.noteAudio(x.showRk, N.anime.jaAudio(m.Media));   // Serien-Metadaten haben keine Spuren
+        if (x.showRk) N.anime.noteAudio(ak(x.showRk), N.anime.jaAudio(m.Media));   // Serien-Metadaten haben keine Spuren
         epMeta.set(x.rk, { media: m.Media || [], date: String(m.originallyAvailableAt || ''), sum: String(m.summary || ''), genres: [], directors: [], writers: [] });
         if (infoFor === x) paintInfo(x);
       }));
@@ -136,20 +142,21 @@
 
     /* ---------- Daten ---------- */
     function track(t) { tasks.push(t); if (tasks.length > 20) tasks.shift(); return t; }
-    function kinds() { var hc = N.session.homeCache(), k = N.hubs.libKinds(hc && (hc.alibs || hc.libs) || []); return k; }
+    function srvLibs() { var a = N.srv.libs(), out = []; for (var i = 0; i < a.length; i++) if (a[i].srv === srv) out.push(a[i]); return out; }
+    function kinds() { var hc = N.session.homeCache(), k = N.hubs.libKinds(srv ? srvLibs() : hc && (hc.alibs || hc.libs) || []); return k; }
     function load() {
       gen++; var g = gen;
       var mrk = isShow ? showRk : it0.rk;
-      track(N.plex.get('/library/metadata/' + mrk, D.query(isShow ? 'show' : 'movie'), { timeout: 12000 }, function (err, dd) {
+      track(get('/library/metadata/' + mrk, D.query(isShow ? 'show' : 'movie'), { timeout: 12000 }, function (err, dd) {
         if (g !== gen || dead) return;
         var m = !err && dd && dd.MediaContainer && dd.MediaContainer.Metadata && dd.MediaContainer.Metadata[0];
         if (!m) { onError(err); return; }
-        N.anime.learn(mrk, m);                         // Anime je Titel: Signale aus den vollen Detaildaten (Genres ungekuerzt)
+        N.anime.learn(ak(mrk), m);                        // Anime je Titel: Signale aus den vollen Detaildaten (Genres ungekuerzt)
         d = D.parse(m, kinds());
         if (!d.lib) d.lib = Number(dd.MediaContainer.librarySectionID) || it0.lib || 0;
         if (!isShow || zone === 'btn') paintInfo(d.it);
         buildButtons(d.it);
-        if (d.lib && s.rail !== 'lib-' + d.lib) { s.rail = 'lib-' + d.lib; if (N.router.top() === s) N.ui.rail.attach(s.rail); }
+        if (d.lib && s.rail !== railId(d.lib)) { s.rail = railId(d.lib); if (N.router.top() === s) N.ui.rail.attach(s.rail); }
         hero.loadBg(d.it.art || it0.art, d.it.thumb || it0.thumb, d.it.title);
         hero.setPoster(d.it.thumb || it0.thumb, d.it.title);   // ohne jedes Bild: Farbflaeche, bis ein Folgenbild kommt
         if (hero.needBg) bgFromEpisodes();
@@ -157,7 +164,7 @@
         if (isShow) N.theme.play(d.theme);
         N.idle.add(updateHints, 'det-hints');
       }));
-      if (isShow) track(N.plex.get('/library/metadata/' + showRk + '/children', { excludeElements: N.hubs.EXCL }, { timeout: 12000 }, function (err, dd) {
+      if (isShow) track(get('/library/metadata/' + showRk + '/children', { excludeElements: N.hubs.EXCL }, { timeout: 12000 }, function (err, dd) {
         if (g !== gen || dead) return;
         if (err) { N.diag.log('warn', 'seasons ' + (err.status || err.type)); return; }
         seasons = D.seasons(dd);
@@ -168,13 +175,21 @@
       }));
     }
     function onError(err) {
-      var kind = N.errs.kind(err, 'pms');
-      if (kind === 'auth') { N.app.authLost(); return; }   // Kinderprofil-Pruefung wie Startseite (Pentest P6)
+      var kind = N.errs.kind(err, 'pms'), sn = srv ? N.srv.name(srv) : '';
+      if (kind === 'auth' && !srv) { N.app.authLost(); return; }   // Kinderprofil-Pruefung wie Startseite (Pentest P6)
       ring.hide();
-      var tx = kind === 'server' ? { title: N.t('err.server.title'), text: N.t('lib.err.text', { server: N.session.state.server && N.session.state.server.name || '' }) } : N.errs.texts('generic', null, N.session.isKid());
-      U.vis(pg, false); U.vis(hero.pc, false);
+      var auth = srv && (kind === 'auth' || N.srv.state(srv) === 'auth');   // Weitere Server: Meldung nur fuer diesen Server
+      var tx = auth ? { title: N.t('srv.err.auth.title', { server: sn }), text: N.t('srv.err.auth.text', { server: sn }) }
+        : srv && kind === 'server' ? { title: N.t('srv.err.down.title', { server: sn }), text: N.t('srv.err.down.text', { server: sn }) }
+        : kind === 'server' ? { title: N.t('err.server.title'), text: N.t('lib.err.text', { server: N.session.state.server && N.session.state.server.name || '' }) } : N.errs.texts('generic', null, N.session.isKid());
+      // TV-Test 1.0.4: Info-Block (Titel, Metazeile) mit ausblenden – sonst lag die Meldung transparent ueber dem Titel
+      U.vis(pg, false); hero.vis(false);
       sb.show({ title: tx.title, text: tx.text, buttons: [{ id: 'retry', t: N.t('err.btn.retry') }, { id: 'back', t: N.t('err.btn.back') }],
-        onSelect: function (id) { if (id === 'back') { N.router.back(); return; } sb.hide(); U.vis(pg, true); U.vis(hero.pc, true); zone = 'btn'; load(); } });
+        onSelect: function (id) {
+          if (id === 'back') { N.router.back(); return; }
+          sb.hide(); U.vis(pg, true); hero.vis(true); zone = 'btn';
+          if (srv) N.srv.resolve(srv, true, function () { if (!dead) load(); }); else load();   // weiterer Server: Adressen neu pruefen
+        } });
       zone = 'state';
     }
 
@@ -223,7 +238,7 @@
       if (epPages[p]) return;
       epPages[p] = 1;
       var g = gen, list0 = eps;
-      track(N.plex.get('/library/metadata/' + se.rk + '/children', D.seasonQuery(p * 50, 50), { timeout: 12000 }, function (err, dd) {
+      track(get('/library/metadata/' + se.rk + '/children', D.seasonQuery(p * 50, 50), { timeout: 12000 }, function (err, dd) {
         if (g !== gen || list0 !== eps) return;
         var mc = !err && dd && dd.MediaContainer;
         if (!mc) { epPages[p] = 0; return; }
@@ -283,9 +298,9 @@
 
     /* ---------- Reihen unter dem Info-Block ---------- */
     function libOf(id) {
-      var hc = N.session.homeCache(), libs = hc && hc.libs || [];
+      var hc = N.session.homeCache(), libs = srv ? srvLibs() : hc && hc.libs || [];
       for (var i = 0; i < libs.length; i++) if (libs[i].id === id) return libs[i];
-      return { id: id, title: '', type: isShow ? 'show' : 'movie', kind: isShow ? 'show' : 'movie' };
+      return { id: id, title: '', type: isShow ? 'show' : 'movie', kind: isShow ? 'show' : 'movie', srv: srv || undefined, srvName: srv ? N.srv.name(srv) : undefined };
     }
     function buildRows() {
       for (var i = 0; i < rows.length; i++) { rows[i].row.clear(); if (rows[i].row.el.parentNode) rows[i].row.el.parentNode.removeChild(rows[i].row.el); }
@@ -416,7 +431,7 @@
     function tracksPanel(tab) {
       var x = zone === 'eps' && eps[epRow.f] && !eps[epRow.f].ph ? eps[epRow.f] : isShow ? (d && d.ondeck) : d && d.it;
       if (!x) return;
-      var key = x.type === 'episode' ? x.showRk : 'm' + x.rk;
+      var key = N.srv.skey(srv, x.type === 'episode' ? x.showRk : 'm' + x.rk);   // Weitere Server: eigener Schluessel
       function withMedia(media) {
         var mi = vIndex(x.rk, media), md = media && (media[mi] || media[0]), part = md && md.Part && md.Part[0];
         if (!part) { N.ui.toast.show(N.t('det.noTracks')); return; }
@@ -437,7 +452,7 @@
       if (!isShow && d && d.media.length) { withMedia(d.media); return; }
       var em = epMeta.get(x.rk);
       if (em) { withMedia(em.media); return; }
-      N.plex.get('/library/metadata/' + x.rk, { excludeElements: 'Role,Director,Writer,Producer,Country,Genre' }, null, function (err, dd) {
+      get('/library/metadata/' + x.rk, { excludeElements: 'Role,Director,Writer,Producer,Country,Genre' }, null, function (err, dd) {
         var m = !err && dd && dd.MediaContainer && dd.MediaContainer.Metadata && dd.MediaContainer.Metadata[0];
         if (!m || dead || away) { if (err) N.ui.toast.show(N.t('toast.actionFailed')); return; }
         withMedia(m.Media || []);
@@ -685,7 +700,7 @@
       if (!N.model.isVideo(it) || U.now() - busy < 1500) return;
       busy = U.now();
       var path = it.type === 'show' ? '/library/metadata/' + it.rk : '/library/metadata/' + it.rk + '/children';
-      N.plex.get(path, it.type === 'show' ? { includeOnDeck: 1, excludeElements: N.hubs.EXCL } : { excludeElements: N.hubs.EXCL }, null, function (err, d) {
+      N.plex.get(path, it.type === 'show' ? { includeOnDeck: 1, excludeElements: N.hubs.EXCL } : { excludeElements: N.hubs.EXCL }, N.srv.o(it.srv), function (err, d) {   // Weitere Server: it.srv
         busy = 0;
         var mc = !err && d && d.MediaContainer, list = mc && mc.Metadata || [], ep = null, i;
         if (it.type === 'show' && list[0] && list[0].OnDeck && list[0].OnDeck.Metadata) ep = N.model.norm(list[0].OnDeck.Metadata);
@@ -695,7 +710,7 @@
         }
         if (ep) { N.player.play(ep, 'resume'); return; }
         if (it.type === 'show' && !err) {                  // alles gesehen bzw. nie angefangen: erste Folge der Serie
-          N.plex.get('/library/metadata/' + it.rk + '/allLeaves', { 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 1 }, null, function (e2, d2) {
+          N.plex.get('/library/metadata/' + it.rk + '/allLeaves', { 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 1 }, N.srv.o(it.srv), function (e2, d2) {
             var m = !e2 && d2 && d2.MediaContainer && d2.MediaContainer.Metadata && d2.MediaContainer.Metadata[0];
             if (m) N.player.play(N.model.norm(m), 'start'); else N.ui.toast.show(N.t('toast.actionFailed'));
           });

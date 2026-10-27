@@ -122,6 +122,20 @@ dd{margin:0;word-break:break-word}
       quit: 'Programm beenden', quitConfirm: 'Programm wirklich beenden? Sync-, Update-Server und Helfer werden gestoppt.',
       quitDone: 'Das Programm ist beendet. Du kannst dieses Fenster schließen.',
       helperForget: 'Helfer entfernen (gemerkten Zugang löschen)',
+      othersTitle: 'Weitere Server (optional)',
+      othersText: 'Hat jemand seinen Plex-Server für dich freigegeben, z. B. ein Freund? Dann kann __APP__ dessen Bibliotheken zusätzlich in der Seitenleiste zeigen. Jedes Profil bekommt nur die Server, die für dieses Profil freigegeben sind. Ohne Haken bleibt alles wie bisher.',
+      othersScan: 'Freigegebene Server suchen', othersScanning: 'Suche und prüfe Server …', othersRescan: 'Erneut suchen',
+      othersNone: 'Für die gewählten Profile ist kein fremder Server freigegeben.',
+      othersFor: 'für', othersUse: 'Auf dem Fernseher zeigen',
+      othersStatus: { ok: 'erreichbar', unreachable: 'gerade nicht erreichbar', https: 'nur sichere Verbindungen', none: 'keine Adresse' },
+      othersWhy: {
+        ok: 'Von diesem Computer aus ohne Verschlüsselung (http) erreichbar – so, wie der Fernseher ihn braucht.',
+        unreachable: 'Gerade nicht erreichbar: vielleicht aus, oder nur über das Plex-Relay erreichbar (das kann der Fernseher nicht). Du kannst ihn trotzdem eintragen; die App versucht es später erneut.',
+        https: 'Der Server verlangt sichere Verbindungen; dein TV (2014) kann das nicht. Der Besitzer kann in Plex unter Einstellungen › Netzwerk „Sichere Verbindungen“ auf „Bevorzugt“ stellen, dann erneut suchen.',
+        none: 'Plex kennt keine Adresse dieses Servers. Läuft er und ist er mit seinem Plex-Konto verbunden?' },
+      othersPlain: 'Wichtig: Dein Fernseher (2014) kann keine sicheren Verbindungen. Die Verbindung zu diesen Servern läuft deshalb unverschlüsselt über das Internet; der Zugang zum fremden Server könnte unterwegs mitgelesen werden. Dein eigener Server bleibt wie bisher nur im Heimnetz.',
+      othersSkipped: 'Nicht geprüft (Profil mit Plex-PIN – das Programm fragt nie nach PINs – oder Fehler bei plex.tv):',
+      othersAddr: 'Wechselt die Internet-Adresse des Servers, findet der optionale Helfer die neue (sonst: Programm erneut ausführen).',
       errors: { network: 'Keine Verbindung zu plex.tv. Ist dieser Computer online?', pin_expired: 'Die Anmeldung ist abgelaufen. Bitte erneut starten.',
         not_owner: 'Nur der Besitzer des Servers kann die Profile einrichten.', no_lan_address: 'Für diesen Server ist keine Adresse im Heimnetz bekannt.',
         unreachable: 'Der Server antwortet im Heimnetz nicht. Läuft er, und ist dieser Computer im selben Netz?', no_profiles: 'Bitte mindestens ein Profil auswählen.',
@@ -194,6 +208,20 @@ dd{margin:0;word-break:break-word}
       quit: 'Quit program', quitConfirm: 'Really quit? The sync server, update server and helper will stop.',
       quitDone: 'The program has stopped. You can close this window.',
       helperForget: 'Remove helper (delete remembered access)',
+      othersTitle: 'Other servers (optional)',
+      othersText: 'Has someone shared their Plex server with you, e.g. a friend? Then __APP__ can also show its libraries in the sidebar. Each profile only gets the servers shared with that profile. Without a tick everything stays as before.',
+      othersScan: 'Search shared servers', othersScanning: 'Searching and checking servers …', othersRescan: 'Search again',
+      othersNone: 'No server of someone else is shared with the chosen profiles.',
+      othersFor: 'for', othersUse: 'Show on the TV',
+      othersStatus: { ok: 'reachable', unreachable: 'not reachable right now', https: 'secure connections only', none: 'no address' },
+      othersWhy: {
+        ok: 'Reachable from this computer without encryption (http) – the way the TV needs it.',
+        unreachable: 'Not reachable right now: maybe off, or only reachable through the Plex relay (the TV cannot use it). You can still add it; the app tries again later.',
+        https: 'The server requires secure connections; your TV (2014) cannot do that. The owner can set “Secure connections” to “Preferred” in Plex under Settings › Network, then search again.',
+        none: 'Plex knows no address for this server. Is it running and linked to its Plex account?' },
+      othersPlain: 'Important: your TV (2014) cannot use secure connections. The connection to these servers therefore goes over the internet without encryption; the access to the other server could be read on the way. Your own server stays on your home network as before.',
+      othersSkipped: 'Not checked (profile with a Plex PIN – this program never asks for PINs – or a plex.tv error):',
+      othersAddr: 'If the server’s internet address changes, the optional helper finds the new one (otherwise run this program again).',
       errors: { network: 'No connection to plex.tv. Is this computer online?', pin_expired: 'The sign-in expired. Please start again.',
         not_owner: 'Only the owner of the server can set up profiles.', no_lan_address: 'No home network address is known for this server.',
         unreachable: 'The server does not answer on your network. Is it running and is this computer on the same network?', no_profiles: 'Please choose at least one profile.',
@@ -375,6 +403,9 @@ dd{margin:0;word-break:break-word}
     var rp = h('input', { type: 'checkbox', checked: !!resetPins });
     rp.addEventListener('change', function () { resetPins = rp.checked; });
     c.appendChild(h('label', { 'class': 'row sel' }, rp, h('div', { 'class': 'grow' }, h('div', { 'class': 't' }, L.resetPins), h('div', { 'class': 'muted' }, L.resetPinsHint))));
+    // Weitere Server (optional, Standard aus): fuer die Profile freigegebene fremde Server, je Server ein Haken
+    var oc = othersBox();
+    c.appendChild(oc.el);
     // optionaler Helfer (installer/README.md "Optionaler Helfer"): Haken + Merken + andere Adresse (NAS)
     var hp = S.helper, hon = h('input', { type: 'checkbox', checked: hp.wanted }), hrem = h('input', { type: 'checkbox', checked: hp.remember });
     var hadr = h('input', { type: 'text', placeholder: '192.168.x.y' }); hadr.value = hp.address || '';
@@ -382,13 +413,34 @@ dd{margin:0;word-break:break-word}
     c.appendChild(h('details', null, h('summary', { text: L.advanced }), h('label', null, hrem, ' ', L.helperRemember), h('p', { 'class': 't', text: L.helperAddr }), hadr));
     c.appendChild(h('button', { 'class': 'secondary', onclick: function () { step = 2; render(); } }, L.back));
     c.appendChild(h('button', { 'class': 'primary', disabled: !!busy, onclick: function () {
+      (S.others.scanned ? act('others', { ids: oc.ids() }) : Promise.resolve({ ok: true })).then(function (dx) { if (!dx.ok) return;
       act('helper', { on: hon.checked, remember: hrem.checked, address: hadr.value.trim() }).then(function (d0) { if (!d0.ok) return;
       act('build', { resetPins: !!resetPins }, L.building).then(function (d) {
         if (!d.ok) return;
         step = 4; act('sync_start');
-      }); });
+      }); }); });
     } }, L.build));
     return c;
+  }
+
+  /* "Weitere Server": Suche-Knopf, danach je Server ein Haken (nicht waehlbar: nur https / ohne Adresse) mit Erklaerung */
+  function othersBox() {
+    var L = t(), O = S.others, el = h('div', null, h('p', { 'class': 't', text: L.othersTitle }), h('p', { 'class': 'muted', text: L.othersText })), boxes = [];
+    if (O.scanned) {
+      if (!O.list.length) el.appendChild(h('p', { 'class': 'note', text: L.othersNone }));
+      O.list.forEach(function (o) {
+        var usable = o.status === 'ok' || o.status === 'unreachable';
+        var cb = h('input', { type: 'checkbox', checked: o.include, disabled: !usable, 'aria-label': o.name });
+        cb._id = o.id; boxes.push(cb);
+        el.appendChild(h('label', { 'class': 'row ' + (usable ? 'sel' : 'dis') }, cb,
+          h('div', { 'class': 'grow' }, h('div', { 'class': 't' }, o.name, h('span', { 'class': 'badge' + (o.status === 'ok' ? ' ok' : '') }, L.othersStatus[o.status] || o.status)),
+            h('div', { 'class': 'muted' }, L.othersFor + ' ' + o.profiles.join(', ')), h('div', { 'class': 'muted' }, L.othersWhy[o.status] || ''))));
+      });
+      if (O.list.length) { el.appendChild(h('p', { 'class': 'note', text: L.othersPlain })); el.appendChild(h('p', { 'class': 'muted', text: L.othersAddr })); }
+      if (O.skipped.length) el.appendChild(h('p', { 'class': 'muted' }, L.othersSkipped + ' ' + O.skipped.join(', ')));
+    }
+    el.appendChild(h('button', { 'class': 'secondary', disabled: !!busy, onclick: function () { act('others_scan', {}, L.othersScanning); } }, O.scanned ? L.othersRescan : L.othersScan));
+    return { el: el, ids: function () { return boxes.filter(function (b) { return b.checked; }).map(function (b) { return b._id; }); } };
   }
 
   function syncLog(ev) {

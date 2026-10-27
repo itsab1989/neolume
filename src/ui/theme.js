@@ -14,7 +14,9 @@
     play: function (key) {
       if (!T.on() || !key || typeof document === 'undefined') return;
       if (N.audio && N.audio.active()) return;           // M4: nie waehrend Musik/Hoerbuch
-      var url = N.plex.url(key, { 'X-Plex-Token': N.plex.token });
+      var x = N.srv ? N.srv.untag(key) : null, c = x ? N.srv.conn(x.id) : null;   // Weitere Server: Melodie von DEM Server
+      if (x && !c) return;
+      var url = x ? U.addQs(c.base + x.path, { 'X-Plex-Token': c.token }) : N.plex.url(key, { 'X-Plex-Token': N.plex.token });
       if (url === cur) return;
       T.stop(true);
       cur = url;

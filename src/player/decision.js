@@ -11,6 +11,9 @@
     'add-transcode-target(type=subtitleProfile&context=all&protocol=http&container=srt&subtitleCodec=srt)'].join('+');
   /* Qualitaet NUR fuer die Umwandlung (K2): kbit/s + Aufloesung */
   var QUAL = { '20': [20000, '1920x1080'], '12': [12000, '1920x1080'], '8': [8000, '1280x720'], '4': [4000, '1280x720'] };
+  /* Weitere Server uebers Internet (TV-Test 1.0.4: Direct Play einer MKV scheiterte sofort mit SEF 1): Obergrenze 8 Mbit/s 1080p,
+   * schon in der Decision (der Server wandelt dann nur um, wenn die Datei darueber liegt); niedrigere Einstellung gilt weiter */
+  var REMOTE = [8000, '1920x1080'];
   var IMG_SUBS = { pgs: 1, hdmv_pgs: 1, vobsub: 1, dvd_subtitle: 1, dvb_subtitle: 1, dvdsub: 1 };
   /* A/B (config hlsEac3): EAC3/AC3 im HLS unveraendert durchreichen statt nach AC3 umzuwandeln (GET-Decision 90546: Ton "copy") */
   var EAC3 = 'add-transcode-target-audio-codec(type=videoProfile&context=streaming&protocol=hls&audioCodec=eac3)';
@@ -19,14 +22,14 @@
    * wirkt laut Plex nur, wenn der Ton umgewandelt wird – Wirkung am TV hoeren (docs/P5-TV-TEST.md). */
   var STEREO = 'add-limitation(scope=videoAudioCodec&scopeName=*&type=upperBound&name=audio.channels&value=2&isRequired=false)';
   var D = {
-    EXTRA: EXTRA, QUAL: QUAL, EAC3: EAC3, STEREO: STEREO,
+    EXTRA: EXTRA, QUAL: QUAL, REMOTE: REMOTE, EAC3: EAC3, STEREO: STEREO,
     /* o: {rk, mediaIndex, partIndex, session, clientId, token, dp, ds, subs:'none'|'burn', quality:'12', offsetSec, transcode,
      *     stereo (P5: Mehrkanal nicht durchreichen), boost (P5: audioBoost 100–300, nur bei Ton-Umwandlung wirksam)}
      * Reihenfolge stabil (Tests). Token als Query: SEF kann keine Header setzen. */
     query: function (o) {
       var C = N.config, q = {
         path: '/library/metadata/' + o.rk, mediaIndex: o.mediaIndex || 0, partIndex: o.partIndex || 0, protocol: 'hls',
-        fastSeek: 1, copyts: 1, location: 'lan', directPlay: o.dp ? 1 : 0, directStream: o.ds ? 1 : 0, directStreamAudio: 1,
+        fastSeek: 1, copyts: 1, location: o.wan ? 'wan' : 'lan', directPlay: o.dp ? 1 : 0, directStream: o.ds ? 1 : 0, directStreamAudio: 1,
         videoResolution: '1920x1080', subtitles: o.subs || 'none', audioBoost: o.boost > 100 ? o.boost : 100, offset: o.offsetSec || 0,
         session: o.session, 'X-Plex-Session-Identifier': o.session, 'X-Plex-Client-Identifier': o.clientId,
         'X-Plex-Product': C.product, 'X-Plex-Version': C.version, 'X-Plex-Platform': C.platform, 'X-Plex-Device': C.device,
@@ -35,8 +38,9 @@
       if (H.eac3) q['X-Plex-Client-Profile-Extra'] = EXTRA + '+' + EAC3;
       if (o.stereo) q['X-Plex-Client-Profile-Extra'] += '+' + STEREO;
       if (H.incomplete) q['X-Plex-Incomplete-Segments'] = 1;
-      if (o.transcode) {                              // Bitratengrenze nur, wenn das Video wirklich umgewandelt wird (K2)
+      if (o.transcode || o.wan) {                     // Bitratengrenze nur, wenn das Video wirklich umgewandelt wird (K2) – bzw. uebers Internet immer
         var qq = QUAL[o.quality] || QUAL['12'];
+        if (o.wan && qq[0] > REMOTE[0]) qq = REMOTE;
         q.maxVideoBitrate = qq[0]; q.videoResolution = qq[1];
       }
       return q;

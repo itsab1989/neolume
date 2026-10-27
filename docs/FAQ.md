@@ -91,7 +91,15 @@ Not for watching – only your Plex Media Server on the home network (the server
 metadata). The setup needs the internet once (plex.tv sign-in).
 
 ### Does it work away from home (remote access)?
-No, by design. Neolume only uses server addresses on your home network, so no access ever travels over the internet unencrypted.
+No, by design. Neolume uses your own server only through its home-network address, so your access never travels over the
+internet unencrypted.
+
+### Can I use a server that a friend shared with me?
+Yes, optionally. In the setup program's **Summary**, click **Search shared servers** and tick the servers you want. Their
+libraries then appear in the side menu ("from <server>"); Search and Home stay with your own server. Two limits come from
+the 2014 TV, which cannot encrypt: the friend's server must allow insecure connections (Plex: **Settings → Network → Secure
+connections: Preferred**), and the connection to it goes over the internet **without encryption**. See
+[INSTALL, section 14](INSTALL.md#14-optional-other-servers-shared-with-you).
 
 ### Profiles, kids profiles and PINs
 - All **Plex Home** profiles chosen during setup are available. Each sees only its own libraries and keeps its own watched status.
@@ -141,6 +149,8 @@ No. Neolume is a separate app with its own name. A preinstalled Plex app stays a
 ### Is it safe? Is the connection encrypted?
 - Between **TV and server** the connection is **not encrypted** (HTTP), because the TV cannot do modern encryption.
   It stays **inside your home network**. Use Neolume only on a network you trust.
+- Exception, only if you tick it in the setup: **servers that someone shared with you** are reached over the internet,
+  also without encryption.
 - The **plex.tv sign-in** on your computer is encrypted (HTTPS).
 - The setup page only accepts connections from your own computer; the app package is only handed to devices on your home
   network, and after the first fetch only to that TV.

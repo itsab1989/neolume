@@ -132,6 +132,14 @@ async function main() {
   await click('Next');
   console.log('4. summary');
   await waitText('Reset app PINs');
+  // Weitere Server (optional): search, status + explanation, tick
+  await click('Search shared servers');
+  await waitText('Search again', 15000);
+  t = await text();
+  ok(t.indexOf('Friend Server') >= 0 && t.indexOf('not reachable right now') >= 0, 'shared server listed with its status');
+  ok(t.indexOf('without encryption') >= 0, 'plain http to other servers explained');
+  ok(t.indexOf('5.6.7.8') < 0, 'no addresses of other servers on the page');
+  await click('Friend Server', 'label');
   await click('Set up the helper', 'label');
   await shot('4-summary');
   await click('Create app package');
@@ -140,6 +148,7 @@ async function main() {
   ok((await text()).indexOf('192.0.2.10') >= 0, 'computer address shown big for the TV');
   var st = await state();
   ok(st.package && st.package.helper === true && st.package.resetPins === false, 'package built with helper, PINs kept ' + JSON.stringify(st.package) + JSON.stringify(st.helper));
+  ok(st.package.others.join() === 'Friend Server', 'chosen other server in the package');
   var wl = await get('http://127.0.0.1:' + st.sync.port + '/widgetlist.xml');
   var pkgName = (/<download>[^<]*\/([A-Za-z0-9_]+\.zip)<\/download>/.exec(wl.body.toString()) || [])[1];   // <widgetId>.zip of the brand
   ok(wl.status === 200 && !!pkgName, 'TV fetch widgetlist.xml');

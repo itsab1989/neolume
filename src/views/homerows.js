@@ -231,22 +231,23 @@
   }));
 
   /* ---------- "Seitenleiste anpassen" (W1): Suche, Entdecken, Start, Bibliotheken – Start immer sichtbar ---------- */
-  function railLib(id) { var l = N.ui.rail.libs || []; for (var i = 0; i < l.length; i++) if ('lib-' + l[i].id === id) return l[i]; return null; }
+  function railLib(id) { var l = N.ui.rail.allLibs(); for (var i = 0; i < l.length; i++) if (N.railRows.libId(l[i]) === id) return l[i]; return null; }
   N.router.define('railitems', editor({
     setting: 'railItems', model: N.railRows, noCatalog: true,
     keys: { title: 'set.railItems', how: 'set.ri.how', help: 'set.ri.help', resetDesc: 'set.ri.reset.desc', resetText: 'dlg.riReset.text',
       always: 'set.ri.always', lockedToast: 'toast.riLocked' },
-    avail: function () { return N.railRows.avail(N.ui.rail.libs || [], !!(N.disc && N.disc.enabled())); },
+    avail: function () { return N.railRows.avail(N.ui.rail.allLibs(), !!(N.disc && N.disc.enabled())); },
     locked: function (it) { return !!N.railRows.LOCKED[it.id]; },
     label: function (it) {
       if (it.id === 'search' || it.id === 'discover' || it.id === 'home') return N.t('nav.' + it.id);
       var lib = railLib(it.id);
       return lib ? lib.title : it.id;
     },
-    val: function () { return ''; },
+    val: function (it) { var lib = railLib(it.id); return lib && lib.srv ? lib.srvName : ''; },   // Weitere Server: Herkunft rechts
     desc: function (it) {
       if (it.id === 'search' || it.id === 'discover' || it.id === 'home') return N.t('set.ri.' + it.id + '.desc');
       var lib = railLib(it.id);
+      if (lib && lib.srv) return N.t('set.ri.xlib.desc', { library: lib.title, server: lib.srvName, n: N.ui.rail.MAX });
       return N.t('set.ri.lib.desc', { library: lib ? lib.title : '' });
     }
   }));

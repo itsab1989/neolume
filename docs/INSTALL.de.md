@@ -139,7 +139,8 @@ Alle Profile deines Plex Home erscheinen mit Haken. Jedes Profil bekommt einen e
 - Du willst, dass **nur dein Fernseher** die App abholen darf: Trage die **IP-Adresse des Fernsehers** ein (`MENU` → **Netzwerk / Network** → **Netzwerkstatus / Network Status** → **IP-Einstellungen / IP Settings**; noch zu prüfen).
 
 ### 6.5 Paket bauen
-1. **Übersicht** prüfen.
+1. **Übersicht** prüfen. Dort gibt es zwei Extras, beide ohne Haken aus: **Weitere Server** (Server, die jemand für dich freigegeben hat,
+   siehe [Nachtrag](#nachtrag-weitere-server-optional)) und den **Helfer** (siehe [Nachtrag](#nachtrag-optionaler-helfer-merkliste--trends)).
 2. **„App-Paket erstellen“** klicken.
 3. Danach startet der Sync-Server automatisch. Das Programm zeigt die **Adresse deines Computers groß** an und wartet auf den Fernseher.
 
@@ -271,3 +272,24 @@ Alles in Neolume funktioniert mit deinem Plex-Server allein. Nur die **Plex-Merk
 
 Merkliste gibt es für den Besitzer und Plex-Home-Profile ohne Plex-PIN. Der Helfer ist kein offener Proxy: nur feste plex.tv-Abfragen, nur für Geräte im Heimnetz.
 **Keine Portweiterleitung für Port 32499 im Router einrichten.**
+
+## Nachtrag: Weitere Server (optional)
+Hat jemand seinen Plex-Server für dich freigegeben, z. B. ein Freund? Dann kann Neolume dessen Bibliotheken **zusätzlich zu deinem eigenen Server** zeigen – standardmäßig aus.
+1. In der **Übersicht** auf **„Freigegebene Server suchen“** klicken. Das Programm schaut nach, welche Server für die gewählten Profile freigegeben sind
+   (nur dein eigener Zugang – es fragt nie nach fremden Passwörtern oder Zugängen), und prüft jeden von deinem Computer aus.
+2. Gewünschte Server ankreuzen, **„App-Paket erstellen“** und wie gewohnt aufspielen. Jedes Profil bekommt nur die Server, die für **dieses** Profil freigegeben sind.
+3. Am Fernseher stehen die Bibliotheken in der Seitenleiste mit dem Zusatz „von <Server>“. Ausblenden oder verschieben unter Einstellungen › Oberfläche ›
+   „Seitenleiste anpassen“. Suche und Startseite bleiben bei deinem eigenen Server.
+
+Was die Anzeige neben einem Server bedeutet:
+- **erreichbar** – passt, der Fernseher kann ihn nutzen.
+- **nur sichere Verbindungen** – der Server verlangt Verschlüsselung, die der Fernseher (2014) nicht kann. Der Besitzer kann in Plex unter
+  *Einstellungen › Netzwerk* „Sichere Verbindungen“ auf **„Bevorzugt“** stellen; danach erneut suchen.
+- **gerade nicht erreichbar** – vielleicht aus oder nur über das Plex-Relay erreichbar (braucht Verschlüsselung, geht am Fernseher nicht).
+  Du kannst ihn trotzdem eintragen; die App versucht es später erneut.
+
+> ⚠️ Der Fernseher kann nicht verschlüsseln. Die Verbindung zu einem freigegebenen Server läuft deshalb **unverschlüsselt über das Internet**;
+> der Zugang zu diesem Server könnte unterwegs mitgelesen werden. Dein eigener Server bleibt wie bisher nur im Heimnetz.
+
+Wechselt die Internet-Adresse des Servers, findet der optionale Helfer die neue von selbst; ohne Helfer die Einrichtung erneut ausführen.
+Ist ein freigegebener Server nicht erreichbar, zeigen nur seine Bibliotheken eine Meldung – alles andere läuft weiter.

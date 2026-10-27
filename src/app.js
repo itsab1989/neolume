@@ -123,7 +123,7 @@
       }
       var name = id === 'settings' || id === 'search' || id === 'discover' ? id : 'library';   // P4: Entdecken
       var params = name !== 'library' ? {} : { lib: lib }, tp = R.topParams();
-      if (R.topName() === name && (name !== 'library' || (tp && tp.lib && lib && tp.lib.id === lib.id && !tp.coll && !tp.actor))) return false;
+      if (R.topName() === name && (name !== 'library' || (tp && tp.lib && lib && tp.lib.id === lib.id && (tp.lib.srv || '') === (lib.srv || '') && !tp.coll && !tp.actor))) return false;
       if (R.topName() === 'home') R.push(name, params); else R.replace(name, params);
       return true;
     },

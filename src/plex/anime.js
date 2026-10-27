@@ -22,6 +22,11 @@
     },
     /* Schluessel: Serie fuer Folge/Staffel, sonst der Titel selbst */
     key: function (it) {
+      var k = A.rkOf(it);
+      return k && it.srv && N.srv ? N.srv.skey(it.srv, k) : k;   // Weitere Server: eigener Schluessel (gleiche ratingKeys moeglich)
+    },
+    /* ratingKey fuer die Anfrage (ohne Server-Praefix) */
+    rkOf: function (it) {
       if (!it) return '';
       if (it.type === 'episode' || it.type === 'season') return it.showRk || '';
       return it.rk || '';
@@ -98,7 +103,7 @@
       if (!A.relevant(it) || !k || cache.has(k) || A.override(it) !== undefined || settings().animeDetect === 'off' || !N.plex || !N.plex.get) { cb(); return; }
       if (wait[k]) { wait[k].push(cb); return; }
       wait[k] = [cb];
-      N.plex.get('/library/metadata/' + k, { excludeElements: EXCL, includeExtras: 0, includeRelated: 0, includeOnDeck: 0 }, { timeout: 6000 }, function (err, d) {
+      N.plex.get('/library/metadata/' + A.rkOf(it), { excludeElements: EXCL, includeExtras: 0, includeRelated: 0, includeOnDeck: 0 }, N.srv ? N.srv.o(it.srv, { timeout: 6000 }) : { timeout: 6000 }, function (err, d) {
         var m = !err && d && d.MediaContainer && d.MediaContainer.Metadata && d.MediaContainer.Metadata[0], list = wait[k] || [];
         delete wait[k];
         if (m) A.learn(k, m);

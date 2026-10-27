@@ -3,6 +3,24 @@
 All notable changes to Neolume are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.0.4] - 2026-10-27
+
+### Added
+- **Optional "Other servers"**: libraries of Plex servers that someone shared with you (for example a friend) can appear in
+  the side menu next to your own, marked "from <server>", and can be hidden or reordered like any library. The setup
+  program finds them with **Search shared servers** (only your own access; each profile only gets the servers shared with
+  it), checks them over plain HTTP and explains when a server cannot work with the 2014 TV ("secure connections only").
+  Libraries, details, playback, progress and "watched" go to that server; your own server works exactly as before.
+  If such a server is offline, only its libraries show a message. With the optional helper, a changed internet address is
+  found automatically. Note: the TV cannot encrypt, so these connections go over the internet without encryption.
+
+### Fixed
+- **Artist pages show every release**: compilations, live albums, singles & EPs, soundtracks, demos and remixes were missing
+  (an artist with only a best-of showed no albums at all). They now appear in their own rows below "Albums", grouped like
+  in the official Plex apps; the album count includes them.
+
+If Neolume now finds every Oasis album for you, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.3] - 2026-10-27
 
 ### Added

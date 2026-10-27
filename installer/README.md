@@ -78,7 +78,14 @@ The page guides you through six steps (English or German, button at the top righ
    on the list** when it syncs. Add the `.zip` of each other app under *Advanced* (one path per line). Under *Advanced*
    you can also enter the TV's IP address so that only the TV may fetch the app.
 4. **Summary → "Create app package".** Options: *Reset app PINs* (only if you forgot the main profile's PIN in the app:
-   all app PINs are deleted once; otherwise they are kept) and *Set up the helper* (see section 6).
+   all app PINs are deleted once; otherwise they are kept), *Other servers* (below) and *Set up the helper* (see section 6).
+   **Other servers (optional, default off):** *Search shared servers* lists the Plex servers that OTHER people shared with
+   the chosen profiles (owner = this sign-in, Plex Home profiles without a Plex PIN via a profile switch, friends never;
+   only each profile's own access from its own plex.tv `resources`, never anybody else's token). Each server is checked
+   from this computer over plain http (`GET /identity`, no token) and shown as *reachable*, *not reachable right now*
+   (offline or relay-only – the relay needs TLS) or *secure connections only* (`httpsRequired`, owner setting
+   "Secure connections: Required" – the 2014 TV cannot do TLS 1.2, so it cannot be ticked). Ticked servers go into
+   `setup.json` per profile (see schema). The page explains that these connections go over the internet without encryption.
 5. **To the TV** – keep the page open and follow the steps shown (Samsung 2014):
    1. Once: `MENU` → **Smart Hub** → **Samsung Account** → **Sign in** → user **`develop`** (password usually fills in, otherwise `any`).
    2. Press **SMART HUB** → open **SAMSUNG APPS**.
@@ -113,6 +120,7 @@ The program has **no telemetry, no update check and no own server**. It talks on
 |---|---|---|
 | **plex.tv** (HTTPS, certificate checked, fixed `https://plex.tv/api/…` addresses only) | sign-in code; then with your sign-in: your account name and avatar, server list, Plex Home profiles, per-profile server access. With the helper: one "switch profile" request per Home profile without a Plex PIN | during the setup |
 | **discover.provider.plex.tv** (HTTPS) | only with the optional helper: watchlist and the three Discover lists, per profile | while the helper runs |
+| **servers shared with you** (plain HTTP, only after *Search shared servers*) | `GET /identity` without any token (is it reachable, right machine?). With *Search shared servers* the program also switches to each Home profile without a Plex PIN once (like the helper) to read that profile's server list | during the setup |
 | **your Plex server** (home network, HTTP) | `/identity` (no token) and `/library/sections` once per profile token (read only, to count libraries) | during the setup |
 | **home network broadcast** (UDP 32414) | "where is a Plex server?" (Plex GDM) | during the setup |
 | **your TV** | the app package incl. `setup.json` with the per-profile **server** tokens (no plex.tv account token, no password, no e-mail) | when the TV fetches it |
@@ -146,6 +154,9 @@ Without the helper everything works with your Plex server. Only the **Plex watch
 - **Security:** the helper is not a proxy – the TV can only call a few fixed functions, each mapped to one fixed plex.tv
   address (`design/reviews/helper-security.md`); home network only (with a TV address under *Advanced*: only the TV),
   only with the key from `setup.json`, rate-limited, never forwards plex.tv tokens to the TV.
+- **Other servers:** with the helper running, the TV can ask `GET /servers` (key + profile) for the current plain-http
+  addresses of the servers shared with that profile (`https://plex.tv/api/v2/resources`, cached 60 s). The answer holds
+  only machine ids and addresses – never a token.
   **Never forward port 32499 in your router.**
 
 ## 7. NAS (Docker, Synology)
@@ -225,6 +236,7 @@ The package `Neolume.zip` contains the release app (same layout as `tools/dev.py
 | `profiles[]` | Profiles chosen in the setup, in display order. `kind`: `owner` / `home` (only your own account and your Plex Home users; older setup programs could also write `friend` entries, which the app skips). `token`: **server-bound token for this PMS only** (from `/api/v2/resources` for the owner, from `shared_servers` for the Plex Home users – entries of other accounts in that answer are discarded and never stored). Use as `X-Plex-Token` against `server.uris` only. `thumb`: https avatar on plex.tv (load via `PMS /photo/:/transcode?url=…`), may be empty. `restrictionProfile`: `little_kid` / `older_kid` / `teen` / `""`. |
 | `resetAppPins` | Optional, only present as `true` when "Reset app PINs" was ticked. The app then deletes all app PINs once for this setup (remembered by `createdAt`). Without it, app PINs are kept across setups of the same server (`machineIdentifier`). |
 | `helper` | Optional, only when "Set up the helper" was ticked: `{"url": "http://<private IPv4>:32499", "key": "<random, 32 chars>"}`. The app sends `key` as `X-Neo-Key` and the profile uuid as `X-Neo-Profile` to the fixed helper routes; **no plex.tv token** is in `setup.json` or ever sent to the TV. Without it the app makes no helper request. |
+| `serversSchema` + `profiles[].servers` | Optional "Other servers" (only present when at least one was ticked): `"serversSchema": 1` and per profile `"servers": [{"machineIdentifier": "<id>", "name": "<server name>", "uris": ["http://<IPv4>:<port>", …], "token": "<this profile's token for THAT server>"}]` (max. 8, only servers shared with that profile, never for `friend` profiles). `uris`: plain http, IPv4 literals (public addresses allowed here, unlike `server.uris`), reachable ones first, no relay. The app checks `GET /identity` (no token, `machineIdentifier` must match) before it sends the token to an address, remembers the working one, and asks the helper (`GET /servers`) for fresh addresses if none answers. Older apps ignore the field; a higher `serversSchema` only disables this feature, the rest of the file stays valid. |
 | `computer` | LAN address of the computer that ran the setup and the port of the optional update server (`GET /neo-helper`, `/update/manifest.json` `{name, version, size, sha256, app}`, `/update/app.js`). `null` if unknown. |
 
 No account password, no Plex PINs, no e-mail addresses. Profile protection uses the app's own PIN per profile (set on the TV, salted hash only).

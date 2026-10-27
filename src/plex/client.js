@@ -25,11 +25,35 @@
     /* PMS-Anfrage mit dem Profil-Token. opts: {method, timeout, retries, query} */
     pms: function (method, path, query, opts, cb) {
       opts = opts || {};
-      var base = opts.base !== undefined ? opts.base : P.base, tok = opts.token !== undefined ? opts.token : P.token;
+      var base = opts.base !== undefined ? opts.base : P.base, tok = opts.token !== undefined ? opts.token : P.token, no401 = opts.no401;
+      if (opts.srv) return P.pmsSrv(method, path, query, opts, cb);
       return N.http.request({
         method: method, url: U.addQs(base + path, query), headers: P.headers(tok),
-        timeout: opts.timeout || 8000, retries: opts.retries, json: opts.json, dedupe: opts.dedupe, no401: opts.no401, nowatch: opts.nowatch
+        timeout: opts.timeout || 8000, retries: opts.retries, json: opts.json, dedupe: opts.dedupe, no401: no401, nowatch: opts.nowatch
       }, cb);
+    },
+    /* Weitere Server (N.srv): Adresse + Token DIESES Servers; 401 dort heisst nie "eigenes Profil abgemeldet" (no401), Ausfaelle
+     * zaehlen nicht fuer die Offline-Leiste des eigenen Servers (nowatch). Laeuft die Adresspruefung noch, wartet die Anfrage
+     * darauf; nicht erreichbar -> Fehler {type:'network', srv}. Rueckruf im Kontext des Servers (N.model.norm markiert). */
+    pmsSrv: function (method, path, query, opts, cb) {
+      var id = opts.srv, done = N.srv.wrap(id, cb), inner = null, dead = false;
+      function go() {
+        if (dead) return;
+        var c = N.srv.conn(id);
+        if (!c) { N.srv.timing(id, method, path, { type: 'down' }, null); done({ type: 'network', srv: id, status: 0 }, null, { status: 0 }); return; }
+        // TV-Test 1.0.4 (Dreamland): uebers Internet sind 8–12 s zu knapp (am TV meldet ein abgebrochenes XHR oft "network") ->
+        // mindestens N.srv.TIMEOUT; GET wiederholt N.http ohnehin (500/1500 ms). Dauer jeder Anfrage ins Protokoll (ohne Query/Token).
+        inner = N.http.request({
+          method: method, url: U.addQs(c.base + path, query), headers: P.headers(c.token),
+          timeout: Math.max(opts.timeout || 8000, N.srv.TIMEOUT), retries: opts.retries, json: opts.json, dedupe: opts.dedupe, no401: true, nowatch: true
+        }, function (err, d, meta) {
+          N.srv.timing(id, method, path, err, meta);
+          if (err) { err.srv = id; N.srv.failed(id, err); }
+          return done(err, d, meta);
+        });
+      }
+      N.srv.when(id, go);
+      return { abort: function () { dead = true; if (inner) inner.abort(); } };
     },
     get: function (path, query, opts, cb) { return P.pms('GET', path, query, opts, cb); },
     /* Schreibende Aktionen (Gesehen, Ausblenden …). N.config.readOnly (config.json {"readOnly":true}) unterdrueckt sie –
@@ -38,6 +62,7 @@
     target: function () { return { base: P.base, token: P.token }; },
     write: function (method, path, query, cb, who) {
       if (N.config.readOnly) { if (N.log) N.log('readOnly: ' + method + ' ' + path + ' unterdrueckt'); setTimeout(function () { cb(null, null, { status: 200 }); }, 0); return { abort: function () {} }; }
+      if (who && who.srv) return P.pms(method, path, query, { json: false, retries: method === 'GET' ? 1 : 0, dedupe: false, srv: who.srv }, cb);   // Weitere Server
       return P.pms(method, path, query, { json: false, retries: method === 'GET' ? 1 : 0, dedupe: false,
         base: who ? who.base : undefined, token: who ? who.token : undefined }, cb);
     },

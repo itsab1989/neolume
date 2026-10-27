@@ -29,14 +29,23 @@
   };
   /* P4: optionaler Eintrag "Entdecken" (N.disc.enabled); W1: Reihenfolge und ausgeblendete Eintraege je Profil
    * ("Seitenleiste anpassen", N.railRows) – Start und Einstellungen sind immer da */
+  /* Weitere Server: deren Bibliotheken (N.srv, mit srv/srvName) nach den eigenen; Seitenleisten-ID 'xlib-<server>-<id>' */
+  R.allLibs = function () { var x = N.srv ? N.srv.libs() : []; return x.length ? R.libs.concat(x) : R.libs; };
+  /* zwischen Profil und Einstellungen passen hoechstens MAX Eintraege (Abstand min. 48); weitere bleiben unsichtbar, bis der
+   * Nutzer andere in "Seitenleiste anpassen" ausblendet (betrifft praktisch nur viele Bibliotheken weiterer Server) */
+  R.MAX = 10;
   R.order = function () {
     var disc = !!(N.disc && N.disc.enabled()), st = N.session && N.session.settings;
-    return N.railRows.enabled(st && st.railItems || null, N.railRows.avail(R.libs, disc));
+    var ids = N.railRows.enabled(st && st.railItems || null, N.railRows.avail(R.allLibs(), disc));
+    if (ids.length <= R.MAX) return ids;
+    var out = [], n = 0;                            // 'home' bleibt immer (gesperrt), an seiner Stelle
+    for (var i = 0; i < ids.length; i++) { if (ids[i] === 'home') out.push(ids[i]); else if (n < R.MAX - 1) { out.push(ids[i]); n++; } }
+    return out;
   };
   /* Eintraege neu aufbauen (nur bei Profil-/Bibliothekswechsel oder geaenderter Auswahl, nie im Fokusschritt) */
   R.build = function () {
-    var ids = R.order(), L = R.layoutY(ids.length), byLib = {}, i;
-    for (i = 0; i < R.libs.length; i++) byLib['lib-' + R.libs[i].id] = R.libs[i];
+    var ids = R.order(), L = R.layoutY(ids.length), byLib = {}, i, all = R.allLibs();
+    for (i = 0; i < all.length; i++) byLib[N.railRows.libId(all[i])] = all[i];
     var list = [{ id: 'profile', y: 28 }];
     if (N.disc) N.disc.probeHelper();               // nur mit konfiguriertem Helfer (sonst keine Anfrage)
     for (i = 0; i < ids.length; i++) {
@@ -64,8 +73,13 @@
         e.ni = U.el('div', 'ni', R.panel, 'top:' + e.y + 'px');
         N.ui.icon(e.ni, e.icon);
         var lt = e.label || N.t(e.t);
-        e.lbT = U.txt('div', R.longLabel(lt) ? 'lb lb2 clamp' : 'lb', e.ni, '');
-        U.clampText(e.lbT, lt);
+        if (e.lib && e.lib.srv) {                      // Weitere Server: Name einzeilig, darunter klein die Herkunft
+          e.lbT = U.txt('div', 'lb lbx', e.ni, lt);
+          U.txt('div', 'lbo', e.ni, N.t('srv.from', { server: e.lib.srvName }));
+        } else {
+          e.lbT = U.txt('div', R.longLabel(lt) ? 'lb lb2 clamp' : 'lb', e.ni, '');
+          U.clampText(e.lbT, lt);
+        }
       }
     }
     R.entries = list;
@@ -156,5 +170,16 @@
   };
   /* Schalter "Entdecken in der Seitenleiste" wirkt sofort */
   N.evt.on('settings:changed', function (e) { if (e && (e.key === 'discover' || e.key === 'railItems') && R.el) R.build(); });
+  /* Weitere Server: Bibliotheken kamen/gingen -> neu aufbauen (nur bei geaenderter Liste; bei offener Leiste erst nach dem Schliessen) */
+  var xsig = '[]', xdirty = false;
+  N.evt.on('srv:changed', function () {
+    var sg = JSON.stringify(N.srv.libs());
+    if (sg === xsig) return;
+    xsig = sg;
+    if (!R.el) return;
+    if (R.open_) xdirty = true; else R.build();
+  });
+  var close0 = R.close;
+  R.close = function (silent) { close0(silent); if (xdirty && !R.open_) { xdirty = false; R.build(); } };
   N.ui.rail = R;
 })(N);

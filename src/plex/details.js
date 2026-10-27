@@ -4,6 +4,7 @@
 (function (N) {
   var U = N.util, M = N.model, F = N.fmt;
   function num(v) { return Number(v) || 0; }
+  function tp(p) { return N.srv ? N.srv.tp(p) : p; }   // Weitere Server: Rohpfade mit Server-Marke (Kontext aus N.plex.pms)
   function tags(list, max) { var out = []; for (var i = 0; list && i < list.length && out.length < (max || 99); i++) if (list[i].tag) out.push({ id: list[i].id, t: String(list[i].tag) }); return out; }
   function genreTags(list, max) { var t = tags(list, max); for (var i = 0; i < t.length; i++) t[i].t = N.fmt.genre(t[i].t); return t; }   // F22: App-Sprache
   var D = {
@@ -20,13 +21,13 @@
     parse: function (m, kinds) {
       var it = M.norm(m, kinds), d = { it: it, sum: String(m.summary || ''), tagline: String(m.tagline || ''), studio: String(m.studio || ''),
         genres: genreTags(m.Genre, 3), directors: tags(m.Director, 3), writers: tags(m.Writer, 3), date: String(m.originallyAvailableAt || ''),
-        cast: [], extras: [], trailer: null, related: [], ondeck: null, media: m.Media || [], theme: m.theme || '', lib: num(m.librarySectionID) };
+        cast: [], extras: [], trailer: null, related: [], ondeck: null, media: m.Media || [], theme: tp(m.theme || ''), lib: num(m.librarySectionID) };
       var i, r = m.Role || [];
-      for (i = 0; i < r.length && i < 20; i++) d.cast.push({ rk: 'p' + r[i].id, type: 'person', id: r[i].id, title: String(r[i].tag || ''), role: String(r[i].role || ''), thumb: r[i].thumb || '', vc: 0, off: 0, dur: 0, leaf: 0, vleaf: 0 });
+      for (i = 0; i < r.length && i < 20; i++) d.cast.push({ rk: 'p' + r[i].id, type: 'person', id: r[i].id, title: String(r[i].tag || ''), role: String(r[i].role || ''), thumb: tp(r[i].thumb || ''), vc: 0, off: 0, dur: 0, leaf: 0, vleaf: 0 });
       var ex = m.Extras && m.Extras.Metadata || [];
       for (i = 0; i < ex.length && i < 20; i++) {
         var x = M.norm(ex[i], kinds);
-        x.extra = true; x.still = ex[i].thumb || ''; x.sub = String(ex[i].subtype || '');
+        x.extra = true; x.still = tp(ex[i].thumb || ''); x.sub = String(ex[i].subtype || '');
         d.extras.push(x);
         if (!d.trailer && (x.sub === 'trailer' || Number(ex[i].extraType) === 1)) d.trailer = x;
       }
@@ -47,7 +48,7 @@
       for (var i = 0; i < list.length; i++) {
         var x = list[i];
         if (x.type !== 'season') continue;
-        var s = { rk: String(x.ratingKey), index: num(x.index), title: String(x.title || ''), leaf: num(x.leafCount), vleaf: num(x.viewedLeafCount), thumb: x.thumb || '' };
+        var s = { rk: String(x.ratingKey), index: num(x.index), title: String(x.title || ''), leaf: num(x.leafCount), vleaf: num(x.viewedLeafCount), thumb: tp(x.thumb || '') };
         if (s.index === 0) sp = s; else out.push(s);
       }
       out.sort(function (a, b) { return a.index - b.index; });

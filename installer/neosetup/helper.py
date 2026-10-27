@@ -27,7 +27,7 @@ import urllib.parse
 import urllib.request
 
 from . import VERSION, brand
-from .netutil import is_private_ipv4
+from .netutil import is_private_ipv4, other_candidate_uris
 import ipaddress
 
 HELPER_PORT = 32499                      # shared with the update server (same LanServer)
@@ -36,6 +36,8 @@ MAX_ITEMS = 50
 TIMEOUT = 10
 CACHE_DISCOVER = 15 * 60
 CACHE_WATCHLIST = 60
+CACHE_SERVERS = 60
+PLEX_TV = 'plex.tv'
 HEX = re.compile(r'^[0-9a-f]{24}$')
 UUID = re.compile(r'^[A-Za-z0-9-]{4,64}$')
 KEY = re.compile(r'^[A-Za-z0-9_-]{16,128}$')
@@ -53,6 +55,7 @@ UPSTREAM = (
     ('GET', DISCOVER, r'/library/metadata/[0-9a-f]{24}(,[0-9a-f]{24}){0,29}/userState', ()),
     ('GET', DISCOVER, r'/hubs/sections/home/(top_watchlisted|recently-released-family|coming-soon)', _PAGING),
     ('GET', METADATA, r'/library/metadata/[0-9a-f]{24}', ()),     # reserved: cast/summary of foreign titles (not routed yet)
+    ('GET', PLEX_TV, r'/api/v2/resources', ('includeHttps', 'includeRelay', 'includeIPv6')),   # "Weitere Server": fresh addresses
 )
 
 # Discover rows: fixed hub table (checked live 27.10.2026, docs/research/discover.md). No hub is chosen by the TV.
@@ -351,15 +354,29 @@ class Helper(object):
                 if len(spec['hubs']) == 1: raise
         return {'items': [public(i) for i in pick(items, type_, spec['when'], today, size)]}
 
+    def servers(self, uuid):
+        """"Weitere Server": current plain-http addresses of the servers OTHER people shared with this profile (the TV tries
+        them when the addresses from setup.json fail, e.g. after a change of the friend's public IP). Only machine ids and
+        addresses go to the TV: never tokens (the TV has its own server token for each of these servers from setup.json)."""
+        tok = self.store.token(uuid)
+        def get():
+            from .plextv import parse_resources
+            data = self.call('GET', PLEX_TV, '/api/v2/resources', [('includeHttps', 0), ('includeRelay', 0), ('includeIPv6', 0)], tok)
+            try: res = parse_resources(json.loads(data.decode('utf-8')))
+            except (ValueError, UnicodeDecodeError): raise HelperError(502, 'parse')
+            return {'servers': [{'id': r['machineIdentifier'], 'uris': other_candidate_uris(r)}
+                                for r in res if not r['owned'] and not r.get('httpsRequired')][:20]}
+        return self._cached(('srv', uuid), CACHE_SERVERS, get)
+
     # --- TV-facing request handling (pure; LanServer passes method/path/headers/client) ---
     def hello(self):
         return {'name': 'plex-neo-helper', 'version': VERSION, 'watchlist': True, 'discover': True,
-                'features': ['watchlist', 'discover'] + (['update'] if self.update_on else [])}
+                'features': ['watchlist', 'discover', 'servers'] + (['update'] if self.update_on else [])}
 
     def handle(self, method, raw_path, headers, client):
         """-> (status, dict) or None when the path is not a helper route (LanServer then tries its static files)."""
         path, _, qs = raw_path.partition('?')
-        if not (path == '/neo-helper' or path == '/watchlist' or path.startswith('/watchlist/') or path.startswith('/discover/')):
+        if not (path == '/neo-helper' or path == '/watchlist' or path.startswith('/watchlist/') or path.startswith('/discover/') or path == '/servers'):
             return None
         try:
             if not host_ok(headers.get('Host')): raise HelperError(403, 'host')     # DNS rebinding: only IP literals
@@ -379,8 +396,12 @@ class Helper(object):
         uuid = str(headers.get('X-Neo-Profile') or '')
         if not UUID.match(uuid): raise HelperError(400, 'profile')
         q = parse_qs(qs)
-        route = path if path in ('/watchlist', '/watchlist/state') else 'item' if path.startswith('/watchlist/') else 'discover'
+        route = path if path in ('/watchlist', '/watchlist/state', '/servers') else 'item' if path.startswith('/watchlist/') else 'discover'
         check_keys(q, route)
+        if path == '/servers':
+            if method != 'GET': raise HelperError(405, 'method')
+            self._need_profile(uuid)
+            return self.servers(uuid)
         if path == '/watchlist':
             if method != 'GET': raise HelperError(405, 'method')
             self._need_profile(uuid)
@@ -425,7 +446,7 @@ def host_ok(host):
     return bool(m)
 
 
-ROUTE_KEYS = {'/watchlist': ('type', 'start', 'size'), '/watchlist/state': ('ids',), 'item': (), 'discover': ('type', 'size')}
+ROUTE_KEYS = {'/watchlist': ('type', 'start', 'size'), '/watchlist/state': ('ids',), 'item': (), 'discover': ('type', 'size'), '/servers': ()}
 
 
 def check_keys(q, route):

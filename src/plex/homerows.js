@@ -149,7 +149,8 @@
 
   /* N.railRows – "Seitenleiste anpassen" (Nutzerwunsch W1, TV-Test 27.10.): Eintraege der Seitenleiste umsortieren und
    * ausblenden, je Profil in settings.railItems [{id, on}] (null = Standard). Eintraege: 'search', 'discover' (nur wenn
-   * Entdecken an ist), 'home' (immer sichtbar, aber verschiebbar), 'lib-<id>' je Bibliothek. Profil oben und Einstellungen
+   * Entdecken an ist), 'home' (immer sichtbar, aber verschiebbar), 'lib-<id>' je Bibliothek, 'xlib-<machineId>-<id>' je
+   * Bibliothek eines weiteren Servers (N.srv; nach den eigenen, wie neue Bibliotheken eingeschaltet). Profil oben und Einstellungen
    * unten stehen fest und sind nicht Teil der Liste. Neue Bibliotheken erscheinen eingeschaltet am Ende; was gerade nicht
    * verfuegbar ist (Entdecken aus, Bibliothek weg), behaelt seine gespeicherte Stelle. Gleiche Schnittstelle wie N.homeRows
    * (view/store/move) fuer den gemeinsamen Listen-Editor (views/homerows.js). */
@@ -159,9 +160,11 @@
       var out = [{ id: 'search', def: true }];
       if (disc) out.push({ id: 'discover', def: true });
       out.push({ id: 'home', def: true });
-      for (var i = 0; libs && i < libs.length; i++) out.push({ id: 'lib-' + libs[i].id, def: true });
+      for (var i = 0; libs && i < libs.length; i++) out.push({ id: RR.libId(libs[i]), def: true });
       return out;
     },
+    /* Eintrags-ID einer Bibliothek: eigener Server 'lib-<id>', weiterer Server (lib.srv) 'xlib-<machineId>-<id>' */
+    libId: function (lib) { return lib.srv ? 'xlib-' + lib.srv + '-' + lib.id : 'lib-' + lib.id; },
     merge: function (saved, avail) {
       var out = [], seen = {}, am = {}, i;
       for (i = 0; i < avail.length; i++) am[avail[i].id] = 1;

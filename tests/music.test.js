@@ -223,3 +223,53 @@ test('Ton: Datei nicht erreichbar (SEF 1/3) -> klare Art, nach 2 Fehlern in Folg
   assert.ok(N.AudioCore.unreachable('404') && !N.AudioCore.unreachable('SEF 4'));
   r.core.stop('test');
 });
+
+/* Live-Befund 27.10.: /library/metadata/<kuenstler>/children laesst Kompilationen, Live-Alben, Singles & EPs … weg
+ * (Kuenstler mit nur einer Kompilation zeigte 0 Alben). Gruppen aus /related wie die offiziellen Apps; Namen erfunden. */
+function hubJson() {
+  function al(rk, title, year) { return { ratingKey: String(rk), type: 'album', title: title, parentTitle: 'Nordlicht Ensemble', year: year, thumb: '/t/' + rk }; }
+  return { MediaContainer: { Hub: [
+    { hubIdentifier: 'artist.albums.singles', type: 'album', Metadata: [al(31, 'Kleiner Sommer', 2019)] },
+    { hubIdentifier: 'artist.albums.live', type: 'album', Metadata: [al(32, 'Abends im Hafen (Live)', 2018)] },
+    { hubIdentifier: 'artist.albums.soundtrack', type: 'album', size: 0 },
+    { hubIdentifier: 'artist.albums.compilation', type: 'album', Metadata: [al(33, 'Das Beste aus zehn Jahren', 2020), al(30, 'Doppelt', 2001)] },
+    { hubIdentifier: 'artist.albums.demo', type: 'album', size: 0 },
+    { hubIdentifier: 'artist.albums.remix', type: 'album', Metadata: [al(34, 'Morgengrau Remixe', 2021)] },
+    { hubIdentifier: 'artist.similar', type: 'artist', Metadata: [{ ratingKey: '99', type: 'artist', title: 'Sternwarte' }] }
+  ] } };
+}
+function normAll(list) { return N.model.normList(list || [], {}, 3); }
+
+test('Kuenstlerseite: Alben-Hubs aus /related erkennen, fremde Hubs ignorieren', function () {
+  var h = MU.albumHubs(hubJson());
+  H.eq(Object.keys(h).sort(), ['compilation', 'demo', 'live', 'remix', 'singles', 'soundtrack']);
+  assert.strictEqual(h.compilation.length, 2); assert.strictEqual(h.soundtrack.length, 0);
+  assert.strictEqual(MU.albumHubs({ MediaContainer: { Hub: [{ hubIdentifier: 'artist.similar', Metadata: [] }] } }), null);   // aeltere PMS
+  assert.strictEqual(MU.albumHubs(null), null);
+});
+
+test('Kuenstlerseite: Reihen Alben · Singles & EPs · Live · Kompilationen · Remixe, leere weg, jedes Album einmal', function () {
+  var raw = MU.albumHubs(hubJson()), hubs = {}, k;
+  for (k in raw) hubs[k] = normAll(raw[k]);
+  var main = normAll([{ ratingKey: '30', type: 'album', title: 'Doppelt', year: 2001 }, { ratingKey: '29', type: 'album', title: 'Erstes Licht', year: 1999 }]);
+  var g = MU.albumGroups(main, hubs, null, false);
+  H.eq(g.map(function (x) { return x.id; }), ['albums', 'singles', 'live', 'compilation', 'remix']);
+  H.eq(g.map(function (x) { return x.tk; }), ['mu.row.albums', 'mu.row.singles', 'mu.row.live', 'mu.row.compilations', 'mu.row.remixes']);
+  H.eq(g[3].items.map(function (x) { return x.rk; }), ['33']);           // '30' steht schon unter Alben
+  assert.strictEqual(MU.groupCount(g), 6);
+  // nur eine Kompilation (der Live-Fall): /children leer -> trotzdem eine Reihe, Zaehler 1
+  var only = MU.albumGroups([], { compilation: normAll([{ ratingKey: '40', type: 'album', title: 'Uhren anhalten', year: 2006 }]) }, null, false);
+  H.eq(only.map(function (x) { return x.id + ':' + x.items.length; }), ['compilation:1']);
+  assert.strictEqual(N.tn('mu.albums', MU.groupCount(only)), '1 Album');
+  assert.strictEqual(N.t('mu.row.compilations'), 'Kompilationen'); assert.strictEqual(N.t('mu.row.singles'), 'Singles & EPs');
+});
+
+test('Kuenstlerseite: Rueckfall ohne Hubs (Abschnitts-Abfrage) und Hoerbuecher in einer Reihe', function () {
+  var main = normAll([{ ratingKey: '50', type: 'album', title: 'Eins' }]);
+  var rest = normAll([{ ratingKey: '51', type: 'album', title: 'Zwei' }, { ratingKey: '50', type: 'album', title: 'Eins' }]);
+  var g = MU.albumGroups(main, null, rest, false);
+  H.eq(g.map(function (x) { return x.id + ':' + x.items.length; }), ['albums:1', 'more:1']);
+  var b = MU.albumGroups(main, { compilation: normAll([{ ratingKey: '52', type: 'album', title: 'Sammelband' }]) }, null, true);
+  H.eq(b.map(function (x) { return x.tk + ':' + x.items.length; }), ['mu.row.books:2']);
+  H.eq(MU.albumGroups([], null, null, false), []);
+});

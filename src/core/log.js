@@ -15,7 +15,13 @@
       return String(s)
         .replace(new RegExp('(X-Plex-Token|accessToken|authToken|authenticationToken|token)' + SEP + '[^&"\'\\s,;}%]+', 'gi'), '$1$2***')
         .replace(new RegExp(PRE + '(pin)' + SEP + '[^&"\'\\s,;}%]+', 'gi'), '$1$2$3***')
-        .replace(new RegExp(PRE + '(code)' + SEP + '[A-Za-z0-9]{4,8}(?![A-Za-z0-9])', 'gi'), '$1$2$3***');
+        .replace(new RegExp(PRE + '(code)' + SEP + '[A-Za-z0-9]{4,8}(?![A-Za-z0-9])', 'gi'), '$1$2$3***')
+        // oeffentliche IPv4-Adressen (weitere Server uebers Internet) nie ins Protokoll; Heimnetz-Adressen bleiben (Fehlersuche)
+        .replace(/(^|[^0-9.])(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?![0-9.])/g, function (m, pre, a, b) {
+          a = Number(a); b = Number(b);
+          var lan = a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254) || (a === 192 && b === 0) || a === 0;
+          return lan ? m : pre + '<fern>';
+        });
     },
     /* reine Funktion: Zeilen an die aktuelle Datei haengen, bei Ueberlauf rotieren. Rueckgabe {files, cur, wrote:[...]} */
     append: function (files, cur, lines, max) {

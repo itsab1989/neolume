@@ -51,6 +51,8 @@ def actions(w):
         'sync_unlock': lambda a: w.sync.unlock(),
         'update_start': lambda a: w.update_start(),
         'update_stop': lambda a: w.update_stop(),
+        'others_scan': lambda a: w.others_scan(),
+        'others': lambda a: w.set_others(a.get('ids')),
         'helper': lambda a: w.set_helper(_bool(a.get('on', False)), _bool(a.get('remember', True)), _str(a.get('address', ''))),
         'helper_start': lambda a: w.helper_start(),
         'helper_stop': lambda a: w.helper_stop(),

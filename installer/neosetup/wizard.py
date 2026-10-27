@@ -7,7 +7,10 @@ from . import brand
 from . import helper as helpermod
 from . import netutil, package, settings
 from .lanserver import LanServer, SYNC_PORT, UPDATE_PORT, port_in_use, sync_files, update_files
-from .plextv import PlexTV, build_profiles
+from .plextv import PlexError, PlexTV, build_profiles
+
+
+OTHERS_USABLE = ('ok', 'unreachable')      # https-only servers and servers without an address cannot be used by the TV
 
 
 class StepError(Exception):
@@ -62,6 +65,9 @@ class Wizard(object):
         self.extras = []
         self.computer_ip = None
         self.build_info = None
+        self.others = []                        # "Weitere Server": servers others shared with the chosen profiles
+        self.others_scanned = False
+        self.others_skipped = []                # profile titles that could not be checked (Plex PIN)
         if getattr(self, 'sync', None) and self.sync.running: self.sync.stop()
 
     def _need(self, what):
@@ -141,6 +147,7 @@ class Wizard(object):
         if not any(new): raise StepError('no_profiles')
         for p, inc in zip(self.profiles, new): p['include'] = inc
         self.package = None
+        self.others, self.others_scanned, self.others_skipped = [], False, []     # depends on the profiles: search again
 
     def set_extras(self, specs):
         if not isinstance(specs, list) or len(specs) > 10 or not all(isinstance(s, str) and len(s) < 1024 for s in specs):
@@ -163,6 +170,60 @@ class Wizard(object):
         self.sync.allow = set([addr]) if addr else set()
         self.update.allow = set([addr]) if addr else set()
 
+    # ---------- optional: other servers ("Weitere Server") ----------
+    def others_scan(self):
+        """Servers OTHER people shared with the chosen profiles (owned=false in each profile's own plex.tv resources).
+        Only the user's own access: owner = this sign-in, Plex Home profiles WITHOUT a Plex PIN via switch (same rule as the
+        helper; the setup never asks for PINs), friends never. Every server is checked read-only from this computer over
+        plain http (GET /identity, no token). Default: not included (checkbox in the summary)."""
+        self._need('server')
+        own = self.server['machineIdentifier']
+        old = dict((e['machineIdentifier'], e.get('include')) for e in self.others)
+        protected = dict((u['id'], u.get('protected')) for u in self.home)
+        found, skipped = {}, []
+
+        def collect(p, token):
+            for r in self.plex.resources(token):
+                mid = r['machineIdentifier']
+                if r['owned'] or mid == own or not r.get('token'): continue
+                e = found.setdefault(mid, {'machineIdentifier': mid, 'name': r['name'] or mid[:8], 'httpsRequired': r.get('httpsRequired', False),
+                                           'connections': r['connections'], 'tokens': {}, 'profiles': [], 'include': bool(old.get(mid))})
+                e['tokens'][p['id']] = r['token']
+                e['profiles'].append(p['title'])
+
+        for p in self.profiles:
+            if not p.get('include') or not p.get('token'): continue
+            if p['kind'] == 'owner':
+                collect(p, self.token)
+            elif p['kind'] == 'home':
+                if protected.get(p['id']): skipped.append(p['title']); continue
+                try: collect(p, self.plex.switch_home_user(self.token, p['id']))
+                except PlexError: skipped.append(p['title'])
+        others = sorted(found.values(), key=lambda e: e['name'].lower())
+
+        def probe(e):
+            e['uris'] = netutil.other_candidate_uris(e)
+            if e['httpsRequired']: e['status'], e['reachable'] = 'https', 0
+            elif not e['uris']: e['status'], e['reachable'] = 'none', 0
+            else:
+                ok = [u for u in e['uris'] if netutil.probe_identity_net(u, self.http_get) == e['machineIdentifier']]
+                e['uris'] = ok + [u for u in e['uris'] if u not in ok]          # reachable addresses first
+                e['status'], e['reachable'] = ('ok' if ok else 'unreachable'), len(ok)
+            if e['status'] not in OTHERS_USABLE: e['include'] = False
+            return e
+        if others:
+            with concurrent.futures.ThreadPoolExecutor(4) as ex: others = list(ex.map(probe, others))
+        self.others, self.others_scanned, self.others_skipped = others, True, skipped
+        self.package = None
+        return None
+
+    def set_others(self, ids):
+        """ids: machineIdentifiers to include (checkboxes). Servers that require https (or have no address) cannot be chosen."""
+        if not isinstance(ids, list) or len(ids) > 50 or not all(isinstance(i, str) and len(i) <= 64 for i in ids): raise StepError('bad_input')
+        wanted = set(ids)
+        for e in self.others: e['include'] = e['machineIdentifier'] in wanted and e['status'] in OTHERS_USABLE
+        self.package = None
+
     # ---------- steps d + e: summary + package ----------
     def build(self, reset_pins=False):
         """reset_pins: checkbox "Reset app PINs" (way out of a forgotten main-profile PIN); default keeps the PINs on the TV."""
@@ -175,7 +236,7 @@ class Wizard(object):
             base = self.base_loader()
             hcfg = self._prepare_helper(ip) if self.helper_wanted else None
             cfg = package.make_config(self.client_id, self.server, self.uris, self.profiles, ip, self.update.port,
-                                      reset_pins=bool(reset_pins), helper=hcfg)
+                                      reset_pins=bool(reset_pins), helper=hcfg, others=self.others)
             data = package.build_package(base, cfg)
         except package.PackageError as e:
             raise StepError(e.code, e.detail)
@@ -186,7 +247,8 @@ class Wizard(object):
         self.app_js = dict(package.release_entries(base)).get('app.js', b'')
         self.app_version = package.app_version(base)
         self.build_info = {'size': len(data), 'profiles': len(cfg['profiles']), 'apps': [a['title'] for a in apps],
-                           'appVersion': self.app_version, 'resetPins': bool(reset_pins), 'helper': bool(hcfg)}
+                           'appVersion': self.app_version, 'resetPins': bool(reset_pins), 'helper': bool(hcfg),
+                           'others': [e['name'] for e in self.others if e.get('include')]}
         if self.sync.running: self._load_sync()
         return self.build_info
 
@@ -321,6 +383,10 @@ class Wizard(object):
                           'hasToken': bool(p['token']), 'libraries': p.get('libraries'), 'restricted': p['restricted']}
                          for p in self.profiles],
             'extras': [{'id': a['id'], 'title': a['title'], 'file': a['file']} for a in self.extras],
+            # other servers: names, status and profile titles only (no tokens, no addresses)
+            'others': {'scanned': self.others_scanned, 'skipped': self.others_skipped,
+                       'list': [{'id': e['machineIdentifier'], 'name': e['name'], 'status': e['status'], 'include': bool(e.get('include')),
+                                 'profiles': e['profiles'], 'reachable': e.get('reachable', 0)} for e in self.others]},
             'extraSpecs': self.extra_specs,
             'package': self.build_info,
             'computer': self.computer_ip,

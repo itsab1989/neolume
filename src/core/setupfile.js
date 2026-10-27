@@ -6,6 +6,8 @@
  * parse(text) -> {ok:true, cfg} | {ok:false, reason}. reason: json|kind|newer|schema|server|uri|profiles|profile|token|dup|owner|friend
  * Freigabe-Konten ausserhalb von Plex Home ("Freunde", kind 'friend' bzw. uuid 'friend-<id>') legte ein aelteres Einrichtungsprogramm
  * mit an; die App uebernimmt sie nicht mehr (Nutzerentscheidung 27.10.): uebersprungen mit Grund 'friend', Token bleibt ungenutzt.
+ * Weitere Server (optional, Nutzerwunsch 27.10.): je Profil "servers": [{machineIdentifier, name, uris, token}] mit "serversSchema": 1.
+ * Das Datei-"schema" bleibt 1: alte Apps ignorieren das Feld, alte Dateien ohne Feld gelten weiter.
  * App-PINs gehoeren zum Server (machineIdentifier) und bleiben bei erneuter Einrichtung erhalten; "resetAppPins": true (Kaestchen
  * "App-PINs zuruecksetzen" im Einrichtungsprogramm) loescht sie einmal je Einrichtung (createdAt), Weg bei vergessener Hauptprofil-PIN. */
 (function (N) {
@@ -29,6 +31,37 @@
     if (port < 1 || port > 65535) return null;
     return 'http://' + m[1] + (m[2] ? ':' + port : '') + (m[3] || '');
   }
+  /* Weitere Server (fuer das Profil freigegebene fremde Server): auch oeffentliche IPv4-Adressen, weiterhin nur http + IP-Literal
+   * (keine Namen, kein DNS; plex.tv liefert Adressen). Ausgeschlossen: 0/8 und Multicast/reserviert (ab 224). */
+  function netIp(host) {
+    var m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+    if (!m) return false;
+    for (var i = 1; i <= 4; i++) if (Number(m[i]) > 255) return false;
+    var a = Number(m[1]), b = Number(m[2]);
+    return a > 0 && a < 224 && !(a === 169 && b === 254);   // kein Link-Local; Loopback nur fuer Vorschau/Tests (wie lanUri)
+  }
+  function netUri(u) {
+    var m = typeof u === 'string' && /^http:\/\/([0-9.]+)(?::(\d{1,5}))?\/?$/.exec(u);
+    if (!m || !netIp(m[1])) return null;
+    var port = m[2] ? Number(m[2]) : 80;
+    if (port < 1 || port > 65535) return null;
+    return 'http://' + m[1] + (m[2] ? ':' + port : '');
+  }
+  /* profile.servers (serversSchema 1): [{machineIdentifier, name, uris:[http://ip:port], token}] -> gepruefte Liste. Fehlerhafte
+   * Eintraege werden uebersprungen (nie die ganze Einrichtung verwerfen), hoechstens 8 je Profil, nie der eigene Server. */
+  function servers(list, ownMid, skipped) {
+    var out = [], seen = {};
+    for (var i = 0; list && list.length && i < list.length && out.length < 8; i++) {
+      var v = list[i], uris = [];
+      if (!v || typeof v !== 'object' || typeof v.machineIdentifier !== 'string' || !MID.test(v.machineIdentifier) ||
+          v.machineIdentifier === ownMid || seen[v.machineIdentifier] || typeof v.token !== 'string' || !TOKEN.test(v.token)) { skipped.push('server'); continue; }
+      for (var j = 0; v.uris && v.uris.length && j < v.uris.length && uris.length < 8; j++) { var nu = netUri(v.uris[j]); if (nu && uris.indexOf(nu) < 0) uris.push(nu); }
+      if (!uris.length) { skipped.push('server'); continue; }
+      seen[v.machineIdentifier] = true;
+      out.push({ machineId: v.machineIdentifier, name: str(v.name, 64) || v.machineIdentifier.substring(0, 8), uris: uris, token: v.token });
+    }
+    return out;
+  }
   function str(v, max) { return typeof v === 'string' ? v.replace(/^\s+|\s+$/g, '').substring(0, max) : ''; }
   function bad(reason) { return { ok: false, reason: reason }; }
 
@@ -46,6 +79,7 @@
     if (!uris.length) return bad('uri');                                       // keine (oder nur oeffentliche/https) Adressen
     if (!d.profiles || !d.profiles.length || d.profiles.length > 24) return bad('profiles');
     var profiles = [], seen = {}, owners = 0, skipped = [];
+    var srvOk = d.serversSchema === undefined || d.serversSchema === 1;        // fehlt = alte Datei; neueres Format -> nur die weiteren Server ignorieren
     for (i = 0; i < d.profiles.length; i++) {
       var p = d.profiles[i];
       if (p && typeof p === 'object' && (p.kind === 'friend' || (typeof p.uuid === 'string' && p.uuid.indexOf('friend-') === 0))) { skipped.push('friend'); continue; }
@@ -57,7 +91,8 @@
       if (p.kind === 'owner') owners++;
       var thumb = typeof p.thumb === 'string' && /^https:\/\/[^\s"'<>]+$/.test(p.thumb) ? p.thumb : '';
       profiles.push({ id: typeof p.id === 'number' ? p.id : 0, uuid: p.uuid, title: str(p.title, 64), thumb: thumb, kind: p.kind,
-        restricted: p.restricted === true, rp: RP[p.restrictionProfile] && typeof p.restrictionProfile === 'string' ? p.restrictionProfile : '', token: p.token });
+        restricted: p.restricted === true, rp: RP[p.restrictionProfile] && typeof p.restrictionProfile === 'string' ? p.restrictionProfile : '', token: p.token,
+        servers: srvOk ? servers(p.servers, s.machineIdentifier, skipped) : [] });   // Weitere Server (optional)
     }
     if (!profiles.length) return bad(skipped[0] || 'profiles');
     if (owners > 1) return bad('owner');
@@ -73,7 +108,8 @@
       server: { machineId: s.machineIdentifier, name: str(s.name, 64), uris: uris }, profiles: profiles, computer: computer, helper: helper,
       id: str(d.createdAt, 40) + '|' + s.machineIdentifier,                    // Kennung dieser Einrichtung
       resetPins: d.resetAppPins === true,                                        // App-PINs einmal zuruecksetzen (s. oben)
-      skipped: skipped                                                           // Gruende uebersprungener Profile (Protokoll)
+      skipped: skipped,                                                          // Gruende uebersprungener Profile/Server (Protokoll)
+      serversIgnored: !srvOk                                                     // weitere Server in neuerem Format (Protokoll)
     } };
   }
 
@@ -166,5 +202,5 @@
   prefetch();
   watchShow();
 
-  N.setupFile = { parse: parse, users: users, read: read, lanUri: lanUri, timing: function () { return timing; }, _watchShow: watchShow };
+  N.setupFile = { parse: parse, users: users, read: read, lanUri: lanUri, netUri: netUri, timing: function () { return timing; }, _watchShow: watchShow };
 })(N);

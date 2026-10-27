@@ -185,7 +185,9 @@ Open **Advanced** only if one of these applies:
 
 ## 6. Build the app package
 
-1. Check the **Summary**.
+1. Check the **Summary**. Optional extras there: **Other servers** (servers that someone shared with you, see
+   [section 14](#14-optional-other-servers-shared-with-you)) and the **helper** ([section 13](#13-optional-the-helper-for-watchlist-and-discover)).
+   Both are off unless you tick them.
 2. Click **Create app package**.
 3. The page now shows **your computer's address in large digits** (for example `192.168.1.20`) and waits for the TV.
    Write it down – you need it in the next step.
@@ -366,3 +368,31 @@ fetches exactly these lists for the TV. It is part of the setup program.
 The watchlist is available for the owner and for Plex Home profiles **without** a Plex PIN. The helper is not an open
 proxy: it only answers devices on your home network and only fetches a fixed list of plex.tv pages.
 **Never forward port 32499 in your router.**
+
+## 14. Optional: other servers (shared with you)
+
+Has someone shared their Plex server with you, for example a friend? Neolume can show that server's libraries **in addition to
+your own server** – off by default.
+
+1. On the setup page, in the **Summary**, click **Search shared servers**. The program looks at the servers that were shared
+   with each chosen profile (only your own access – it never asks for anyone else's password or token) and checks each one
+   from your computer.
+2. Tick the servers you want and click **Create app package**, then install as usual. Each profile only gets the servers
+   that were shared with **that** profile.
+3. On the TV the libraries appear in the side menu with a small "from <server>" line. You can hide or move them under
+   **Settings → Interface → Customize side menu**. Search and Home stay with your own server.
+
+What the status next to a server means:
+- **reachable** – fine, the TV can use it.
+- **secure connections only** – the server requires encrypted connections, which the 2014 TV cannot do. The owner can set
+  **Settings → Network → Secure connections** to **Preferred** in Plex; then search again.
+- **not reachable right now** – the server may be off, or it is only reachable through the Plex relay (which needs
+  encryption, so the TV cannot use it). You can still add it; the app tries again later.
+
+> ⚠️ The TV cannot encrypt. The connection to a shared server therefore goes **over the internet without encryption**, and
+> the access to that server could be read on the way. Your own server stays on your home network as before. Only tick a
+> server if you are fine with that.
+
+If the shared server's internet address changes, the optional [helper](#13-optional-the-helper-for-watchlist-and-discover)
+finds the new one automatically; without the helper, run the setup again. If a shared server is not reachable, only its
+libraries show a message – everything else keeps working.

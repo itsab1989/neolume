@@ -17,6 +17,7 @@ from . import VERSION, brand
 
 CONFIG_NAME = 'setup.json'
 SCHEMA = 1
+SERVERS_SCHEMA = 1                                      # profiles[i].servers ("Weitere Server"); older apps ignore it
 SAFE_ENTRY = re.compile(r'^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$')
 DEV_ONLY = {'bench.js', 'proto.js'}                     # old prototypes that must not ship
 APP_FILES = re.compile(r'^(app\.js|[A-Za-z0-9_-]+\.(png|gif))$')   # same rule as tools/dev.py
@@ -146,10 +147,13 @@ def app_version(entries):
     return ''
 
 
-def make_config(client_id, server, uri_list, profiles, computer_ip=None, update_port=None, now=None, reset_pins=False, helper=None):
+def make_config(client_id, server, uri_list, profiles, computer_ip=None, update_port=None, now=None, reset_pins=False, helper=None,
+                others=None):
     """setup.json content (schema 1, see installer/README.md). Only profiles with include=True and a token,
     and only the owner and Plex Home users (shared accounts outside Plex Home are never written).
-    reset_pins: checkbox "Reset app PINs" -> the app deletes all app PINs once for this setup (otherwise they are kept)."""
+    reset_pins: checkbox "Reset app PINs" -> the app deletes all app PINs once for this setup (otherwise they are kept).
+    others: optional "Weitere Server" (wizard.others_scan): each profile gets only the chosen servers that were shared with
+    THAT profile (its own token from its own plex.tv resources), as profiles[i].servers + "serversSchema": 1."""
     now = now or datetime.datetime.now(datetime.timezone.utc)
     cfg = {
         'schema': SCHEMA,
@@ -164,6 +168,14 @@ def make_config(client_id, server, uri_list, profiles, computer_ip=None, update_
                      for p in profiles if p.get('include') and p.get('token') and p.get('kind') in ('owner', 'home')],   # never friends
         'computer': {'address': computer_ip, 'updatePort': update_port} if computer_ip else None,
     }
+    chosen = [e for e in (others or []) if e.get('include') and e.get('uris') and e.get('status') in ('ok', 'unreachable')]
+    if chosen:
+        for prof in cfg['profiles']:
+            pid = prof['id']
+            lst = [{'machineIdentifier': e['machineIdentifier'], 'name': e.get('name', ''), 'uris': list(e['uris']), 'token': e['tokens'][pid]}
+                   for e in chosen if e['tokens'].get(pid)]
+            if lst: prof['servers'] = lst
+        cfg['serversSchema'] = SERVERS_SCHEMA
     if reset_pins: cfg['resetAppPins'] = True
     if helper: cfg['helper'] = {'url': helper['url'], 'key': helper['key']}     # optional helper (no plex.tv tokens here)
     return cfg

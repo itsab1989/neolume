@@ -79,6 +79,8 @@
         chs: m.chapterSource === 'media' ? 1 : 0, codec: String(md && md.audioCodec || ''), container: String(md && md.container || ''),
         year: num(m.parentYear || m.year), vleaf: 0, leaf: 0, child: 0
       };
+      var sv = N.srv ? N.srv.cur() : '';                 // Weitere Server: Titel traegt seinen Server, Bilder die Marke
+      if (sv) { t.srv = sv; t.thumb = N.srv.tag(sv, t.thumb); t.art = N.srv.tag(sv, t.art); }
       return t;
     },
     tracks: function (json, at) {
@@ -108,6 +110,46 @@
       return (h ? h + ':' + U.pad2(m) : m) + ':' + U.pad2(s % 60);
     },
     totalDur: function (tracks) { var d = 0; for (var i = 0; i < tracks.length; i++) d += tracks[i].dur || 0; return d; },
+
+    /* ---------- Kuenstlerseite: Alben nach Art (wie die offiziellen Plex-Apps) ----------
+     * /library/metadata/<id>/children liefert nur die "normalen" Alben: PMS laesst dort Singles & EPs, Live-Alben, Soundtracks,
+     * Kompilationen, Demos und Remixe weg (Format-/Subformat-Tags; Live-Befund 27.10.: Kuenstler mit nur einer Kompilation
+     * zeigte 0 Alben). Die uebrigen Gruppen liefert /library/metadata/<id>/related als Hubs artist.albums.* (Reihenfolge wie PMS). */
+    ALBUM_GROUPS: [['singles', 'mu.row.singles'], ['live', 'mu.row.live'], ['soundtrack', 'mu.row.soundtracks'],
+      ['compilation', 'mu.row.compilations'], ['demo', 'mu.row.demos'], ['remix', 'mu.row.remixes']],
+    /* related-JSON -> {singles: [Metadata…], live: […], …} bzw. null, wenn der Server keine Album-Hubs liefert (aeltere PMS) */
+    albumHubs: function (json) {
+      var hubs = json && json.MediaContainer && json.MediaContainer.Hub || [], out = null;
+      for (var i = 0; i < hubs.length; i++) {
+        var m = /^artist\.albums\.(\w+)$/.exec(String(hubs[i] && hubs[i].hubIdentifier || ''));
+        if (m) { out = out || {}; out[m[1]] = (out[m[1]] || []).concat(hubs[i].Metadata || []); }
+      }
+      return out;
+    },
+    /* Reihen der Kuenstlerseite. main = Alben aus /children, hubs = {gruppe: [..]} (albumHubs, schon normalisiert) oder null,
+     * rest = alle Alben der Abschnitts-Abfrage (Rueckfall ohne Hubs: was /children fehlt, kommt in "Weitere Alben").
+     * Jedes Album genau einmal, leere Gruppen fallen weg. book: alles in EINER Reihe "Hoerbuecher".
+     * -> [{id, tk, items}] */
+    albumGroups: function (main, hubs, rest, book) {
+      var seen = {}, out = [], i;
+      function take(list) {
+        var r = [];
+        for (var k = 0; list && k < list.length; k++) { var x = list[k]; if (x && x.rk && !seen[x.rk]) { seen[x.rk] = 1; r.push(x); } }
+        return r;
+      }
+      function add(id, tk, items) { if (items.length) out.push({ id: id, tk: tk, items: items }); }
+      if (book) {
+        var all = take(main);
+        for (i = 0; hubs && i < MU.ALBUM_GROUPS.length; i++) all = all.concat(take(hubs[MU.ALBUM_GROUPS[i][0]]));
+        add('albums', 'mu.row.books', all.concat(take(rest)));
+        return out;
+      }
+      add('albums', 'mu.row.albums', take(main));
+      for (i = 0; hubs && i < MU.ALBUM_GROUPS.length; i++) add(MU.ALBUM_GROUPS[i][0], MU.ALBUM_GROUPS[i][1], take(hubs[MU.ALBUM_GROUPS[i][0]]));
+      add('more', 'mu.row.moreAlbums', take(rest));
+      return out;
+    },
+    groupCount: function (groups) { var n = 0; for (var i = 0; groups && i < groups.length; i++) n += groups[i].items.length; return n; },
 
     /* ---------- Hoerbuch ---------- */
     /* Fortsetzen je Buch (research 1.4): juengster gehoerter Track (lastViewedAt; ohne Zeitstempel der mit Offset);
@@ -200,7 +242,7 @@
     query: function (o) {
       var C = N.config;
       return {
-        path: '/library/metadata/' + o.rk, mediaIndex: 0, partIndex: 0, protocol: 'http', location: 'lan',
+        path: '/library/metadata/' + o.rk, mediaIndex: 0, partIndex: 0, protocol: 'http', location: o.wan ? 'wan' : 'lan',
         directPlay: o.dp ? 1 : 0, directStream: o.dp ? 1 : 0, offset: Math.floor((o.offsetMs || 0) / 1000),
         session: o.session, 'X-Plex-Session-Identifier': o.session, 'X-Plex-Client-Identifier': o.clientId,
         'X-Plex-Product': C.product, 'X-Plex-Version': C.version, 'X-Plex-Platform': C.platform, 'X-Plex-Device': C.device,

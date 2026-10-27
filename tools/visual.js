@@ -125,6 +125,11 @@ var MUS = (function () {
   var nc = al[2]; delete nc.thumb; nc.art = '/a/hell'; nc.nocover = true;
   ar[1].art = '/a/hell';
   al.push({ ratingKey: String(9200 + al.length), type: 'album', title: '', titleSort: 'Morgenlicht 100a', addedAt: 1700000000, summary: '' });
+  // Live-Befund 27.10.: Kompilation/Live-Album fehlen in /children, kommen ueber /related (Hubs artist.albums.*) – 'Celine Vogt'
+  al.push({ ratingKey: String(9200 + al.length), type: 'album', title: 'Das Beste von Celine Vogt', titleSort: 'Zz Beste', parentTitle: names[2], parentRatingKey: '9102', year: 2015,
+    thumb: '/t/al' + al.length, art: '/a/ar2', addedAt: 1700000000, summary: '', hub: 'compilation' });
+  al.push({ ratingKey: String(9200 + al.length), type: 'album', title: 'Abends am Fluss (Live)', titleSort: 'Zz Live', parentTitle: names[2], parentRatingKey: '9102', year: 2012,
+    thumb: '/t/al' + al.length, art: '/a/ar2', addedAt: 1700000000, summary: '', hub: 'live' });
   al.sort(function (a, b) { return a.titleSort < b.titleSort ? -1 : 1; });
   function tracks(alb) {
     var k = Number(alb.ratingKey) - 9200, out = [];
@@ -145,14 +150,18 @@ function musicRoute(p, q) {
     if (m[1] === 'firstCharacter') return firstChars(list);
     var pa = page(list, q); pa.MediaContainer.librarySectionID = 3; return pa;
   }
-  m = /^\/library\/metadata\/(9\d\d\d)(\/children|\/allLeaves)?$/.exec(p);
+  m = /^\/library\/metadata\/(9\d\d\d)(\/children|\/allLeaves|\/related)?$/.exec(p);
   if (!m) return null;
   var rk = m[1];
   for (i = 0; i < MUS.ar.length; i++) if (MUS.ar[i].ratingKey === rk) {
     var a = MUS.ar[i], als = MUS.al.filter(function (x) { return x.parentRatingKey === rk; });
-    if (m[2] === '/children') return { MediaContainer: { size: als.length, librarySectionID: 3, Metadata: als } };
-    if (m[2] === '/allLeaves') return { MediaContainer: { size: 18, Metadata: MUS.tracks(als[0]).concat(MUS.tracks(als[1])) } };
-    var x = JSON.parse(JSON.stringify(a)); x.librarySectionID = 3; x.PopularLeaves = { size: 5, Metadata: MUS.tracks(als[0]).slice(0, 5) };
+    var main = als.filter(function (x) { return !x.hub; });
+    if (m[2] === '/children') return { MediaContainer: { size: main.length, librarySectionID: 3, Metadata: main } };
+    if (m[2] === '/related') return { MediaContainer: { size: 6, Hub: ['singles', 'live', 'soundtrack', 'compilation', 'demo', 'remix'].map(function (h) {
+      var l = als.filter(function (x) { return x.hub === h; }); return { hubIdentifier: 'artist.albums.' + h, type: 'album', size: l.length, Metadata: l };
+    }) } };
+    if (m[2] === '/allLeaves') return { MediaContainer: { size: 18, Metadata: MUS.tracks(main[0]).concat(MUS.tracks(main[1])) } };
+    var x = JSON.parse(JSON.stringify(a)); x.librarySectionID = 3; x.PopularLeaves = { size: 5, Metadata: MUS.tracks(main[0]).slice(0, 5) };
     return { MediaContainer: { size: 1, Metadata: [x] } };
   }
   for (i = 0; i < MUS.al.length; i++) if (MUS.al[i].ratingKey === rk) {
@@ -264,9 +273,15 @@ function longSections() {
   s.MediaContainer.Directory[4].title = 'Dokumentationen, Reportagen und Naturfilme';
   return s;
 }
+/* Weitere Server: freigegebener Server eines Freundes als zweiter Mock auf eigenem Port (setup.json erlaubt dort keine Pfade) */
+var FRIEND_MID = 'friend-machine-0001', friendPort = 0;
+function friendSections() {
+  return { MediaContainer: { size: 2, Directory: [{ key: '1', type: 'movie', title: 'Kino', hidden: 0 }, { key: '2', type: 'show', title: 'Serienabend', hidden: 0 }] } };
+}
 function startServer(cb) {
   var sink = { on: null };                                   // tools/bench.js: Protokollzeilen der Vorschau (&logurl=)
-  var srv = http.createServer(function (req, res) {
+  var srv = http.createServer(handle), fsrv = http.createServer(function (req, res) { req.url = '/friend' + req.url; handle(req, res); });
+  function handle(req, res) {
     var u = new URL(req.url, 'http://x'), p = u.pathname;
     function cors() { res.setHeader('Access-Control-Allow-Origin', '*'); res.setHeader('Access-Control-Allow-Headers', '*'); res.setHeader('Access-Control-Allow-Methods', '*'); }
     function json(o, code) { cors(); res.writeHead(code || 200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); }
@@ -284,9 +299,12 @@ function startServer(cb) {
       if (/\/switch$/.test(t.pathname)) return t.searchParams.get('pin') === '1234' ? json({ authToken: 'u' }, 201) : json({}, 403);
       return json({}, 404);
     }
-    var empty = p.indexOf('/leer') === 0;                    // Server ohne Inhalte (Leerzustand)
-    if (!empty && p.indexOf('/pms') !== 0) { res.writeHead(404); return res.end(); }
-    p = p.slice(empty ? 5 : 4);
+    var empty = p.indexOf('/leer') === 0, friend = p.indexOf('/friend') === 0;   // Server ohne Inhalte (Leerzustand) / Server des Freundes
+    if (!empty && !friend && p.indexOf('/pms') !== 0) { res.writeHead(404); return res.end(); }
+    p = p.slice(empty ? 5 : friend ? 7 : 4);
+    if (friend && p === '/identity') return json({ MediaContainer: { machineIdentifier: FRIEND_MID } });
+    if (friend && p === '/library/sections') return json(friendSections());
+    if (friend && curSeed === 'pkgSrvMetaFail' && /^\/library\/metadata\/\d+$/.test(p)) return json({}, 500);   // Detailanfrage scheitert (TV-Test 1.0.4)
     if (empty && p !== '/photo/:/transcode') return json({ MediaContainer: { size: 0 } });
     if (p === '/photo/:/transcode') {
       var w = Math.min(1280, Number(u.searchParams.get('width')) || 100), h = Math.min(720, Number(u.searchParams.get('height')) || 100);
@@ -339,8 +357,15 @@ function startServer(cb) {
     if (m) { var eps = []; for (var i = 1; i <= 12; i++) eps.push({ ratingKey: String(5000 + i), type: 'episode', index: i, viewCount: i < 3 ? 1 : 0, viewOffset: i === 3 ? 600000 : 0, duration: 1440000 }); return json({ MediaContainer: { size: 12, totalSize: 12, Metadata: eps } }); }
     if (/^\/(:\/|actions)/.test(p)) return json({});
     return json({ MediaContainer: { size: 0 } });
+  }
+  srv.listen(0, '127.0.0.1', function () {
+    fsrv.listen(0, '127.0.0.1', function () {
+      friendPort = fsrv.address().port;
+      var close0 = srv.close;
+      srv.close = function (f) { fsrv.close(); return close0.call(srv, f); };
+      cb(srv, srv.address().port, sink);
+    });
   });
-  srv.listen(0, '127.0.0.1', function () { cb(srv, srv.address().port, sink); });
 }
 
 /* Player: Metadaten aus den synthetischen Karten + Spuren aus meta-anime.json; Marker je Szene (rk 1001 Intro um die
@@ -444,6 +469,18 @@ function makeSeeds(port) {
     p: { bbbb2222: { s: pinSalt, h: require('crypto').pbkdf2Sync('1234', Buffer.from(pinSalt, 'hex'), 1000, 32, 'sha256').toString('hex'), i: 1000 } } };
   seeds.pkg = seed({ account: null, server: null, users: null, profiles: {}, lastProfile: 'aaaa1111', protectRemindAt: 4102444800000, startProfile: 'picker' }, { 'pins.json': pkgPins }) +
     'window.PN_SETUP=' + JSON.stringify(JSON.stringify(pkgCfg)) + ';';
+  // Weitere Server: Alex hat Zugang zum Server eines Freundes (zweiter Mock-Port); Variante: Server nicht erreichbar (Bibliotheken aus dem Speicher)
+  function pkgWith(uris) {
+    var c = JSON.parse(JSON.stringify(pkgCfg));
+    c.serversSchema = 1;
+    c.profiles[0].servers = [{ machineIdentifier: FRIEND_MID, name: 'Max-NAS', uris: uris, token: 'T-friend-1' }];
+    return 'window.PN_SETUP=' + JSON.stringify(JSON.stringify(c)) + ';';
+  }
+  var pkgState = { account: null, server: null, users: null, profiles: {}, lastProfile: 'aaaa1111', protectRemindAt: 4102444800000, startProfile: 'main' };
+  seeds.pkgSrv = seed(pkgState) + pkgWith(['http://127.0.0.1:' + friendPort]);
+  seeds.pkgSrvMetaFail = seed(pkgState) + pkgWith(['http://127.0.0.1:' + friendPort]);
+  seeds.pkgSrvDown = seed(pkgState, { 'srv-aaaa1111.json': { v: 1, s: { 'friend-machine-0001': { uri: '', ts: 1, libs: [{ id: 1, title: 'Kino', type: 'movie', kind: 'movie' }] } } } }) +
+    pkgWith(['http://127.0.0.1:9']);
   seeds.noart = seed();                                                                               // Hero ohne Art: Poster unscharf
   seeds.noartOff = seed({}, { 'settings-aaaa1111.json': { backgrounds: false } });                   // ... Hintergrundbilder aus: einfarbig
   seeds.empty = seed({ server: { uri: base + '/leer', machineId: 'mid', name: 'Leer', token: 'T' } });
@@ -624,8 +661,19 @@ var SCENES = [
   { name: 'music-mini-nocover', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,RIGHT,RIGHT,ENTER,wait800,ENTER,wait800,PAUSE,RETURN,wait1500' },
   { name: 'music-mini-list', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait1500,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait800' },
   { name: 'music-mini-lib', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait800,RETURN,wait1500' },
+  { name: 'music-artist-groups', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,RIGHT,RIGHT,ENTER,wait800,DOWN' },   // Alben + Live + Kompilation
+  { name: 'music-artist-groups2', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,RIGHT,RIGHT,ENTER,wait800,DOWN,DOWN,DOWN' },
   { name: 'music-artist-bright', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800' },
   { name: 'rail-long', seed: 'longLib', keys: 'LEFT' },
+  // Weitere Server: Seitenleiste mit Bibliotheken eines freigegebenen Servers (Herkunft), Bibliothek/Details mit Herkunft,
+  // Seitenleiste anpassen, Einstellungszeile, nicht erreichbarer Server (Meldung nur fuer ihn)
+  { name: 'srv-rail', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'srv-library', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait1000' },
+  { name: 'srv-details', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait1000,RIGHT,ENTER,wait2500', mask: [[992, 624, 288, 32]] },   // letzte Besetzungsbilder laden mal spaeter
+  { name: 'srv-railitems', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'srv-settings', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN' },
+  { name: 'srv-details-error', seed: 'pkgSrvMetaFail', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait1000,RIGHT,ENTER,wait2600', hold: 16000 },   // Meldung deckt Titel/Metazeile ab
+  { name: 'srv-down', seed: 'pkgSrvDown', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait1500' },
   { name: 'rail-long-en', seed: 'longLibEn', keys: 'LEFT' }
 ];
 
@@ -639,7 +687,7 @@ SAVER_STYLES.forEach(function (st) {
 function shot(port, sc, done) {
   var prof = fs.mkdtempSync(path.join(os.tmpdir(), 'pnvis-'));
   var keys = (sc.keys ? '&keys=' + sc.keys + '&wait=1800' : '') + (sc.moves ? '&moves=' + sc.moves + '&mwait=' + (sc.mwait || 2500) : '');
-  var hold = 3500 + (sc.keys ? sc.keys.split(',').length * 400 + 1800 : 0) + (sc.moves ? sc.moves.split(',').length * 300 : 0);
+  var hold = sc.hold || 3500 + (sc.keys ? sc.keys.split(',').length * 400 + 1800 : 0) + (sc.moves ? sc.moves.split(',').length * 300 : 0);
   var url = 'file://' + path.join(ROOT, 'tools', 'preview.html') + '?clear=1&seed=' + encodeURIComponent('http://127.0.0.1:' + port + '/seed/' + sc.seed + '.js') +
     '&hold=' + hold + '&holdurl=' + encodeURIComponent('http://127.0.0.1:' + port + '/sleep') + keys + (MIN ? '&min=1' : '');
   var out = path.join(CUR, sc.name + '.png');
@@ -690,4 +738,4 @@ function report(results) {
 }
 
 if (require.main === module) main();
-module.exports = { compare: compare, readPng: readPng, writePng: writePng, solidPng: solidPng, startServer: startServer, makeSeeds: makeSeeds };
+module.exports = { compare: compare, readPng: readPng, writePng: writePng, solidPng: solidPng, startServer: startServer, makeSeeds: makeSeeds, SCENES: SCENES };

@@ -72,7 +72,7 @@
   };
   /* Decision fuer Titel it (dp = Direct Play erlaubt) -> cb({mode, url}) bzw. cb(null, Fehler) */
   P.resolve = function (it, dp, offMs, session, cb) {
-    var self = this, o = { rk: it.rk, session: session, clientId: this.d.clientId, token: this.d.token, dp: dp, offsetMs: 0 };
+    var self = this, o = { rk: it.rk, session: session, clientId: this.d.clientId, token: this.d.token, dp: dp, offsetMs: 0, wan: !!this.d.wan };
     this.d.get(MU.DECISION, MU.query(o), { timeout: 15000, retries: 1 }, function (err, json) {
       var r = D.parse(json);
       if (err || r.mode === 'error') { cb(null, err ? (err.status || err.type) : r.code + ' ' + r.text); return; }
@@ -346,13 +346,15 @@
 
   /* ---------- Singleton fuer die App ---------- */
   var core = null, onFlush = null;
-  function deps() {
+  /* sv: Weitere Server (N.srv) – Titel eines fremden Servers spielen ueber DIESEN Server (Decision, Datei, Timeline) */
+  function deps(sv) {
+    var c = sv ? N.srv.conn(sv) || { base: '', token: '' } : { base: N.plex.base, token: N.plex.token };
     return {
-      sef: null, base: N.plex.base, token: N.plex.token, clientId: N.plex.clientId, threshold: N.config.watchedThreshold,
+      sef: null, base: c.base, token: c.token, clientId: N.plex.clientId, threshold: N.config.watchedThreshold, wan: !!sv,
       cfg: N.session.settings || {}, log: N.log,
       timers: { now: U.now, set: function (f, ms) { return setTimeout(f, ms); }, clear: function (t) { clearTimeout(t); } },
-      get: function (path, q, o, cb) { return N.plex.get(path, q, o, cb); },
-      write: function (m, path, q, cb) { return N.plex.write(m, path, q, function (e, d) { cb(e, d); }); }
+      get: function (path, q, o, cb) { return N.plex.get(path, q, N.srv.o(sv, o), cb); },
+      write: function (m, path, q, cb) { return N.plex.write(m, path, q, function (e, d) { cb(e, d); }, N.srv.who(sv) || undefined); }
     };
   }
   function relay(ev, data) {
@@ -373,7 +375,7 @@
       if (N.theme) N.theme.stop(true);
       var c = core;
       if (c) c.stop('neu');
-      core = new Core(deps());
+      core = new Core(deps(items[0] && items[0].srv || ''));
       core.on(relay);
       var me = core;
       core.d.sef = N.sef.create(function (type, data) { if (me === core) me.onEvent(type, data); });

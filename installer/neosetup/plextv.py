@@ -169,8 +169,10 @@ def parse_resources(d):
             if not addr or not (0 < port < 65536): continue
             conns.append({'address': addr, 'port': port, 'local': _bool(c.get('local'))})
         tok = r.get('accessToken')
-        out.append({'machineIdentifier': mid, 'name': str(r.get('name') or ''), 'version': str(r.get('productVersion') or ''),
-                    'owned': _bool(r.get('owned')), 'token': tok if valid_token(tok) else None, 'connections': conns})
+        # httpsRequired: owner set "Secure connections: Required" -> no plain http (the TV cannot do TLS 1.2), see wizard.others_scan
+        out.append({'machineIdentifier': mid, 'name': str(r.get('name') or '')[:64], 'version': str(r.get('productVersion') or ''),
+                    'owned': _bool(r.get('owned')), 'token': tok if valid_token(tok) else None, 'connections': conns,
+                    'httpsRequired': _bool(r.get('httpsRequired'))})
     return out
 
 

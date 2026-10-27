@@ -6,7 +6,7 @@
   function snapshot(it) { return { vc: it.vc, off: it.off, vleaf: it.vleaf }; }
   function restore(it, sn) { it.vc = sn.vc; it.off = sn.off; it.vleaf = sn.vleaf; }
   function apply(it, w) { if (M.isLeaf(it)) { it.vc = w ? Math.max(1, it.vc) : 0; it.off = 0; } else it.vleaf = w ? it.leaf : 0; }
-  function scrobble(it, w, cb) { N.plex.write('GET', w ? '/:/scrobble' : '/:/unscrobble', { identifier: 'com.plexapp.plugins.library', key: it.rk }, cb); }
+  function scrobble(it, w, cb) { N.plex.write('GET', w ? '/:/scrobble' : '/:/unscrobble', { identifier: 'com.plexapp.plugins.library', key: it.rk }, cb, it.srv ? N.srv.who(it.srv) : undefined); }   // Weitere Server: auf DEM Server
   var W = {
     apply: apply,
     /* o: {changed(it, w) – Darstellung aktualisieren, reverted(it) – nach Fehler/Rueckgaengig, label (Dialog-Titel der Serie)} */

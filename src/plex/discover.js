@@ -8,7 +8,7 @@
   var U = N.util, M = N.model;
   var AGENT = { movie: 'tv.plex.agents.movie', show: 'tv.plex.agents.series' }, LTYPE = { movie: 1, show: 2 };
   var GUID = /^plex:\/\/(movie|show)\/([0-9a-f]{12,40})$/, HEX = /^[0-9a-f]{12,40}$/;
-  var anchors = {}, helperOk = null, helperDisc = false, helperT = null, helperBase = '', helperDownAt = 0, noWl = {}, downShown = false, PORT = '32499';   // anchors je Profil-uuid: {movie: rk|'' , show: rk|''}
+  var anchors = {}, helperOk = null, helperDisc = false, helperFeat = [], helperT = null, helperBase = '', helperDownAt = 0, noWl = {}, downShown = false, PORT = '32499';   // anchors je Profil-uuid: {movie: rk|'' , show: rk|''}
 
   var D = {
     DELAY: 700, MAX_EXT: 30, TIMEOUT: 15000,
@@ -81,13 +81,16 @@
           if (err || !d || d.name !== 'plex-neo-helper' || d.watchlist !== true) { next(); return; }
           helperBase = base === D.helperConf() ? '' : base;
           helperDisc = d.discover === true;
+          helperFeat = d.features && d.features.length ? d.features : [];   // z. B. 'servers' (Weitere Server: frische Adressen)
           downShown = false;
           fin(true);
         });
       })();
     },
     RETRY: 60000,
-    _resetHelper: function () { helperOk = null; helperDisc = false; helperT = null; helperBase = ''; helperDownAt = 0; noWl = {}; downShown = false; },
+    /* Helfer erreichbar und kann diese Funktion (aus /neo-helper features) */
+    helperHas: function (f) { return helperOk === true && helperFeat.indexOf(f) >= 0; },
+    _resetHelper: function () { helperOk = null; helperDisc = false; helperFeat = []; helperT = null; helperBase = ''; helperDownAt = 0; noWl = {}; downShown = false; },
     /* Fehler einer Helfer-Anfrage auswerten: nicht erreichbar -> 'down' (Merkliste/Trends weg, Einstellungen erklaeren es);
      * 404 {error:"profile"} -> Merkliste fuer dieses Profil aus. Rueckgabe: 'down' | 'profile' | '' */
     helperFail: function (err) {

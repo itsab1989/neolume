@@ -404,7 +404,7 @@ class WizardHelper(unittest.TestCase):
         self.w.helper_start()
         self.assertTrue(self.w.public_state()['helper']['running'])
         base = 'http://127.0.0.1:%d' % self.w.update.port
-        with urllib.request.urlopen(base + '/neo-helper', timeout=5) as r: self.assertEqual(json.loads(r.read())['features'], ['watchlist', 'discover'])
+        with urllib.request.urlopen(base + '/neo-helper', timeout=5) as r: self.assertEqual(json.loads(r.read())['features'], ['watchlist', 'discover', 'servers'])
         self.w.update_start()
         with urllib.request.urlopen(base + '/neo-helper', timeout=5) as r: self.assertIn('update', json.loads(r.read())['features'])
         self.w.update_stop()

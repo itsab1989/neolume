@@ -120,7 +120,13 @@
       S.own = N.store.get('settings-' + user.uuid + '.json') || {};
       S.applyDefaults();
       N.fx.setReduced(S.settings.reduceMotion);
+      // Weitere Server dieses Profils (setup.json, optional): Bibliotheken aus dem Speicher, Adressen spaeter im Hintergrund pruefen
+      if (N.srv) { var pp = S.pkgProfile(user.uuid); N.srv.setProfile(pp ? pp.servers : [], user.uuid); N.srv.start(); }
       N.evt.emit('profile:changed', user);
+    },
+    pkgProfile: function (uuid) {
+      for (var i = 0; S.pkg && i < S.pkg.profiles.length; i++) if (S.pkg.profiles[i].uuid === uuid) return S.pkg.profiles[i];
+      return null;
     },
     /* Einstellungen = Standard + eigene Wahl. Gespeichert wird nur, was das Profil selbst gewaehlt hat: So folgen Ton- und
      * Untertitelsprache der Oberflaechensprache, solange das Profil nie eine gewaehlt hat (TV-Test 27.10., F12). */
@@ -226,11 +232,12 @@
       if (S.pkg) { N.appPin.verify(a.uuid, pin, function (ok) { cb(ok, ok ? null : { type: 'pin', wrongPin: true }); }); return; }
       N.auth.switchUser(S.state.account.token, a.uuid, pin, function (err) { cb(!err, err); });
     },
-    leaveProfile: function () { S.profile = null; S.settings = null; S.own = null; N.plex.setServer(S.state.server ? S.state.server.uri : '', null); if (N.img) N.img.reset(); },
+    leaveProfile: function () { if (N.srv) N.srv.setProfile([], ''); S.profile = null; S.settings = null; S.own = null; N.plex.setServer(S.state.server ? S.state.server.uri : '', null); if (N.img) N.img.reset(); },
     signOut: function () {
       var keep = { v: 1, clientId: S.state.clientId, account: null, server: null, users: null, usersTs: 0, profiles: {},
         lastProfile: null, lang: S.state.lang, pinSwitch: null, protectRemindAt: 0, firstPicker: false };
       S.state = keep; S.profile = null; S.settings = null; S.own = null;
+      if (N.srv) N.srv.setProfile([], '');
       N.store.remove('auth.json');
       S.save();
       N.plex.setServer('', null);

@@ -12,7 +12,10 @@
   N.router.define('library', function (params) {
     var lib = params.lib || { id: 0, title: '', type: 'movie' }, coll = params.coll || null;
     // Seitenleiste markiert die Bibliothek auch in Sammlung/Personenfilter (TV-Befund 26.10.); sub: RETURN geht dort zurueck
-    var sub = !!(coll || params.actor), s = { rail: lib.id ? 'lib-' + lib.id : null, wheelKeys: ['UP', 'DOWN'], miniX: REG_X - 16 - 360 };   // Mini-Player links neben A–Z (F26)
+    var sub = !!(coll || params.actor), s = { rail: lib.id ? N.railRows.libId(lib) : null, wheelKeys: ['UP', 'DOWN'], miniX: REG_X - 16 - 360 };   // Mini-Player links neben A–Z (F26)
+    // Weitere Server (N.srv): Bibliothek eines fremden Servers -> alle Anfragen dorthin, Ansicht-Merken mit eigenem Schluessel
+    var srv = lib.srv || '', libKey = srv ? N.srv.skey(srv, lib.id) : lib.id;
+    function get(path, q, o, cb) { return N.plex.get(path, q, N.srv.o(srv, o), cb); }
     var G = N.GridMath, root, titleT, statT, chipBar, chips = [], chipRects = null, grid, ring, sb, regDivs = [], regCur = -1, regFoc = false, regHas = '', bubble, bubbleT, skel, fade;
     var prefs = null, items = [], n = -1, total = -1, chars = [], pages = {}, gen = 0, tasks = [], collN = -1;
     // M4 Musik/Hoerbuecher: Reiter 'lib' = Kuenstler (Musik) bzw. Buecher (Hoerbuecher), 'alt' = Alben bzw. Autoren; quadratische Karten
@@ -23,6 +26,7 @@
     s.create = function (el) {
       root = el;
       titleT = U.txt('div', 'a t-h1 ell', root, coll ? coll.title : lib.title, 'left:144px;top:40px;width:900px');
+      if (srv) U.txt('div', 'a t-label cacc ell', root, N.t('srv.libFrom', { server: lib.srvName || N.srv.name(srv) }), 'left:144px;top:16px;width:900px');   // Herkunft
       statT = U.txt('div', 'a t-small c2 ell', root, N.t('common.loading'), 'left:144px;top:84px;width:1000px');
       chipBar = U.el('div', 'lchips', root);
       grid = new N.ui.Grid(root);
@@ -40,7 +44,7 @@
       fade = U.el('img', 'fade', root); fade.src = N.assetBase + 'fade-bottom.png';
       ring = new N.ui.Ring(root);
       sb = new N.ui.StateBlock(root);
-      onScanned = function (d) { if (!dead && (!d || !d.lib || String(d.lib) === String(lib.id))) { if (away) pages = null; else reload(); } };
+      onScanned = function (d) { if (!dead && !srv && (!d || !d.lib || String(d.lib) === String(lib.id))) { if (away) pages = null; else reload(); } };
       N.evt.on('library:scanned', onScanned);
     };
     function mode() { return coll ? 'coll-items' : prefs.tab === 'coll' ? 'colls' : 'lib'; }
@@ -105,7 +109,7 @@
       if (!pages || pages[p]) return;
       pages[p] = 1;
       var g = gen, r = pageReq(p);
-      track(N.plex.get(r.path, r.q, { timeout: 12000 }, function (err, d) {
+      track(get(r.path, r.q, { timeout: 12000 }, function (err, d) {
         if (g !== gen || dead) return;
         var mc = !err && d && d.MediaContainer;
         if (!mc) { pages[p] = 0; if (n < 0) onError(err); else N.diag.log('warn', 'library page ' + p + ' ' + (err && (err.status || err.type))); return; }
@@ -124,14 +128,15 @@
       grid.clear(); ring.hide(); sb.hide(); hideReg(); U.show(skel, true);
       if (G.size !== L.view(prefs) || !!G.square !== music) { G = N.GridMath.make(L.view(prefs), music); grid.setGeom(G); }   // Ansicht Gross/Mittel/Klein/Liste
       buildChips(); paintStatus();
+      if (srv && !N.srv.conn(srv)) U.setText(statT, N.t('srv.connecting', { server: lib.srvName || N.srv.name(srv) }));   // weiterer Server: Verbindung wird geprueft
       loadPage(0);
       var g = gen;
       if (mode() === 'lib') {
-        if (L.hasRegister(prefs)) track(N.plex.get('/library/sections/' + lib.id + '/firstCharacter', L.filterQuery(prefs, qlib()), null, function (err, d) {
+        if (L.hasRegister(prefs)) track(get('/library/sections/' + lib.id + '/firstCharacter', L.filterQuery(prefs, qlib()), null, function (err, d) {
           if (g !== gen || err) return;
           chars = L.chars(d); if (n >= 0) paintReg(true);
         }));
-        if (L.hasFilter(prefs)) track(N.plex.get('/library/sections/' + lib.id + '/all', { type: L.typeNum(qlib()), 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 0 }, null, function (err, d) {
+        if (L.hasFilter(prefs)) track(get('/library/sections/' + lib.id + '/all', { type: L.typeNum(qlib()), 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 0 }, null, function (err, d) {
           if (g !== gen || err || !d || !d.MediaContainer) return;
           total = Number(d.MediaContainer.totalSize) || 0; paintStatus();
         }));
@@ -152,11 +157,22 @@
     function onError(err) {
       U.show(skel, false); ring.hide();
       var kind = N.errs.kind(err, 'pms'), tx;
+      if (srv) { srvError(err); return; }                 // Weitere Server: Meldung nur fuer diesen Server, eigenes Profil bleibt
       if (kind === 'auth') { N.app.authLost(); return; }   // Kinderprofil-Pruefung wie Startseite (Pentest P6)
       tx = kind === 'server' ? { title: N.t('err.server.title'), text: N.t('lib.err.text', { server: N.session.state.server && N.session.state.server.name || '' }) }
         : N.errs.texts('generic', null, N.session.isKid());
       U.setText(statT, '');
       sb.show({ title: tx.title, text: tx.text, buttons: [{ id: 'retry', t: N.t('err.btn.retry') }], onSelect: function () { sb.hide(); reload(true); } });
+      zone = 'state';
+    }
+    /* Weitere Server: nicht erreichbar (Freund offline, Adresse gewechselt, "Sichere Verbindungen: Erforderlich") oder Zugang
+     * abgelehnt (Freigabe entzogen). Erneut versuchen = alle Adressen neu pruefen (ggf. frische vom Helfer), dann neu laden. */
+    function srvError(err) {
+      var name = lib.srvName || N.srv.name(srv), auth = N.srv.state(srv) === 'auth' || (err && (err.status === 401 || err.status === 403));
+      U.setText(statT, '');
+      sb.show({ title: N.t(auth ? 'srv.err.auth.title' : 'srv.err.down.title', { server: name }), text: N.t(auth ? 'srv.err.auth.text' : 'srv.err.down.text', { server: name }),
+        buttons: [{ id: 'retry', t: N.t('err.btn.retry') }],
+        onSelect: function () { sb.hide(); U.setText(statT, N.t('common.loading')); N.srv.resolve(srv, true, function () { if (!dead) reload(true); }); } });
       zone = 'state';
     }
     function showEmpty() {
@@ -252,7 +268,7 @@
     }
     function setPrefs(p) {
       prefs = p;
-      if (!coll && !params.actor) L.save(lib.id, prefs);
+      if (!coll && !params.actor) L.save(libKey, prefs);
       reload();
     }
     function resetFilter() { var p = U.extend({}, prefs); p.f = { status: '' }; params.actor = null; setPrefs(p); }
@@ -288,7 +304,7 @@
         keys: { RED: function () {} },
         onPick: function (t, id) {
           if (t === 0) { setPrefs(L.pickSort(prefs, id, qlib())); return true; }
-          if (t === 2) { var pv = U.extend({}, prefs); pv.view = id; restoreF = grid.f; prefs = pv; if (!coll && !params.actor) L.save(lib.id, prefs); reload(true); return true; }
+          if (t === 2) { var pv = U.extend({}, prefs); pv.view = id; restoreF = grid.f; prefs = pv; if (!coll && !params.actor) L.save(libKey, prefs); reload(true); return true; }
           var p = U.extend({}, prefs); p.f = U.extend({}, prefs.f || {});
           if (id.indexOf('st:') === 0) { p.f.status = id.slice(3); setPrefs(p); return true; }
           if (id === 'actor') { delete p.f.actor; params.actor = null; setPrefs(p); return true; }
@@ -302,7 +318,7 @@
       var def = null, ls = L.lists(qlib());
       for (var i = 0; i < ls.length; i++) if (ls[i].id === lid) def = ls[i];
       if (!def) return;
-      N.plex.get('/library/sections/' + lib.id + '/' + def.key, { type: L.typeNum(qlib()) }, null, function (err, d) {
+      get('/library/sections/' + lib.id + '/' + def.key, { type: L.typeNum(qlib()) }, null, function (err, d) {
         if (dead || away) return;
         var vals = err ? [] : L.values(d), cur0 = prefs.f && prefs.f[lid], e = [{ id: '', t: N.t('lib.filter.any') }];
         if (err) { N.ui.toast.show(N.t('toast.actionFailed')); return; }
@@ -318,12 +334,12 @@
     }
     /* Alle abspielen / Zufall: Play-Queue ueber den PMS (sortiert/gefiltert wie das Raster) */
     function playAll(shuffle) {
-      var mid = N.session.state.server && N.session.state.server.machineId;
+      var mid = srv || N.session.state.server && N.session.state.server.machineId;   // Weitere Server: Queue auf DEM Server
       if (music && !coll) { N.music.playLib(lib, shuffle); return; }   // M4: lokale Warteschlange (kein Play-Queue-POST)
       if (!mid || n <= 0) return;
       var uri = coll ? 'server://' + mid + '/com.plexapp.plugins.library/library/collections/' + coll.rk + '/children' : L.queueUri(mid, lib, prefs);
       N.ui.toast.show(N.t('common.loading'));
-      N.plex.pms('POST', '/playQueues', { type: 'video', uri: uri, shuffle: shuffle ? 1 : 0, continuous: 0, includeChapters: 0 }, { retries: 0, dedupe: false, timeout: 15000 }, function (err, d) {
+      N.plex.pms('POST', '/playQueues', { type: 'video', uri: uri, shuffle: shuffle ? 1 : 0, continuous: 0, includeChapters: 0 }, N.srv.o(srv, { retries: 0, dedupe: false, timeout: 15000 }), function (err, d) {
         var mc = !err && d && d.MediaContainer;
         if (dead || away) return;
         if (!mc || !mc.Metadata || !mc.Metadata.length) { N.ui.toast.show(N.t('toast.actionFailed')); return; }
@@ -365,7 +381,7 @@
       if (it) b.push({ id: 'info', t: N.t('menu.info') });
       if (mode() !== 'colls' && n > 0) { b.push({ id: 'all', t: N.t('lib.playAll') }); b.push({ id: 'shuffle', t: N.t('lib.shuffle') }); }
       if (mode() === 'lib') b.push({ id: 'sort', t: N.t('lib.chip') });
-      if (!coll && N.session.isAdmin()) b.push({ id: 'scan', t: N.t('menu.scanLib') });
+      if (!coll && !srv && N.session.isAdmin()) b.push({ id: 'scan', t: N.t('menu.scanLib') });
       if (!b.length) return;
       N.ui.dialog.open({ title: it ? it.title : (coll ? coll.title : lib.title), buttons: b, vertical: true, focus: 0, top: 120,
         onSelect: function (id) {
@@ -406,12 +422,12 @@
     s.enter = function (p, restore) {
       away = false;
       if (!prefs) {
-        prefs = coll ? L.defaults() : L.load(lib.id);
+        prefs = coll ? L.defaults() : L.load(libKey);
         if (params.actor) { prefs = U.extend({}, prefs); prefs.tab = 'lib'; prefs.f = { status: '', actor: params.actor }; }
         if (params.view) { prefs = U.extend({}, prefs); prefs.view = params.view; }   // Messlauf (P7): Ansicht nur fuer diesen Aufruf
         if (restore) { restoreF = restore.f || 0; if (restore.prefs) prefs = restore.prefs; }
         if (!coll && !params.actor) checkColls();
-        if (music && !coll) N.music.probeLib(lib, function (b) { if (!dead && b !== book) { book = b; if (!restore) prefs = L.load(lib.id); reload(true); } });
+        if (music && !coll) N.music.probeLib(lib, function (b) { if (!dead && b !== book) { book = b; if (!restore) prefs = L.load(libKey); reload(true); } });
         reload(true);
         return;
       }
@@ -421,7 +437,7 @@
     };
     /* Gibt es Sammlungen? (nur dann den Reiter zeigen) */
     function checkColls() {
-      N.plex.get('/library/sections/' + lib.id + '/collections', { 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 0 }, null, function (err, d) {
+      get('/library/sections/' + lib.id + '/collections', { 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 0 }, null, function (err, d) {
         if (dead || err || !d || !d.MediaContainer) return;
         var c = Number(d.MediaContainer.totalSize || d.MediaContainer.size) || 0;
         if (c !== collN) { collN = c; if (!c && prefs.tab === 'coll') { prefs.tab = 'lib'; reload(); } else buildChips(); }

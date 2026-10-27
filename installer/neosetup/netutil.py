@@ -29,6 +29,14 @@ def is_private_ipv4(addr):
         and not ip.is_unspecified and not ip.is_multicast
 
 
+def is_net_ipv4(addr):
+    """IPv4 literal usable as a server address (private OR public; not unspecified/loopback/multicast/reserved).
+    Used only for servers OTHER people shared with the user ("Weitere Server"), which are usually on the internet."""
+    ip = _ip(addr)
+    return bool(ip) and ip.version == 4 and str(ip) == str(addr) and not (ip.is_unspecified or ip.is_loopback
+                                                                       or ip.is_multicast or ip.is_reserved)
+
+
 def lan_client_ok(addr, allow=None):
     """Sync/update servers: only loopback or private/link-local clients; with an allow-list only those (+ loopback)."""
     ip = _ip(addr)
@@ -128,6 +136,19 @@ def merge_servers(resources, gdm_hits):
     return out
 
 
+def other_candidate_uris(server, limit=8):
+    """Plain-http URIs for a server shared with the user ("Weitere Server"): every non-relay IPv4 connection from plex.tv
+    resources (relay connections need TLS, live-checked: plain http to the relay port is refused). Local addresses first
+    (same LAN), then remote ones; the TV checks /identity (machineIdentifier) before it sends a token anywhere."""
+    out = []
+    for local in (True, False):
+        for c in server.get('connections', []):
+            if bool(c.get('local')) == local and is_net_ipv4(c.get('address')):
+                u = 'http://%s:%d' % (c['address'], c['port'])
+                if u not in out: out.append(u)
+    return out[:limit]
+
+
 # ---------- read-only PMS probes ----------
 def http_get(url, headers=None, timeout=3):
     req = urllib.request.Request(url, headers=headers or {})
@@ -150,6 +171,17 @@ def probe_identity(uri, get=http_get):
     """GET {uri}/identity without token (only private addresses). Returns machineIdentifier or None."""
     host = uri.split('//', 1)[-1].rsplit(':', 1)[0]
     if not uri.startswith('http://') or not is_private_ipv4(host): return None
+    try:
+        status, data = get(uri + '/identity', {'Accept': 'application/json'})
+    except Exception:
+        return None
+    return parse_identity(data) if status == 200 else None
+
+
+def probe_identity_net(uri, get=http_get):
+    """Like probe_identity, but also for public IPv4 addresses (shared servers). Without token; read-only."""
+    host = uri.split('//', 1)[-1].rsplit(':', 1)[0]
+    if not uri.startswith('http://') or not is_net_ipv4(host): return None
     try:
         status, data = get(uri + '/identity', {'Accept': 'application/json'})
     except Exception:

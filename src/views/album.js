@@ -11,7 +11,11 @@
 
   N.router.define('album', function (params) {
     var it0 = params.it || {}, book = MU.isBookItem(it0);
-    var s = { rail: it0.lib ? 'lib-' + it0.lib : N.ui.rail && N.ui.rail.cur || 'home', wheelKeys: ['UP', 'DOWN'] };
+    // Weitere Server (N.srv): Album eines fremden Servers -> alle Anfragen dorthin
+    var srv = it0.srv || '';
+    function get(path, q, o, cb) { return N.plex.get(path, q, N.srv.o(srv, o), cb); }
+    function railId(lib) { return N.railRows.libId({ id: lib, srv: srv }); }
+    var s = { rail: it0.lib ? railId(it0.lib) : N.ui.rail && N.ui.rail.cur || 'home', wheelKeys: ['UP', 'DOWN'] };
     var root, hero, pg, bar, btns = [], bdefs = [], btnRects = null, blbl, blblT, headT, cntT, list, sb;
     var meta = null, tracks = [], chs = [], rows = [], kind = 'tracks', res = null, zone = 'btn', bf = 0, off = 0, gen = 0, tasks = [], dead = false, away = false;
     var onTrack = null, onMini = null, jump = { d: '', t: 0 };
@@ -41,28 +45,28 @@
     function track(t) { tasks.push(t); if (tasks.length > 10) tasks.shift(); return t; }
     function load() {
       gen++; var g = gen;
-      track(N.plex.get('/library/metadata/' + it0.rk, { excludeElements: 'Image,UltraBlurColors,Guid,Mood,Style' }, { timeout: 12000 }, function (err, d) {
+      track(get('/library/metadata/' + it0.rk, { excludeElements: 'Image,UltraBlurColors,Guid,Mood,Style' }, { timeout: 12000 }, function (err, d) {
         var m = !err && d && d.MediaContainer && d.MediaContainer.Metadata && d.MediaContainer.Metadata[0];
         if (g !== gen || dead) return;
         if (!m) { if (!tracks.length) onError(err); return; }
         meta = { sum: String(m.summary || ''), year: Number(m.year) || 0, artist: String(m.parentTitle || it0.artist || ''), artistRk: m.parentRatingKey ? String(m.parentRatingKey) : '',
-          art: m.art || '', thumb: m.thumb || it0.thumb || '', title: String(m.title || it0.title || '') || N.t('mu.untitled'), lib: Number(m.librarySectionID) || it0.lib || 0,
+          art: N.srv.tp(m.art || ''), thumb: N.srv.tp(m.thumb || '') || it0.thumb || '', title: String(m.title || it0.title || '') || N.t('mu.untitled'), lib: Number(m.librarySectionID) || it0.lib || 0,
           genres: [], vc: Number(m.viewCount) || 0 };
         for (var i = 0; m.Genre && i < m.Genre.length && i < 3; i++) meta.genres.push(N.fmt.genre(m.Genre[i].tag));
-        if (meta.lib && s.rail !== 'lib-' + meta.lib) { s.rail = 'lib-' + meta.lib; if (N.router.top() === s) N.ui.rail.attach(s.rail); }
+        if (meta.lib && s.rail !== railId(meta.lib)) { s.rail = railId(meta.lib); if (N.router.top() === s) N.ui.rail.attach(s.rail); }
         hero.loadBg(meta.art, meta.thumb);
         if (meta.thumb !== it0.thumb) hero.setPoster(meta.thumb, meta.title);
         paint();
       }));
-      track(N.plex.get('/library/metadata/' + it0.rk + '/children', { 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 500, excludeElements: 'Image,UltraBlurColors,Guid,Mood' }, { timeout: 12000 }, function (err, d) {
+      track(get('/library/metadata/' + it0.rk + '/children', { 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 500, excludeElements: 'Image,UltraBlurColors,Guid,Mood' }, { timeout: 12000 }, function (err, d) {
         if (g !== gen || dead) return;
         if (err) { onError(err); return; }
-        tracks = MU.tracks(d, d && d.MediaContainer && d.MediaContainer.thumb || it0.thumb);   // Cover des Albums statt Autorenbild (F30)
+        tracks = MU.tracks(d, d && d.MediaContainer && N.srv.tp(d.MediaContainer.thumb) || it0.thumb);   // Cover des Albums statt Autorenbild (F30)
         if (book && tracks.length === 1 && tracks[0].chs) loadChapters(g); else build();
       }));
     }
     function loadChapters(g) {
-      track(N.plex.get('/library/metadata/' + tracks[0].rk, { includeChapters: 1, excludeElements: 'Image,UltraBlurColors,Guid' }, { timeout: 12000 }, function (err, d) {
+      track(get('/library/metadata/' + tracks[0].rk, { includeChapters: 1, excludeElements: 'Image,UltraBlurColors,Guid' }, { timeout: 12000 }, function (err, d) {
         if (g !== gen || dead) return;
         var m = !err && d && d.MediaContainer && d.MediaContainer.Metadata && d.MediaContainer.Metadata[0];
         chs = m ? MU.chapters(m.Chapter) : [];
@@ -90,8 +94,8 @@
     }
     function onError(err) {
       var k = N.errs.kind(err, 'pms');
-      if (k === 'auth') { N.app.authLost(); return; }   // Kinderprofil-Pruefung wie Startseite (Pentest P6)
-      var tx = k === 'server' ? { title: N.t('err.server.title'), text: N.t('lib.err.text', { server: N.session.state.server && N.session.state.server.name || '' }) } : N.errs.texts('generic', null, N.session.isKid());
+      if (k === 'auth' && !srv) { N.app.authLost(); return; }   // Kinderprofil-Pruefung wie Startseite (Pentest P6); weiterer Server: nie das eigene Profil
+      var tx = srv ? N.srv.errText(srv, err) : k === 'server' ? { title: N.t('err.server.title'), text: N.t('lib.err.text', { server: N.session.state.server && N.session.state.server.name || '' }) } : N.errs.texts('generic', null, N.session.isKid());
       U.vis(pg, false); hero.vis(false);
       sb.show({ title: tx.title, text: tx.text, buttons: [{ id: 'retry', t: N.t('err.btn.retry') }, { id: 'back', t: N.t('err.btn.back') }],
         onSelect: function (id) { if (id === 'back') { N.router.back(); return; } sb.hide(); U.vis(pg, true); hero.vis(true); zone = 'btn'; load(); } });
@@ -184,6 +188,8 @@
     }
 
     /* ---------- Aktionen ---------- */
+    /* Warteschlange nur mit Titeln desselben Servers (der laufende Ton-Kern spricht mit genau einem Server) */
+    function sameSrv() { var c = N.audio.core(); return !!c && ((c.item && c.item.srv) || '') === srv; }
     function ctx() { return { title: meta ? meta.title : it0.title, rk: it0.rk, lib: meta ? meta.lib : it0.lib, thumb: meta ? meta.thumb : it0.thumb }; }
     function playFrom(i, offMs, shuffle) {
       if (!tracks.length) return;
@@ -214,18 +220,18 @@
     function toggleHeard() {
       if (!book || !tracks.length) return;
       var all = res && res.state === 'done';
-      N.plex.write('GET', all ? '/:/unscrobble' : '/:/scrobble', { identifier: 'com.plexapp.plugins.library', key: it0.rk }, function (err) {
+      N.plex.write('GET', all ? '/:/unscrobble' : '/:/scrobble', { identifier: 'com.plexapp.plugins.library', key: it0.rk }, function (err) {   // Weitere Server: who
         if (dead) return;
         if (err) { N.ui.toast.show(N.t('toast.actionFailed')); return; }
         for (var i = 0; i < tracks.length; i++) { tracks[i].vc = all ? 0 : Math.max(1, tracks[i].vc); tracks[i].off = 0; if (all) tracks[i].lv = 0; }
         N.ui.toast.show(N.t(all ? 'mu.toast.unheard' : 'mu.toast.heard'), { icon: 'confirm' });
         build();
-      });
+      }, N.srv.who(srv) || undefined);
     }
     function menu() {
       var b = [], inList = zone === 'list' && rows[list.f];
       if (inList) b.push({ id: 'row', t: N.t('mu.menu.playFrom') });
-      if (inList && kind !== 'embedded' && N.audio.active() && !book) { b.push({ id: 'next', t: N.t('mu.menu.playNext') }); b.push({ id: 'end', t: N.t('mu.menu.addEnd') }); }
+      if (inList && kind !== 'embedded' && N.audio.active() && !book && sameSrv()) { b.push({ id: 'next', t: N.t('mu.menu.playNext') }); b.push({ id: 'end', t: N.t('mu.menu.addEnd') }); }
       if (book) b.push({ id: 'heard', t: N.t(res && res.state === 'done' ? 'mu.menu.unheard' : 'mu.menu.heard') });
       if (meta && meta.artistRk) b.push({ id: 'artist', t: N.t(book ? 'mu.menu.toAuthor' : 'mu.menu.toArtist') });
       b.push({ id: 'info', t: N.t('menu.info') });
@@ -234,7 +240,7 @@
           if (id === 'row') playRow(list.f);
           else if (id === 'next' || id === 'end') { var c = N.audio.core(); if (c && c.q) { c.q.insert([rows[list.f]], id === 'next'); c.pre = null; N.evt.emit('audio:queue', c.q); N.ui.toast.show(N.t('mu.toast.queued'), { icon: 'confirm' }); } }
           else if (id === 'heard') toggleHeard();
-          else if (id === 'artist') N.router.push('artist', { it: { rk: meta.artistRk, type: 'artist', title: meta.artist, lib: meta.lib } });
+          else if (id === 'artist') N.router.push('artist', { it: { rk: meta.artistRk, type: 'artist', title: meta.artist, lib: meta.lib, srv: srv || undefined } });
           else showInfo();
         } });
     }
@@ -339,26 +345,28 @@
 
   /* ---------- Einstieg (Bibliothek, Startseite, Details-Hooks) ---------- */
   var offs = {}, busy = 0;
-  function libOf(id) {
-    var hc = N.session.homeCache(), l = hc && (hc.alibs || hc.libs) || [];
-    for (var i = 0; i < l.length; i++) if (l[i].id === Number(id)) return l[i];
+  /* sv: Weitere Server (N.srv) – Bibliotheken/Anfragen des fremden Servers */
+  function libOf(id, sv) {
+    var hc = N.session.homeCache(), l = sv ? N.srv.libs() : hc && (hc.alibs || hc.libs) || [];
+    for (var i = 0; i < l.length; i++) if (l[i].id === Number(id) && (l[i].srv || '') === (sv || '')) return l[i];
     return null;
   }
-  function children(rk, cb, at) {
-    N.plex.get('/library/metadata/' + rk + '/children', { 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 500, excludeElements: 'Image,UltraBlurColors,Guid,Mood' }, { timeout: 12000 }, function (err, d) {
-      cb(err ? [] : MU.tracks(d, d && d.MediaContainer && d.MediaContainer.thumb || at), err);
+  function okey(lib) { return N.srv.skey(lib.srv, lib.id); }
+  function children(rk, cb, at, sv) {
+    N.plex.get('/library/metadata/' + rk + '/children', { 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 500, excludeElements: 'Image,UltraBlurColors,Guid,Mood' }, N.srv.o(sv, { timeout: 12000 }), function (err, d) {
+      cb(err ? [] : MU.tracks(d, d && d.MediaContainer && N.srv.tp(d.MediaContainer.thumb) || at), err);
     });
   }
   function failed() { N.ui.toast.show(N.t('toast.actionFailed')); }
   U.extend(MU, {
     /* Hoerbuch-Bibliothek? Name oder gemerktes "Store track progress" (probeLib) */
-    bookLib: function (lib) { return !!lib && MU.isBookLib(lib, offs[lib.id]); },
-    isBookItem: function (it) { var l = it && libOf(it.lib); return l ? MU.bookLib(l) : !!(it && it.kind === 'audio'); },
+    bookLib: function (lib) { return !!lib && MU.isBookLib(lib, offs[okey(lib)]); },
+    isBookItem: function (it) { var l = it && libOf(it.lib, it.srv); return l ? MU.bookLib(l) : !!(it && it.kind === 'audio'); },
     /* enableTrackOffsets einmal je Sitzung lesen (GET /library/sections/<id>/prefs) */
     probeLib: function (lib, cb) {
-      if (!lib || offs[lib.id] !== undefined) { if (cb) cb(MU.bookLib(lib)); return; }
-      N.plex.get('/library/sections/' + lib.id + '/prefs', null, null, function (err, d) {
-        if (!err) offs[lib.id] = MU.offsetsOn(d);
+      if (!lib || offs[okey(lib)] !== undefined) { if (cb) cb(MU.bookLib(lib)); return; }
+      N.plex.get('/library/sections/' + lib.id + '/prefs', null, N.srv.o(lib.srv), function (err, d) {
+        if (!err) offs[okey(lib)] = MU.offsetsOn(d);
         if (cb) cb(MU.bookLib(lib));
       });
     },
@@ -377,7 +385,7 @@
       busy = U.now();
       var book = MU.isBookItem(it);
       if (it.type === 'artist') {
-        N.plex.get('/library/metadata/' + it.rk + '/allLeaves', { 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 500, excludeElements: 'Image,UltraBlurColors,Guid,Mood' }, { timeout: 12000 }, function (err, d) {
+        N.plex.get('/library/metadata/' + it.rk + '/allLeaves', { 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 500, excludeElements: 'Image,UltraBlurColors,Guid,Mood' }, N.srv.o(it.srv, { timeout: 12000 }), function (err, d) {
           busy = 0;
           var tr = err ? [] : MU.tracks(d);
           if (!tr.length) { failed(); return; }
@@ -396,14 +404,14 @@
         else if (book) { var r = MU.resume(tr); if (r.state !== 'done') { i = r.i; off = MU.rewind(r.off, tr[i].lv); } }
         N.audio.play(tr, i, { book: book, off: off, ctx: { title: it.type === 'album' ? it.title : it.album || '', rk: albumRk, lib: it.lib, thumb: it.thumb } });
         N.router.push('nowplaying');
-      }, it.thumb);
+      }, it.thumb, it.srv);
       return true;
     },
     /* Bibliothek: Alle abspielen / Zufall (max. 200 Titel, Zufall vom Server gemischt; keine Play-Queue) */
     playLib: function (lib, shuffle) {
       var r = MU.libTracksQuery(lib.id, shuffle, 200);
       N.ui.toast.show(N.t('common.loading'));
-      N.plex.get(r.path, r.q, { timeout: 15000 }, function (err, d) {
+      N.plex.get(r.path, r.q, N.srv.o(lib.srv, { timeout: 15000 }), function (err, d) {
         var tr = err ? [] : MU.tracks(d);
         if (!tr.length) { failed(); return; }
         N.ui.toast.hide();

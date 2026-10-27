@@ -37,10 +37,14 @@ Nein. Nur für die Einrichtung und für Updates. Danach kann der Computer aus se
 Im Alltag nicht – nur dein Plex Media Server im Heimnetz. Die einmalige Einrichtung braucht Internet (plex.tv). Ausnahme: die Merkliste und die Trend-Reihen in „Entdecken“ brauchen plex.tv und dafür den optionalen Helfer im Heimnetz (siehe INSTALL, Nachtrag).
 
 ### Funktioniert Neolume außerhalb des Heimnetzes (Fernzugriff)?
-Nein, bewusst nicht. Neolume nutzt nur Server-Adressen im Heimnetz.
+Nein, bewusst nicht. Deinen eigenen Server erreicht Neolume nur über seine Adresse im Heimnetz.
 
 ### Kann ich mehrere Server nutzen?
-Derzeit wird bei der Einrichtung ein Server gewählt. Mehrere Server sind nicht geplant.
+Ein eigener Server wird bei der Einrichtung gewählt. Zusätzlich kannst du **Server, die jemand für dich freigegeben hat** (z. B. ein Freund), einbinden:
+in der Übersicht des Einrichtungsprogramms „Freigegebene Server suchen“ und ankreuzen. Ihre Bibliotheken stehen dann in der Seitenleiste („von <Server>“);
+Suche und Startseite bleiben bei deinem Server. Grenzen durch den Fernseher (2014), der nicht verschlüsseln kann: Der fremde Server muss unsichere Verbindungen
+erlauben (Plex: *Einstellungen › Netzwerk › Sichere Verbindungen: Bevorzugt*), und die Verbindung läuft **unverschlüsselt über das Internet**.
+Siehe [INSTALL, Nachtrag „Weitere Server“](INSTALL.de.md#nachtrag-weitere-server-optional).
 
 ### Kann ich Profile wechseln?
 Ja, alle bei der Einrichtung gewählten Plex-Home-Profile. Jedes Profil sieht nur seine eigenen Bibliotheken und hat seinen eigenen Gesehen-Status.

@@ -123,6 +123,9 @@ body { color: #F2F2F2; font-family: 'PlexNeo', 'Inter', 'Helvetica Neue', Helvet
 .ni.is-cur .lb { color: #F2F2F2; }
 .ni.is-focus { background: @accent@; }
 .ni.is-focus .lb { color: #141414; }
+.ni .lb.lbx { top: 2px; line-height: 24px; }   /* Weitere Server: Bibliothek (1 Zeile) + Herkunft darunter */
+.ni .lbo { position: absolute; left: 72px; top: 26px; width: 168px; font-size: 16px; line-height: 20px; color: #858B92; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ni.is-focus .lbo { color: #141414; }
 .ni .rav { left: 24px; top: 8px; }
 .nav-sep { position: absolute; left: 56px; top: 620px; width: 208px; height: 1px; background: #2A2E33; }
 

@@ -27,9 +27,12 @@
     if (opts && opts.blur) q.blur = opts.blur;
     if (opts && opts.quality) q.quality = opts.quality;   // PMS: JPEG-Qualitaet 1..100 (Standard ~75; s. SOFT_Q)
     else if (N.comfort && N.comfort.isSpoiler(path)) q.blur = 30;   // Spoilerschutz (SPEC 5.3): ungesehene Folgen unscharf
-    q.url = path;
-    q['X-Plex-Token'] = (opts && opts.token) || N.plex.token || '';
-    return ((opts && opts.base) || N.plex.base) + '/photo/:/transcode?' + U.qs(q);
+    // Weitere Server: Pfad mit Marke '@<machineId>|<pfad>' -> Bild ueber DIESEN Server (nicht erreichbar -> kein Bild)
+    var x = path.charAt(0) === '@' && N.srv ? N.srv.untag(path) : null, c = x ? N.srv.conn(x.id) : null;
+    if (x && !c) return '';
+    q.url = x ? x.path : path;
+    q['X-Plex-Token'] = c ? c.token : (opts && opts.token) || N.plex.token || '';
+    return (c ? c.base : (opts && opts.base) || N.plex.base) + '/photo/:/transcode?' + U.qs(q);
   }
 
   /* Vollbild-Hintergrund eines Titels (Startseiten-Hero, Detailseiten, "Jetzt laeuft"), TV-Befund 27.10. nachmittags (neu

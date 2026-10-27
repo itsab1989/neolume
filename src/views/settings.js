@@ -211,6 +211,12 @@
       // Konto-Aktionen (PIN-Schalter, Server, Abmelden) nur im Hauptkonto-Profil; andere Erwachsene sehen nur "Profil wechseln"
       var acc = [{ id: 'switch', type: 'action', label: 'set.switchProfile', desc: 'set.switchProfile.desc', run: function () { N.app.switchProfile(); } }];
       if (S.pkg) N.pinSettings.rows(acc, paintAll);   // P2: eigene App-PIN je Profil (nur mit setup.json, views/pinsettings.js)
+      // Weitere Server (optional, setup.json): Anzahl + erreichbar; der Satz erklaert, wo man sie einrichtet
+      if (S.pkg) acc.push({ id: 'others', type: 'value', label: 'set.otherServers', desc: 'set.otherServers.desc', val: function () {
+        var l = N.srv.list(), ok = 0;
+        for (var i = 0; i < l.length; i++) if (l[i].state === 'ok') ok++;
+        return l.length ? N.t('set.otherServers.val', { ok: ok, n: l.length }) : v('notSetUp');
+      } });
       if (S.isAdmin()) acc.push(
         { id: 'pinsw', type: 'toggle', label: 'set.pinSwitch', desc: S.pkg ? 'set.pinSwitch.app.desc' : 'set.pinSwitch.desc', disabled: function () { return !S.pinSwitchAvailable() || !S.hasRestricted(); },
           ddesc: function () { if (S.pkg && !S.pinSwitchAvailable()) return 'set.pinSwitch.app.disabled'; return S.pinSwitchAvailable() ? 'set.pinSwitch.noKids.disabled' : 'set.pinSwitch.disabled'; },

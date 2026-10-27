@@ -48,6 +48,7 @@ eigenen Plex Media Server im Heimnetz**.
 - Musik und Hörbücher; Plex-Home-Profile, Kinderprofile, eigene App-PIN je Profil.
 - Entdecken und Plex-Merkliste über einen optionalen Helfer im Heimnetz.
 - Bildschirmschoner mit Bildern aus deinen ganzen Bibliotheken, zehn Übergängen und sieben Einblendungen zur Wahl.
+- Optional: Bibliotheken von **Servern, die jemand für dich freigegeben hat** (z. B. ein Freund), mit Herkunft in der Seitenleiste.
 - Oberfläche Deutsch und Englisch, Akzentfarbe je Profil wählbar (sieben Farben). Keine Werbung, kein Tracking.
 
 <p align="center"><img src="docs/screenshots/home.png" alt="Startseite von Neolume" width="900"></p>

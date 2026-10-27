@@ -94,7 +94,7 @@
       acc = new N.SeekAcc(commitSeek, { now: U.now, set: function (f, ms) { return setTimeout(f, ms); }, clear: function (t) { clearTimeout(t); } }, N.config.seekDelay || 600);
       onFlush = exitSync;
       N.evt.on('app:flush', onFlush);
-      onOff = function () { if (pb && !closed && !errOn && (pb.state === 'playing' || pb.state === 'paused' || pb.state === 'buffering')) connLost(); };
+      onOff = function () { if (pb && !closed && !isrv() && !errOn && (pb.state === 'playing' || pb.state === 'paused' || pb.state === 'buffering')) connLost(); };
       onOn = function () { if (lost) resumeLost(); };
       N.evt.on('net:offline', onOff); N.evt.on('net:online', onOn);
       status = function () { return { active: !!pb && !closed && !errOn, paused: !!lost || !!(pb && pb.state === 'paused'), item: item }; };
@@ -148,6 +148,12 @@
       pb.dead = true;
     }
     function libsOf() { var hc = N.session.homeCache(); return hc && (hc.alibs || hc.libs) || []; }
+    /* Weitere Server (N.srv): Titel eines fremden Servers -> Decision, Datei, Timeline, Untertitel, Vorschaubilder, Play-Queue
+     * und Verbindungspruefung gehen an DIESEN Server (item.srv); der eigene Server bleibt unberuehrt */
+    function isrv() { return item && item.srv || ''; }
+    function conn() { var sv = isrv(); return sv ? N.srv.conn(sv) || { base: '', token: '' } : { base: N.plex.base, token: N.plex.token }; }
+    function ping(cb) { if (isrv()) N.srv.ping(isrv(), cb); else N.net.ping(cb); }
+    function mkey(k) { return N.srv.skey(isrv(), k); }
     /* Einstellungen + Sitzungs-Werte aus dem Mehr-Menue */
     function eff(k) { return sess[k] !== undefined ? sess[k] : cfg()[k]; }
 
@@ -159,14 +165,20 @@
       U.setText(t1, it.type === 'episode' ? it.title : ''); U.setText(t2, it.type === 'episode' ? N.t('pl.epTitle', { s: it.s, e: it.e, t: it.epTitle || '' }) : it.title);
       pcfg = U.extend(U.extend({}, cfg()), sess);
       subLook();
+      var cn = conn(), sv = isrv();
+      if (sv && !cn.base) {                              // Weitere Server: Adresse erst pruefen (frisch gestartet oder ausgefallen)
+        showSpin(N.t('common.loading'));
+        N.srv.resolve(sv, false, function (st) { if (closed || item !== it) return; if (st === 'ok' && N.srv.conn(sv)) play(it, off, q); else onError({ kind: 'server' }); });
+        return;
+      }
       pb = new N.Playback({
-        sef: sef, base: N.plex.base, token: N.plex.token, clientId: N.plex.clientId, threshold: N.config.watchedThreshold,
+        sef: sef, base: cn.base, token: cn.token, clientId: N.plex.clientId, threshold: N.config.watchedThreshold, wan: !!sv,
         timers: { now: U.now, set: function (f, ms) { return setTimeout(f, ms); }, clear: function (t) { clearTimeout(t); } },
-        cfg: pcfg, mem: function (k) { return trackMem[k || 'm' + it.rk] || null; },   // Film: Spurwahl aus den Details (M3b)
+        cfg: pcfg, mem: function (k) { return trackMem[mkey(k || 'm' + it.rk)] || null; },   // Film: Spurwahl aus den Details (M3b)
         // Anime je Titel (N.anime): Bibliothek "Anime" + Signale aus dem Cache + japanische Spur der Datei; Erkennung "aus" -> nie
-        isAnime: function (m, ja) { return N.anime.rulesOn() && N.anime.is({ type: m.type, rk: m.rk, showRk: m.showRk, lib: m.lib, kind: N.hubs.libKinds(libsOf())[m.lib] || '' }, { ja: ja }); },
-        get: function (path, qq, o, cb) { return N.plex.get(path, qq, o, cb); },
-        write: function (m, path, qq, cb) { return N.plex.write(m, path, qq, function (e, d) { cb(e, d); }); }
+        isAnime: function (m, ja) { return N.anime.rulesOn() && N.anime.is({ type: m.type, rk: m.rk, showRk: m.showRk, lib: m.lib, srv: sv || undefined, kind: (sv ? it.kind : N.hubs.libKinds(libsOf())[m.lib]) || '' }, { ja: ja }); },
+        get: function (path, qq, o, cb) { return N.plex.get(path, qq, N.srv.o(sv, o), cb); },
+        write: function (m, path, qq, cb) { return N.plex.write(m, path, qq, function (e, d) { cb(e, d); }, N.srv.who(sv) || undefined); }
       }, { rk: it.rk, off: off, pqi: q ? q.pqi : null, pqId: queue ? queue.id : null });
       if (sess.forced) pb.att = { dp: false, ds: false };
       var me = pb;
@@ -328,7 +340,7 @@
       cues = null; cueI = -1; showSub('');
       if (mode !== 'sidecar' || !pb || !pb.sub) return;
       var key = pb.sub.key;
-      N.plex.get(key, { encoding: 'utf-8', format: 'srt' }, { json: false, timeout: 15000 }, function (err, txt) {
+      N.plex.get(key, { encoding: 'utf-8', format: 'srt' }, N.srv.o(isrv(), { json: false, timeout: 15000 }), function (err, txt) {
         if (err || !pb || !pb.sub || pb.sub.key !== key) return;
         cues = N.subs.parse(txt);
       });
@@ -459,13 +471,15 @@
       thLast = snap; thT0 = now;
       if (bif) { thImg.src = N.thumbs.dataUri(bifRaw, bif, N.thumbs.frameAt(bif, ms)) || N.img.BLANK; return; }
       thImg.onerror = function () { if (++thFail === 2) loadBif(); };
-      thImg.src = N.thumbs.url(N.plex.base, pb.meta.partId, ms, N.plex.token);
+      var cn = conn();
+      thImg.src = cn.base ? N.thumbs.url(cn.base, pb.meta.partId, ms, cn.token) : N.img.BLANK;
     }
     /* Rueckfall: BIF-Datei einmal als Binaer-String laden (Einzelbild-Endpunkt am TV gescheitert) */
     function loadBif() {
       try {
         var x = new XMLHttpRequest(), part = pb.meta.partId;
-        x.open('GET', N.thumbs.bifUrl(N.plex.base, part, N.plex.token), true);
+        var cb0 = conn();
+        x.open('GET', N.thumbs.bifUrl(cb0.base, part, cb0.token), true);
         if (x.overrideMimeType) x.overrideMimeType('text/plain; charset=x-user-defined');
         x.onreadystatechange = function () {
           if (x.readyState !== 4) return;
@@ -491,10 +505,10 @@
 
     /* ---------- Naechste Folge (Play-Queue, Countdown) ---------- */
     function makeQueue(m) {
-      var mid = N.session.state.server && N.session.state.server.machineId;
+      var mid = isrv() || N.session.state.server && N.session.state.server.machineId;   // Weitere Server: Queue auf DEM Server
       if (!mid) return;
       qTask = N.plex.pms('POST', '/playQueues', { type: 'video', continuous: 1, includeChapters: 0,
-        uri: 'server://' + mid + '/com.plexapp.plugins.library/library/metadata/' + m.rk }, { retries: 0, dedupe: false }, function (err, d) {
+        uri: 'server://' + mid + '/com.plexapp.plugins.library/library/metadata/' + m.rk }, N.srv.o(isrv(), { retries: 0, dedupe: false }), function (err, d) {
         qTask = null;
         var mc = !err && d && d.MediaContainer;
         if (!mc || !mc.Metadata) { N.log('playQueue ' + (err ? err.status || err.type : 'leer')); return; }
@@ -603,6 +617,12 @@
     /* ---------- Fehler ---------- */
     function onError(e) {
       if (e.kind === 'server' && pb && pb.firstTick && !lost) { connLost(); return; }   // P5: lief schon -> "Verbindung unterbrochen"
+      // weiterer Server: Startfehler heisst nicht "Server weg" – antwortet /identity, ist es ein Wiedergabefehler (Erneut/Geringere Qualitaet)
+      if (e.kind === 'server' && isrv() && !e.checked) {
+        var it1 = item;
+        N.srv.ping(isrv(), function (ok) { if (!closed && item === it1) onError(U.extend(U.extend({}, e), { kind: ok ? 'playback' : 'server', checked: true })); });
+        return;
+      }
       acc.cancel(); hideSpin(); hideSkip(); hideUp(); hideLast(); hideOsd(true);
       errOn = true;
       transparent(false); U.show(sbBg, true);
@@ -635,7 +655,7 @@
     }
     function lostLoop() {
       if (lostT) clearTimeout(lostT);
-      lostT = setTimeout(function () { lostT = 0; if (!lost) return; N.net.ping(function (ok) { if (!lost) return; if (ok) resumeLost(); else lostLoop(); }); }, 5000);
+      lostT = setTimeout(function () { lostT = 0; if (!lost) return; ping(function (ok) { if (!lost) return; if (ok) resumeLost(); else lostLoop(); }); }, 5000);
     }
     function hideLost() { if (lostEl) U.show(lostEl, false); }
     function setLostF(i) { U.cls(lostBtns[lostF], 'is-focus', false); lostF = i; U.cls(lostBtns[i], 'is-focus', true); }
@@ -652,7 +672,7 @@
     function lostAct(i) {
       if (i === 1) { close(); return; }
       U.setText(lostBtns[0].firstChild, N.t('net.bar.checkingShort'));
-      N.net.ping(function (ok) { U.setText(lostBtns[0].firstChild, N.t('err.btn.retry')); if (ok) resumeLost(); else N.ui.toast.show(N.t('err.connLost.still')); });
+      ping(function (ok) { U.setText(lostBtns[0].firstChild, N.t('err.btn.retry')); if (ok) resumeLost(); else N.ui.toast.show(N.t('err.connLost.still')); });
     }
 
     /* ---------- Panels ---------- */
@@ -667,7 +687,7 @@
       var m = pb.meta;
       if (!eff('rememberTracks') || !m.showRk) return;
       var T = m.tracks, st = N.tracks.selected(T.subs);
-      trackMem = N.tracks.remember(trackMem, m.showRk, N.tracks.selected(T.audio), st || 0, U.now());
+      trackMem = N.tracks.remember(trackMem, mkey(m.showRk), N.tracks.selected(T.audio), st || 0, U.now());
       N.store.set(memFile(), trackMem);
       N.ui.toast.show(N.t('pl.toast.remembered'), { icon: 'confirm' });
     }
@@ -675,7 +695,7 @@
     function chapters() {
       if (!chs.length || !pb) return;
       var L = O.chapterList(chs, pb.t, hms), imgs = false;
-      for (var i = 0; i < L.entries.length; i++) if (L.entries[i].img) { imgs = true; L.entries[i].img = N.img.url(L.entries[i].img, 'chapter'); }
+      for (var i = 0; i < L.entries.length; i++) if (L.entries[i].img) { imgs = true; L.entries[i].img = N.img.url(N.srv.tag(isrv(), L.entries[i].img), 'chapter'); }
       N.ui.panel.select({ title: N.t('pl.chapters'), entries: L.entries, selected: String(L.cur), images: imgs, onSelect: function (id) {
         var c = chs[Number(id)];
         N.ui.toast.show(N.t('pl.jumpTo', { time: hms(c.start) }));
@@ -806,7 +826,7 @@
           var e = [];
           for (var i = 0; i < res.length && i < 20; i++) e.push({ id: String(i), t: res[i].title || N.tracks.langName(res[i].lang), s: N.subSearch.subline(res[i]) });
           N.ui.panel.select({ title: N.t('pl.ss.results', { n: res.length }), entries: e, onCancel: again, onSelect: function (id) { subWarn(rk, res[Number(id)], again); } });
-        });
+        }, isrv());
       } });
     }
     function subWarn(rk, r, back) {
@@ -820,7 +840,7 @@
             N.ui.toast.show(N.t('pl.ss.done'), { icon: 'confirm' });
             var at = pb ? pb.t : 0; if (pb) pb.stop('user');               // neu laden: die neue Spur steht danach unter Ton & Untertitel
             play(item, at, item && item.pqi ? item : null);
-          });
+          }, isrv());
         } });
     }
     /* "Problem mit der Wiedergabe?": Neu laden · Umwandlung erzwingen · Geringere Qualitaet · Technische Infos */

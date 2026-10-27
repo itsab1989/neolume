@@ -40,6 +40,7 @@
  "plex/inspire.js",
  "plex/music.js",
  "plex/anime.js",
+ "plex/servers.js",
  "player/decision.js",
  "player/versions.js",
  "player/tracks.js",

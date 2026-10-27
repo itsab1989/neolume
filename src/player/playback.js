@@ -9,7 +9,7 @@
   var U = N.util, D = N.decision, TR = N.tracks, TL_MS = 10000;
   function Playback(deps, item) {
     this.d = deps; this.item = item; this.state = 'idle'; this.t = item.off || 0; this.resume = item.off || 0;
-    this.meta = null; this.r = null; this.hls = false; this.att = { dp: deps.cfg.directPlay !== false, ds: true };
+    this.meta = null; this.r = null; this.hls = false; this.att = { dp: deps.cfg.directPlay !== false && !deps.wan, ds: true };   // weiterer Server uebers Internet: gleich HLS (Direct Stream/Umwandlung)
     this.fns = []; this.loop = 0; this.session = ''; this.sub = null; this.subMode = 'none'; this.firstTick = false; this.dead = false;
     this.aspect = deps.cfg.aspect || 'auto'; this.base = 0; this.rel = false; this.t0 = 0; this.cropped = null;
     this.queueItem = item.pqi || null; this.queueId = item.pqId || null;
@@ -112,7 +112,7 @@
     var self = this, c = this.d.cfg, M = this.meta;
     this.session = U.uuid();
     var burn = TR.subMode(this.sub, c.ass, false) === 'burn';
-    var o = { rk: M.rk, mediaIndex: M.mi, session: this.session, clientId: this.d.clientId, token: this.d.token, dp: this.att.dp && !burn, ds: this.att.ds, subs: burn ? 'burn' : 'none', quality: c.quality,
+    var o = { rk: M.rk, mediaIndex: M.mi, session: this.session, clientId: this.d.clientId, token: this.d.token, wan: !!this.d.wan, dp: this.att.dp && !burn, ds: this.att.ds, subs: burn ? 'burn' : 'none', quality: c.quality,
       stereo: c.passthrough === false, boost: c.passthrough === false ? Number(c.audioBoost) || 100 : 100 };
     this.setState('resolving');
     this.d.get('/video/:/transcode/universal/decision', D.query(o), { timeout: 15000, retries: 1 }, function (err, json) {
@@ -209,7 +209,9 @@
     type = Number(type);
     if (type === 7 || type === 9 || type === 11 || type === 12) this.mark('SEF ' + ({ 7: 'Bild startet', 9: 'Stream-Info', 11: 'Puffern', 12: 'Puffer voll' })[type]);
     switch (type) {
-      case 1: case 2: case 3: this.fail(type === 2 ? 'notAllowed' : type === 3 ? 'fileMissing' : 'server', 'SEF ' + type); break;
+      case 1: if (this.d.wan && !this.firstTick && D.fallback(this.att, this.r ? this.r.mode : 'direct')) { this.renderError('SEF 1 (fern)'); break; }   // uebers Internet: erst Rueckfall-Kette
+      /* falls through */
+      case 2: case 3: this.fail(type === 2 ? 'notAllowed' : type === 3 ? 'fileMissing' : 'server', 'SEF ' + type); break;
       case 4: this.fail('server', 'Netz weg'); break;
       case 6: this.renderError(data); break;
       case 8: this.ended(); break;

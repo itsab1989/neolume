@@ -85,6 +85,7 @@ program on your computer signs in **once**, and from then on the TV talks **only
 - Music and audiobooks.
 - Plex Home profiles with avatars; kids profiles with reduced settings; an optional **app PIN** per profile.
 - *Discover* rows and your Plex **watchlist** through an optional helper on your home network (everything else works without it).
+- Optional: libraries of **servers that someone shared with you** (for example a friend), shown in the side menu with their origin.
 - No ads, no tracking, no telemetry.
 
 Deliberately **not** included: casting, downloads, Watch Together, remote access outside your home network.

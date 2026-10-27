@@ -202,7 +202,7 @@ function rig(opts) {
   var sef = { exec: function (n, a) { calls.push(a === undefined ? n : n + ':' + a); return opts.jumpRet !== undefined && /^Jump/.test(n) ? opts.jumpRet : 1; } };
   var meta = opts.meta || 'meta-direct.json', dec = opts.dec || 'decision-direct.json';
   var deps = {
-    sef: sef, base: 'http://pms', token: 'TOK', clientId: 'CID', threshold: 0.9,
+    sef: sef, base: 'http://pms', token: 'TOK', clientId: 'CID', threshold: 0.9, wan: !!opts.wan,
     timers: { now: T.now, set: T.setTimeout, clear: T.clearTimeout },
     cfg: { directPlay: true, quality: '12', ass: 'burn', audioLang: 'server', subs: 'server', subLang: 'de', anime: false, rememberTracks: false },
     get: function (path, q, o, cb) { gets.push({ path: path, q: q }); cb(null, /decision/.test(path) ? S(opts.decs ? opts.decs[gets.length - 2] : dec) : opts.metaJson || S(meta)); },
@@ -260,6 +260,33 @@ test('Renderfehler: direct -> direct stream -> transcode -> Fehler', function ()
   T.tick(1000); p.onEvent(6, 2);
   eq(errs, ['playback']); assert.strictEqual(p.state, 'error');
   assert.ok(r.calls.filter(function (c) { return /^StartPlayback:5$/.test(c); }).length >= 2, 'Neustart an der Fehlerstelle');
+});
+test('Weiterer Server uebers Internet (TV-Test 1.0.4): kein Direct Play, 8 Mbit/s 1080p in der Decision, SEF 1 beim Start -> Rueckfall statt Fehler', function () {
+  var r = rig({ wan: true, decs: ['decision-truehd.json', 'decision-hevc.json'] }), p = r.p, errs = [];
+  p.on(function (e, d) { if (e === 'error') errs.push(d.kind); });
+  p.start();
+  var q = r.gets[1].q;
+  assert.strictEqual(q.directPlay, 0); assert.strictEqual(q.directStream, 1); assert.strictEqual(q.location, 'wan');
+  assert.strictEqual(q.maxVideoBitrate, 8000); assert.strictEqual(q.videoResolution, '1920x1080');
+  T.tick(1000);
+  p.onEvent(1);                                          // Verbindung/Oeffnen gescheitert, noch kein Bild
+  eq(errs, []);
+  assert.strictEqual(r.gets[2].q.directStream, 0, 'Rueckfall: Umwandlung');
+  T.tick(1000);
+  p.onEvent(1);
+  eq(errs, ['server']);                                  // Kette zu Ende -> Fehler (Ansicht prueft /identity, s. views/player.js)
+  // niedrigere eigene Qualitaet gilt weiter; eigener Server ohne Grenze in der ersten Decision (K2)
+  assert.strictEqual(N.decision.query({ rk: '1', wan: true, quality: '4' }).maxVideoBitrate, 4000);
+  assert.strictEqual(N.decision.query({ rk: '1', quality: '12' }).maxVideoBitrate, undefined);
+  r = rig(); p = r.p; errs = [];
+  p.on(function (e, d) { if (e === 'error') errs.push(d.kind); });
+  p.start(); p.onEvent(1);
+  eq(errs, ['server']);                                  // eigener Server unveraendert
+});
+test('Protokoll: oeffentliche IPv4-Adressen geschwaerzt, Heimnetz-Adressen bleiben', function () {
+  assert.strictEqual(N.diag.redact('InitPlayer http://203.0.113.7:32400/library/parts/1/file.mkv'), 'InitPlayer http://<fern>:32400/library/parts/1/file.mkv');
+  assert.strictEqual(N.diag.redact('http://192.168.1.20:32400/x 10.0.0.5 172.16.3.4'), 'http://192.168.1.20:32400/x 10.0.0.5 172.16.3.4');
+  assert.strictEqual(N.diag.redact('Version 1.43.5.11029'), 'Version 1.43.5.11029');
 });
 test('Ende: unter der Schwelle scrobble, darueber nur Timeline; Jump-Fehler bei HLS -> Neustart', function () {
   var r = rig(), p = r.p;

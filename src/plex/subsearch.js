@@ -31,16 +31,18 @@
       return p.join(' · ');
     },
     /* Suche (lesend) */
-    search: function (rk, lang, cb) {
-      return N.plex.get('/library/metadata/' + rk + '/subtitles', S.query(lang, false, false), { timeout: 30000, retries: 0 }, function (err, json) {
+    /* srv: Weitere Server (N.srv) – Titel eines fremden Servers (leer = eigener Server) */
+    search: function (rk, lang, cb, srv) {
+      var o = { timeout: 30000, retries: 0 };
+      return N.plex.get('/library/metadata/' + rk + '/subtitles', S.query(lang, false, false), N.srv && srv ? N.srv.o(srv, o) : o, function (err, json) {
         cb(err, err ? [] : S.parse(json));
       });
     },
     /* Herunterladen (schreibend, ueber N.plex.write -> readOnly beachtet). confirmed muss true sein (Warn-Dialog bestaetigt). */
-    download: function (rk, key, confirmed, cb) {
+    download: function (rk, key, confirmed, cb, srv) {
       if (confirmed !== true) { cb({ type: 'unconfirmed', status: 0 }); return null; }
       if (N.log) N.log('Untertitel laden (PUT) rk=' + rk);
-      return N.plex.write('PUT', '/library/metadata/' + rk + '/subtitles', { key: key }, cb);
+      return N.plex.write('PUT', '/library/metadata/' + rk + '/subtitles', { key: key }, cb, N.srv && srv ? N.srv.who(srv) : undefined);
     }
   };
   N.subSearch = S;
