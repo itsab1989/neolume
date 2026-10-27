@@ -11,6 +11,6 @@
     isNav: function (k) { return k === 'UP' || k === 'DOWN' || k === 'LEFT' || k === 'RIGHT'; },
     isDigit: function (k) { return k !== null && k.length === 1 && k >= '0' && k <= '9'; },
     /* Tastenkappen: aufgedruckter Text, nie uebersetzt */
-    cap: { INFO: 'INFO', TOOLS: 'TOOLS', EXIT: 'EXIT', DIGITS: '0–9' }
+    cap: { INFO: 'INFO', TOOLS: 'TOOLS', EXIT: 'EXIT', DIGITS: '0–9', ENTER: 'OK' }
   };
 })(N);

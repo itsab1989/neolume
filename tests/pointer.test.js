@@ -184,6 +184,27 @@ test('Verweilen (hold): erst nach 250 ms; Taste, Klick oder neues Verweilen brec
   assert.strictEqual(n, 11, 'nur das letzte Verweilen');
 });
 
+test('Wiederauflegen: Punkt springt in die Bildmitte -> kein Fokus, kein Verweilen, laufendes Rollen endet sofort', function () {
+  var c = anchored(), P = c.P, T = c.T, s = c.s;
+  assert.ok(P.retouch(639, 360, 400, 640, 50), 'Sprung > 200 px in die Mitte');
+  assert.ok(P.retouch(642, 355, 630, 350, P.LIVE), 'nach Stille >= LIVE, auch ohne grossen Sprung');
+  assert.ok(!P.retouch(639, 360, 630, 352, 100), 'kleine Bewegung durch die Mitte = normales Zeigen');
+  assert.ok(!P.retouch(700, 360, 300, 600, 5000), 'Sprung, aber nicht in die Mitte');
+  P.move(400, 640); c.live(P.EDGE_DWELL + 50);              // Randzone rollt
+  assert.strictEqual(s.scrolls, 1);
+  var m = s.moves;
+  P.move(639, 360);                                          // Finger neu aufgelegt (Sprung aus der Zone in die Mitte)
+  T.tick(3000);
+  assert.strictEqual(s.scrolls, 1, 'Rollen sofort beendet');
+  assert.strictEqual(s.moves, m, 'Mitte nicht als Zeigen ausgewertet');
+  var n = 0; P.hold(function () { n++; }); P.move(400, 640); P.move(640, 361); T.tick(1000);
+  assert.strictEqual(n, 0, 'Verweilen abgebrochen');
+  assert.strictEqual(s.moves, m + 1, 'nur die Bewegung in die Zone zaehlte, nicht die Mitte');
+  assert.strictEqual(s.scrolls, 1);
+  P.move(645, 420); T.tick(50);                              // echte Bewegung danach: normal
+  assert.strictEqual(s.moves, m + 2);
+});
+
 test('Mausrad: hoechstens ein Schritt je 150 ms', function () {
   var c = anchored(), P = c.P, T = c.T, keys = [];
   c.N.router.key = function (k) { keys.push(k); };

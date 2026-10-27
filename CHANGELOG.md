@@ -3,6 +3,30 @@
 All notable changes to Neolume are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.0.3] - 2026-10-27
+
+### Added
+- **Screensaver, much more varied** (Settings → Interface):
+  - *Screensaver pictures from*: **Libraries** (new default) shows random titles with background art from whole libraries,
+    with no repeats until every title has been shown; or **Home screen** as before. *Screensaver libraries* lets you pick
+    them (movies and TV shows by default; music shows artist pictures), *Unwatched titles only* is optional. The app asks
+    your server for 30 titles at a time – roughly one small request every 15 minutes – and keeps nothing on disk.
+    Kids profiles only ever see what their own Plex account is allowed to see.
+  - *Picture transition*: Cut, Crossfade (default), Fade through black, Slow zoom, Slow drift, Zoom through, Curtain,
+    Blinds, Tiles or Random. Every picture is fully loaded before the transition starts, and only GPU-friendly effects are
+    used. With *Reduced motion* on, moving transitions become a crossfade.
+  - *Screensaver overlay*: Ambient (new default: large clock, title and a "Movie · 2019" line on a soft shadow), Classic
+    (the old box), Movie poster, Lower third, Big clock, Small clock only, or Off. The position changes with every picture
+    to protect the screen from burn-in.
+  - *Change picture every* 10, 20, 30 or 60 seconds, and *Screensaver after* now also offers 1 and 2 minutes.
+
+### Changed
+- **Pointer scrolling feels natural on the TV:** scrolling at the edge keeps going while you hold the remote still and
+  stops about a second after you lift your finger (the TV gives no signal when the finger is lifted). Putting your finger
+  back – the dot reappears in the middle of the screen – stops scrolling at once and selects nothing by accident.
+
+If you enjoy watching your library drift by, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.2] - 2026-10-27
 
 ### Added

@@ -1,18 +1,14 @@
 /* N.comfort – reine Logik fuer P5 "Einstellungen & Komfort" (ohne DOM, in Node getestet; tests/comfort.test.js):
- * Bildschirmschoner (wann, welche Bilder, Ecken-Sprung), Spoilerschutz, Zurueckspulen beim Fortsetzen,
+ * Bildschirmschoner (wann, welche Bilder aus dem Home-Cache; Uebergaenge/Bibliotheks-Quelle/Ecken: core/saverlogic.js), Spoilerschutz, Zurueckspulen beim Fortsetzen,
  * "Geringere Qualitaet?"-Angebot beim Puffern, Uhrzeit-Text. Die Ansichten dazu: ui/saver.js, views/help.js, views/player.js. */
 (function (N) {
   var MIN = 60000;
-  /* Insel des Schoners (SPEC 7.14): 4 feste Positionen in den Ecken, Wechsel alle 30 s (gegen Einbrennen) */
-  var CORNERS = [[64, 56], [856, 56], [856, 568], [64, 568]];
   var spoil = {}, spoilN = 0, SPOIL_MAX = 600;
   var C = {
-    SAVER_MIN: [0, 5, 10, 15, 30],
+    SAVER_MIN: [0, 1, 2, 5, 10, 15, 30],   // Nutzerwunsch 27.10.: auch 1 und 2 Min. (Standard bleibt 5)
     REWIND: [0, 3, 5, 10, 15, 30],
     STILL_H: [0, 1, 2, 3],
     BOOST: [100, 150, 200, 300],
-    CORNERS: CORNERS,
-    CYCLE_MS: 30000,
     /* Schoner faellig? rest = ms ohne Eingabe, minutes = Einstellung (0 = aus), st: {playing, paused}
      * Wiedergabe laeuft -> nie; Pause -> fruehestens nach 10 Min. (SPEC 7.14), sonst nach der Einstellung */
     saverDue: function (rest, minutes, st) {
@@ -21,7 +17,6 @@
       if (st && st.paused) m = Math.max(m, 10);
       return rest >= m * MIN;
     },
-    corner: function (i) { return CORNERS[((i % 4) + 4) % 4]; },
     /* Bilder fuer den Schoner aus dem Home-Cache (0 Anfragen): erst Weiterschauen + "Neu", sonst alle Reihen; je Bild einmal */
     saverItems: function (cache, max) {
       var rows = cache && cache.rows || [], out = [], seen = {}, pass, i, j;
@@ -34,17 +29,11 @@
             var it = r.items[j], art = it.art || '';   // nur echte Hintergrundbilder (TV 27.10.: Poster als Ersatz = Farbbrei)
             if (!art || seen[art]) continue;
             seen[art] = 1;
-            out.push({ art: art, title: it.title || '', sub: it.type === 'episode' ? N.t('ss.saver.ep', { s: it.s, e: it.e }) : '' });
+            out.push({ art: art, title: it.title || '', sub: N.saverLogic.meta(it) });
           }
         }
       }
       return out;
-    },
-    /* naechstes Bild: zufaellig, aber nie zweimal hintereinander dasselbe */
-    nextIndex: function (n, cur, rnd) {
-      if (n <= 1) return 0;
-      var k = Math.floor((rnd === undefined ? Math.random() : rnd) * (n - 1));
-      return k >= cur ? k + 1 : k;
     },
     /* Pausen-Variante: "Pausiert · Serie S1 · F5" bzw. "Pausiert · Film" */
     pausedText: function (it) {
@@ -109,6 +98,7 @@
   C.DEFAULTS = { screensaver: 5, saverBlur: true, clock: true, backgrounds: true, spoiler: false, resumeRewind: 0, passthrough: true, audioBoost: 100,
     stillTime: 2, sleepDefault: 'off', lowerOffer: true, subColor: 'white', subDelay: 0,
     animeDetect: 'normal', animeShow: true, animeAudio: 'ja', animeSubs: 'deen', animeSigns: false,
+    saverFx: 'fade', saverInterval: 30, saverSrc: 'libs', saverLibs: null, saverUnwatched: false, saverInfo: 'ambient',   // Schoner (N.saverLogic)
     accent: N.brand.accent };   // Akzentfarbe (N.accent): Standard = Farbe der Marke
   C.applyDefaults = function (st, kid) {
     if (!st) return st;

@@ -13,6 +13,7 @@
  *                  (TV-Test 27.10., F5/F17: Text auf hellen Hintergruenden lesbar); eine Ebene statt zwei
  * - scrim-np.png   1280x720 Jetzt laeuft + Kuenstlerseite: scrim-det.png + gleichmaessige Abdunklung (F24: weisse Fotos hinter weissem Text)
  *                  Nur die Scrims neu erzeugen: node tools/make_assets.js --scrims
+ * - scrim-saver*.png Bildschirmschoner-Einblendungen (siehe saverScrims); nur diese: node tools/make_assets.js --saver
  * Braucht: rsvg-convert (Homebrew librsvg) fuer den Sprite, npm-Paket qrcode.
  */
 'use strict';
@@ -38,7 +39,7 @@ fs.readdirSync(path.join(ROOT, 'brand')).filter(function (f) { return /\.json$/.
   var b = JSON.parse(fs.readFileSync(path.join(ROOT, 'brand', f), 'utf8'));
   ptrs.push([b.pointer, b.accent, b.accentPress]);
 });
-ptrs.forEach(function (b) {
+if (process.argv.indexOf('--saver') < 0) ptrs.forEach(function (b) {
   [[b[0] + '.png', b[1]], [b[0] + '-press.png', b[2]]].forEach(function (p) {
     var t = path.join(require('os').tmpdir(), 'neo-' + p[0] + '.svg');
     fs.writeFileSync(t, arrowSvg(p[1]));
@@ -64,7 +65,28 @@ function png(w, h, pixel) {   // pixel(x,y) -> [r,g,b,a]
 }
 var BG = [0x0E, 0x0F, 0x11];
 
-if (process.argv.indexOf('--scrims') >= 0) { scrimDet(); scrimNp(); process.exit(0); }
+if (process.argv.indexOf('--scrims') >= 0) { scrimDet(); scrimNp(); saverScrims(); process.exit(0); }
+if (process.argv.indexOf('--saver') >= 0) { saverScrims(); process.exit(0); }
+
+/* ---------- Bildschirmschoner: Abdunklungen der Einblendungen (core/saverlogic.js INFO), schwarz mit weichem Alpha ----------
+ * Zusammen mit der Bild-Abdunklung 0,35 bleibt weisser Text auch auf weissen Bildern lesbar (Ziel Kontrast >= 4,5:1:
+ * Hintergrund <= ~110 von 255 -> Alpha >= ~0,3 hinter jedem Text; hier 0,55-0,78). Kein CSS-Verlauf, kein Blur (Orsay).
+ * - scrim-saver.png   1000x460 Ecke links unten (Ambient, Minimal; andere Ecken per scale(-1,1)/(1,-1) gespiegelt)
+ * - scrim-saver-b.png 1280x340 Band unten (Filmplakat, Untertitel-Leiste)
+ * - scrim-saver-c.png 1200x600 weiche Ellipse (Grosse Uhr) */
+function saverScrims() {
+  function S(v, a, b) { var t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); }
+  function out(name, w, h, alpha) { fs.writeFileSync(path.join(OUT, name), png(w, h, function (x, y) { return [0, 0, 0, Math.round(255 * alpha(x, y))]; })); }
+  out('scrim-saver.png', 1000, 460, function (x, y) {        // Ellipse um die Ecke: wirkt wie ein Schatten, kein Rechteck
+    var dx = x / 1000, dy = (460 - y) / 460;
+    return 0.8 * (1 - S(Math.sqrt(dx * dx + dy * dy), 0.55, 1));
+  });
+  out('scrim-saver-b.png', 1280, 340, function (x, y) { return 0.78 * S(y, 0, 210); });
+  out('scrim-saver-c.png', 1200, 600, function (x, y) {        // sehr weich auslaufend: kein sichtbares "Ei" auf hellen Bildern
+    var dx = (x - 600) / 600, dy = (y - 300) / 300;
+    return 0.66 * (1 - S(Math.sqrt(dx * dx + dy * dy), 0.15, 1));
+  });
+}
 
 /* fade-bottom: Bild beginnt bei y=632; transparent bei 0, deckend ab 20 (y=652) */
 fs.writeFileSync(path.join(OUT, 'fade-bottom.png'), png(1280, 88, function (x, y) {
@@ -163,6 +185,6 @@ QR.toFile(path.join(OUT, 'qr.png'), 'https://plex.tv/link', { errorCorrectionLev
   if (err) console.error('QR-Fehler', err);
   var scrimSrc = path.join(ROOT, 'app', 'scrim.png');
   if (!fs.existsSync(path.join(OUT, 'scrim.png')) && fs.existsSync(scrimSrc)) fs.copyFileSync(scrimSrc, path.join(OUT, 'scrim.png'));
-  scrimDet(); scrimNp();
+  scrimDet(); scrimNp(); saverScrims();
   fs.readdirSync(OUT).forEach(function (f) { console.log(f, fs.statSync(path.join(OUT, f)).size + ' B'); });
 });

@@ -105,6 +105,23 @@ Yes. **Settings → Interface → Accent colour** offers seven colours for the f
 (the default), Amber, Coral, Rose, Lavender, Sky blue and Mint. The choice is saved per profile and takes effect at once.
 Every colour is checked for good contrast: labels on it and the colour itself on the dark background reach at least 4.5:1.
 
+### How do I set up the screensaver?
+Under **Settings → Interface**. *Screensaver after* (Off, 1, 2, 5, 10, 15 or 30 minutes; default 5) starts it when no key
+has been pressed; it never starts while a video plays. The other screensaver settings:
+
+| Setting | Choices (default first) | What it does |
+|---|---|---|
+| Screensaver pictures from | Libraries · Home screen | Libraries: random titles with background art from whole libraries, no repeats until all were shown. Home screen: only titles from there (no extra requests). |
+| Screensaver libraries | Movies & TV shows · your pick | Which libraries are used. Music libraries show artist pictures. |
+| Unwatched titles only | Off · On | Only movies and shows you haven't finished yet. |
+| Change picture every | 30 · 10 · 20 · 60 seconds | How long each picture stays. |
+| Picture transition | Crossfade · Cut · Fade through black · Slow zoom · Slow drift · Zoom through · Curtain · Blinds · Tiles · Random | How the next picture appears. With *Reduced motion*, moving ones become a crossfade. |
+| Screensaver overlay | Ambient · Classic · Movie poster · Lower third · Big clock · Small clock only · Off | How the time and title appear. Press INFO on the setting for a description of each. The position changes with every picture against burn-in. |
+| Blur screensaver images | On · Off | Soft and calm, or sharp. |
+
+*Show clock* applies to the screensaver too: when it is off, no overlay style shows the time. Kids profiles use the
+defaults and only see pictures their own Plex account may see.
+
 ### What happens to my other self-installed apps?
 During the sync the TV **removes every self-installed app that is not on the sync list**. That is how the TV works, not a
 Neolume decision. Add your other apps in the setup program under **Advanced** before you sync. Apps from the Samsung store

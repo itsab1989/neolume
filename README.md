@@ -64,6 +64,7 @@ program on your computer signs in **once**, and from then on the TV talks **only
 - Smooth navigation on the TV's modest hardware; works with the normal remote **and** the Smart Control touch pointer.
 - German and English interface (follows the TV's language, or choose in Settings).
 - Choose your accent colour per profile: seven colours, all checked for readability.
+- A screensaver that shows art from your whole libraries, with ten transitions and seven overlay styles to choose from.
 
 **Home, libraries, details, search**
 - Home with *Continue Watching*, *Up Next*, *Recently Added* per library, background art that follows the focus, and a

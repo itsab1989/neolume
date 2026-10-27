@@ -321,13 +321,45 @@ body { color: #F2F2F2; font-family: 'PlexNeo', 'Inter', 'Helvetica Neue', Helvet
 
 /* ---------- P5: Uhr (Startseite), Bildschirmschoner (SPEC 7.14), Offline-Leiste, Tastenbelegung, Willkommenskarte ---------- */
 .hclock { position: absolute; right: 56px; top: 32px; height: 40px; padding: 0 14px; border-radius: 8px; background: rgba(14,15,17,0.6); font-size: 24px; line-height: 40px; font-weight: 600; color: #F2F2F2; }
-.scs { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; background: #000000; z-index: 9; }
+.scs { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; background: #000000; z-index: 9; overflow: hidden; }
+/* Bildschirmschoner: 2 Bild-Ebenen (Huelle .scs-l clippt, .scs-in ist die GPU-Ebene mit Bild + Abdunklung), Teile fuer Jalousie/Kacheln, Info-Block */
+.scs-l { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; overflow: hidden; -webkit-transform: translate3d(0,0,0); }
+.scs-in { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; background: #000000; -webkit-transform: translate3d(0,0,0); }
 .scs-img { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; }
 .scs-dim { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; background: rgba(0,0,0,0.35); }
-.scs-isl { position: absolute; width: 360px; padding: 12px 20px 14px; border-radius: 12px; background: rgba(14,15,17,0.72); }
-.scs-ck { font-size: 40px; line-height: 48px; font-weight: 600; color: #F2F2F2; }
-.scs-ti { font-size: 18px; line-height: 24px; color: #F2F2F2; }
-.scs-sb { font-size: 16px; line-height: 22px; color: #B7BBC0; }
+.scs-tiles { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; }
+.scs-tile { position: absolute; overflow: hidden; background-color: #000000; background-repeat: no-repeat; -webkit-background-size: 1280px 720px; background-size: 1280px 720px; -webkit-transform: translate3d(0,0,0); }
+.scs-tile i { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.35); }
+.scs-ov { position: absolute; left: 0; top: 0; z-index: 5; -webkit-transform: translate3d(0,0,0); }
+.scs-scr { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.scs-ov.r .scs-scr { -webkit-transform: scale(-1,1); } .scs-ov.t .scs-scr { -webkit-transform: scale(1,-1); } .scs-ov.r.t .scs-scr { -webkit-transform: scale(-1,-1); }
+.scs-blk { position: absolute; left: 64px; bottom: 56px; width: 640px; }
+.scs-ov.r .scs-blk { left: auto; right: 64px; text-align: right; } .scs-ov.t .scs-blk { bottom: auto; top: 56px; }
+.scs-ck { font-size: 72px; line-height: 80px; font-weight: 300; color: #F2F2F2; }
+.scs-ti { font-size: 28px; line-height: 36px; font-weight: 600; color: #F2F2F2; margin-top: 2px; }
+.scs-sb { font-size: 20px; line-height: 28px; color: #D2D5D9; }
+/* Klassisch: die bisherige Insel (Kasten 360 breit, 72 % deckend) */
+.st-classic .scs-blk { width: 320px; padding: 12px 20px 14px; border-radius: 12px; background: rgba(14,15,17,0.72); }
+.st-classic.r .scs-blk { text-align: left; }
+.st-classic .scs-ck { font-size: 40px; line-height: 48px; font-weight: 600; }
+.st-classic .scs-ti { font-size: 18px; line-height: 24px; font-weight: 400; margin-top: 0; }
+.st-classic .scs-sb { font-size: 16px; line-height: 22px; color: #B7BBC0; }
+/* Filmplakat: grosser Titel unten, Uhr klein darueber */
+.st-poster .scs-blk { bottom: 60px; width: 1040px; }
+.st-poster .scs-ck { font-size: 26px; line-height: 34px; font-weight: 600; color: #D2D5D9; }
+.st-poster .scs-ti { font-size: 60px; line-height: 70px; font-weight: 700; margin-top: 4px; }
+.st-poster .scs-sb { font-size: 24px; line-height: 32px; }
+/* Untertitel-Leiste: duenne Linie, Titel + Zeile links, Uhr rechts */
+.st-lower .scs-blk { left: 64px; right: 64px; bottom: 48px; width: auto; padding-top: 16px; border-top: 1px solid rgba(242,242,242,0.55); }
+.st-lower .scs-ck { position: absolute; right: 0; top: 14px; font-size: 40px; line-height: 48px; font-weight: 300; }
+.st-lower .scs-ti, .st-lower .scs-sb { width: 900px; }
+.st-lower .scs-ti { font-size: 26px; line-height: 34px; margin-top: 0; }
+/* Grosse Uhr: mittig, sehr gross und duenn; kein Titel */
+.st-bigclock .scs-blk { left: 0; right: 0; bottom: auto; top: 200px; width: auto; text-align: center; }
+.st-bigclock .scs-ck { font-size: 180px; line-height: 200px; font-weight: 300; }
+/* Minimal: nur eine kleine Uhr in der Ecke */
+.st-minimal .scs-blk { bottom: 48px; width: 300px; } .st-minimal.t .scs-blk { top: 48px; }
+.st-minimal .scs-ck { font-size: 36px; line-height: 44px; font-weight: 400; }
 .netbar { position: absolute; z-index: 6; left: 340px; top: 16px; width: 600px; height: 48px; border-radius: 10px; background: #3A2A12; padding: 0 20px 0 52px;
   font-size: 18px; line-height: 48px; color: #F2F2F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .netbar .ic { left: 14px; top: 8px; }

@@ -43,6 +43,7 @@
       el = U.el('div', '', parent, 'display:none'); el.id = 'pn-dev';
       txt = U.txt('div', '', el, '');
       if (N.devbench) N.devbench.init();             // P7: Messlauf (window.PN_BENCH / Ziffern 9,8,7)
+      if (N.devptr) N.devptr.init();                 // Zeiger-Ereignisse protokollieren (Ausblende-Signal am TV finden)
     },
     /* true = Taste verbraucht */
     key: function (k) {

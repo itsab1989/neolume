@@ -60,6 +60,15 @@ function posterPng(w, rgb) {
   for (var i = 0; i < w * h; i++) { var k = i < w * h / 2 ? 1 : 0.55; px[i * 4] = rgb[0] * k; px[i * 4 + 1] = rgb[1] * k; px[i * 4 + 2] = rgb[2] * k; px[i * 4 + 3] = 255; }
   return writePng(w, h, px);
 }
+/* Bildschirmschoner-Szenen: sehr unruhiges Bild (8-px-Schachbrett aus Weiss und kraeftigen Farben) = schlimmster Fall fuer Lesbarkeit */
+function busyPng(w, h) {
+  var px = Buffer.alloc(w * h * 4), C = [[250, 250, 250], [230, 40, 40], [250, 210, 30], [30, 160, 240], [20, 20, 24], [60, 200, 90]];
+  for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+    var c = C[((x >> 3) * 7 + (y >> 3) * 3 + ((x >> 5) ^ (y >> 4))) % C.length], o = (y * w + x) * 4;
+    px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2]; px[o + 3] = 255;
+  }
+  return writePng(w, h, px);
+}
 function solidPng(w, h, rgb) { var px = Buffer.alloc(w * h * 4); for (var i = 0; i < w * h; i++) { px[i * 4] = rgb[0]; px[i * 4 + 1] = rgb[1]; px[i * 4 + 2] = rgb[2]; px[i * 4 + 3] = 255; } return writePng(w, h, px); }
 
 /* reiner Vergleich (auch fuer Tests): -> {diff, ratio, mask(px)} */
@@ -283,6 +292,9 @@ function startServer(cb) {
       var w = Math.min(1280, Number(u.searchParams.get('width')) || 100), h = Math.min(720, Number(u.searchParams.get('height')) || 100);
       var src = u.searchParams.get('url') || '';
       if (u.searchParams.get('blur') && w >= 640 && !/\/a\/|\/art\//.test(src)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(posterPng(w, colorFor(src))); }
+      var sv = /^sv[A-Z]/.test(curSeed) && /^\/a\//.test(src);   // Bildschirmschoner-Szenen: helles, dunkles, unruhiges Bild
+      if (sv && /Busy/.test(curSeed)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(busyPng(w, h)); }
+      if (sv) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(solidPng(w, h, /Bright/.test(curSeed) ? [246, 246, 244] : [14, 14, 16])); }
       cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(solidPng(w, h, colorFor(u.searchParams.get('url') || '')));
     }
     if (p === '/library/sections') return json(/^longLib/.test(curSeed) ? longSections() : syn('sections.json'));
@@ -304,6 +316,7 @@ function startServer(cb) {
         var pa = page(libAll(ls[1], q), q);
         pa.MediaContainer.librarySectionID = Number(ls[1]);
         pa.MediaContainer.Metadata = pa.MediaContainer.Metadata.map(function (m) { var c = JSON.parse(JSON.stringify(m)); delete c.librarySectionID; return c; });
+        if (/^sv[A-Z].*Long/.test(curSeed)) pa.MediaContainer.Metadata.forEach(function (m) { m.title = 'Die unglaublich lange Reise des kleinen Leuchtturmwärters ' + m.title + ' bis ans Ende der Welt'; });
         return json(pa);
       }
       if (ls[2] === 'firstCharacter') return json(firstChars(libAll(ls[1], q)));
@@ -438,6 +451,17 @@ function makeSeeds(port) {
   seeds.welcome = seed(null, null, JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34' }));
   seeds.saver = seed(null, null, JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, saverMs: 1500 }));
   seeds.spoiler = seed({}, { 'settings-aaaa1111.json': { spoiler: true, clock: false } });
+  // Bildschirmschoner: Einblendung je Stil auf hellem (lange Titel, de), dunklem (lange Titel, en) und unruhigem Bild (de); Quelle Filme
+  var svCfg = JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, saverMs: 1500 });
+  SAVER_STYLES.forEach(function (st) {
+    var cap = st.charAt(0).toUpperCase() + st.slice(1), set = { saverInfo: st, saverLibs: [1], saverFx: 'cut' };
+    seeds['svBright' + cap + 'Long'] = seed({}, { 'settings-aaaa1111.json': set }, svCfg);
+    seeds['svDark' + cap + 'LongEn'] = seed({ lang: 'en' }, { 'settings-aaaa1111.json': set }, svCfg);
+    seeds['svBusy' + cap] = seed({}, { 'settings-aaaa1111.json': set }, svCfg);
+  });
+  seeds.svBrightNoclockLongEn = seed({ lang: 'en' }, { 'settings-aaaa1111.json': { saverInfo: 'ambient', saverLibs: [1], saverFx: 'cut', clock: false } }, svCfg);
+  seeds.svBusyOff = seed({}, { 'settings-aaaa1111.json': { saverInfo: 'off', saverLibs: [1], saverFx: 'cut' } }, svCfg);
+  seeds.svDarkFade = seed({}, { 'settings-aaaa1111.json': { saverLibs: [1] } }, svCfg);   // Standard: Ueberblenden + Ambient
   // Anime je Titel: alle synthetischen Serien per eigener Markierung als Anime; Variante mit ausgeblendeter Kategorie
   var animeOv = { 900: 1, 910: 1 };
   for (var ai = 0; ai < 30; ai++) animeOv[5100 + ai * 10] = 1;
@@ -450,6 +474,8 @@ function makeSeeds(port) {
 }
 var LOGIN_MASK = [[144, 476, 640, 70]];
 var CLOCK = [[896, 36, 320, 72]];                     // Uhrzeit + "Ende um" im Player               // Countdown + Spinner
+var SAVER_STYLES = ['ambient', 'classic', 'poster', 'lower', 'bigclock', 'minimal'];
+function rep(k, n) { var o = []; for (var i = 0; i < n; i++) o.push(k); return o.join(','); }
 var SCENES = [
   // P2: nur PMS (setup.json) + App-PIN je Profil
   { name: 'p2-profiles', seed: 'pkg' },
@@ -534,7 +560,15 @@ var SCENES = [
   { name: 'p5-anime-menu', seed: 'anime', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,TOOLS' },
   { name: 'p5-anime-hidden', seed: 'animeHidden', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,INFO' },
   { name: 'p5-welcome', seed: 'welcome', keys: 'wait3500' },
-  { name: 'p5-saver', seed: 'saver', keys: 'wait3500' },
+  { name: 'p5-saver', seed: 'saver', keys: 'wait6000' },
+  { name: 'saver-noclock-bright-en', seed: 'svBrightNoclockLongEn', keys: 'wait6000' },   // "Uhrzeit anzeigen" aus: nur Titel + Zeile
+  { name: 'saver-off-busy', seed: 'svBusyOff', keys: 'wait6000' },
+  { name: 'saver-fade-done', seed: 'svDarkFade', keys: 'wait7000' },                   // Standard (Ueberblenden) nach dem ersten Bild
+  // Einstellungen: Schoner-Zeilen, Auswahl Uebergang/Einblendung, Mehrfachauswahl Bibliotheken
+  { name: 'saver-settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,' + rep('DOWN', 19) },
+  { name: 'saver-fx-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,' + rep('DOWN', 22) + ',ENTER' },
+  { name: 'saver-info-picker-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,' + rep('DOWN', 23) + ',ENTER' },
+  { name: 'saver-libs-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,' + rep('DOWN', 19) + ',ENTER,DOWN,DOWN,DOWN,ENTER' },   // Musik dazu
   { name: 'p5-spoiler', seed: 'spoiler', keys: 'DOWN' },
   // Akzentfarbe: Einstellung (Farbfeld), Auswahl mit Farbfeldern, Wechsel wirkt sofort; Startseite/Seitenleiste in anderen Farben
   { name: 'accent-setting', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN' },
@@ -594,6 +628,13 @@ var SCENES = [
   { name: 'rail-long', seed: 'longLib', keys: 'LEFT' },
   { name: 'rail-long-en', seed: 'longLibEn', keys: 'LEFT' }
 ];
+
+SAVER_STYLES.forEach(function (st) {
+  var cap = st.charAt(0).toUpperCase() + st.slice(1);
+  SCENES.push({ name: 'saver-' + st + '-bright', seed: 'svBright' + cap + 'Long', keys: 'wait6000' },
+    { name: 'saver-' + st + '-dark-en', seed: 'svDark' + cap + 'LongEn', keys: 'wait6000' },
+    { name: 'saver-' + st + '-busy', seed: 'svBusy' + cap, keys: 'wait6000' });
+});
 
 function shot(port, sc, done) {
   var prof = fs.mkdtempSync(path.join(os.tmpdir(), 'pnvis-'));

@@ -51,6 +51,21 @@ Ohne plex.tv kann der Fernseher die Plex-PIN nicht prüfen. Stattdessen kann jed
 ### Kann ich die Farben ändern?
 Ja. Unter **Einstellungen → Oberfläche → Akzentfarbe** stehen sieben Farben für Fokus, Knöpfe und Fortschrittsbalken zur Wahl: Türkis (Standard), Bernstein, Koralle, Rosé, Lavendel, Himmelblau und Mintgrün. Die Wahl gilt je Profil und wirkt sofort. Alle Farben sind auf guten Kontrast geprüft (mindestens 4,5:1 für Schrift auf der Farbe und für die Farbe auf dem dunklen Hintergrund).
 
+### Wie stelle ich den Bildschirmschoner ein?
+Unter **Einstellungen → Oberfläche**. *Bildschirmschoner nach* (Aus, 1, 2, 5, 10, 15 oder 30 Minuten; Standard 5) startet ihn, wenn keine Taste gedrückt wurde – nie während ein Video läuft. Dazu:
+
+| Einstellung | Auswahl (Standard zuerst) | Wirkung |
+|---|---|---|
+| Schoner-Bilder aus | Bibliotheken · Startseite | Bibliotheken: zufällige Titel mit Hintergrundbild aus ganzen Bibliotheken, keiner doppelt, bis alle dran waren. Startseite: nur Titel von dort (keine zusätzlichen Anfragen). |
+| Bibliotheken im Schoner | Filme & Serien · eigene Auswahl | Welche Bibliotheken genutzt werden. Musik zeigt Künstlerbilder. |
+| Nur Ungesehenes zeigen | Aus · An | Nur Filme und Serien, die du noch nicht zu Ende gesehen hast. |
+| Bildwechsel alle | 30 · 10 · 20 · 60 Sekunden | Wie lange jedes Bild bleibt. |
+| Bildübergang | Überblenden · Schnitt · Über Schwarz · Langsamer Zoom · Langsames Gleiten · Zoom-Durchflug · Vorhang · Jalousie · Kacheln · Zufällig | Wie das nächste Bild erscheint. Bei *Reduzierte Bewegung* wird aus Bewegung ein Überblenden. |
+| Einblendung im Schoner | Ambient · Klassisch · Filmplakat · Untertitel-Leiste · Große Uhr · Nur kleine Uhr · Aus | Wie Uhr und Titel erscheinen; INFO auf der Einstellung erklärt jeden Stil. Die Lage wechselt mit jedem Bild (gegen Einbrennen). |
+| Schoner-Bilder unscharf | An · Aus | Weich und ruhig oder scharf. |
+
+*Uhrzeit anzeigen* gilt auch im Schoner: Ist sie aus, zeigt kein Stil die Uhr. Kinderprofile nutzen die Standardwerte und sehen nur Bilder, die ihr eigenes Plex-Konto sehen darf.
+
 ### Was passiert mit meinen anderen selbst installierten Apps?
 Der Fernseher entfernt beim Sync **alle selbst installierten Apps, die nicht in der Liste stehen**. Trage sie im Einrichtungsprogramm unter *Erweitert* ein. Apps aus dem Samsung-Store sind nicht betroffen.
 

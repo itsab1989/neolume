@@ -28,7 +28,8 @@ test('Meter: fps, lange Frames, schlimmster Frame, Bild-Haenger', function () {
 });
 
 test('Szenario-Auswahl: all ohne leak, Praefix, leak:n', function () {
-  var BM = H.load().N.benchMath, names = ['home', 'home-hero', 'lib-L', 'lib-M', 'search', 'leak'];
+  var BM = H.load().N.benchMath, names = ['home', 'home-hero', 'lib-L', 'lib-M', 'search', 'leak', 'saver-fade', 'saver-zoom'];
+  H.eq(BM.pick('saver', names), ['saver-fade', 'saver-zoom']);   // Bildschirmschoner nur auf Wunsch (Ziffern 9,8,4)
   H.eq(BM.pick('all', names), ['home', 'home-hero', 'lib-L', 'lib-M', 'search']);
   H.eq(BM.pick('lib', names), ['lib-L', 'lib-M']);
   H.eq(BM.pick('home', names), ['home', 'home-hero']);

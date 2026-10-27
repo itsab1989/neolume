@@ -5,7 +5,8 @@
  * --bench …, Vorschau &bench=…). RETURN/EXIT bricht ab. Ergebnis: je Szenario eine Zeile "bench <name>: …" im Protokoll (ctx.log).
  * Szenarien: home, home-hero, lib-L/M/S/list, details-movie, details-show, search, player-osd (readOnly erzwungen, keine
  * Fortschritts-/Spur-Schreibzugriffe), leak (Details Film/Serie, Bibliothek, Suche, Einstellungen, Musik, Player je Runde
- * oeffnen/schliessen, Standard 10 Runden, 'leak:20'; nur auf Wunsch: 'leak' bzw. 'all,leak'). */
+ * oeffnen/schliessen, Standard 10 Runden, 'leak:20'; nur auf Wunsch: 'leak' bzw. 'all,leak'), saver-<uebergang> (nur auf Wunsch:
+ * 'saver' bzw. Ziffern 9,8,4 = alle Uebergaenge mit Frame-Protokoll). */
 (function (N) {
   var U = N.util, BM = N.benchMath, GAP = 160, SEQ = ['9', '8', '7'], SEQ_MS = 4000;
   var run = null, seq = 0, seqT = 0, tm = null;
@@ -312,7 +313,40 @@
       });
     }); });
   };
-  var NAMES = ['home', 'home-hero', 'lib-L', 'lib-M', 'lib-S', 'lib-list', 'details-movie', 'details-show', 'search', 'player-osd', 'leak'].concat(CHUNKS);
+  /* Bildschirmschoner ('saver' = alle Uebergaenge, 'saver-zoom' = einer; nicht in 'all'): Schoner mit festem Uebergang ueber der
+   * Startseite (realistisch: deren Ebenen werden mit zusammengesetzt), warten bis das 2. Bild geladen und gezeichnet ist, dann fps
+   * waehrend des Uebergangs (+ Vorbereitung); bei Zoom/Gleiten zusaetzlich 3 s Dauerbewegung ('saver-zoom-hold'). */
+  function measureFor(name, ms, done) {
+    var my = run, m = new BM.Meter(), on = true, fs = my.frames ? new Frames() : null, raf = fs ? fs.raf : U.raf, sT = fs ? fs.sT : setTimeout;
+    (function tick() { if (!on || run !== my) return; var t = U.now(); m.frame(t, imgN()); if (fs) fs.tick(pnow !== U.now ? pnow() : t); raf.call(U, tick); })();
+    sT.call(window, function () {
+      on = false;
+      if (run !== my || my.stop) { if (fs) fs.end(name); return; }
+      log(BM.line(name, m.result(), { steps: 0, heap: heap(), dom: domCount() }));
+      if (fs) log(fs.end(name));
+      done();
+    }, ms);
+  }
+  var SAVERS = [];
+  N.saverLogic.FX.forEach(function (fx) {
+    if (fx === 'random') return;
+    SAVERS.push('saver-' + fx);
+    S['saver-' + fx] = function (done) {
+      var Sv = N.ui.saver;
+      function end() { Sv.stop(); later(800, done); }
+      home();
+      later(1500, function () {
+        Sv.bench(fx, function (go) {
+          if (!go) { log('bench saver-' + fx + ': uebersprungen (kein Bild)'); end(); return; }
+          var d = go();
+          measureFor('saver-' + fx, d + 900, function () {
+            if (fx === 'zoom' || fx === 'drift') measureFor('saver-' + fx + '-hold', 3000, end); else end();
+          });
+        });
+      });
+    };
+  });
+  var NAMES = ['home', 'home-hero', 'lib-L', 'lib-M', 'lib-S', 'lib-list', 'details-movie', 'details-show', 'search', 'player-osd', 'leak'].concat(CHUNKS, SAVERS);
 
   function waitHome(my, tries, fn) {
     if (run !== my || my.stop) return;
@@ -346,7 +380,7 @@
     key: function (k) {
       if (run) { if (k === 'RETURN') B.stop(); return true; }
       // perf2: dritte Ziffer waehlt den Lauf: 7 = alles (wie bisher), 6 = home,lib mit Frame-Protokoll, 5 = Varianten chunk (1/2/3) und nocapl mit Frame-Protokoll
-      var LAST = { '7': 'all', '6': 'home,lib,frames', '5': 'chunk,nocapl,frames' };
+      var LAST = { '7': 'all', '6': 'home,lib,frames', '5': 'chunk,nocapl,frames', '4': 'saver,frames' };   // 4: Bildschirmschoner-Uebergaenge
       if (seq === SEQ.length - 1 && LAST[k] && U.now() - seqT < SEQ_MS) { seq = 0; B.start(LAST[k]); return true; }
       if (k === SEQ[seq] && (seq === 0 || U.now() - seqT < SEQ_MS)) { seq++; seqT = U.now(); if (seq === SEQ.length) { seq = 0; B.start('all'); return true; } }
       else seq = k === SEQ[0] ? 1 : 0;

@@ -18,15 +18,9 @@ test('Schoner: nach der Einstellung, nie waehrend ein Video laeuft, in der Pause
   assert.strictEqual(C.saverDue(9 * MIN, 5, { paused: true }), false);
   assert.strictEqual(C.saverDue(10 * MIN, 5, { paused: true }), true);
   assert.strictEqual(C.saverDue(29 * MIN, 30, { paused: true }), false);
-  eq(C.SAVER_MIN, [0, 5, 10, 15, 30]);
-});
-test('Schoner: Insel springt reihum durch 4 Ecken; naechstes Bild nie dasselbe', function () {
-  var seen = {};
-  for (var i = 0; i < 8; i++) seen[C.corner(i).join(',')] = 1;
-  assert.strictEqual(Object.keys(seen).length, 4);
-  eq(C.corner(4), [64, 56]); eq(C.corner(-1), [64, 568]); eq(C.corner(0), [64, 56]);
-  for (var r = 0; r < 1; r += 0.1) assert.notStrictEqual(C.nextIndex(5, 2, r), 2);
-  assert.strictEqual(C.nextIndex(1, 0, 0.5), 0);
+  eq(C.SAVER_MIN, [0, 1, 2, 5, 10, 15, 30]);   // Nutzerwunsch 27.10.: auch 1 und 2 Min.
+  assert.strictEqual(C.saverDue(1 * MIN, 1, {}), true); assert.strictEqual(C.saverDue(2 * MIN - 1, 2, {}), false);
+  assert.strictEqual(C.applyDefaults({}, false).screensaver, 5);
 });
 test('Schoner: Bilder aus dem Home-Cache – Weiterschauen + Neu zuerst, je Bild einmal, sonst andere Reihen', function () {
   var cache = { v: 1, rows: [
@@ -35,7 +29,7 @@ test('Schoner: Bilder aus dem Home-Cache – Weiterschauen + Neu zuerst, je Bild
     { id: 'new-2', items: [{ title: 'Neu', art: '/a/n' }, { title: 'Ohne Bild', art: '' }] }] };
   var it = C.saverItems(cache);
   eq(it.map(function (x) { return x.title; }), ['Wolkenreiter', 'Neu']);
-  assert.strictEqual(it[0].sub, 'S1 · F5');
+  assert.strictEqual(it[0].sub, 'Serie · S1 · F5');
   eq(C.saverItems({ rows: [{ id: 'hub-1-x', items: [{ title: 'Nur Hub', art: '/a/h' }] }] }).length, 1);
   eq(C.saverItems(null), []);
   // TV 27.10. nachmittags: Titel ohne Art (frisch hinzugefuegt) nicht ueber das Poster (still) -> uebersprungen

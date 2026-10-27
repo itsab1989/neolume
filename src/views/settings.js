@@ -89,8 +89,44 @@
       var out = [toggle('backgrounds'), toggle('spoiler'), toggle('clock')];
       if (!S.isKid()) out = out.concat(discRows());   // P4 Entdecken + Merkliste (Kinderprofile: nicht vorhanden)
       if (!S.isKid()) out.push(choice('screensaver', [[0, v('off')]].concat(N.comfort.SAVER_MIN.slice(1).map(function (n) { return [n, N.t('set.v.min', { n: n })]; }))));
-      if (!S.isKid()) out.push(toggle('saverBlur'));   // F21: Bilder des Schoners unscharf (Standard) oder scharf
+      if (!S.isKid()) out = out.concat(saverRows());
       return out;
+    }
+    /* Bildschirmschoner (ui/saver.js, core/saverlogic.js): Quelle, Bibliotheken, Ungesehenes, Takt, Uebergang, Einblendung, unscharf.
+     * Schoner aus -> alle gedimmt; Bibliotheken/Ungesehenes nur bei Quelle "Bibliotheken". */
+    function saverRows() {
+      var S = st(), SL = N.saverLogic;
+      function off() { return !(S.settings && Number(S.settings.screensaver) > 0); }
+      function dim(r) { r.disabled = off; r.ddesc = 'set.saver.off.desc'; return r; }
+      function dimLib(r) {
+        r.disabled = function () { return off() || !(S.settings && S.settings.saverSrc === 'libs'); };
+        r.ddesc = function () { return off() ? 'set.saver.off.desc' : 'set.saverLibs.off.desc'; };
+        return r;
+      }
+      function opts(list, pre) { var o = []; for (var i = 0; i < list.length; i++) o.push([list[i], v(pre + list[i])]); return o; }
+      var fx = dim(choice('saverFx', opts(SL.FX, 'fx_'))), info = dim(choice('saverInfo', opts(SL.INFOS, 'inf_')));
+      fx.help = 'help.saverFx'; info.help = 'help.saverInfo';      // INFO: jede Moeglichkeit erklaert (zu lang fuer die Beschreibungszeile)
+      return [dim(choice('saverSrc', [['libs', v('src_libs')], ['home', v('src_home')]])), dimLib(saverLibsRow()), dimLib(toggle('saverUnwatched')),
+        dim(choice('saverInterval', secs(SL.SEC))), fx, info, dim(toggle('saverBlur'))];   // saverBlur (F21): weich (Standard) oder scharf
+    }
+    /* Mehrfachauswahl der Bibliotheken (Panel mit Haken); keine Auswahl = Standard (alle Film- und Serien-Bibliotheken) */
+    function saverLibsRow() {
+      var S = st();
+      function all() { var hc = S.homeCache(); return hc && (hc.alibs || hc.libs) || []; }   // Bibliotheken dieses Profils
+      function sel() { return S.settings && S.settings.saverLibs && S.settings.saverLibs.length ? S.settings.saverLibs : null; }
+      return { id: 'saverLibs', type: 'list', label: 'set.saverLibs', desc: 'set.saverLibs.desc',
+        val: function () { var s0 = sel(); return s0 ? N.tn('set.saverLibs.val', N.saverLogic.libs(s0, all()).length) : v('libsAuto'); },
+        open: function () {
+          var libs = all(), cur = N.saverLogic.libs(sel(), libs), on = {}, e = [], i;
+          for (i = 0; i < cur.length; i++) on[cur[i].id] = 1;
+          for (i = 0; i < libs.length; i++) if (N.saverLogic.TYPE[libs[i].type]) e.push({ id: String(libs[i].id), t: libs[i].title, on: !!on[libs[i].id] });
+          N.ui.panel.select({ title: N.t('set.saverLibs'), multi: true, entries: e, onDone: function (ids) {
+            var nums = [];
+            for (var j = 0; j < ids.length; j++) nums.push(Number(ids[j]));
+            S.setSetting('saverLibs', nums.length ? nums : null);
+            paintAll();
+          } });
+        } };
     }
     /* P4 (docs/research/discover.md): Entdecken an/aus (Standard: an im Hauptprofil). Merkliste nur mit Helfer; ohne Helfer eine
      * Wertzeile "Nicht eingerichtet", deren Satz erklaert, wie man sie einschaltet – sonst ist die Merkliste nirgends sichtbar. */
@@ -303,7 +339,7 @@
       if (k === 'UP' || k === 'DOWN') { n = N.nav.list(r, rowsOf().length, k, true); if (n >= 0) focusRow(n); }
       else if (k === 'LEFT' || k === 'RETURN') focusCat(c);
       else if (k === 'ENTER') activate();
-      else if (k === 'INFO') { var d = rowsOf()[r]; N.ui.panel.help(N.t(d.label), N.t(descKey(d))); }
+      else if (k === 'INFO') { var d = rowsOf()[r]; N.ui.panel.help(N.t(d.label), N.t(d.help && !(d.disabled && d.disabled()) ? d.help : descKey(d))); }
       return true;
     };
     /* Zeiger: Kategorien und Zeilen per Index-Mathe */

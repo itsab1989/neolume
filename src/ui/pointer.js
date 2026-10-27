@@ -20,7 +20,8 @@
  *      eine angeschnittene, aber zu >= 40 % sichtbare Zeile nach HOLD ms Verweilen (EIN Schritt Rollen, dann Sperre).
  *   d) Lebenszeichen: Liegt der Finger auf dem Touchpad, kommen laufend kleinste Bewegungen (auch unter JITTER). Bleibt LIVE ms
  *      jedes Roh-Ereignis mit neuer Position aus, ist der Finger weg (der Punkt bleibt am TV stehen) -> Randzonen-Rollen endet.
- *      Ereignisse mit gleicher Position zaehlen nicht (WebKit schickt sie, wenn Inhalt unter dem Punkt wandert). Liefert ein TV
+ *      Ereignisse mit gleicher Position zaehlen nicht (WebKit schickt sie, wenn Inhalt unter dem Punkt wandert). Ein Ausblende-
+ *      Ereignis gibt es am TV nicht (Log 27.10.); Wiederauflegen = Sprung in die Bildmitte (P.retouch) beendet Rollen sofort. Liefert ein TV
  *      im Stillstand gar keine Ereignisse, braucht das Rollen fortlaufende (auch winzige) Bewegung. Dev: "ptr raw n/med/p90/max"
  *      im Protokoll zeigt die Abstaende je Randzonen-Lauf.
  * Ziel-Schnittstelle (Bildschirm/Overlay/Rail): pointer(x, y, kind:'move'|'click', target) -> bool,
@@ -29,7 +30,10 @@
  *   pointerScroll(d) (einen Schritt rollen, Fokus bleibt sichtbar) */
 (function (N) {
   var U = N.util, THROTTLE = 40, IDLE = 3000, KEY_GUARD = 16, LONG = 800;
-  var JITTER = 4, SCROLL_COOL = 450, SCROLL_MOVE = 40, EDGE_DWELL = 400, EDGE_RATE = 300, WHEEL_RATE = 150, EDGE_SLOW = 400, EDGE_FAST = 120, LIVE = 1000, HOLD = 250;   // LIVE: am TV ruhender Finger mit Luecken bis ~0,7 s (Log 27.10.)
+  var JITTER = 4, SCROLL_COOL = 450, SCROLL_MOVE = 40, EDGE_DWELL = 400, EDGE_RATE = 300, WHEEL_RATE = 150, EDGE_SLOW = 400, EDGE_FAST = 120, LIVE = 1000, HOLD = 250, CX = 640, CY = 360, CENTRE = 8, JUMP = 200;
+  // LIVE (TV-Log 27.10., dev/ptrlog.js): ruhig gehaltene Fernbedienung mit Finger auf dem Pad -> Roh-Ereignisse p90 ~340 ms,
+  // max ~710 ms; Loslassen liefert KEIN Ereignis (kein mouseout/blur), nur Stille -> 1 s Frist = kurzer Nachlauf, kein Abbruch
+  // beim Stillhalten. Wiederauflegen: Punkt erscheint in der Bildmitte (~639,360) = Sprung, siehe P.retouch.
   var P = { on: true, root: null, x: -1, y: -1, pend: false, timer: 0, lastMove: 0, keyT: 0, ax: -1, ay: -1, idleT: 0, arrows: null, arrowsOn: false,
     rx: -1e4, ry: -1e4, rawT: 0, holdT: 0, gaps: [], lockT: 0, lx: 0, ly: 0, edge: null, edgeT: 0, edgeEl: null, wheelT: 0 };
   P.accel = true;
@@ -42,6 +46,12 @@
   };
   P.setAccel = function (on) { P.accel = on !== false; };
   P.LIVE = LIVE; P.HOLD = HOLD;
+  /* Wiederauflegen des Fingers (rein, getestet): der TV setzt den Punkt in die Bildmitte. Erkannt an Position nahe (640,360)
+   * nach >= LIVE ms Stille oder nach einem Sprung > JUMP px. Kein bewusstes Zeigen -> kein Fokus/Rollen/Verweilen. */
+  P.retouch = function (x, y, px, py, silent) {
+    if (Math.abs(x - CX) >= CENTRE || Math.abs(y - CY) >= CENTRE) return false;
+    return silent >= LIVE || (px >= 0 && Math.abs(x - px) + Math.abs(y - py) > JUMP);
+  };
   P.JITTER = JITTER; P.SCROLL_COOL = SCROLL_COOL; P.SCROLL_MOVE = SCROLL_MOVE; P.EDGE_DWELL = EDGE_DWELL; P.EDGE_RATE = EDGE_RATE;
 
   function owner() {
@@ -167,11 +177,16 @@
   P.move = function (x, y) {
     if (!P.on) return;
     if (x === P.x && y === P.y) return;                 // gleiche Stelle: kuenstlich (Inhalt wanderte) -> kein Lebenszeichen
-    var now = U.now();
+    var now = U.now(), re = P.rawT > 0 && P.retouch(x, y, P.x, P.y, now - P.rawT);
     if (P.edge && P.rawT && P.gaps.length < 200) P.gaps.push(now - P.rawT);
     P.rawT = now;                                       // Lebenszeichen VOR der Zitterschwelle (Randzone, s. edgeCheck)
     P.x = x; P.y = y;
     moveCursor();
+    if (re) {                                          // Finger wieder aufgelegt: Punkt in der Mitte -> nichts ausloesen
+      edgeStop(); P.holdCancel(); thr.cancel(); P.pend = false;
+      P.rx = x; P.ry = y; P.lockT = 0;                  // naechste echte Bewegung wird ab hier normal ausgewertet
+      return;
+    }
     // letzte Eingabe gewinnt: nach Tastendruck erst bei deutlicher Bewegung uebernehmen
     if (P.keyT && Math.abs(x - P.ax) + Math.abs(y - P.ay) < KEY_GUARD) return;
     P.keyT = 0;
