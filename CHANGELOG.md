@@ -5,6 +5,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-27
+
+### Changed
+- **Smoother scrolling on the TV:** library grids and the home screen now stay at about 60 frames per second while you hold an
+  arrow key (measured on a UE48H8000: small grid from 47 to 60 fps, home from 55 to 62 fps). Cards and images are filled in
+  small steps between frames, and captions repaint on their own.
+- **Faster start:** the setup file is read while the app is still loading (about 0.6 s saved on a cold start).
+- **New setting "Customize side menu":** reorder or hide Search, Discover and each library, per profile.
+- Detail pages are easier to read on bright artwork; descriptions end with "…"; long library names fit the side menu.
+
+### Fixed
+- The focus ring disappeared after choosing "Home" in the side menu while already on Home.
+- A shared (friend) account in the setup made the whole setup file invalid on the TV.
+- "Up Next" no longer repeats movies that are already in Continue Watching.
+- A clear message when a music file on the server can't be reached, instead of skipping through the queue.
+- "Lower quality?" no longer appears after the short buffering caused by skipping forward.
+
+If Neolume makes your evenings on the sofa a bit nicer, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.0] - 2026-10-27
 
 **The first public release.** Neolume brings a fast, modern client for your Plex Media Server to Samsung Smart TVs from 2014
@@ -29,5 +48,6 @@ that the TV talks only to your own server at home.
 
 If Neolume gives your TV a second life and you'd like to say thanks, a coffee on [Ko-fi](https://ko-fi.com/itsab1989) is always appreciated – entirely optional. ☕
 
-[Unreleased]: https://github.com/itsab1989/neolume/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/itsab1989/neolume/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/itsab1989/neolume/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/itsab1989/neolume/releases/tag/v1.0.0

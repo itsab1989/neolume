@@ -24,6 +24,8 @@ package-lock.json
 local.example.json
 .gitignore
 .github/workflows/test.yml
+.github/workflows/setup-tests.yml
+.github/workflows/release-setup.yml
 src
 app
 loader

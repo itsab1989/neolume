@@ -38,7 +38,7 @@
       for (var i = 0; i < names.length; i++) {
         for (var j = 0; j < want.length; j++) {
           var w = want[j].replace(/^\s+|\s+$/g, '').replace(/:\d+$/, '');
-          if (w === 'all' ? names[i] !== 'leak' && names[i].indexOf('chunk-') !== 0 && names[i].indexOf('capl-') !== 0 : names[i] === w || names[i].indexOf(w + '-') === 0) { out.push(names[i]); break; }
+          if (w === 'all' ? names[i] !== 'leak' && names[i].indexOf('chunk-') !== 0 && names[i].indexOf('nocapl-') !== 0 : names[i] === w || names[i].indexOf(w + '-') === 0) { out.push(names[i]); break; }
         }
       }
       return out;

@@ -63,7 +63,7 @@ test('Loeschen leert Speicher und Dateien; Senden schickt Kopfzeile + geschwaerz
     var r = x.log.opened[0];
     assert.strictEqual(r.method, 'POST');
     assert.strictEqual(r.url, 'http://192.0.2.10:8099/log');
-    assert.ok(/^# Neolume 1\.0\.0 \| Samsung TV UE48H8000/.test(r.body));
+    assert.ok(/^# Neolume \d+\.\d+\.\d+ \| Samsung TV UE48H8000/.test(r.body));
     assert.ok(/ERROR Fehler/.test(r.body) && !/GEHEIM/.test(r.body));
     D.clear();
     assert.strictEqual(disk['log-a.txt'], ''); assert.strictEqual(D.dump(), ''); assert.strictEqual(D.ring.length, 0);

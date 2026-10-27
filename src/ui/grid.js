@@ -168,7 +168,7 @@
   };
   Grid.prototype.setVisible = function (on) { U.vis(this.clip, on); };
   /* Haeppchen-Groesse je Frame (P7 perf2: per Messlauf einstellbar, 'chunks' vergleicht Varianten am TV); FAST = waehrend Tastenwiederholung */
-  Grid.CHUNK = 3; Grid.CHUNK_FAST = 3;
+  Grid.CHUNK = 1; Grid.CHUNK_FAST = 1;   // perf3: TV 9,8,5 chunk-S1 58,8 / S3 53,5 / S9 50,1 fps
   function chunk() { return N.fx && N.fx.isFast() ? Grid.CHUNK_FAST : Grid.CHUNK; }
   N.ui.Grid = Grid;
 })(N);

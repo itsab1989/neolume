@@ -232,7 +232,7 @@
   };
   Row.prototype.setVisible = function (on) { U.vis(this.el, on); };
   /* Haeppchen-Groesse je Frame (P7 perf2: per Messlauf einstellbar, 'chunks' vergleicht Varianten am TV); FAST = waehrend Tastenwiederholung */
-  Row.CHUNK = 3; Row.CHUNK_FAST = 3;
+  Row.CHUNK = 1; Row.CHUNK_FAST = 1;   // perf3: wie Grid (TV 9,8,5)
   function chunk() { return N.fx && N.fx.isFast() ? Row.CHUNK_FAST : Row.CHUNK; }
   N.ui.Row = Row;
 })(N);

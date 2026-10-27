@@ -34,6 +34,8 @@ function shown(pool) { return pool.filter(function (e) { return e.on; }).length;
 
 test('Raster Klein: ▼ fuellt nur sichtbare Zeilen sofort, die Pufferzeile in rAF-Haeppchen, ohne display-Wechsel', function () {
   var s = setup(), N = s.N, G = N.GridMath.make('S'), g = new N.ui.Grid(s.doc.createElement('div'));
+  assert.strictEqual(N.ui.Grid.CHUNK, 1); assert.strictEqual(N.ui.Row.CHUNK, 1);   // perf3: Standard 1 Karte je Frame (TV-Messung)
+  N.ui.Grid.CHUNK = N.ui.Grid.CHUNK_FAST = 3;                          // Ablauf unten mit 3er-Haeppchen
   g.setGeom(G); g.setModel(s.items, s.items.length, 0); g.setFocused(true);
   assert.strictEqual(g.vis, 3);                                       // 176, 388, 600 liegen im Clip (bis 720)
   assert.strictEqual(shown(g.pool), 36);                              // Zeile 0..3 (keine Zeile -1)
@@ -66,7 +68,9 @@ test('Raster: Ende der Liste versteckt ueberzaehlige Karten erst nach dem letzte
 });
 
 test('Reihe: ▶ fuellt die neue Puffer-Karte erst im naechsten Frame; setModel(mode 2) komplett in Haeppchen', function () {
-  var s = setup(), N = s.N, r = new N.ui.Row(s.doc.createElement('div'), { noHead: true, captions: function () { return true; } });
+  var s = setup(), N = s.N;
+  N.ui.Row.CHUNK = N.ui.Row.CHUNK_FAST = 3;
+  var r = new N.ui.Row(s.doc.createElement('div'), { noHead: true, captions: function () { return true; } });
   r.setModel({ id: 'a', kind: 'poster', items: s.items.slice(0, 30) }, 0);
   r.setFocused(true);
   s.reset();

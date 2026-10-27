@@ -3,7 +3,7 @@
  * LRU der geladenen URLs (Treffer sofort), 1 Wiederholung nach 2 s, nie src="" (statt dessen BLANK).
  * P7 27.10. (TV: lange Frames in den ersten Schritten nach dem Laden = Dekodieren beim Scrollen):
  * - Dekodier-Sperre: Downloads laufen in ein losgeloestes Image(); das sichtbare <img> bekommt die (dann im Cache liegende) URL
- *   erst in einer Ruhephase, hoechstens PER_FRAME je Frame. WebKit dekodiert beim ersten Zeichnen -> nie mitten in einer Tastenfolge.
+ *   erst in einer Ruhephase, hoechstens SHOW_PER_FRAME (1) je Frame. WebKit dekodiert beim ersten Zeichnen -> nie mitten in einer Tastenfolge.
  * - Nach Tastenwiederholung (N.fx.isFast) gilt REST_FAST statt REST: bei 160-ms-Wiederholung kein Zuweisen zwischen zwei Tasten. */
 (function (N) {
   var U = N.util;
@@ -14,7 +14,7 @@
     square: [176, 176], squareS: [144, 144], squareXS: [96, 96], listSq: [48, 48], cover: [192, 192], coverL: [400, 400],   // M4 Musik (quadratisch)
     backdrop: [640, 360], upnext: [176, 99], chapter: [96, 54], avatar: [160, 160], avatarM: [96, 96], avatarS: [32, 32], cast: [120, 120]
   };
-  var MAX_ACTIVE = 4, PER_FRAME = 2, REST = 150, REST_FAST = 250;
+  var MAX_ACTIVE = 4, PER_FRAME = 2, SHOW_PER_FRAME = 1, REST = 150, REST_FAST = 250;   // perf3: 1 Dekodierung je Frame (TV: 2 Poster = 82-ms-Frame)
   var jobs = [], ready = [], active = 0, lru = new N.LRU(400), frameT = 0, paused = false, sets = 0, loads = 0;   // sets/loads: Zaehler fuer den Messlauf (P7)
   /* losgeloestes Bild fuer den Download (Tests ohne DOM: null -> direkt ins <img> wie frueher) */
   function mkPre() { return typeof Image !== 'undefined' ? new Image() : null; }
@@ -92,9 +92,9 @@
     if (paused || r < need) { if (jobs.length || ready.length) frameT = setTimeout(pump, paused ? REST : need - r + 10); return; }
     var n = 0, d = 0, i;
     if (ready.length > 1) ready.sort(byPrio);
-    while (ready.length && n < PER_FRAME) { show(ready.shift()); n++; }   // fertige Downloads zuerst sichtbar machen
+    while (ready.length && n < SHOW_PER_FRAME) { show(ready.shift()); n++; }   // fertige Downloads zuerst sichtbar machen
     jobs.sort(byPrio);
-    for (i = 0; i < jobs.length && n < PER_FRAME && d < PER_FRAME;) {      // LRU-Treffer duerfen an wartenden Downloads vorbei
+    for (i = 0; i < jobs.length && n < SHOW_PER_FRAME && d < PER_FRAME;) {      // LRU-Treffer duerfen an wartenden Downloads vorbei
       if (lru.has(jobs[i].url)) { assign(jobs.splice(i, 1)[0]); n++; }
       else if (active < MAX_ACTIVE) { assign(jobs.splice(i, 1)[0]); d++; }
       else i++;

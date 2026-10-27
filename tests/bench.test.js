@@ -84,6 +84,6 @@ test('Dev-Messlauf: Ziffernfolge 9,8,7 (6, 5) startet, andere Folgen nicht; ohne
   H.eq(started, ['all', 'all']);
   k('9'); k('8'); assert.strictEqual(k('6'), true);   // perf2: 9,8,6 = home,lib mit Frame-Protokoll; 9,8,5 = Varianten
   k('9'); k('8'); k('5');
-  H.eq(started, ['all', 'all', 'home,lib,frames', 'chunk,capl,frames']);
+  H.eq(started, ['all', 'all', 'home,lib,frames', 'chunk,nocapl,frames']);
   assert.strictEqual(N.devperf.key('9'), false);    // devperf ohne init(dev) -> nicht aktiv
 });

@@ -65,7 +65,7 @@ body { color: #F2F2F2; font-family: 'PlexNeo', 'Inter', 'Helvetica Neue', Helvet
   background: #F2F2F2; color: #141414; font-size: 16px; line-height: 24px; font-weight: 600; text-align: center; }
 .bdg.done { display: block; right: 8px; top: 8px; width: 24px; height: 24px; border-radius: 12px; background-color: #F2F2F2;
   background-image: url(@A/icons.png); background-repeat: no-repeat; background-position: -420px -100px; }
-.cap { position: absolute; }
+.cap { position: absolute; -webkit-transform: translate3d(0,0,0); }   /* perf3: eigene kleine GPU-Ebene (TV: 9,8,5 capl-M 57,4 statt 53,5 fps) */
 .cap-land { width: 288px; } .cap-poster { width: 176px; }
 .cap .t1 { font-size: 18px; line-height: 24px; font-weight: 600; color: #B7BBC0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cap .t2 { font-size: 16px; line-height: 22px; color: #858B92; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -589,5 +589,5 @@ body { color: #F2F2F2; font-family: 'PlexNeo', 'Inter', 'Helvetica Neue', Helvet
 .mini-k { position: absolute; left: 300px; top: 21px; width: 22px; height: 22px; border-radius: 4px; text-align: center; font-size: 16px; line-height: 22px; font-weight: 600; color: #141414; }
 .mini-bar { position: absolute; left: 0; bottom: 0; width: 360px; height: 3px; background: #3A3F45; }
 .mini-bar i { position: absolute; left: 0; top: 0; width: 0; height: 3px; background: @accent@; }
-/* perf2-Versuch (nur per Messlauf 'capl' aktiv): Beschriftungen als eigene GPU-Ebene */
-.capl .cap { -webkit-transform: translate3d(0,0,0); }
+/* Gegenprobe (nur per Messlauf 'nocapl' aktiv): Beschriftungen ohne eigene Ebene wie bis perf2 */
+.nocapl .cap { -webkit-transform: none; }

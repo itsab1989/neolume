@@ -125,8 +125,16 @@
     wrap('img.want', N.img, 'want');
     var sT = W.setTimeout, raf = U.raf;
     F.sT = sT; F.raf = raf;
-    W.setTimeout = function (f, ms) { return sT.call(W, typeof f === 'function' ? F.wrapFn('timer', f) : f, ms); };
-    U.raf = function (f) { return raf.call(U, F.wrapFn('raf', f)); };
+    /* perf3: teure Timer/rAF (>= 4 ms) zusaetzlich mit Code-Anfang benennen, damit man sie im Quelltext findet */
+    function named(lb, f) {
+      var w = F.wrapFn(lb, f);
+      return function () {
+        var t = pnow(); w.apply(this, arguments); var d = pnow() - t;
+        if (d >= 4) { var src = String(f).replace(/\s+/g, ' '); F.add(lb + '<' + src.slice(src.indexOf('{') + 1, src.indexOf('{') + 45) + '>', d); }
+      };
+    }
+    W.setTimeout = function (f, ms) { return sT.call(W, typeof f === 'function' ? named('timer', f) : f, ms); };
+    U.raf = function (f) { return raf.call(U, named('raf', f)); };
     F.undo.push(function () { W.setTimeout = sT; U.raf = raf; });
   }
   Frames.prototype.key = function (k) { this.wrapFn('key ' + k, function () { R().key(k); })(); };
@@ -224,17 +232,16 @@
     S[nm] = function (done) { on(); S[base](function () { off(); done(); }, nm); };
   }
   ['S', 'M'].forEach(function (v) {
-    [1, 3, 9].forEach(function (c) {
+    [1, 2, 3].forEach(function (c) {
       var G = N.ui.Grid, Rw = N.ui.Row, old;
       variant('chunk-' + v + c, 'lib-' + v,
         function () { old = [G.CHUNK, G.CHUNK_FAST, Rw.CHUNK, Rw.CHUNK_FAST]; G.CHUNK = G.CHUNK_FAST = Rw.CHUNK = Rw.CHUNK_FAST = c; },
         function () { G.CHUNK = old[0]; G.CHUNK_FAST = old[1]; Rw.CHUNK = old[2]; Rw.CHUNK_FAST = old[3]; });
     });
   });
-  /* perf2: Beschriftungen als eigene GPU-Ebene (Klasse capl am body): Text-Aenderung malt dann nur die kleine Ebene neu statt des
-   * grossen Seiten-Containers – kostet dafuer mehr Ebenen. 'capl' = lib-S/M/L + home mit dieser Variante */
+  /* perf3: Beschriftungen sind Standard eigene GPU-Ebenen; Gegenprobe 'nocapl' = ohne (Klasse nocapl am body, Stand perf2) */
   ['lib-S', 'lib-M', 'lib-L', 'home'].forEach(function (b) {
-    variant('capl-' + b.replace('lib-', ''), b, function () { U.cls(document.body, 'capl', true); }, function () { U.cls(document.body, 'capl', false); });
+    variant('nocapl-' + b.replace('lib-', ''), b, function () { U.cls(document.body, 'nocapl', true); }, function () { U.cls(document.body, 'nocapl', false); });
   });
   ['movie', 'show'].forEach(function (t) {
     S['details-' + t] = function (done) {
@@ -338,8 +345,8 @@
     /* echte Tasten: waehrend des Laufs nur RETURN/EXIT (Abbruch); sonst Ziffernfolge 9,8,7 erkennen. true = verbraucht */
     key: function (k) {
       if (run) { if (k === 'RETURN') B.stop(); return true; }
-      // perf2: dritte Ziffer waehlt den Lauf: 7 = alles (wie bisher), 6 = home,lib mit Frame-Protokoll, 5 = Varianten chunk/capl mit Frame-Protokoll
-      var LAST = { '7': 'all', '6': 'home,lib,frames', '5': 'chunk,capl,frames' };
+      // perf2: dritte Ziffer waehlt den Lauf: 7 = alles (wie bisher), 6 = home,lib mit Frame-Protokoll, 5 = Varianten chunk (1/2/3) und nocapl mit Frame-Protokoll
+      var LAST = { '7': 'all', '6': 'home,lib,frames', '5': 'chunk,nocapl,frames' };
       if (seq === SEQ.length - 1 && LAST[k] && U.now() - seqT < SEQ_MS) { seq = 0; B.start(LAST[k]); return true; }
       if (k === SEQ[seq] && (seq === 0 || U.now() - seqT < SEQ_MS)) { seq++; seqT = U.now(); if (seq === SEQ.length) { seq = 0; B.start('all'); return true; } }
       else seq = k === SEQ[0] ? 1 : 0;
