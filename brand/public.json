@@ -1,0 +1,22 @@
+{
+  "id": "public",
+  "name": "Neolume",
+  "widgetId": "Neolume",
+  "slug": "neolume",
+  "repo": "itsab1989/neolume",
+  "wordmark": [
+    "Neo",
+    "lume"
+  ],
+  "accent": "#2EC4B6",
+  "accentPress": "#6FD9CF",
+  "pointer": "pointer-teal",
+  "softLight": "#e6f7f5",
+  "softDark": "#15292a",
+  "description": "Neolume - unofficial client for Plex Media Server",
+  "icons": [
+    "original"
+  ],
+  "defaultIcon": "original",
+  "extraApps": []
+}

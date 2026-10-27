@@ -1,0 +1,46 @@
+{
+ "MediaContainer": {
+  "size": 5,
+  "allowSync": false,
+  "title1": "Plex Library",
+  "Directory": [
+   {
+    "key": "1",
+    "type": "movie",
+    "title": "Filme",
+    "agent": "tv.plex.agents.movie",
+    "language": "de-DE",
+    "hidden": 0
+   },
+   {
+    "key": "2",
+    "type": "show",
+    "title": "Serien",
+    "agent": "tv.plex.agents.series",
+    "language": "de-DE",
+    "hidden": 0
+   },
+   {
+    "key": "5",
+    "type": "show",
+    "title": "Anime",
+    "agent": "tv.plex.agents.series",
+    "language": "ja-JP",
+    "hidden": 0
+   },
+   {
+    "key": "3",
+    "type": "artist",
+    "title": "Musik",
+    "agent": "tv.plex.agents.music",
+    "hidden": 0
+   },
+   {
+    "key": "6",
+    "type": "movie",
+    "title": "Dokus",
+    "hidden": 0
+   }
+  ]
+ }
+}

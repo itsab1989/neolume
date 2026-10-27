@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1220" height="1000" viewBox="0 0 1220 1000">
+  <!-- App-Symbol. Idee: die Signatur der Oberflaeche – der amberfarbene Fokusrahmen
+       auf einer Posterkarte in einer Reihe. Farben aus design/mockups/tokens.css. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1F2226"/>
+      <stop offset="1" stop-color="#0E0F11"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3A3F45"/>
+      <stop offset="1" stop-color="#23262A"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1220" height="1000" rx="150" fill="url(#bg)"/>
+  <!-- Nachbarkarte (ruhend) -->
+  <rect x="236" y="280" width="290" height="436" rx="34" fill="#2A2E33"/>
+  <!-- fokussierte Karte -->
+  <rect x="566" y="196" width="388" height="584" rx="44" fill="url(#card)"/>
+  <!-- Fokusrahmen -->
+  <rect x="534" y="164" width="452" height="648" rx="72" fill="none" stroke="#2EC4B6" stroke-width="32"/>
+  <!-- Play -->
+  <path d="M704 404 L704 572 L846 488 Z" fill="#F2F2F2" stroke="#F2F2F2" stroke-width="26" stroke-linejoin="round"/>
+</svg>

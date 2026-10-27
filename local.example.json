@@ -1,0 +1,10 @@
+{
+  "_comment": "Vorlage fuer local.json (git-ignoriert). Lokale Netzwerk-Werte, die tools/build.js ins gebaute app/app.js schreibt und tools/dev.py als Standard nutzt. Beispiel-Adressen (192.0.2.x) durch die eigenen ersetzen. Optional: brand (Marken-Profil aus brand/), icon (Symbol-Set aus loader-icons/), extraApps (weitere eigene TV-Apps, die beim Sync erhalten bleiben: [{\"id\": \"MyApp\", \"title\": \"My App\", \"zip\": \"~/path/MyApp.zip\"}]; ersetzt die Liste des Marken-Profils).",
+  "macIp": "192.0.2.10",
+  "proxyHost": "192.0.2.10:3000",
+  "pms": "http://192.0.2.20:32400",
+  "logHost": "192.0.2.10:8099",
+  "allowClients": [],
+  "brand": "",
+  "icon": ""
+}

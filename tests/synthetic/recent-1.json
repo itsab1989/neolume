@@ -1,0 +1,59 @@
+{
+ "MediaContainer": {
+  "size": 3,
+  "allowSync": true,
+  "identifier": "com.plexapp.plugins.library",
+  "Metadata": [
+   {
+    "ratingKey": "2101",
+    "key": "/library/metadata/2101",
+    "type": "movie",
+    "title": "Neuer Film A",
+    "contentRating": "de/6",
+    "summary": "Synthetischer Film Neuer Film A.",
+    "audienceRating": 7.8,
+    "year": 2025,
+    "thumb": "/library/metadata/2101/thumb/1700000000",
+    "art": "/library/metadata/2101/art/1700000000",
+    "duration": 6000000,
+    "librarySectionID": 1,
+    "librarySectionTitle": "Filme",
+    "addedAt": 1700000000
+   },
+   {
+    "ratingKey": "2102",
+    "key": "/library/metadata/2102",
+    "type": "movie",
+    "title": "Gesehener Film",
+    "contentRating": "de/6",
+    "summary": "Synthetischer Film Gesehener Film.",
+    "audienceRating": 7.8,
+    "year": 2020,
+    "thumb": "/library/metadata/2102/thumb/1700000000",
+    "art": "/library/metadata/2102/art/1700000000",
+    "duration": 5400000,
+    "librarySectionID": 1,
+    "librarySectionTitle": "Filme",
+    "addedAt": 1700000000,
+    "viewCount": 1
+   },
+   {
+    "ratingKey": "2103",
+    "key": "/library/metadata/2103",
+    "type": "movie",
+    "title": "Angefangener Film",
+    "contentRating": "de/6",
+    "summary": "Synthetischer Film Angefangener Film.",
+    "audienceRating": 7.8,
+    "year": 2024,
+    "thumb": "/library/metadata/2103/thumb/1700000000",
+    "art": "/library/metadata/2103/art/1700000000",
+    "duration": 6000000,
+    "librarySectionID": 1,
+    "librarySectionTitle": "Filme",
+    "addedAt": 1700000000,
+    "viewOffset": 1200000
+   }
+  ]
+ }
+}

@@ -1,0 +1,118 @@
+/* N.osd – reine OSD-Logik des Players (SPEC 7.10–7.12): Knopfreihe (Lage, sichtbare Knoepfe, ◀▶-Navigation, Zeiger-Treffer,
+ * Label-Mitte), Kapitel zur Zeit, Mehr-Menue-Eintraege, Sleep-Timer-Rest, Untertitel-Verzoegerung als Text, Qualitaetsstufen.
+ * Ohne DOM, in Node getestet. Koordinaten absolut im 1280x720-Raster. */
+(function (N) {
+  var ISL_X = 64, ISL_Y = 556;
+  /* Bedien-Insel x 64, y 556, 1152 x 128; Knoepfe Insel-y 68 (48 hoch), Play/Pause 64 rund bei Insel-y 60, Mitte x = 640 */
+  var BTNS = [
+    { id: 'back', x: 480, y: 68, w: 48 }, { id: 'pp', x: 544, y: 60, w: 64 }, { id: 'fwd', x: 624, y: 68, w: 48 }, { id: 'next', x: 688, y: 68, w: 48 },
+    { id: 'chap', x: 944, y: 68, w: 48 }, { id: 'tracks', x: 1008, y: 68, w: 48 }, { id: 'more', x: 1072, y: 68, w: 48 }
+  ];
+  var BY = {};
+  for (var i = 0; i < BTNS.length; i++) BY[BTNS[i].id] = BTNS[i];
+  var QS = ['20', '12', '8', '4'];
+  var O = {
+    BTNS: BTNS, ISL_X: ISL_X, ISL_Y: ISL_Y,
+    btn: function (id) { return BY[id]; },
+    /* sichtbare Knoepfe: f {next: naechster Eintrag da (nur Folgen), chap: Kapitel vorhanden} */
+    visible: function (f) {
+      var out = [];
+      for (var i = 0; i < BTNS.length; i++) {
+        var id = BTNS[i].id;
+        if ((id === 'next' && !f.next) || (id === 'chap' && !f.chap)) continue;
+        out.push(id);
+      }
+      return out;
+    },
+    /* ◀▶ zwischen den sichtbaren Knoepfen, ohne Umlauf; fehlt der aktuelle (ausgeblendet) -> Play/Pause */
+    nav: function (ids, cur, key) {
+      var i = ids.indexOf(cur);
+      if (i < 0) return ids.indexOf('pp') >= 0 ? 'pp' : ids[0];
+      if (key === 'LEFT' && i > 0) return ids[i - 1];
+      if (key === 'RIGHT' && i < ids.length - 1) return ids[i + 1];
+      return cur;
+    },
+    /* Zeiger: Knopf unter (x, y) mit 8 px Toleranz, sonst null */
+    hit: function (ids, x, y) {
+      for (var i = 0; i < ids.length; i++) {
+        var b = BY[ids[i]], bx = ISL_X + b.x, by = ISL_Y + b.y;
+        if (x >= bx - 8 && x < bx + b.w + 8 && y >= by - 8 && y < by + b.w + 8) return ids[i];
+      }
+      return null;
+    },
+    center: function (id) { var b = BY[id]; return ISL_X + b.x + b.w / 2; },
+    /* Kapitel aus den Metadaten: [{n, t, start, end, thumb}] */
+    chapters: function (list) {
+      var out = [];
+      for (var i = 0; list && i < list.length; i++) {
+        var c = list[i];
+        out.push({ n: Number(c.index) || i + 1, t: String(c.tag || c.title || ''), start: Number(c.startTimeOffset) || 0, end: Number(c.endTimeOffset) || 0, thumb: c.thumb || '' });
+      }
+      out.sort(function (a, b) { return a.start - b.start; });
+      return out;
+    },
+    /* Kapitelname: Server-Titel, generische ("Chapter 3", "Kapitel 3", nur Zahl) -> "Kapitel 3" in der App-Sprache */
+    chapterNamed: function (c) { return !!c.t && !/^(chapter|kapitel|chapitre|cap[ií]tulo|capitolo)?\s*\d+$/i.test(c.t); },
+    chapterTitle: function (c, i) { return O.chapterNamed(c) ? c.t : N.t('pl.chapterN', { n: i + 1 }); },
+    /* Eintraege der Kapitelliste: [{id, t, s (Startzeit), img (Pfad oder '')}] und Index des laufenden Kapitels */
+    chapterList: function (chs, ms, hms) {
+      var e = [], cur = O.chapterAt(chs, ms);
+      for (var i = 0; chs && i < chs.length; i++) e.push({ id: String(i), t: O.chapterTitle(chs[i], i), s: hms(chs[i].start), img: chs[i].thumb });
+      return { entries: e, cur: cur };
+    },
+    chapterAt: function (chs, ms) {
+      var k = -1;
+      for (var i = 0; chs && i < chs.length; i++) if (ms >= chs[i].start) k = i;
+      return k;
+    },
+    /* Untertitel-Verzoegerung (ms) -> "+0,5 Sek. später" / "Keine"; Komma je Sprache */
+    delayText: function (ms) {
+      if (!ms) return N.t('pl.delay.zero');
+      var str = String(Math.abs(ms) / 1000);
+      if (N.i18n.lang() === 'de') str = str.replace('.', ',');
+      return N.t('pl.delay.val', { n: (ms > 0 ? '+' : '-') + str }) + ' ' + N.t(ms > 0 ? 'pl.delay.later' : 'pl.delay.earlier');
+    },
+    DELAYS: [-3000, -2000, -1000, -500, -250, 0, 250, 500, 1000, 2000, 3000],
+    SLEEP: ['off', 'end', 15, 30, 60, 90],
+    sleepLeft: function (at, now) { return Math.max(1, Math.ceil((at - now) / 60000)); },
+    /* eine Stufe geringer; direkt abgespielt -> 8 Mbit/s (Umwandlung) */
+    lower: function (q, direct) {
+      if (direct) return '8';
+      var i = QS.indexOf(String(q));
+      return QS[Math.min(QS.length - 1, (i < 0 ? 1 : i) + 1)];
+    },
+    QS: QS,
+    /* Mehr-Menue: st {version (Klartext, nur bei mehreren Dateien), direct, quality, aspect, subsOn, skipIntro, skipCredits, autoNext, ep, sleep (Text)} -> [{id, t, s}] */
+    more: function (st) {
+      var v = function (k) { return N.t('set.v.' + k); }, q = N.decision.QUAL[st.quality] || N.decision.QUAL['12'];
+      var out = [{ id: 'quality', t: N.t('pl.m.quality'), s: st.direct ? N.t('pl.q.orig') : N.t('set.v.q', { n: st.quality, r: q[1] === '1920x1080' ? '1080p' : '720p' }) },
+        { id: 'aspect', t: N.t('pl.m.aspect'), s: v(st.aspect === '43' ? 'a43' : st.aspect || 'auto') }];
+      if (st.version) out.unshift({ id: 'version', t: N.t('pl.m.version'), s: st.version });   // nur bei mehreren Dateien
+      if (st.subsOn) out.push({ id: 'subs', t: N.t('pl.m.subs'), s: v(st.subSize || 'medium') + ' · ' + v(st.subBg || 'dim') });
+      if (st.subSearch) out.push({ id: 'subsearch', t: N.t('pl.m.subSearch'), s: N.t('pl.m.subSearch.s') });   // P5, nur Hauptkonto
+      if (st.markers) {
+        out.push({ id: 'skipIntro', t: N.t('pl.m.skipIntro'), s: v(st.skipIntro || 'button') });
+        out.push({ id: 'skipCredits', t: N.t('pl.m.skipCredits'), s: v(st.skipCredits || 'button') });
+      }
+      if (st.ep) out.push({ id: 'autoNext', t: N.t('pl.m.autoNext'), s: N.t(st.autoNext ? 'set.on' : 'set.off') });
+      out.push({ id: 'sleep', t: N.t('pl.m.sleep'), s: st.sleep });
+      out.push({ id: 'problem', t: N.t('pl.m.problem'), s: '' });
+      return out;
+    }
+  };
+  /* "Schaust du noch?" (SPEC 7.10): zaehlt Folgen, die ohne Eingabe nacheinander zu Ende liefen. limit 0 = aus.
+   * advance(letzte Eingabe, jetzt) beim automatischen Wechsel zur naechsten Folge -> true = vorher nachfragen. */
+  /* P5: zusaetzlich nach Zeit (hours, wie Plex "Passout Protection"): seit der letzten Eingabe bzw. dem Start mindestens so lange */
+  function Still(limit, now, hours) { this.limit = Number(limit) || 0; this.n = 0; this.mark = now || 0; this.t0 = now || 0; this.ms = (Number(hours) || 0) * 3600000; }
+  Still.prototype.advance = function (lastInput, now) {
+    if (lastInput > this.mark) this.n = 0;           // seit dem letzten Wechsel wurde etwas gedrueckt
+    this.n++; this.mark = now;
+    var long = this.ms > 0 && now - Math.max(lastInput || 0, this.t0) >= this.ms;
+    this.why = this.limit > 0 && this.n >= this.limit ? 'eps' : long ? 'time' : '';
+    return !!this.why;
+  };
+  Still.prototype.reset = function (now) { this.n = 0; this.mark = now; this.t0 = now; };
+  O.Still = Still;
+  O.STILL = [0, 2, 3, 5];
+  N.osd = O;
+})(N);

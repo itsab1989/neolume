@@ -1,0 +1,120 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Metadata": [
+   {
+    "ratingKey": "90546",
+    "type": "episode",
+    "title": "Morgen",
+    "grandparentTitle": "Testserie",
+    "grandparentRatingKey": "20521",
+    "parentRatingKey": "20545",
+    "parentIndex": 3,
+    "index": 1,
+    "librarySectionID": 2,
+    "duration": 2206912,
+    "Marker": [
+     {
+      "type": "credits",
+      "startTimeOffset": 2102220,
+      "endTimeOffset": 2206912,
+      "final": true
+     }
+    ],
+    "Media": [
+     {
+      "id": 30026,
+      "width": 1920,
+      "height": 1080,
+      "aspectRatio": 1.78,
+      "videoCodec": "hevc",
+      "audioCodec": "eac3",
+      "container": "mkv",
+      "Part": [
+       {
+        "id": 30094,
+        "key": "/library/parts/30094/1790525571/file.mkv",
+        "duration": 2206912,
+        "container": "mkv",
+        "Stream": [
+         {
+          "id": 95394,
+          "streamType": 1,
+          "codec": "hevc",
+          "index": 0,
+          "languageCode": "eng",
+          "language": "English",
+          "displayTitle": "1080p DoVi/HDR10+",
+          "extendedDisplayTitle": "1080p DoVi/HDR10+ (HEVC Main 10)",
+          "default": true,
+          "bitDepth": 10
+         },
+         {
+          "id": 95395,
+          "streamType": 2,
+          "codec": "eac3",
+          "index": 1,
+          "languageCode": "deu",
+          "language": "Deutsch",
+          "displayTitle": "Deutsch (EAC3 5.1)",
+          "extendedDisplayTitle": "Deutsch (EAC3 5.1)",
+          "selected": true,
+          "default": true,
+          "channels": 6
+         },
+         {
+          "id": 95396,
+          "streamType": 2,
+          "codec": "eac3",
+          "index": 2,
+          "languageCode": "eng",
+          "language": "English",
+          "displayTitle": "English (EAC3 5.1)",
+          "extendedDisplayTitle": "English (EAC3 5.1)",
+          "default": true,
+          "channels": 6
+         },
+         {
+          "id": 95397,
+          "streamType": 3,
+          "codec": "srt",
+          "index": 3,
+          "languageCode": "deu",
+          "language": "Deutsch",
+          "title": "Forced",
+          "displayTitle": "Deutsch Forced",
+          "extendedDisplayTitle": "Forced (Deutsch SRT)",
+          "forced": true
+         },
+         {
+          "id": 95398,
+          "streamType": 3,
+          "codec": "srt",
+          "index": 4,
+          "languageCode": "deu",
+          "language": "Deutsch",
+          "displayTitle": "Deutsch",
+          "extendedDisplayTitle": "Deutsch (SRT)",
+          "default": true
+         },
+         {
+          "id": 95399,
+          "streamType": 3,
+          "codec": "srt",
+          "index": 5,
+          "languageCode": "eng",
+          "language": "English",
+          "title": "SDH",
+          "displayTitle": "English SDH",
+          "extendedDisplayTitle": "SDH (English SRT)",
+          "hearingImpaired": true
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

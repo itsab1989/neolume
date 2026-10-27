@@ -1,0 +1,24 @@
+{
+  "name": "neolume",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Unofficial client for Plex Media Server on 2014 Samsung Smart TVs (Orsay), ES5",
+  "scripts": {
+    "build": "node tools/build.js",
+    "test": "node tools/build.js",
+    "unit": "node --test \"tests/*.test.js\"",
+    "visual": "node tools/visual.js",
+    "visual:approve": "node tools/visual.js --approve",
+    "assets": "node tools/make_assets.js",
+    "showcase": "node tools/showcase.js && node tools/showcase.js --lang de"
+  },
+  "devDependencies": {
+    "acorn": "^8.19.0",
+    "acorn-walk": "^8.3.5",
+    "qrcode": "^1.5.4",
+    "terser": "5.49.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

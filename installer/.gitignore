@@ -1,0 +1,2 @@
+# eingebettetes Release-Paket (enthaelt gebautes app.js mit lokalen Werten) nie einchecken
+neosetup/payload/

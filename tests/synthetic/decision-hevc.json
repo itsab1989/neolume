@@ -1,0 +1,56 @@
+{
+ "MediaContainer": {
+  "generalDecisionCode": 1001,
+  "generalDecisionText": "Direct play not available; Conversion OK.",
+  "directPlayDecisionCode": 3000,
+  "directPlayDecisionText": "This app cannot play this item. The reason is: video.width limitation applies: 1920 > 0.",
+  "transcodeDecisionCode": 1001,
+  "transcodeDecisionText": "Direct play not available; Conversion OK.",
+  "Metadata": [
+   {
+    "ratingKey": "90546",
+    "type": "episode",
+    "duration": 2206912,
+    "Media": [
+     {
+      "protocol": "hls",
+      "container": "mpegts",
+      "videoCodec": "h264",
+      "audioCodec": "ac3",
+      "width": 1920,
+      "height": 1080,
+      "bitrate": 20640,
+      "Part": [
+       {
+        "id": "30094",
+        "decision": "transcode",
+        "duration": 2206912,
+        "container": "mpegts",
+        "Stream": [
+         {
+          "id": "95394",
+          "streamType": 1,
+          "codec": "h264",
+          "decision": "transcode",
+          "languageCode": "eng",
+          "bitDepth": 8,
+          "width": 1920,
+          "height": 1080
+         },
+         {
+          "id": "95395",
+          "streamType": 2,
+          "codec": "ac3",
+          "decision": "transcode",
+          "languageCode": "deu",
+          "selected": true
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

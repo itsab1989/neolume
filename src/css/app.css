@@ -1,0 +1,593 @@
+/* Produktions-CSS (SPEC v2, Tokens als Literalwerte, Quelle design/mockups/tokens.css).
+ * Build-Gates: kein gradient, box-shadow, text-shadow, filter, flex, calc, vw/vh, var(), font-size < 16px.
+ * @A/ wird zur Laufzeit durch die Asset-Basis ersetzt (lokal: '', Dev: http://<mac>:8090/).
+ * Farben: bg #0E0F11 · surface-1 #17191C · surface-2 #1F2226 · surface-3 #2A2E33 · line #3A3F45 · key-rim #585E66
+ *         text-1 #F2F2F2 · text-2 #B7BBC0 · text-3 #858B92 · accent @accent@ (Marke, tools/build.js) · on-accent #141414
+ *         danger #E5534B · success #4CAF64 · warn #F5C518 · info #4A9BE8 */
+
+html, body { margin: 0; padding: 0; width: 1280px; height: 720px; overflow: hidden; background: #0E0F11; }
+body { color: #F2F2F2; font-family: 'PlexNeo', 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 18px; line-height: 26px; font-weight: 400; -webkit-font-smoothing: antialiased; }
+#root { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; overflow: hidden; }
+#root div, #root img, #root span, #root b { -webkit-box-sizing: border-box; box-sizing: border-box; }
+.layer { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; }
+.scr { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; overflow: hidden; background: #0E0F11; }
+.a { position: absolute; }
+.ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.c1 { color: #F2F2F2; } .c2 { color: #B7BBC0; } .c3 { color: #858B92; } .cacc { color: @accent@; } .cdanger { color: #E5534B; }
+
+/* Typo (SPEC 4) */
+.t-display { font-size: 40px; line-height: 48px; font-weight: 600; letter-spacing: -0.5px; }
+.t-h1 { font-size: 32px; line-height: 40px; font-weight: 600; letter-spacing: -0.3px; }
+.t-h2 { font-size: 24px; line-height: 32px; font-weight: 600; }
+.t-title { font-size: 20px; line-height: 28px; font-weight: 600; }
+.t-body { font-size: 18px; line-height: 26px; font-weight: 400; }
+.t-small { font-size: 16px; line-height: 24px; font-weight: 400; }
+.t-label { font-size: 16px; line-height: 24px; font-weight: 600; letter-spacing: 0.3px; }
+
+/* Sprite (SPEC 5.21): Spalte = Icon (inline background-position-x), Zeile = Zustand */
+.ic { position: absolute; width: 32px; height: 32px; background-image: url(@A/icons.png); background-repeat: no-repeat;
+  background-position-y: 0; }
+.ic.s2, .is-cur .ic { background-position-y: -64px; }
+.ic.s1 { background-position-y: -32px; }
+.is-focus .ic, .ic.s3 { background-position-y: -96px; }
+
+/* ---------- Fokus-Ring & Karten (SPEC 5.1–5.3) ---------- */
+.focus-ring { position: absolute; left: 0; top: 0; z-index: 3; border: 4px solid @accent@; border-radius: 14px; visibility: hidden;
+  -webkit-transform-origin: 50% 50%; -webkit-transform: translate3d(0,0,0);
+  -webkit-transition: -webkit-transform 150ms cubic-bezier(0,0,0.2,1); }
+.fr-poster { width: 192px; height: 280px; }
+.fr-land { width: 304px; height: 178px; }
+.fr-prof { width: 176px; height: 176px; border-radius: 88px; }
+
+.pg { position: absolute; left: 0; top: 0; width: 1280px; height: 720px;
+  -webkit-transform: translate3d(0,0,0); -webkit-transition: -webkit-transform 150ms cubic-bezier(0,0,0.2,1); }
+.hrow { position: absolute; left: 0; width: 1280px; height: 340px; }
+.row-head { position: absolute; left: 144px; top: 0; height: 32px; width: 1000px; font-size: 22px; line-height: 32px; font-weight: 600; color: #F2F2F2; white-space: nowrap; }
+.row-head .cnt { font-size: 16px; font-weight: 400; color: #858B92; padding-left: 10px; }
+.rclip { position: absolute; left: 128px; top: 0; width: 1152px; height: 340px; overflow: hidden; }
+.strip { position: absolute; left: 16px; top: 52px; width: 10px; height: 10px;
+  -webkit-transform: translate3d(0,0,0); -webkit-transition: -webkit-transform 150ms cubic-bezier(0,0,0.2,1); }
+.card { position: absolute; top: 0; background: #1F2226; border-radius: 6px; overflow: hidden;
+  -webkit-transform: translate3d(0,0,0); -webkit-transform-origin: 50% 50%;
+  -webkit-transition: -webkit-transform 150ms cubic-bezier(0,0,0.2,1); }
+.card.is-focus { -webkit-transform: translate3d(0,0,0) scale(1.08); }
+.card-poster { width: 176px; height: 264px; } .card-poster img { width: 176px; height: 264px; }
+.card-land { width: 288px; height: 162px; } .card-land img { width: 288px; height: 162px; }
+.card img { position: absolute; left: 0; top: 0; }
+.card .ph { position: absolute; left: 12px; right: 12px; bottom: 12px; max-height: 72px; overflow: hidden;
+  font-size: 16px; line-height: 24px; font-weight: 600; color: #B7BBC0; }
+.card .prog { position: absolute; left: 10px; right: 10px; bottom: 10px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.28); overflow: hidden; display: none; }
+.card .prog i { position: absolute; left: 0; top: 0; height: 4px; background: @accent@; border-radius: 2px; }
+.bdg { position: absolute; display: none; }
+.bdg.new { display: block; right: 0; top: 0; width: 0; height: 0; border-top: 24px solid #F2F2F2; border-left: 24px solid transparent; }
+.bdg.count { display: block; right: 8px; top: 8px; min-width: 28px; height: 24px; padding: 0 6px; border-radius: 4px;
+  background: #F2F2F2; color: #141414; font-size: 16px; line-height: 24px; font-weight: 600; text-align: center; }
+.bdg.done { display: block; right: 8px; top: 8px; width: 24px; height: 24px; border-radius: 12px; background-color: #F2F2F2;
+  background-image: url(@A/icons.png); background-repeat: no-repeat; background-position: -420px -100px; }
+.cap { position: absolute; }
+.cap-land { width: 288px; } .cap-poster { width: 176px; }
+.cap .t1 { font-size: 18px; line-height: 24px; font-weight: 600; color: #B7BBC0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cap .t2 { font-size: 16px; line-height: 22px; color: #858B92; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cap.is-focus .t1 { color: #F2F2F2; } .cap.is-focus .t2 { color: #B7BBC0; }
+
+/* ---------- Hero (SPEC 5.6) – Bilder/Scrim statisch, ohne translate3d ---------- */
+.hero-img { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; visibility: hidden; }
+.full { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; }
+.fade { position: absolute; left: 0; top: 632px; width: 1280px; height: 88px; }
+.s-fade { top: 584px; }
+.s-fadebg { position: absolute; left: 0; top: 672px; width: 1280px; height: 48px; background: #0E0F11; }
+.hero-txt { position: absolute; left: 144px; top: 0; width: 640px; height: 316px; opacity: 1;
+  -webkit-transform: translate3d(0,0,0); -webkit-transition: opacity 120ms cubic-bezier(0,0,0.2,1); }
+.hero-txt.out { opacity: 0; -webkit-transition: none; }
+.hero-ov { position: absolute; left: 0; top: 72px; width: 640px; text-transform: uppercase; }
+.hero-ti { position: absolute; left: 0; top: 96px; width: 640px; }
+.hero-me { position: absolute; left: 0; top: 152px; width: 640px; }
+.hero-de { position: absolute; left: 0; top: 188px; width: 560px; height: 78px; overflow: hidden; -webkit-line-clamp: 3; }
+.hero-de.l2 { height: 52px; -webkit-line-clamp: 2; }
+.clamp { display: -webkit-box; -webkit-box-orient: vertical; }   /* "…" am Ende (F13; ohne CSS-Unterstuetzung U.clampText) */
+.hero-ep { position: absolute; left: 0; top: 280px; width: 640px; }
+.hero-mp { position: absolute; left: 0; top: 285px; width: 160px; height: 6px; border-radius: 3px; background: #3A3F45; overflow: hidden; }
+.hero-mp i { position: absolute; left: 0; top: 0; height: 6px; background: @accent@; }
+.hero-mt { position: absolute; left: 176px; top: 276px; width: 460px; }
+
+/* Staffelstreifen (SPEC 5.20) */
+.ss { position: absolute; width: 476px; height: 30px; }
+.ss-c { position: absolute; top: 0; background: #3A3F45; overflow: hidden; }
+.ss-c.w { background: #B7BBC0; }
+.ss-c i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: @accent@; }
+.ss-m { position: absolute; background: #F2F2F2; }
+.ss-L .ss-c { width: 12px; height: 18px; } .ss-M .ss-c { width: 10px; height: 18px; } .ss-S .ss-c { width: 8px; height: 12px; }
+.ss-bar { position: absolute; left: 0; top: 0; background: #3A3F45; overflow: hidden; }
+.ss-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: #B7BBC0; }
+.ss-t { position: absolute; top: -9px; font-size: 16px; line-height: 24px; color: #B7BBC0; white-space: nowrap; }
+
+/* ---------- Seitenleiste (SPEC 5.5, 7.4) ---------- */
+#pn-rail { position: absolute; left: 0; top: 0; width: 120px; height: 720px; z-index: 4; }
+.rail-bg { position: absolute; left: 0; top: 0; width: 120px; height: 720px; }
+.ri { position: absolute; left: 44px; width: 56px; height: 48px; border-radius: 8px; }
+.ri .ic { left: 12px; top: 8px; }
+.ri .bar { position: absolute; left: -16px; top: 12px; width: 4px; height: 24px; border-radius: 2px; background: #F2F2F2; display: none; }
+.ri.is-cur .bar { display: block; }
+.rav { position: absolute; left: 56px; top: 36px; width: 32px; height: 32px; border-radius: 16px; overflow: hidden; text-align: center;
+  font-size: 16px; line-height: 32px; font-weight: 600; color: #F2F2F2; }
+.rav img { position: absolute; left: 0; top: 0; width: 32px; height: 32px; }
+.nav-panel { position: absolute; left: 0; top: 0; width: 320px; height: 720px; background: #121316; visibility: hidden;
+  -webkit-transform: translate3d(-200px,0,0); -webkit-transition: -webkit-transform 150ms cubic-bezier(0,0,0.2,1); }
+.nav-panel.open { visibility: visible; -webkit-transform: translate3d(0,0,0); }
+.ni { position: absolute; left: 32px; width: 256px; height: 48px; border-radius: 8px; }
+.ni .ic { left: 24px; top: 8px; }
+.ni .lb { position: absolute; left: 72px; top: 10px; width: 168px; font-size: 20px; line-height: 28px; font-weight: 600; color: #B7BBC0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ni .lb.lb2 { top: 5px; font-size: 16px; line-height: 19px; white-space: normal; max-height: 38px; text-overflow: clip; word-wrap: break-word; }   /* lange Bibliotheksnamen zweizeilig (F6) */
+.ni.is-cur .lb { color: #F2F2F2; }
+.ni.is-focus { background: @accent@; }
+.ni.is-focus .lb { color: #141414; }
+.ni .rav { left: 24px; top: 8px; }
+.nav-sep { position: absolute; left: 56px; top: 620px; width: 208px; height: 1px; background: #2A2E33; }
+
+/* ---------- Hinweisleiste (SPEC 5.11) ---------- */
+#pn-hints { position: absolute; left: 144px; top: 656px; width: 1072px; height: 28px; text-align: right; white-space: nowrap; z-index: 6; }
+.hint { display: inline-block; height: 28px; margin-left: 24px; font-size: 16px; line-height: 28px; color: #B7BBC0; vertical-align: top; }
+.hint .k { display: inline-block; width: 22px; height: 22px; border-radius: 4px; margin-right: 8px; margin-top: 3px; vertical-align: top;
+  text-align: center; font-size: 16px; line-height: 22px; font-weight: 600; color: #141414; }
+.k-red { background: #E5534B; } .k-green { background: #4CAF64; } .k-yellow { background: #F5C518; } .k-blue { background: #4A9BE8; }
+.hint .kt { display: inline-block; position: relative; height: 24px; padding: 0 6px; margin-right: 8px; margin-top: 2px; vertical-align: top;
+  border: 1px solid #585E66; border-radius: 4px; font-size: 16px; line-height: 22px; font-weight: 600; color: #B7BBC0; }
+.hint .kt.ret { width: 32px; padding: 0; }
+.hint .kt.ret .ic { left: -1px; top: -5px; background-position: -288px -32px; }
+
+/* ---------- Buttons, Toast, Dialog (SPEC 5.7, 5.12, 5.13) ---------- */
+.btn { position: absolute; height: 48px; padding: 0 22px; border-radius: 8px; background: #2A2E33; color: #F2F2F2;
+  font-size: 18px; line-height: 48px; font-weight: 600; white-space: nowrap;
+  -webkit-transform: translate3d(0,0,0); -webkit-transition: -webkit-transform 120ms cubic-bezier(0,0,0.2,1); }
+.btn.is-focus { background: @accent@; color: #141414; -webkit-transform: translate3d(0,0,0) scale(1.04); }
+.btn.inl { position: relative; display: inline-block; margin-right: 16px; vertical-align: top; }
+.btn.blk { position: relative; display: block; margin-bottom: 8px; }
+#pn-toast { position: absolute; left: 144px; top: 568px; width: 480px; height: 56px; border-radius: 10px; background: #2A2E33;
+  padding: 0 20px 0 56px; font-size: 18px; line-height: 56px; color: #F2F2F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  z-index: 8; opacity: 0; visibility: hidden; -webkit-transform: translate3d(0,16px,0);
+  -webkit-transition: -webkit-transform 150ms cubic-bezier(0,0,0.2,1), opacity 150ms cubic-bezier(0,0,0.2,1); }
+#pn-toast.on { opacity: 1; visibility: visible; -webkit-transform: translate3d(0,0,0); }
+#pn-toast .ic { left: 14px; top: 12px; }
+#pn-over { z-index: 7; visibility: hidden; }
+#pn-over.on { visibility: visible; }
+/* leichte Abdunklung hinter Seitenpanels und aufgeklappter Leiste (statisch, kein Ueberblenden grosser Flaechen) */
+.dim { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; background: rgba(8,9,10,0.6); }   /* F19: 0.45 war auf hellen Bildern zu schwach */
+.nav-dim { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; background: rgba(8,9,10,0.6); visibility: hidden; }
+.nav-dim.on { visibility: visible; }
+.backdrop { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; background: rgba(8,9,10,0.78); }
+.dlg { position: absolute; left: 320px; top: 200px; width: 640px; min-height: 280px; border-radius: 16px; background: #17191C; padding: 40px 48px; }
+.dlg .dt { font-size: 24px; line-height: 32px; font-weight: 600; color: #F2F2F2; }
+.dlg .dx { margin-top: 16px; font-size: 18px; line-height: 26px; color: #B7BBC0; }
+.dlg .db { margin-top: 32px; height: 48px; white-space: nowrap; }
+.dlg .db.v { height: auto; }
+.dlg.c { left: 370px; top: 230px; width: 540px; min-height: 0; padding: 40px 40px 36px; text-align: center; }
+.dlg.c .btn.inl { min-width: 176px; margin: 0 8px; text-align: center; }
+
+/* ---------- Auswahl-/Hilfe-Panel (SPEC 5.19, 10.6) ---------- */
+.panel { position: absolute; left: 840px; top: 0; width: 440px; height: 720px; background: #121316; }
+.panel .pt { position: absolute; left: 32px; top: 48px; width: 376px; }
+.panel .pe { position: absolute; left: 24px; width: 392px; height: 64px; border-radius: 8px; }
+.panel .pe .lb { position: absolute; left: 48px; top: 18px; width: 336px; font-size: 18px; line-height: 28px; font-weight: 600; color: #F2F2F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.panel .pe .ic { left: 8px; top: 16px; background-position-y: -64px; visibility: hidden; }
+.panel .pe.sel .ic { visibility: visible; }
+.panel .pe.is-focus { background: @accent@; } .panel .pe.is-focus .lb { color: #141414; } .panel .pe.is-focus .ic { background-position-y: -96px; }
+.panel .px { position: absolute; left: 32px; top: 112px; width: 376px; font-size: 18px; line-height: 26px; color: #B7BBC0; white-space: pre-line; }
+
+/* ---------- Login (SPEC 7.1) ---------- */
+.wordmark { position: absolute; left: 144px; top: 56px; font-size: 24px; line-height: 32px; font-weight: 600; }
+.step-n { position: absolute; left: 144px; width: 32px; height: 32px; border-radius: 16px; border: 2px solid #585E66; text-align: center;
+  font-size: 16px; line-height: 28px; font-weight: 600; color: #F2F2F2; }
+.step-t { position: absolute; left: 192px; height: 32px; width: 620px; font-size: 18px; line-height: 32px; color: #F2F2F2; white-space: nowrap; }
+.step-t b { font-weight: 600; }
+.code-box { position: absolute; top: 344px; width: 88px; height: 112px; border-radius: 8px; background: #1F2226; color: #F2F2F2; text-align: center;
+  font-size: 64px; line-height: 112px; font-weight: 600; }
+.qr-panel { position: absolute; left: 840px; top: 168px; width: 312px; height: 312px; border-radius: 16px; background: #FFFFFF; }
+.qr-panel img { position: absolute; left: 24px; top: 24px; width: 264px; height: 264px; }
+@-webkit-keyframes pnspin { from { -webkit-transform: rotate(0deg); } to { -webkit-transform: rotate(360deg); } }
+.spinner { position: absolute; width: 40px; height: 40px; border-radius: 20px; border: 4px solid #3A3F45; border-top-color: @accent@;
+  -webkit-animation: pnspin 900ms linear infinite; }
+.spinner.sm { width: 24px; height: 24px; border-radius: 12px; border-width: 3px; }
+.rm .spinner { -webkit-animation: none; }
+
+/* ---------- Profilwahl & PIN (SPEC 5.15, 5.16, 7.2) ---------- */
+.prof { position: absolute; width: 168px; height: 240px; text-align: center; }
+.prof .av { position: absolute; left: 4px; top: 4px; width: 160px; height: 160px; border-radius: 80px; overflow: hidden; color: #F2F2F2;
+  font-size: 64px; line-height: 160px; font-weight: 600;
+  -webkit-transform: translate3d(0,0,0); -webkit-transition: -webkit-transform 150ms cubic-bezier(0,0,0.2,1); }
+.prof .av img { position: absolute; left: 0; top: 0; width: 160px; height: 160px; }
+.prof .nm { position: absolute; left: 0; width: 168px; top: 184px; font-size: 20px; line-height: 28px; font-weight: 600; color: #B7BBC0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prof .sub { position: absolute; left: 0; width: 168px; top: 212px; font-size: 16px; line-height: 24px; color: #B7BBC0; }
+.prof .lock { position: absolute; left: 124px; top: 124px; width: 40px; height: 40px; border-radius: 20px; background: #17191C; z-index: 4;
+  -webkit-transform: translate3d(0,0,0); -webkit-transition: -webkit-transform 150ms cubic-bezier(0,0,0.2,1); }
+/* Schloss liegt ueber dem Fokusrahmen und wandert beim Zoom (1.08) mit dem Kreisrand nach aussen */
+.prof.is-focus .lock { -webkit-transform: translate3d(6px,6px,0); }
+/* heller Ring knapp ausserhalb des dunklen Kreises (Nutzerwunsch): 1 px Abstand, 2 px Linie; Kreis + Symbol unveraendert */
+.prof .lock:before { content: ''; position: absolute; left: -3px; top: -3px; width: 42px; height: 42px; border-radius: 23px; border: 2px solid #B7BBC0; }
+.prof .lock .ic { left: 4px; top: 4px; background-position-y: -64px; }
+.prof.is-focus .av { -webkit-transform: translate3d(0,0,0) scale(1.08); }
+.prof.is-focus .nm { color: #F2F2F2; }
+.av0 { background: #3B4A6B; } .av1 { background: #6B3B47; } .av2 { background: #2F5E55; } .av3 { background: #6B5A33; }
+.av4 { background: #4F3B6B; } .av5 { background: #3D5F73; } .av6 { background: #5C6B3B; } .av7 { background: #73473D; }
+.pdlg { position: absolute; left: 400px; top: 64px; width: 480px; height: 592px; border-radius: 16px; background: #17191C; }
+.pav { position: absolute; left: 192px; top: 32px; width: 96px; height: 96px; border-radius: 48px; overflow: hidden; text-align: center;
+  font-size: 40px; line-height: 96px; font-weight: 600; color: #F2F2F2; }
+.pav img { position: absolute; left: 0; top: 0; width: 96px; height: 96px; }
+.pin-dot { position: absolute; top: 192px; width: 20px; height: 20px; border-radius: 10px; border: 2px solid #858B92; }
+.pin-dot.on { background: #F2F2F2; border-color: #F2F2F2; }
+.pin-dot.bad { background: #E5534B; border-color: #E5534B; }
+.pkey { position: absolute; width: 80px; height: 64px; border-radius: 8px; background: #1F2226; color: #F2F2F2; text-align: center;
+  font-size: 28px; line-height: 64px; font-weight: 600; -webkit-transform: translate3d(0,0,0); }
+.pkey.is-focus { background: @accent@; color: #141414; }
+.pkey .ic { left: 24px; top: 16px; background-position-y: -64px; }
+.pkey.is-focus .ic { background-position-y: -96px; }
+.pkey .spinner { left: 26px; top: 18px; }
+.pmsg { position: absolute; left: 24px; top: 544px; width: 432px; text-align: center; font-size: 16px; line-height: 24px; color: #B7BBC0; }
+
+/* ---------- Einstellungen (SPEC 5.18, 7.13) ---------- */
+.set-cat { position: absolute; left: 144px; width: 280px; height: 48px; border-radius: 8px; padding: 0 20px; font-size: 20px; line-height: 48px;
+  font-weight: 600; color: #B7BBC0; white-space: nowrap; }
+.set-cat .bar { position: absolute; left: 0; top: 12px; width: 4px; height: 24px; border-radius: 2px; background: #F2F2F2; display: none; }
+.set-cat.is-cur { color: #F2F2F2; } .set-cat.is-cur .bar { display: block; }
+.set-cat.is-focus { background: @accent@; color: #141414; } .set-cat.is-focus .bar { display: none; }
+.set-row { position: absolute; left: 464px; width: 736px; height: 64px; border-radius: 8px; border: 3px solid transparent; }
+/* Rahmen immer da (transparent), Fokus aendert nur Farben -> kein Layout pro Fokusschritt (Review L7) */
+.set-row .lb { position: absolute; left: 21px; top: 15px; width: 440px; font-size: 20px; line-height: 28px; font-weight: 600; color: #F2F2F2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.set-row .val { position: absolute; right: 21px; top: 15px; width: 220px; font-size: 18px; line-height: 28px; color: #B7BBC0; white-space: nowrap; text-align: right;
+  overflow: hidden; text-overflow: ellipsis; }
+.set-row .sep { position: absolute; left: 21px; right: 21px; bottom: -3px; height: 1px; background: #23262A; }
+.set-row .toggle { right: 21px; top: 15px; }
+.set-row.is-focus { background: #2A2E33; border-color: @accent@; }
+.set-row.is-focus .val { color: #F2F2F2; }
+.set-row.is-focus .sep { visibility: hidden; }
+.set-row.dis .lb { color: #858B92; }
+.set-desc { position: absolute; left: 464px; top: 528px; width: 736px; height: 80px; border-radius: 8px; background: #17191C; padding: 16px 24px;
+  font-size: 16px; line-height: 24px; color: #B7BBC0; overflow: hidden; }
+/* ---------- Startseite anpassen (SPEC 7.3.1) – Liste x 144, 6 Zeilen sichtbar, ein Container per translate3d ---------- */
+.hr-clip { position: absolute; left: 144px; top: 112px; width: 736px; height: 384px; overflow: hidden; }
+.hr-list { position: absolute; left: 0; top: 0; width: 736px; -webkit-transition: -webkit-transform 150ms ease-out; }
+.hr-row { left: 0; }
+.hr-row .lb { width: 400px; }
+.hr-row .val { right: 85px; width: 200px; }
+.hr-row .mv { position: absolute; right: 21px; top: 15px; width: 48px; height: 28px; display: none; }
+.hr-row .mv i { position: absolute; top: 9px; width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; }
+.hr-row .mv i.up { left: 8px; border-bottom: 10px solid #141414; } .hr-row .mv i.dn { left: 26px; border-top: 10px solid #141414; }
+.hr-row.off .lb { color: #B7BBC0; }
+.hr-row.is-move { background: @accent@; border-color: @accent@; }
+.hr-row.is-move .lb, .hr-row.is-move .val { color: #141414; }
+.hr-row.is-move .toggle { display: none; }
+.hr-row.is-move .mv { display: block; }
+.hr-desc { left: 144px; }
+.hr-how { position: absolute; left: 912px; top: 112px; width: 288px; }
+.hr-how-t { font-size: 20px; line-height: 28px; font-weight: 600; color: #F2F2F2; }
+.hr-how-x { margin-top: 8px; font-size: 16px; line-height: 24px; color: #B7BBC0; }
+.hr-stat { margin-top: 16px; font-size: 16px; line-height: 24px; color: #858B92; }
+.toggle { position: absolute; right: 24px; top: 18px; width: 48px; height: 28px; border-radius: 14px; background: #3A3F45; }
+.toggle i { position: absolute; left: 3px; top: 3px; width: 22px; height: 22px; border-radius: 11px; background: #B7BBC0; }
+.toggle.on { background: #F2F2F2; }
+.toggle.on i { left: 23px; background: #141414; }
+
+/* ---------- Zustands-Block (Leer/Fehler, SPEC 9) ---------- */
+.stb { position: absolute; left: 144px; top: 176px; width: 800px; }
+/* Lade-Skelett der Startseite (statisch, ohne Animation) */
+.skel { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; }
+.skel i { position: absolute; background: #1F2226; border-radius: 6px; }
+.stb .big { position: absolute; left: 0; top: 0; width: 64px; height: 64px; background-image: url(@A/icons.png); background-repeat: no-repeat;
+  -webkit-background-size: 896px 256px; background-size: 896px 256px; background-position: -704px -128px; }
+.stb .st { position: absolute; left: 0; top: 88px; width: 800px; }
+.stb .sx { position: absolute; left: 0; top: 140px; width: 640px; }
+.stb .sb { position: absolute; left: 0; top: 240px; width: 800px; height: 48px; white-space: nowrap; }
+
+/* ---------- Platzhalter / Start ---------- */
+.soon-ov { position: absolute; left: 144px; top: 200px; width: 900px; text-transform: uppercase; }
+.soon-ti { position: absolute; left: 144px; top: 232px; width: 900px; }
+.soon-tx { position: absolute; left: 144px; top: 288px; width: 640px; }
+.splash-wm { position: absolute; left: 0; top: 320px; width: 1280px; text-align: center; font-size: 40px; line-height: 48px; font-weight: 600; }
+.splash-st { position: absolute; left: 0; top: 384px; width: 1280px; text-align: center; }
+
+/* ---------- Zeiger (Smart Control): Blaetter-Pfeile nur bei aktivem Zeiger ---------- */
+.parr { position: absolute; width: 40px; height: 64px; border-radius: 8px; background: #17191C; color: #F2F2F2; text-align: center;
+  font-size: 40px; line-height: 60px; font-weight: 600; z-index: 5; }
+.nocursor, .nocursor div, .nocursor img { cursor: none; }
+/* Variante A: Amber-Pfeil als CSS-Cursor (Spitze 4,4); Variante B: cursor:none + eigenes Element .pcur */
+.cur-a, .cur-a div, .cur-a img { cursor: url(@A/@pointer@.png) 4 4, default; }
+.cur-a.cur-press, .cur-a.cur-press div, .cur-a.cur-press img { cursor: url(@A/@pointer@-press.png) 4 4, default; }
+.cur-b, .cur-b div, .cur-b img { cursor: none; }
+.pcur { position: absolute; left: 0; top: 0; width: 32px; height: 32px; z-index: 10; visibility: hidden; pointer-events: none;
+  background-image: url(@A/@pointer@.png); -webkit-transform: translate3d(0,0,0); }
+.pcur.press { background-image: url(@A/@pointer@-press.png); }
+
+/* ---------- Dev-FPS (nur Dev-Quelle, per INFO,INFO) ---------- */
+#pn-dev { position: absolute; left: 1000px; top: 8px; width: 272px; height: 56px; background: #000000; color: #4CAF64; z-index: 9;
+  font-size: 16px; line-height: 24px; padding: 4px 8px; }
+
+/* ---------- Reduzierte Bewegung (SPEC 8) ---------- */
+.rm .card, .rm .btn, .rm .prof .av, .rm .focus-ring, .rm .strip, .rm .pg, .rm .nav-panel, .rm #pn-toast, .rm .hero-txt { -webkit-transition: none; }
+.rm .card.is-focus, .rm .btn.is-focus, .rm .prof .lock, .rm .prof.is-focus .lock { -webkit-transition: none; }
+.rm .prof.is-focus .av { -webkit-transform: translate3d(0,0,0); }
+.stb .btn.inl { width: 300px; text-align: center; padding: 0; }
+
+/* ---------- P5: Uhr (Startseite), Bildschirmschoner (SPEC 7.14), Offline-Leiste, Tastenbelegung, Willkommenskarte ---------- */
+.hclock { position: absolute; right: 56px; top: 32px; height: 40px; padding: 0 14px; border-radius: 8px; background: rgba(14,15,17,0.6); font-size: 24px; line-height: 40px; font-weight: 600; color: #F2F2F2; }
+.scs { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; background: #000000; z-index: 9; }
+.scs-img { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; }
+.scs-dim { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; background: rgba(0,0,0,0.35); }
+.scs-isl { position: absolute; width: 360px; padding: 12px 20px 14px; border-radius: 12px; background: rgba(14,15,17,0.72); }
+.scs-ck { font-size: 40px; line-height: 48px; font-weight: 600; color: #F2F2F2; }
+.scs-ti { font-size: 18px; line-height: 24px; color: #F2F2F2; }
+.scs-sb { font-size: 16px; line-height: 22px; color: #B7BBC0; }
+.netbar { position: absolute; z-index: 6; left: 340px; top: 16px; width: 600px; height: 48px; border-radius: 10px; background: #3A2A12; padding: 0 20px 0 52px;
+  font-size: 18px; line-height: 48px; color: #F2F2F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.netbar .ic { left: 14px; top: 8px; }
+.netbar.ok { background: #1F3326; }
+.ky-row { position: absolute; left: 464px; width: 736px; height: 44px; }
+.ky-cap { position: absolute; left: 0; top: 8px; width: 168px; height: 28px; margin: 0; text-align: right; white-space: nowrap; }
+.ky-cap .k, .ky-cap .kt { margin-right: 0; }
+.ky-t { position: absolute; left: 192px; top: 8px; width: 544px; font-size: 18px; line-height: 28px; color: #F2F2F2; }
+.dlg.wc { top: 150px; }
+.wc-row { display: block; height: 28px; margin: 18px 0 0; font-size: 18px; color: #F2F2F2; }
+.wc-row .k, .wc-row .kt { margin-right: 14px; }
+.wc-more { margin-top: 24px; font-size: 16px; line-height: 24px; color: #B7BBC0; }
+.wc-btn { margin-top: 24px; min-width: 176px; text-align: center; }
+.pl-lost { left: 400px; top: 248px; width: 480px; height: 192px; border-radius: 16px; background: #17191C; }
+.pl-lostti { position: absolute; left: 24px; top: 20px; width: 432px; font-size: 22px; line-height: 30px; font-weight: 600; color: #F2F2F2; }
+.pl-lostx { position: absolute; left: 24px; top: 56px; width: 432px; font-size: 16px; line-height: 24px; color: #B7BBC0; }
+.pl-lost .pl-upb { top: 128px; }
+.pl-sub.sz-xl span { font-size: 46px; line-height: 62px; }
+.pl-sub.yel span { color: #F5D547; }
+
+/* ---------- Player & OSD (SPEC 7.10): Inseln ueber dem Video, ohne Ein-/Ausblend-Animation ---------- */
+.scr.pl { background: transparent; }
+.pl-vbg { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; background: #2B3440; }
+.pl-isl { position: absolute; background: rgba(14,15,17,0.92); border-radius: 12px; }
+.pl-top { position: absolute; left: 64px; top: 36px; width: 1152px; height: 72px; }
+.pl-ti { left: 0; top: 0; width: 640px; height: 72px; padding: 8px 20px; }
+.pl-ti.one { padding-top: 20px; } .pl-ti.one .pl-t1 { display: none; }
+.in-player #pn-hints { width: 1048px; }
+.pl-t1 { height: 24px; font-size: 16px; line-height: 24px; color: #B7BBC0; }
+.pl-t2 { height: 32px; font-size: 24px; line-height: 32px; font-weight: 600; color: #F2F2F2; }
+.pl-clk { left: 832px; top: 0; width: 320px; height: 72px; padding: 0 20px; text-align: right; font-size: 18px; line-height: 72px; color: #F2F2F2; white-space: nowrap; }
+.pl-bot { left: 64px; top: 556px; width: 1152px; height: 128px; }
+/* Scrubber (SPEC 5.10): 6 px, fokussiert 10 px (nur Klasse), Marker-Segmente, Kapitelgrenzen als 3-px-Luecken */
+.pl-tr { position: absolute; left: 32px; top: 24px; width: 1088px; height: 6px; border-radius: 3px; background: #3A3F45; overflow: hidden; }
+.pl-bot.foc .pl-tr { top: 22px; height: 10px; border-radius: 5px; }
+.pl-segs i { position: absolute; top: 0; height: 10px; background: #8C7A52; }
+.pl-pl { position: absolute; left: 0; top: 0; width: 0; height: 10px; background: @accent@; }
+.pl-cg i { position: absolute; top: 0; width: 3px; height: 10px; background: #0E0F11; }
+.pl-hd { position: absolute; left: 0; top: 15px; width: 24px; height: 24px; border-radius: 12px; background: #F2F2F2; border: 4px solid @accent@;
+  -webkit-transform: translate3d(0,0,0); }
+.pl-tm0 { position: absolute; left: 32px; top: 38px; width: 200px; font-size: 18px; line-height: 26px; color: #F2F2F2; }
+.pl-tm1 { position: absolute; right: 32px; top: 38px; width: 200px; text-align: right; font-size: 18px; line-height: 26px; color: #B7BBC0; }
+.pl-skl { position: absolute; left: 326px; top: 37px; width: 500px; text-align: center; font-size: 20px; line-height: 28px; font-weight: 600; color: @accent@; white-space: nowrap; }
+.pl-chn { position: absolute; left: 32px; top: 80px; width: 352px; height: 24px; font-size: 16px; line-height: 24px; color: #B7BBC0; }
+.pl-mh { position: absolute; left: 240px; top: 38px; width: 672px; height: 28px; text-align: center; white-space: nowrap; }
+.pl-mh .hint { margin: 0 12px; }
+/* Knopfreihe (SPEC 5.7/7.10): 48er Icon-Knoepfe, Play/Pause 64 rund; Fokus Amber + scale(1.08), Label darueber (5.22) */
+.pl-b { position: absolute; width: 48px; height: 48px; border-radius: 8px; background: #2A2E33;
+  -webkit-transform: translate3d(0,0,0); -webkit-transition: -webkit-transform 120ms cubic-bezier(0,0,0.2,1); }
+.pl-b.lg { width: 64px; height: 64px; border-radius: 32px; }
+.pl-b .ic { left: 8px; top: 8px; background-position-y: -64px; } .pl-b.lg .ic { left: 16px; top: 16px; }
+.pl-b.is-focus { background: @accent@; -webkit-transform: translate3d(0,0,0) scale(1.08); } .pl-b.is-focus .ic { background-position-y: -96px; }
+.pl-b .num { position: absolute; left: 0; top: 12px; width: 48px; text-align: center; font-size: 16px; line-height: 24px; font-weight: 600; color: #F2F2F2; }
+.pl-b.is-focus .num { color: #141414; }
+.rm .pl-b { -webkit-transition: none; } .rm .pl-b.is-focus { -webkit-transform: translate3d(0,0,0); }
+.pl-lbl { position: absolute; top: 516px; width: 300px; height: 32px; text-align: center; }
+.pl-lbl span { display: inline-block; height: 32px; padding: 0 10px; border-radius: 6px; background: #17191C; color: #F2F2F2;
+  font-size: 16px; line-height: 32px; font-weight: 600; white-space: nowrap; }
+.pl-th { position: absolute; top: 372px; width: 240px; height: 163px; border-radius: 6px; overflow: hidden; background: #17191C; }
+.pl-th img { position: absolute; left: 0; top: 0; width: 240px; height: 135px; }
+.pl-tht { position: absolute; left: 0; top: 135px; width: 240px; height: 28px; text-align: center; font-size: 16px; line-height: 28px; color: #F2F2F2; }
+.pl-spin { position: absolute; left: 440px; top: 304px; width: 400px; height: 112px; border-radius: 12px; background: rgba(14,15,17,0.92); }
+.pl-spt { position: absolute; left: 16px; top: 64px; width: 368px; height: 48px; text-align: center; font-size: 16px; line-height: 20px; color: #F2F2F2; overflow: hidden; }
+.pl-skip { position: absolute; right: 64px; top: 452px; height: 48px; padding: 0 14px 0 22px; border-radius: 8px; background: @accent@; color: #141414;
+  font-size: 18px; line-height: 48px; font-weight: 600; white-space: nowrap; }
+.pl-skip .kc { display: inline-block; margin-left: 14px; height: 24px; padding: 0 6px; border: 1px solid #141414; border-radius: 4px;
+  font-size: 16px; line-height: 22px; vertical-align: middle; margin-top: -3px; }
+.pl-skip.is-focus { background: #F2F2F2; }
+.pl-up { position: absolute; left: 816px; top: 420px; width: 400px; height: 232px; border-radius: 16px; background: #17191C; }
+.pl-up img { position: absolute; left: 16px; top: 16px; width: 176px; height: 99px; border-radius: 6px; }
+.pl-upbar { position: absolute; left: 16px; top: 123px; width: 176px; height: 4px; background: #3A3F45; overflow: hidden; }
+.pl-upbar i { position: absolute; left: 0; top: 0; width: 176px; height: 4px; background: @accent@; -webkit-transform-origin: 0 0; }
+.pl-upov { position: absolute; left: 208px; top: 16px; width: 176px; font-size: 16px; line-height: 24px; font-weight: 600; color: #B7BBC0; }
+.pl-upti { position: absolute; left: 208px; top: 40px; width: 176px; height: 48px; overflow: hidden; font-size: 18px; line-height: 24px; font-weight: 600; color: #F2F2F2; }
+.pl-upin { position: absolute; left: 208px; top: 96px; width: 176px; font-size: 16px; line-height: 24px; color: #B7BBC0; }
+.pl-upb { top: 168px; width: 176px; padding: 0; text-align: center; }
+.pl-last { top: 468px; height: 184px; } .pl-last .pl-upb { top: 120px; }   /* kompakt, Knoepfe auf derselben Hoehe wie beim Countdown (y 588) */
+.pl-lastti { position: absolute; left: 16px; top: 16px; width: 368px; font-size: 18px; line-height: 24px; font-weight: 600; color: #F2F2F2; }
+.pl-lastx { position: absolute; left: 16px; top: 48px; width: 368px; font-size: 16px; line-height: 24px; color: #B7BBC0; }
+.pl-sub { position: absolute; left: 140px; bottom: 56px; width: 1000px; text-align: center; }
+.pl-sub.hi { bottom: 120px; } .pl-sub.up { bottom: 212px; }
+/* Untertitel-Darstellung (Einstellung / Mehr): Groesse, Hintergrund; kein text-shadow (SPEC 7.10) */
+.pl-sub span { background: rgba(0,0,0,0.6); padding: 2px 12px; font-size: 30px; line-height: 42px; color: #FFFFFF; white-space: pre-line; }
+.pl-sub.sz-small span { font-size: 24px; line-height: 34px; } .pl-sub.sz-large span { font-size: 38px; line-height: 52px; }
+.pl-sub.bg-solid span { background: #000000; } .pl-sub.bg-none span { background: transparent; }
+.pl-errbg { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; background: #0E0F11; }
+/* Ton & Untertitel: Reiter + scrollende Liste */
+.tp-tab { position: absolute; top: 112px; height: 40px; padding: 0 12px; font-size: 20px; line-height: 40px; font-weight: 600; color: #858B92; border-bottom: 3px solid transparent; }
+.tp-tab.is-cur { color: #F2F2F2; border-bottom-color: #F2F2F2; }
+.tp-clip { position: absolute; left: 0; top: 160px; width: 440px; height: 504px; overflow: hidden; }
+.tp-list { position: absolute; left: 0; top: 0; width: 440px; -webkit-transform: translate3d(0,0,0); }
+.panel .pe.two .lb { top: 6px; }
+.panel .pe.im img { position: absolute; left: 8px; top: 5px; width: 96px; height: 54px; border-radius: 4px; background: #24272B; }
+.panel .pe.im .lb, .panel .pe.im .sb { left: 116px; width: 268px; }
+.panel .pe .sb { position: absolute; left: 48px; top: 34px; width: 336px; font-size: 16px; line-height: 22px; color: #B7BBC0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.panel .pe.is-focus .sb { color: #141414; }
+/* Einstellungen: scrollende Zeilenliste (6 sichtbar, ein Container per translate3d) */
+.set-clip { position: absolute; left: 464px; top: 112px; width: 736px; height: 384px; overflow: hidden; }
+.set-list { position: absolute; left: 0; top: 0; width: 736px; -webkit-transform: translate3d(0,0,0); -webkit-transition: -webkit-transform 150ms cubic-bezier(0,0,0.2,1); }
+.set-list .set-row { left: 0; }
+.rm .set-list { -webkit-transition: none; }
+
+/* ===== M3b: Bibliothek, Details, Suche (SPEC 7.5–7.9) ===== */
+/* Chips (SPEC 5.8): 32 hoch, Radius 6, 16 px 600; aktiv = 1-px-Rahmen text-2 + Text text-1; Fokus Amber */
+.lchips { position: absolute; left: 144px; top: 120px; width: 1072px; height: 32px; white-space: nowrap; }
+.chip { display: inline-block; position: relative; height: 32px; padding: 0 12px; margin-right: 12px; border-radius: 6px; background: #1F2226;
+  color: #B7BBC0; font-size: 16px; line-height: 32px; font-weight: 600; vertical-align: top; border: 1px solid #1F2226;
+  -webkit-transform: translate3d(0,0,0); }
+.chip.act { border-color: #B7BBC0; color: #F2F2F2; }
+.chip.is-focus { background: @accent@; border-color: @accent@; color: #141414; }
+/* Raster: Clip unter der Chip-Zeile, EIN Seiten-Container per translate3d */
+.gclip { position: absolute; left: 0; top: 164px; width: 1280px; height: 556px; overflow: hidden; }
+.gpg { position: absolute; left: 0; top: 0; width: 1280px; height: 10px;
+  -webkit-transform: translate3d(0,0,0); -webkit-transition: -webkit-transform 150ms cubic-bezier(0,0,0.2,1); }
+.gpg .cap { top: 0; }
+/* Buchstaben-Register (SPEC 7.5): 5 Positionen bei x 1160, aktueller Buchstabe 40 px im 56er-Kasten */
+.reg { position: absolute; text-align: center; }
+/* Sprung-Blase (SPEC 5.23) */
+.jump { position: absolute; left: 552px; top: 276px; min-width: 160px; height: 64px; padding: 0 16px; border-radius: 8px; background: #17191C;
+  border: 2px solid @accent@; text-align: center; font-size: 32px; line-height: 60px; font-weight: 600; color: #F2F2F2; z-index: 5; white-space: nowrap; }
+/* Details (SPEC 7.6/7.7) */
+.dinfo { position: absolute; left: 144px; top: 0; width: 1000px; height: 260px; opacity: 1;
+  -webkit-transform: translate3d(0,0,0); -webkit-transition: opacity 120ms cubic-bezier(0,0,0.2,1), -webkit-transform 150ms cubic-bezier(0,0,0.2,1); }
+.dsec { position: absolute; left: 0; top: 248px; width: 1280px; height: 10px; }
+.dinfo.out { opacity: 0; -webkit-transition: -webkit-transform 150ms cubic-bezier(0,0,0.2,1); }
+.d-ov { position: absolute; left: 0; top: 48px; width: 864px; text-transform: uppercase; }
+.d-ti { position: absolute; left: 0; top: 72px; width: 864px; }
+.d-me { position: absolute; left: 0; top: 124px; width: 864px; }
+.d-de { position: absolute; left: 0; top: 156px; width: 620px; height: 52px; overflow: hidden; -webkit-line-clamp: 2; }
+.d-chips { position: absolute; left: 0; top: 216px; width: 900px; height: 28px; white-space: nowrap; }
+.chip-tech { display: inline-block; height: 28px; padding: 0 10px; margin-right: 8px; border: 1px solid #3A3F45; border-radius: 6px;
+  font-size: 16px; line-height: 26px; color: #B7BBC0; vertical-align: top; }
+.d-btns { position: absolute; left: 352px; top: 448px; width: 1072px; height: 48px; white-space: nowrap; }
+.btn.ib { width: 48px; padding: 0; }
+.btn.ib .ic { left: 8px; top: 8px; background-position-y: -64px; }
+.btn.ib.is-focus .ic { background-position-y: -96px; }
+.btn.ib.is-focus { -webkit-transform: translate3d(0,0,0) scale(1.08); }
+.d-btns.dim .btn { color: #858B92; }
+.d-btns.dim .btn.ib .ic { background-position-y: 0; }
+.blbl { position: absolute; top: 408px; width: 160px; height: 32px; text-align: center; }
+.blbl { font-size: 16px; line-height: 32px; font-weight: 600; color: #F2F2F2; }
+.d-tclip { position: absolute; left: 128px; top: 332px; width: 464px; height: 44px; overflow: hidden; }
+.d-tstrip { position: absolute; left: 0; top: 0; width: 4000px; height: 44px; white-space: nowrap;
+  -webkit-transform: translate3d(0,0,0); -webkit-transition: -webkit-transform 150ms cubic-bezier(0,0,0.2,1); }
+.tab { display: inline-block; position: relative; height: 40px; padding: 0 16px; margin-right: 8px; border-radius: 8px; vertical-align: top;
+  font-size: 20px; line-height: 40px; font-weight: 600; color: #B7BBC0; border-bottom: 3px solid transparent; }
+.tab.is-cur { color: #F2F2F2; border-bottom-color: #F2F2F2; }
+.tab.is-focus { background: @accent@; color: #141414; border-bottom-color: @accent@; }
+.d-sst { position: absolute; left: 600px; top: 334px; width: 200px; text-align: right; white-space: nowrap; overflow: hidden; }
+.d-sbar { position: absolute; left: 800px; top: 364px; width: 416px; height: 6px; }
+.ss-seg { position: absolute; top: 0; height: 6px; background: #3A3F45; overflow: hidden; }
+.ss-seg i { position: absolute; left: 0; top: 0; height: 6px; background: #B7BBC0; }
+.ss-seg.sel { background: #585E66; } .ss-seg.sel i { background: #F2F2F2; }
+/* Besetzung (SPEC 7.6): runde Bilder 120 px, Name + Rolle */
+.card-cast { width: 120px; height: 120px; border-radius: 60px; } .card-cast img { width: 120px; height: 120px; }
+.card-cast .ph { left: 8px; right: 8px; bottom: 40px; text-align: center; }
+.cap-cast { width: 120px; text-align: center; }
+.fr-cast { width: 136px; height: 136px; border-radius: 68px; }
+/* Suche (SPEC 7.9, 5.14) */
+.sfield { position: absolute; left: 144px; top: 48px; width: 352px; height: 56px; border-radius: 8px; background: #1F2226; overflow: hidden; }
+.sfield .ic { left: 12px; top: 12px; background-position-y: -32px; }
+.sfield .q { position: absolute; left: 52px; top: 12px; width: 288px; height: 32px; font-size: 22px; line-height: 32px; font-weight: 600; color: #F2F2F2; white-space: nowrap; overflow: hidden; }
+.sfield .q u { text-decoration: underline; }
+.caret { display: inline-block; width: 2px; height: 26px; margin-left: 2px; background: @accent@; vertical-align: -5px; }
+.key { position: absolute; width: 52px; height: 52px; border-radius: 8px; background: #1F2226; color: #F2F2F2; text-align: center;
+  font-size: 22px; line-height: 52px; font-weight: 600; -webkit-transform: translate3d(0,0,0); }
+.key.wide { width: 172px; font-size: 16px; }
+.key.is-focus { background: @accent@; color: #141414; }
+.t9b { position: absolute; left: 144px; top: 4px; height: 40px; padding: 0 8px; border-radius: 8px; background: @accent@; white-space: nowrap; z-index: 5; }
+.t9b span { display: inline-block; width: 28px; text-align: center; font-size: 22px; line-height: 40px; font-weight: 600; color: #141414; }
+.t9b span.on { background: #141414; color: @accent@; border-radius: 6px; }
+.sclip { position: absolute; left: 0; top: 52px; width: 1280px; height: 668px; overflow: hidden; }
+.sres { position: absolute; left: 0; top: -52px; width: 1280px; height: 720px;
+  -webkit-transform: translate3d(0,0,0); -webkit-transition: -webkit-transform 150ms cubic-bezier(0,0,0.2,1); }
+.sres .hrow { left: 416px; width: 864px; }
+.sres .rclip { left: 128px; width: 736px; }
+.card-poster-s { width: 144px; height: 216px; } .card-poster-s img { width: 144px; height: 216px; }
+.cap-poster-s { width: 144px; }
+.fr-poster-s { width: 160px; height: 232px; }
+.srecent { position: absolute; left: 560px; top: 48px; width: 656px; }
+.srecent .chip { margin-bottom: 12px; }
+.rm .gpg, .rm .d-tstrip, .rm .sres, .rm .dinfo, .rm .chip, .rm .key { -webkit-transition: none; }
+/* Bibliothek: Ansichten Mittel/Klein/Liste (NUTZER-FEEDBACK-REGELN 2) und volle A–Z-Leiste (Regel 1) */
+.card-poster-xs { width: 96px; height: 144px; } .card-poster-xs img { width: 96px; height: 144px; }
+.cap-poster-xs { width: 96px; }
+.fr-poster-xs { width: 112px; height: 160px; }
+.card-list { width: 976px; height: 72px; background: #17191C; }
+.card-list img { width: 48px; height: 72px; }
+.card-list.is-focus { -webkit-transform: translate3d(0,0,0); background: #2A2E33; }
+.card-list .prog { left: 72px; right: auto; width: 200px; bottom: 8px; }
+.card-list .ph { display: none; }
+.cap-list { width: 860px; }
+.fr-list { width: 992px; height: 88px; }
+.regcol { position: absolute; left: 1160px; top: 168px; width: 56px; height: 460px; }
+.regcol .reg { left: 0; width: 56px; height: 17px; font-size: 16px; line-height: 17px; color: #858B92; }
+.regcol .reg.off { color: #3A3F45; }
+.regcol .reg.cur { height: 17px; border-radius: 4px; font-size: 16px; line-height: 17px; font-weight: 600; color: #F2F2F2; background: #2A2E33; }
+.regcol .reg.cur.is-focus { background: @accent@; color: #141414; }
+.d-poster { position: absolute; left: 144px; top: 232px; width: 176px; height: 264px; border-radius: 6px; overflow: hidden; background: #1F2226; }
+.d-poster img { position: absolute; left: 0; top: 0; width: 176px; height: 264px; }
+.d-poster { opacity: 1; -webkit-transition: opacity 120ms cubic-bezier(0,0,0.2,1); }
+.d-poster.out { opacity: 0; }
+.d-pfb { position: absolute; left: 0; top: 0; width: 176px; height: 264px; padding: 24px 12px; overflow: hidden;
+  font-size: 22px; line-height: 29px; font-weight: 600; color: #F2F2F2; text-align: center; word-wrap: break-word; }
+.rm .d-poster { -webkit-transition: none; }
+/* kompakter Kopf (Abschnitte): dunkles Band hinter Ueberzeile/Titel/Metazeile, nur Opazitaet (GPU) */
+.dtop { position: absolute; left: 0; top: 0; width: 1280px; height: 288px; opacity: 0; -webkit-transform: translate3d(0,0,0) rotate(180deg);
+  -webkit-transition: opacity 120ms cubic-bezier(0,0,0.2,1); }
+.dtop.on { opacity: 0.92; }
+.rm .dtop { -webkit-transition: none; }
+/* Suche: Ergebniskarten 120x180 (zwei Gruppen passen untereinander), Loeschen-Taste mit Sprite-Symbol */
+.card-poster-q { width: 120px; height: 180px; } .card-poster-q img { width: 120px; height: 180px; }
+.cap-poster-q { width: 120px; }
+.fr-poster-q { width: 136px; height: 196px; }
+.key.del { padding-left: 28px; }
+.key.del .ic { left: 22px; top: 10px; background-position-y: -64px; }
+.key.del.is-focus .ic { background-position-y: -96px; }
+/* ---------- M4 Musik & Hoerbuecher: quadratische Karten, Titelliste, Jetzt laeuft, Mini-Player ---------- */
+.card-sq { width: 176px; height: 176px; } .card-sq img { width: 176px; height: 176px; } .cap-sq { width: 176px; } .fr-sq { width: 192px; height: 192px; }
+.card-sq-s { width: 144px; height: 144px; } .card-sq-s img { width: 144px; height: 144px; } .cap-sq-s { width: 144px; } .fr-sq-s { width: 160px; height: 160px; }
+.card-sq-xs { width: 96px; height: 96px; } .card-sq-xs img { width: 96px; height: 96px; } .cap-sq-xs { width: 96px; } .fr-sq-xs { width: 112px; height: 112px; }
+.card-list-sq { width: 976px; height: 56px; background: #17191C; }
+.card-list-sq img { left: 4px; top: 4px; width: 48px; height: 48px; border-radius: 4px; }
+.card-list-sq.is-focus { -webkit-transform: translate3d(0,0,0); background: #2A2E33; }
+.card-list-sq .prog { left: 64px; right: auto; width: 200px; bottom: 4px; }
+.card-list-sq .ph { display: none; }
+.cap-list-sq { width: 860px; } .fr-list-sq { width: 992px; height: 72px; }
+.d-poster.sq { top: 304px; width: 192px; height: 192px; } .d-poster.sq img, .d-poster.sq .d-pfb { width: 192px; height: 192px; }
+.tl-head { position: absolute; left: 144px; width: 900px; height: 32px; }
+.tl-head .cnt { font-size: 16px; font-weight: 400; color: #858B92; padding-left: 10px; }
+.tl-clip { position: absolute; overflow: hidden; }
+.tl-list { position: absolute; left: 0; top: 0; width: 10px; height: 10px;
+  -webkit-transform: translate3d(0,0,0); -webkit-transition: -webkit-transform 150ms cubic-bezier(0,0,0.2,1); }
+.tl-row { position: absolute; left: 0; height: 52px; border-radius: 6px; background: #17191C; }
+.tl-row.is-focus { background: @accent@; }
+.tl-n { position: absolute; left: 0; top: 13px; width: 48px; text-align: center; font-size: 16px; line-height: 26px; color: #858B92; }
+.tl-t { position: absolute; left: 56px; top: 13px; width: 700px; height: 26px; font-size: 18px; line-height: 26px; font-weight: 600; color: #F2F2F2; }
+.tl-s { position: absolute; left: 56px; top: 27px; width: 700px; height: 22px; font-size: 16px; line-height: 22px; color: #B7BBC0; display: none; }
+.tl-row.two .tl-t { top: 3px; } .tl-row.two .tl-s { display: block; }
+.tl-d { position: absolute; right: 16px; top: 13px; width: 120px; text-align: right; font-size: 16px; line-height: 26px; color: #B7BBC0; }
+.tl-p { position: absolute; right: 152px; top: 24px; width: 160px; height: 4px; border-radius: 2px; background: #3A3F45; overflow: hidden; }
+.tl-p i { position: absolute; left: 0; top: 0; height: 4px; background: @accent@; }
+.tl-row.done .tl-t { color: #858B92; }
+.tl-row.is-focus .tl-n, .tl-row.is-focus .tl-t, .tl-row.is-focus .tl-s, .tl-row.is-focus .tl-d { color: #141414; }
+.tl-row.is-focus .ic { background-position-y: -96px; }
+.rm .tl-list { -webkit-transition: none; }
+.np-cover { position: absolute; left: 144px; top: 112px; width: 400px; height: 400px; border-radius: 8px; overflow: hidden; background: #1F2226; }
+.np-cover img { position: absolute; left: 0; top: 0; width: 400px; height: 400px; }
+.np-ov { position: absolute; left: 600px; top: 120px; width: 560px; text-transform: uppercase; }
+.np-ti { position: absolute; left: 600px; top: 148px; width: 560px; height: 80px; overflow: hidden; }
+.np-ar { position: absolute; left: 600px; top: 236px; width: 560px; }
+.np-al { position: absolute; left: 600px; top: 276px; width: 560px; }
+.np-ch { position: absolute; left: 600px; top: 312px; width: 560px; color: #F2F2F2; }
+.np-st { position: absolute; left: 600px; top: 352px; width: 560px; }
+.np-bar { position: absolute; left: 600px; top: 401px; width: 536px; height: 6px; border-radius: 3px; background: #3A3F45; overflow: hidden; }
+.np-bar i { position: absolute; left: 0; top: 0; width: 0; height: 6px; background: @accent@; }
+.np-tm0 { position: absolute; left: 600px; top: 416px; width: 200px; font-size: 18px; line-height: 26px; color: #F2F2F2; }
+.np-tm1 { position: absolute; left: 936px; top: 416px; width: 200px; text-align: right; font-size: 18px; line-height: 26px; color: #B7BBC0; }
+.np-b { position: absolute; }
+.np-dot { position: absolute; left: 20px; bottom: 4px; width: 8px; height: 4px; border-radius: 2px; background: @accent@; }
+.np-b.is-focus .np-dot { background: #141414; }
+.np-lbl { position: absolute; top: 560px; width: 300px; height: 28px; text-align: center; font-size: 16px; line-height: 28px; font-weight: 600; color: #F2F2F2; white-space: nowrap; }
+.np-nx { position: absolute; left: 600px; top: 600px; width: 560px; }
+.mini { position: absolute; left: 856px; top: 572px; width: 360px; height: 64px; border-radius: 8px; background: rgba(23,25,28,0.96); overflow: hidden; z-index: 5; }
+.mini img { position: absolute; left: 8px; top: 8px; width: 48px; height: 48px; border-radius: 4px; }
+.mini-t1 { position: absolute; left: 68px; top: 8px; width: 180px; height: 24px; font-size: 16px; line-height: 24px; font-weight: 600; color: #F2F2F2; }
+.mini-t2 { position: absolute; left: 68px; top: 32px; width: 180px; height: 22px; font-size: 16px; line-height: 22px; color: #B7BBC0; }
+.mini-k { position: absolute; left: 300px; top: 21px; width: 22px; height: 22px; border-radius: 4px; text-align: center; font-size: 16px; line-height: 22px; font-weight: 600; color: #141414; }
+.mini-bar { position: absolute; left: 0; bottom: 0; width: 360px; height: 3px; background: #3A3F45; }
+.mini-bar i { position: absolute; left: 0; top: 0; width: 0; height: 3px; background: @accent@; }
+/* perf2-Versuch (nur per Messlauf 'capl' aktiv): Beschriftungen als eigene GPU-Ebene */
+.capl .cap { -webkit-transform: translate3d(0,0,0); }

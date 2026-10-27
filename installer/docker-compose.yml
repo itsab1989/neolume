@@ -1,0 +1,13 @@
+# Neolume – optional helper on a NAS (Docker Compose / Synology Container Manager "Project").
+# Before starting: run the setup program once on a computer, tick "Set up the helper" and, under "Advanced",
+# "Remember access" + the NAS IP address; then copy helper.json into the folder mounted at /data below.
+# Details: installer/README.md ("Optional helper") and installer/BUILD.md ("Docker").
+services:
+  neolume-helper:
+    image: ghcr.io/itsab1989/neolume-setup:latest   # <APP_SLUG>-setup; pin a version tag instead of latest if you like
+    container_name: neolume-helper
+    network_mode: host                # required: the helper must see the TV's real IP (LAN-only checks); uses port 32499
+    restart: unless-stopped
+    user: "1026:100"                  # your NAS user:group id (Synology: run "id" via SSH); must be able to read helper.json
+    volumes:
+      - /volume1/docker/neolume:/data:ro

@@ -1,0 +1,56 @@
+{
+ "MediaContainer": {
+  "generalDecisionCode": 1001,
+  "generalDecisionText": "Direct play not available; Conversion OK.",
+  "directPlayDecisionCode": 3000,
+  "directPlayDecisionText": "App cannot direct play this item. No direct play video profile exists for protocol http, with container mkv, video codec h264, and audio codec truehd.",
+  "transcodeDecisionCode": 1001,
+  "transcodeDecisionText": "Direct play not available; Conversion OK.",
+  "Metadata": [
+   {
+    "ratingKey": "19820",
+    "type": "movie",
+    "duration": 5290656,
+    "Media": [
+     {
+      "protocol": "hls",
+      "container": "mpegts",
+      "videoCodec": "h264",
+      "audioCodec": "ac3",
+      "width": 1920,
+      "height": 800,
+      "bitrate": 23884,
+      "Part": [
+       {
+        "id": "27872",
+        "decision": "transcode",
+        "duration": 5290656,
+        "container": "mpegts",
+        "Stream": [
+         {
+          "id": "80984",
+          "streamType": 1,
+          "codec": "h264",
+          "decision": "copy",
+          "languageCode": "eng",
+          "bitDepth": 8,
+          "width": 1920,
+          "height": 800
+         },
+         {
+          "id": "80985",
+          "streamType": 2,
+          "codec": "ac3",
+          "decision": "transcode",
+          "languageCode": "deu",
+          "selected": true
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

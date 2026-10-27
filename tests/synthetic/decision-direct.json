@@ -1,0 +1,52 @@
+{
+ "MediaContainer": {
+  "generalDecisionCode": 1000,
+  "generalDecisionText": "Direct play OK.",
+  "directPlayDecisionCode": 1000,
+  "directPlayDecisionText": "Direct play OK.",
+  "Metadata": [
+   {
+    "ratingKey": "2345",
+    "type": "episode",
+    "duration": 3185057,
+    "Media": [
+     {
+      "container": "mkv",
+      "videoCodec": "h264",
+      "audioCodec": "ac3",
+      "width": 1280,
+      "height": 720,
+      "bitrate": 3042,
+      "Part": [
+       {
+        "id": "25307",
+        "key": "/library/parts/25307/1461260780/file.mkv",
+        "decision": "directplay",
+        "duration": 3185057,
+        "container": "mkv",
+        "Stream": [
+         {
+          "id": "70833",
+          "streamType": 1,
+          "codec": "h264",
+          "languageCode": "eng",
+          "bitDepth": 8,
+          "width": 1280,
+          "height": 720
+         },
+         {
+          "id": "70834",
+          "streamType": 2,
+          "codec": "ac3",
+          "languageCode": "deu",
+          "selected": true
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

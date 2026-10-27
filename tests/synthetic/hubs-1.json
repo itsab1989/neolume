@@ -1,0 +1,12 @@
+{ "MediaContainer": { "size": 5, "Hub": [
+  { "hubIdentifier": "movie.inprogress.1", "context": "hub.movie.inprogress", "type": "movie", "title": "Fortsetzen", "size": 1,
+    "Metadata": [ { "ratingKey": "2001", "type": "movie", "title": "Der stille Berg", "librarySectionID": 1 } ] },
+  { "hubIdentifier": "movie.recentlyreleased.1", "context": "hub.movie.recentlyreleased", "type": "movie", "title": "Zuletzt veröffentlichte Filme", "size": 2,
+    "Metadata": [ { "ratingKey": "2101", "type": "movie", "title": "Morgenrot", "librarySectionID": 1, "thumb": "/library/metadata/2101/thumb/1" },
+                  { "ratingKey": "2102", "type": "movie", "title": "Abendstern", "librarySectionID": 1, "thumb": "/library/metadata/2102/thumb/1" } ] },
+  { "hubIdentifier": "movie.genre.1.143", "context": "hub.movie.genre", "type": "movie", "title": "Top-Filme in Action", "size": 1,
+    "Metadata": [ { "ratingKey": "2103", "type": "movie", "title": "Sturmlauf", "librarySectionID": 1 } ] },
+  { "hubIdentifier": "movie.curated.1.1", "context": "hub.movie.curated", "type": "movie", "title": "Gruselabend", "size": 1,
+    "Metadata": [ { "ratingKey": "2104", "type": "movie", "title": "Nebelhaus", "librarySectionID": 1 } ] },
+  { "hubIdentifier": "movie.recentlyadded.1", "context": "hub.movie.recentlyadded", "type": "movie", "title": "Zuletzt in Filme hinzugefügt", "size": 0 }
+] } }

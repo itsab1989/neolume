@@ -1,0 +1,57 @@
+[
+ {
+  "name": "Wohnzimmer",
+  "product": "Plex Media Server",
+  "provides": "server",
+  "clientIdentifier": "mid-own",
+  "owned": true,
+  "accessToken": "tok-own",
+  "connections": [
+   {
+    "protocol": "https",
+    "address": "10.0.0.5",
+    "port": 32400,
+    "uri": "https://10-0-0-5.x.plex.direct:32400",
+    "local": true,
+    "relay": false,
+    "IPv6": false
+   },
+   {
+    "protocol": "https",
+    "address": "203.0.113.9",
+    "port": 41000,
+    "uri": "https://203-0-113-9.x.plex.direct:41000",
+    "local": false,
+    "relay": false,
+    "IPv6": false
+   }
+  ]
+ },
+ {
+  "name": "Freund",
+  "product": "Plex Media Server",
+  "provides": "server",
+  "clientIdentifier": "mid-friend",
+  "owned": false,
+  "accessToken": "tok-friend",
+  "connections": [
+   {
+    "protocol": "https",
+    "address": "198.51.100.7",
+    "port": 32400,
+    "local": false,
+    "relay": false,
+    "IPv6": false
+   }
+  ]
+ },
+ {
+  "name": "Fernseher",
+  "product": "Plex for Samsung",
+  "provides": "client,player",
+  "clientIdentifier": "tv1",
+  "owned": true,
+  "accessToken": "x",
+  "connections": []
+ }
+]

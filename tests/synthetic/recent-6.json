@@ -1,0 +1,23 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Metadata": [
+   {
+    "ratingKey": "2201",
+    "key": "/library/metadata/2201",
+    "type": "movie",
+    "title": "Tiefsee",
+    "contentRating": "de/6",
+    "summary": "Synthetischer Film Tiefsee.",
+    "audienceRating": 7.8,
+    "year": 2022,
+    "thumb": "/library/metadata/2201/thumb/1700000000",
+    "art": "/library/metadata/2201/art/1700000000",
+    "duration": 3000000,
+    "librarySectionID": 1,
+    "librarySectionTitle": "Filme",
+    "addedAt": 1700000000
+   }
+  ]
+ }
+}

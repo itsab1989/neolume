@@ -1,0 +1,164 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Metadata": [
+   {
+    "ratingKey": "18681",
+    "type": "movie",
+    "title": "Film mit DTS",
+    "librarySectionID": 1,
+    "duration": 6468704,
+    "Marker": [
+     {
+      "type": "credits",
+      "startTimeOffset": 6039833,
+      "endTimeOffset": 6087833
+     },
+     {
+      "type": "credits",
+      "startTimeOffset": 6171833,
+      "endTimeOffset": 6468704,
+      "final": true
+     }
+    ],
+    "Media": [
+     {
+      "id": 21254,
+      "width": 1920,
+      "height": 816,
+      "aspectRatio": 2.35,
+      "videoCodec": "h264",
+      "audioCodec": "dca",
+      "container": "mkv",
+      "Part": [
+       {
+        "id": 21321,
+        "key": "/library/parts/21321/1252688664/file.mkv",
+        "duration": 6468704,
+        "container": "mkv",
+        "Stream": [
+         {
+          "id": 53173,
+          "streamType": 1,
+          "codec": "h264",
+          "index": 0,
+          "languageCode": "eng",
+          "language": "English",
+          "displayTitle": "1080p",
+          "extendedDisplayTitle": "1080p (H.264)",
+          "bitDepth": 8
+         },
+         {
+          "id": 53174,
+          "streamType": 2,
+          "codec": "dca",
+          "index": 1,
+          "languageCode": "deu",
+          "language": "Deutsch",
+          "title": "German DTS 5.1 @ 768 kbps",
+          "displayTitle": "Deutsch (DTS 5.1)",
+          "extendedDisplayTitle": "German DTS 5.1 @ 768 kbps (Deutsch)",
+          "selected": true,
+          "default": true,
+          "channels": 6
+         },
+         {
+          "id": 53175,
+          "streamType": 2,
+          "codec": "dca",
+          "index": 2,
+          "languageCode": "eng",
+          "language": "English",
+          "title": "English DTS 5.1 @ 1.536 kbps (core of DTS-MA)",
+          "displayTitle": "English (DTS 5.1)",
+          "extendedDisplayTitle": "English DTS 5.1 @ 1.536 kbps (core of DTS-MA)",
+          "channels": 6
+         },
+         {
+          "id": 53176,
+          "streamType": 2,
+          "codec": "vorbis",
+          "index": 3,
+          "languageCode": "eng",
+          "language": "English",
+          "title": "English Commentary OGG 2.0 @ 96 kbps",
+          "displayTitle": "English (VORBIS Stereo)",
+          "extendedDisplayTitle": "English Commentary OGG 2.0 @ 96 kbps (VORBIS)",
+          "channels": 2
+         },
+         {
+          "id": 53177,
+          "streamType": 3,
+          "codec": "srt",
+          "index": 4,
+          "languageCode": "deu",
+          "language": "Deutsch",
+          "title": "German",
+          "displayTitle": "Deutsch",
+          "extendedDisplayTitle": "German (Deutsch SRT)",
+          "default": true
+         },
+         {
+          "id": 53178,
+          "streamType": 3,
+          "codec": "srt",
+          "index": 5,
+          "languageCode": "eng",
+          "language": "English",
+          "title": "English",
+          "displayTitle": "English",
+          "extendedDisplayTitle": "English (SRT)"
+         },
+         {
+          "id": 53179,
+          "streamType": 3,
+          "codec": "srt",
+          "index": 6,
+          "languageCode": "fra",
+          "language": "Français",
+          "title": "French",
+          "displayTitle": "Français",
+          "extendedDisplayTitle": "French (Français SRT)"
+         },
+         {
+          "id": 53180,
+          "streamType": 3,
+          "codec": "srt",
+          "index": 7,
+          "languageCode": "spa",
+          "language": "Español",
+          "title": "Spanish",
+          "displayTitle": "Español",
+          "extendedDisplayTitle": "Spanish (Español SRT)"
+         },
+         {
+          "id": 53181,
+          "streamType": 3,
+          "codec": "srt",
+          "index": 8,
+          "languageCode": "pol",
+          "language": "polski",
+          "title": "Polish",
+          "displayTitle": "polski",
+          "extendedDisplayTitle": "Polish (polski SRT)"
+         },
+         {
+          "id": 53182,
+          "streamType": 3,
+          "codec": "srt",
+          "index": 9,
+          "languageCode": "hrv",
+          "language": "Hrvatski",
+          "title": "Croatian",
+          "displayTitle": "Hrvatski",
+          "extendedDisplayTitle": "Croatian (Hrvatski SRT)"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

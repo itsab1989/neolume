@@ -1,0 +1,8 @@
+# build context = installer/ ; the helper needs only plexneo_setup.py + neosetup/ (no app payload, no build tools)
+*
+!plexneo_setup.py
+!neosetup
+!neosetup/**
+neosetup/payload
+**/__pycache__
+**/*.pyc

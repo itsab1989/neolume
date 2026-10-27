@@ -1,0 +1,84 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Metadata": [
+   {
+    "ratingKey": "2345",
+    "type": "episode",
+    "title": "Anfänge",
+    "grandparentTitle": "Testserie",
+    "grandparentRatingKey": "2343",
+    "parentRatingKey": "2344",
+    "parentIndex": 1,
+    "index": 1,
+    "librarySectionID": 2,
+    "duration": 3185057,
+    "Marker": [
+     {
+      "type": "credits",
+      "startTimeOffset": 3142551,
+      "endTimeOffset": 3185057,
+      "final": true
+     }
+    ],
+    "Media": [
+     {
+      "id": 25240,
+      "width": 1280,
+      "height": 720,
+      "aspectRatio": 1.78,
+      "videoCodec": "h264",
+      "audioCodec": "ac3",
+      "container": "mkv",
+      "Part": [
+       {
+        "id": 25307,
+        "key": "/library/parts/25307/1461260780/file.mkv",
+        "duration": 3185057,
+        "container": "mkv",
+        "Stream": [
+         {
+          "id": 70833,
+          "streamType": 1,
+          "codec": "h264",
+          "index": 0,
+          "languageCode": "eng",
+          "language": "English",
+          "displayTitle": "720p",
+          "extendedDisplayTitle": "720p (H.264)",
+          "default": true,
+          "bitDepth": 8
+         },
+         {
+          "id": 70834,
+          "streamType": 2,
+          "codec": "ac3",
+          "index": 1,
+          "languageCode": "deu",
+          "language": "Deutsch",
+          "displayTitle": "Deutsch (AC3 5.1)",
+          "extendedDisplayTitle": "Deutsch (AC3 5.1)",
+          "selected": true,
+          "default": true,
+          "channels": 6
+         },
+         {
+          "id": 70835,
+          "streamType": 2,
+          "codec": "ac3",
+          "index": 2,
+          "languageCode": "eng",
+          "language": "English",
+          "displayTitle": "English (AC3 5.1)",
+          "extendedDisplayTitle": "English (AC3 5.1)",
+          "channels": 6
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

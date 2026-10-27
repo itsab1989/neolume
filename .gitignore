@@ -1,0 +1,17 @@
+dist/
+logs/
+*.log
+.DS_Store
+__pycache__/
+.secrets/
+tests/fixtures/
+node_modules/
+tests/visual/current/
+# lokale Netzwerk-Werte (Vorlage: local.example.json) und Build-Ausgaben, die sie enthalten
+local.json
+app/app.js
+app/bench.js
+app/proto.js
+app/app.min.js
+dist-setup/
+installer/neosetup/payload/

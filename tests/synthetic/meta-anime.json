@@ -1,0 +1,127 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Metadata": [
+   {
+    "ratingKey": "90367",
+    "type": "episode",
+    "title": "Folge 1",
+    "grandparentTitle": "Testserie",
+    "grandparentRatingKey": "17365",
+    "parentRatingKey": "17366",
+    "parentIndex": 1,
+    "index": 1,
+    "librarySectionID": 2,
+    "duration": 1437083,
+    "Marker": [
+     {
+      "type": "credits",
+      "startTimeOffset": 1349374,
+      "endTimeOffset": 1411374
+     },
+     {
+      "type": "intro",
+      "startTimeOffset": 1361,
+      "endTimeOffset": 87121
+     }
+    ],
+    "Media": [
+     {
+      "id": 25489,
+      "width": 1920,
+      "height": 1080,
+      "aspectRatio": 1.78,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "container": "mkv",
+      "Part": [
+       {
+        "id": 25556,
+        "key": "/library/parts/25556/1739761371/file.mkv",
+        "duration": 1437083,
+        "container": "mkv",
+        "Stream": [
+         {
+          "id": 72299,
+          "streamType": 1,
+          "codec": "h264",
+          "index": 0,
+          "languageCode": "eng",
+          "language": "English",
+          "displayTitle": "1080p",
+          "extendedDisplayTitle": "1080p (H.264)",
+          "default": true,
+          "bitDepth": 8
+         },
+         {
+          "id": 72300,
+          "streamType": 2,
+          "codec": "aac",
+          "index": 1,
+          "languageCode": "deu",
+          "language": "Deutsch",
+          "title": "German",
+          "displayTitle": "Deutsch (AAC Stereo)",
+          "extendedDisplayTitle": "German (Deutsch AAC Stereo)",
+          "selected": true,
+          "default": true,
+          "channels": 2
+         },
+         {
+          "id": 72301,
+          "streamType": 2,
+          "codec": "aac",
+          "index": 2,
+          "languageCode": "jpn",
+          "language": "日本語",
+          "title": "Japanese",
+          "displayTitle": "日本語 (AAC Mono)",
+          "extendedDisplayTitle": "Japanese (日本語 AAC Mono)",
+          "default": true,
+          "channels": 1
+         },
+         {
+          "id": 72302,
+          "streamType": 3,
+          "codec": "ass",
+          "index": 3,
+          "languageCode": "deu",
+          "language": "Deutsch",
+          "title": "German [Forced]",
+          "displayTitle": "Deutsch Forced",
+          "extendedDisplayTitle": "German [Forced] (Deutsch ASS)",
+          "forced": true
+         },
+         {
+          "id": 72303,
+          "streamType": 3,
+          "codec": "ass",
+          "index": 4,
+          "languageCode": "deu",
+          "language": "Deutsch",
+          "title": "German [Full]",
+          "displayTitle": "Deutsch",
+          "extendedDisplayTitle": "German [Full] (Deutsch ASS)",
+          "default": true
+         },
+         {
+          "id": 72304,
+          "streamType": 3,
+          "codec": "ass",
+          "index": 5,
+          "languageCode": "eng",
+          "language": "English",
+          "title": "English [Full]",
+          "displayTitle": "English",
+          "extendedDisplayTitle": "English [Full] (ASS)",
+          "default": true
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

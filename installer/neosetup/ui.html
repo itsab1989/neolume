@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__APP__ Setup</title>
+<style nonce="__NONCE__">
+:root{--bg:#f6f5f2;--card:#fff;--fg:#1d1d1f;--muted:#6b6b70;--line:#e3e1dc;--accent:__ACCENT__;--accent-fg:#1d1d1f;--ok:#2f8a4a;--err:#b3261e;--soft:__SOFT_LIGHT__}
+@media (prefers-color-scheme:dark){:root{--bg:#141416;--card:#1f1f23;--fg:#ececef;--muted:#9a9aa2;--line:#33333a;--accent:__ACCENT__;--accent-fg:#141416;--ok:#5cc27a;--err:#ff8a80;--soft:__SOFT_DARK__}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+header{max-width:760px;margin:0 auto;padding:24px 16px 8px;display:flex;align-items:center;gap:12px}
+header h1{font-size:20px;margin:0;flex:1}
+header h1 span{color:var(--accent)}
+.lang button{background:none;border:1px solid var(--line);color:var(--muted);padding:4px 10px;border-radius:6px;cursor:pointer}
+.lang button.on{color:var(--fg);border-color:var(--fg)}
+main{max-width:760px;margin:0 auto;padding:8px 16px 48px}
+ol.steps{list-style:none;padding:0;margin:0 0 16px;display:flex;gap:6px;flex-wrap:wrap}
+ol.steps li{font-size:13px;color:var(--muted);padding:3px 10px;border-radius:999px;border:1px solid var(--line)}
+ol.steps li.on{color:var(--accent-fg);background:var(--accent);border-color:var(--accent)}
+ol.steps li.done{color:var(--ok);border-color:var(--ok)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px}
+.card h2{margin:0 0 8px;font-size:20px}
+p{margin:8px 0}
+.muted{color:var(--muted);font-size:14px}
+button.primary,button.secondary{font:inherit;border-radius:8px;padding:10px 18px;cursor:pointer;margin:8px 8px 0 0}
+button.primary{background:var(--accent);color:var(--accent-fg);border:0;font-weight:600}
+button.secondary{background:none;color:var(--fg);border:1px solid var(--line)}
+button:disabled{opacity:.5;cursor:default}
+.code{font:600 32px/1.2 ui-monospace,Menlo,Consolas,monospace;letter-spacing:4px;margin:8px 0}
+.big{font:600 28px/1.2 ui-monospace,Menlo,Consolas,monospace}
+.list{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.row{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.row.sel{cursor:pointer}
+.row.sel:hover{border-color:var(--accent)}
+.row.dis{opacity:.55}
+.row img{width:36px;height:36px;border-radius:50%;object-fit:cover;background:var(--line)}
+.row .av{width:36px;height:36px;border-radius:50%;background:var(--line);display:flex;align-items:center;justify-content:center;font-weight:600}
+.row .grow{flex:1;min-width:0}
+.row .t{font-weight:600}
+.badge{font-size:12px;padding:1px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:6px;white-space:nowrap}
+.badge.ok{color:var(--ok);border-color:var(--ok)}
+.err{color:var(--err);margin:8px 0}
+.note{background:var(--soft);border-radius:8px;padding:10px 12px;font-size:14px;margin:12px 0}
+.quit{text-align:right}
+ol.howto{padding-left:22px}
+ol.howto li{margin:6px 0}
+.log{font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;background:var(--bg);border-radius:8px;padding:10px;max-height:220px;overflow:auto;margin:8px 0}
+.log .ok{color:var(--ok)}
+textarea,input[type=text]{width:100%;font:14px ui-monospace,Menlo,Consolas,monospace;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px}
+details{margin:12px 0}
+summary{cursor:pointer;color:var(--muted)}
+dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;margin:8px 0}
+dt{color:var(--muted)}
+dd{margin:0;word-break:break-word}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:s 1s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes s{to{transform:rotate(360deg)}}
+@media (max-width:520px){.code{font-size:26px}dl{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><h1>Plex <span>Neo</span> Setup</h1><div class="lang" id="lang"></div></header>
+<main><ol class="steps" id="steps"></ol><div id="view"></div></main>
+<script nonce="__NONCE__">
+(function () {
+  'use strict';
+  var CSRF = '__CSRF__';
+  var T = {
+    de: {
+      steps: ['Anmelden', 'Server', 'Profile', 'Übersicht', 'Auf den Fernseher', 'Fertig'],
+      welcome: 'Willkommen! Dieses Programm richtet __APP__ einmalig für deinen Fernseher ein. Es meldet sich dazu bei Plex an, holt deine Profile und spielt die App auf den Fernseher.',
+      privacy: 'Deine Zugangsdaten bleiben nur im Arbeitsspeicher dieses Programms und im App-Paket für deinen Fernseher. Dein Plex-Passwort und deine Plex-PIN siehst nur du bei Plex.',
+      login: 'Mit Plex anmelden', loginLink: 'Lieber mit Code auf plex.tv/link',
+      loginWait: 'Bitte im geöffneten Plex-Fenster anmelden und „Zulassen“ wählen. Diese Seite geht danach von selbst weiter.',
+      linkWait: 'Öffne plex.tv/link (auf diesem Computer oder dem Handy) und gib diesen Code ein:',
+      openAgain: 'Plex-Fenster erneut öffnen',
+      chooseServer: 'Welcher Plex-Server soll auf dem Fernseher laufen?',
+      lan: 'im Heimnetz gefunden', owner: 'dein Server', notOwner: 'nicht dein Server – nur der Besitzer kann einrichten',
+      noLan: 'keine Adresse im Heimnetz', foreign: 'nicht in deinem Plex-Konto', reload: 'Neu suchen', checking: 'Prüfe Server …',
+      noServers: 'Kein eigener Plex-Server gefunden. Läuft der Plex Media Server und ist er mit deinem Konto verbunden?',
+      profilesTitle: 'Welche Profile sollen auf dem Fernseher erscheinen?',
+      profilesHint: 'Profile mit Kindersicherung sehen auch auf dem Fernseher nur ihre freigegebenen Bibliotheken. Einen Profilschutz (PIN) legst du später direkt in der App am Fernseher fest.',
+      kind: { owner: 'Besitzer', home: 'Plex Home', friend: 'Freund' }, libs: function (n) { return n + (n === 1 ? ' Bibliothek' : ' Bibliotheken'); },
+      noToken: 'kein Zugriff auf diesen Server (in Plex unter „Benutzer & Freigaben“ freigeben)', tokenBad: 'Server lehnt den Zugang ab',
+      restricted: 'Kindersicherung', next: 'Weiter', back: 'Zurück',
+      advanced: 'Erweitert', extrasTitle: 'Weitere eigene Apps auf dem Fernseher behalten',
+      extrasHint: 'Wichtig: Beim Aufspielen entfernt der Fernseher alle eigenen Apps, die nicht in der Liste stehen. Hast du weitere eigene Apps , trage hier je Zeile den Pfad zur .zip-Datei ein (optional „ID=Pfad“).',
+      tvTitle: 'Nur dieses Gerät zulassen (IP-Adresse des Fernsehers, optional)', save: 'Übernehmen',
+      resetPins: 'App-PINs zurücksetzen',
+      resetPinsHint: 'Nur ankreuzen, wenn du die PIN des Hauptprofils vergessen hast: __APP__ löscht dann beim nächsten Start alle App-PINs auf dem Fernseher. Ohne Haken bleiben sie erhalten.',
+      summary: 'Übersicht', server: 'Server', address: 'Adresse', profiles: 'Profile', apps: 'Apps auf dem TV', computer: 'Dieser Computer',
+      build: 'App-Paket erstellen', building: 'Erstelle Paket …',
+      tvTitleStep: 'App auf den Fernseher spielen',
+      tvIntro: 'Lass dieses Fenster offen und mach am Fernseher (Samsung 2014, H-Serie):',
+      how: [
+        'Einmalig: MENU → Smart Hub → Samsung-Konto → Anmelden → Benutzer „develop“ (Passwort füllt sich meist selbst, sonst „any“).',
+        'Taste SMART HUB → „SAMSUNG APPS“ öffnen.',
+        'Auf irgendeine App gehen und OK etwa 5 Sekunden gedrückt halten, bis ein Menü erscheint.',
+        'IP Setting → diese Adresse eingeben:',
+        'Menü erneut öffnen (OK 5 Sekunden) → Start User App Sync → mit OK bestätigen (nur einmal OK drücken).',
+        'Nach wenigen Sekunden erscheint „__APP__“ unter EIGENE APPS. Sonst Smart Hub schließen und wieder öffnen.'
+      ],
+      syncRunning: 'Bereit – der Fernseher kann die App jetzt abholen.', syncOff: 'Der Sync-Server ist aus.',
+      startSync: 'Sync-Server starten', stopSync: 'Sync-Server stoppen',
+      fetched: function (c, p) { return 'Fernseher ' + c + ' hat ' + p + ' abgeholt'; }, denied: function (c) { return 'Abgewiesen: ' + c; },
+      gotAll: 'Die App ist auf dem Fernseher angekommen.', locked: function (ip) { return 'Nur noch Gerät ' + ip + ' darf abholen.'; }, unlock: 'Freigeben',
+      onTv: 'Die App ist auf dem Fernseher', waiting: 'Warte auf den Fernseher …',
+      doneTitle: 'Fertig – das Programm kann geschlossen werden',
+      doneText: '__APP__ spricht ab jetzt nur noch mit deinem Plex-Server. Dieses Programm brauchst du erst wieder, wenn ein Profil dazukommt, du ein Plex-Passwort änderst oder die App neu aufspielen möchtest.',
+      updTitle: 'Update-Server (optional)', updText: 'Liefert neue App-Versionen an den Fernseher, solange dieses Programm läuft. Nur im Heimnetz, ohne Zugangsdaten.',
+      updStart: 'Update-Server starten', updStop: 'Update-Server stoppen', updOn: function (p) { return 'läuft auf Port ' + p; },
+      remember: 'Einstellungen auf diesem Computer merken (ohne Zugangsdaten)', finish: 'Zugangsdaten aus dem Speicher löschen und beenden', finished: 'Zugangsdaten gelöscht. Du kannst dieses Fenster und das Programm jetzt schließen.',
+      logout: 'Abmelden / neu beginnen',
+      helperTitle: 'Optionaler Helfer: Merkliste & Trends',
+      helperText: 'Der Fernseher erreicht plex.tv nicht. Der Helfer läuft auf diesem Computer (oder einem NAS) und holt für ihn deine Plex-Merkliste sowie „Gerade beliebt“, „Neu erschienen“ und „Bald verfügbar“. Ohne Helfer funktioniert alles andere genauso.',
+      helperOn: 'Helfer einrichten', helperRemember: 'Zugang auf diesem Computer merken (nötig für Autostart; Datei nur für dich lesbar)',
+      helperAddr: 'Helfer läuft auf einem anderen Gerät, z. B. NAS (IP-Adresse, optional)',
+      helperStart: 'Helfer starten', helperStop: 'Helfer stoppen', helperRunning: function (p) { return 'Helfer läuft auf Port ' + p + ' (nur Heimnetz)'; },
+      helperOff: 'Helfer ist aus. Die Merkliste erscheint am Fernseher nur, solange er läuft.',
+      helperProfiles: 'Merkliste für', helperSkipped: 'Ohne Merkliste (Profil mit Plex-PIN oder Freund):',
+      helperAuto: 'Damit der Helfer immer läuft: Autostart einrichten (Anleitung auf der Download-Seite, Abschnitt „Optionaler Helfer“).',
+      quit: 'Programm beenden', quitConfirm: 'Programm wirklich beenden? Sync-, Update-Server und Helfer werden gestoppt.',
+      quitDone: 'Das Programm ist beendet. Du kannst dieses Fenster schließen.',
+      helperForget: 'Helfer entfernen (gemerkten Zugang löschen)',
+      errors: { network: 'Keine Verbindung zu plex.tv. Ist dieser Computer online?', pin_expired: 'Die Anmeldung ist abgelaufen. Bitte erneut starten.',
+        not_owner: 'Nur der Besitzer des Servers kann die Profile einrichten.', no_lan_address: 'Für diesen Server ist keine Adresse im Heimnetz bekannt.',
+        unreachable: 'Der Server antwortet im Heimnetz nicht. Läuft er, und ist dieser Computer im selben Netz?', no_profiles: 'Bitte mindestens ein Profil auswählen.',
+        no_lan_ip: 'Die Heimnetz-Adresse dieses Computers ist unbekannt. Ist er per WLAN/LAN verbunden?',
+        port_denied: 'Port 80 darf nicht geöffnet werden. Linux: Programm mit sudo starten. Mac/Windows: Firewall-Abfrage erlauben.',
+        port_busy: 'Port ist schon belegt (läuft ein anderer Webserver oder dieses Programm zweimal?).',
+        no_app: 'App-Dateien fehlen in diesem Programm.', incomplete: 'Das App-Paket ist unvollständig.',
+        extra_missing: 'Datei nicht gefunden:', extra_not_app: 'Keine TV-App:', extra_bad_name: 'Ungültiger Name:',
+        http401: 'Plex hat die Anmeldung abgelehnt. Bitte neu anmelden.', no_helper: 'Der Helfer ist noch nicht eingerichtet (Übersicht → „Helfer einrichten“).', bad_input: 'Ungültige Eingabe.', csrf: 'Sitzung abgelaufen – bitte die Seite neu laden.',
+        not_logged_in: 'Bitte zuerst bei Plex anmelden.', no_server: 'Bitte zuerst einen Server wählen.', no_package: 'Bitte zuerst das App-Paket erstellen.',
+        no_pin: 'Bitte die Anmeldung neu starten.', parse: 'plex.tv hat unerwartet geantwortet. Bitte später erneut versuchen.',
+        httpOther: 'plex.tv hat einen Fehler gemeldet. Bitte später erneut versuchen.', offline: 'Das Programm antwortet nicht mehr. Läuft es noch? Sonst neu starten.',
+        no_loader: 'App-Dateien fehlen in diesem Programm.', bad_zip: 'Die Datei ist kein gültiges ZIP-Archiv.', unsafe_entry: 'Das ZIP-Archiv enthält ungültige Dateinamen.',
+        too_large: 'Die Datei ist zu groß.', bad_host: 'Die Heimnetz-Adresse dieses Computers ist ungültig.', bad_app: 'Ungültiger App-Name.',
+        internal: 'Unerwarteter Fehler.', other: 'Fehler:' }
+    },
+    en: {
+      steps: ['Sign in', 'Server', 'Profiles', 'Summary', 'To the TV', 'Done'],
+      welcome: 'Welcome! This program sets up __APP__ for your TV once. It signs in to Plex, fetches your profiles and installs the app on the TV.',
+      privacy: 'Your access data stays only in this program\'s memory and in the app package for your TV. Only you see your Plex password and Plex PIN, on plex.tv.',
+      login: 'Sign in with Plex', loginLink: 'Use a code on plex.tv/link instead',
+      loginWait: 'Please sign in in the Plex window and choose “Allow”. This page continues by itself.',
+      linkWait: 'Open plex.tv/link (on this computer or your phone) and enter this code:',
+      openAgain: 'Open the Plex window again',
+      chooseServer: 'Which Plex server should the TV use?',
+      lan: 'found on your network', owner: 'your server', notOwner: 'not your server – only the owner can set it up',
+      noLan: 'no address on your network', foreign: 'not in your Plex account', reload: 'Search again', checking: 'Checking server …',
+      noServers: 'No server of yours was found. Is Plex Media Server running and linked to your account?',
+      profilesTitle: 'Which profiles should appear on the TV?',
+      profilesHint: 'Profiles with parental controls only see their shared libraries on the TV, too. A profile lock (PIN) is set later directly in the app on the TV.',
+      kind: { owner: 'Owner', home: 'Plex Home', friend: 'Friend' }, libs: function (n) { return n + (n === 1 ? ' library' : ' libraries'); },
+      noToken: 'no access to this server (share it in Plex under “Users & Sharing”)', tokenBad: 'server refuses access',
+      restricted: 'parental controls', next: 'Next', back: 'Back',
+      advanced: 'Advanced', extrasTitle: 'Keep other user apps on the TV',
+      extrasHint: 'Important: the TV removes every user app that is not on the list. If you use other user apps, enter the path of each .zip file, one per line (optionally “ID=path”).',
+      tvTitle: 'Allow only this device (IP address of the TV, optional)', save: 'Apply',
+      resetPins: 'Reset app PINs',
+      resetPinsHint: 'Only tick this if you forgot the main profile’s PIN: __APP__ then deletes all app PINs on the TV the next time it starts. Without the tick they are kept.',
+      summary: 'Summary', server: 'Server', address: 'Address', profiles: 'Profiles', apps: 'Apps on the TV', computer: 'This computer',
+      build: 'Create app package', building: 'Creating package …',
+      tvTitleStep: 'Install the app on the TV',
+      tvIntro: 'Keep this window open and do this on the TV (Samsung 2014, H series):',
+      how: [
+        'Once: MENU → Smart Hub → Samsung Account → Sign in → user “develop” (the password usually fills in, otherwise “any”).',
+        'Press SMART HUB → open “SAMSUNG APPS”.',
+        'Go to any app and hold OK for about 5 seconds until a menu appears.',
+        'IP Setting → enter this address:',
+        'Open the menu again (hold OK 5 seconds) → Start User App Sync → confirm with OK (press OK only once).',
+        'After a few seconds “__APP__” appears under MY APPS. Otherwise close and reopen Smart Hub.'
+      ],
+      syncRunning: 'Ready – the TV can fetch the app now.', syncOff: 'The sync server is off.',
+      startSync: 'Start sync server', stopSync: 'Stop sync server',
+      fetched: function (c, p) { return 'TV ' + c + ' fetched ' + p; }, denied: function (c) { return 'Refused: ' + c; },
+      gotAll: 'The app has arrived on the TV.', locked: function (ip) { return 'Only device ' + ip + ' may fetch now.'; }, unlock: 'Unlock',
+      onTv: 'The app is on the TV', waiting: 'Waiting for the TV …',
+      doneTitle: 'Done – you can close this program',
+      doneText: 'From now on __APP__ only talks to your Plex server. You only need this program again when a profile is added, you change your Plex password or want to reinstall the app.',
+      updTitle: 'Update server (optional)', updText: 'Delivers new app versions to the TV while this program runs. Home network only, no access data.',
+      updStart: 'Start update server', updStop: 'Stop update server', updOn: function (p) { return 'running on port ' + p; },
+      remember: 'Remember settings on this computer (no access data)', finish: 'Clear access data from memory and finish', finished: 'Access data cleared. You can close this window and the program now.',
+      logout: 'Sign out / start over',
+      helperTitle: 'Optional helper: watchlist & trends',
+      helperText: 'The TV cannot reach plex.tv. The helper runs on this computer (or a NAS) and fetches your Plex watchlist plus “Trending”, “New releases” and “Coming soon” for it. Everything else works the same without it.',
+      helperOn: 'Set up the helper', helperRemember: 'Remember access on this computer (needed for autostart; file readable only by you)',
+      helperAddr: 'The helper runs on another device, e.g. a NAS (IP address, optional)',
+      helperStart: 'Start helper', helperStop: 'Stop helper', helperRunning: function (p) { return 'Helper running on port ' + p + ' (home network only)'; },
+      helperOff: 'The helper is off. The TV only shows the watchlist while it runs.',
+      helperProfiles: 'Watchlist for', helperSkipped: 'No watchlist (profile with a Plex PIN, or friend):',
+      helperAuto: 'To keep the helper running: set up autostart (instructions on the download page, section “Optional helper”).',
+      quit: 'Quit program', quitConfirm: 'Really quit? The sync server, update server and helper will stop.',
+      quitDone: 'The program has stopped. You can close this window.',
+      helperForget: 'Remove helper (delete remembered access)',
+      errors: { network: 'No connection to plex.tv. Is this computer online?', pin_expired: 'The sign-in expired. Please start again.',
+        not_owner: 'Only the owner of the server can set up profiles.', no_lan_address: 'No home network address is known for this server.',
+        unreachable: 'The server does not answer on your network. Is it running and is this computer on the same network?', no_profiles: 'Please choose at least one profile.',
+        no_lan_ip: 'The home network address of this computer is unknown. Is it connected by Wi-Fi/LAN?',
+        port_denied: 'Port 80 may not be opened. Linux: start the program with sudo. Mac/Windows: allow the firewall prompt.',
+        port_busy: 'The port is already in use (another web server, or this program running twice?).',
+        no_app: 'App files are missing in this program.', incomplete: 'The app package is incomplete.',
+        extra_missing: 'File not found:', extra_not_app: 'Not a TV app:', extra_bad_name: 'Invalid name:',
+        http401: 'Plex refused the sign-in. Please sign in again.', no_helper: 'The helper is not set up yet (Summary → “Set up the helper”).', bad_input: 'Invalid input.', csrf: 'Session expired – please reload the page.',
+        not_logged_in: 'Please sign in with Plex first.', no_server: 'Please choose a server first.', no_package: 'Please create the app package first.',
+        no_pin: 'Please start the sign-in again.', parse: 'plex.tv sent an unexpected answer. Please try again later.',
+        httpOther: 'plex.tv reported an error. Please try again later.', offline: 'The program does not answer any more. Is it still running? Otherwise start it again.',
+        no_loader: 'App files are missing in this program.', bad_zip: 'The file is not a valid ZIP archive.', unsafe_entry: 'The ZIP archive contains invalid file names.',
+        too_large: 'The file is too large.', bad_host: 'This computer\'s home network address is invalid.', bad_app: 'Invalid app name.',
+        internal: 'Unexpected error.', other: 'Error:' }
+    }
+  };
+  var lang = (navigator.language || 'de').slice(0, 2) === 'de' ? 'de' : 'en';
+  var S = null, step = 0, err = '', busy = '', popup = null, pollTimer = 0, finished = false, resetPins = false, linkCode = '', authUrl = '', quitted = false;
+
+  function t() { return T[lang]; }
+  function h(tag, attrs) {
+    var el = document.createElement(tag), i, k;
+    attrs = attrs || {};
+    for (k in attrs) {
+      if (k === 'class') el.className = attrs[k];
+      else if (k === 'onclick') el.addEventListener('click', attrs[k]);
+      else if (k === 'text') el.textContent = attrs[k];
+      else if (attrs[k] !== null && attrs[k] !== undefined && attrs[k] !== false) el.setAttribute(k, attrs[k] === true ? '' : attrs[k]);
+    }
+    for (i = 2; i < arguments.length; i++) {
+      var c = arguments[i];
+      if (c === null || c === undefined || c === false) continue;
+      if (Array.isArray(c)) c.forEach(function (x) { if (x) el.appendChild(typeof x === 'string' ? document.createTextNode(x) : x); });
+      else el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    }
+    return el;
+  }
+  function api(action, args) {
+    return fetch('/api/' + action, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Neo-Csrf': CSRF },
+      body: JSON.stringify(args || {}), credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.state) S = d.state;
+        if (!d.ok) err = errText(d.error, d.detail);
+        else err = '';
+        return d;
+      })
+      .catch(function () { err = t().errors.offline; return { ok: false, error: 'offline' }; });
+  }
+  function errText(code, detail) {
+    var e = t().errors, msg = e[code] || (/^http\d+$/.test(code || '') ? e.httpOther + ' (' + code.slice(4) + ')' : e.other + ' ' + code);
+    return msg + (detail && e[code] && /^(extra_|unsafe_entry|too_large)/.test(code) ? ' ' + detail : '');
+  }
+  function act(action, args, label) {
+    busy = label || '…'; render();
+    return api(action, args).then(function (d) { busy = ''; autoStep(); render(); return d; });
+  }
+  function autoStep() {
+    if (!S) return;
+    if (finished) { step = 5; return; }
+    if (!S.loggedIn) step = 0;
+    else if (step === 0) step = 1;
+    if (step >= 2 && !S.server) step = 1;
+  }
+
+  function stepper() {
+    var ol = document.getElementById('steps'); ol.textContent = '';
+    t().steps.forEach(function (n, i) { ol.appendChild(h('li', { 'class': i === step ? 'on' : i < step ? 'done' : '' }, (i + 1) + '. ' + n)); });
+    var lg = document.getElementById('lang'); lg.textContent = '';
+    ['de', 'en'].forEach(function (l) {
+      lg.appendChild(h('button', { 'class': l === lang ? 'on' : '', onclick: function () { lang = l; document.documentElement.lang = l; api('prefs', { lang: l }); render(); } }, l.toUpperCase()));
+    });
+  }
+  function errBox() { return err ? h('p', { 'class': 'err', role: 'alert' }, err) : null; }
+  function busyBox() { return busy ? h('p', { 'class': 'muted' }, h('span', { 'class': 'spin' }), busy) : null; }
+  function avatar(p) { return p.thumb ? h('img', { src: p.thumb, alt: '' }) : h('div', { 'class': 'av' }, (p.title || '?').charAt(0).toUpperCase()); }
+
+  function viewLogin() {
+    var L = t(), c = h('div', { 'class': 'card' }, h('h2', { text: L.steps[0] }), h('p', { text: L.welcome }), h('p', { 'class': 'muted', text: L.privacy }));
+    c.appendChild(h('button', { 'class': 'primary', disabled: !!busy, onclick: function () {
+      popup = window.open('about:blank', 'plexauth', 'width=800,height=700');
+      act('login_start', { kind: 'auth' }).then(function (d) {
+        if (d.ok) { authUrl = d.result.url; if (popup) popup.location.href = authUrl; else window.open(authUrl, '_blank', 'noopener'); startPoll(); }
+        else if (popup) popup.close();
+      });
+    } }, L.login));
+    c.appendChild(h('button', { 'class': 'secondary', disabled: !!busy, onclick: function () {
+      act('login_start', { kind: 'link' }).then(function (d) { if (d.ok) { linkCode = d.result.code; startPoll(); render(); } });
+    } }, L.loginLink));
+    if (S && S.pending.indexOf('auth') >= 0) {
+      c.appendChild(h('div', { 'class': 'note' }, h('span', { 'class': 'spin' }), L.loginWait));
+      if (authUrl) c.appendChild(h('a', { href: authUrl, target: '_blank', rel: 'noopener noreferrer' }, L.openAgain));
+    }
+    if (S && S.pending.indexOf('link') >= 0 && linkCode) {
+      c.appendChild(h('div', { 'class': 'note' }, h('p', { text: L.linkWait }), h('div', { 'class': 'code' }, linkCode),
+        h('a', { href: 'https://plex.tv/link', target: '_blank', rel: 'noopener noreferrer' }, 'plex.tv/link')));
+    }
+    return c;
+  }
+  function startPoll() {
+    clearInterval(pollTimer);
+    pollTimer = setInterval(function () {
+      api('login_poll').then(function (d) {
+        if (!d.ok && (d.error === 'network' || d.error === 'offline')) { render(); return; }   // transient: keep waiting
+        if (!d.ok || (d.result && d.result.done)) { clearInterval(pollTimer); linkCode = ''; if (popup) try { popup.close(); } catch (e) {} autoStep(); }
+        render();
+      });
+    }, 2000);
+  }
+
+  function viewServer() {
+    var L = t(), c = h('div', { 'class': 'card' }, h('h2', { text: L.chooseServer }));
+    if (S.account) c.appendChild(h('p', { 'class': 'muted' }, S.account.title));
+    var list = h('div', { 'class': 'list' }), any = false;
+    S.servers.forEach(function (s) {
+      var ok = s.owned && s.uris.length && !s.foreign;
+      if (ok) any = true;
+      var badges = [];
+      if (s.lan) badges.push(h('span', { 'class': 'badge ok' }, L.lan));
+      badges.push(h('span', { 'class': 'badge' }, s.foreign ? L.foreign : s.owned ? L.owner : L.notOwner));
+      if (!s.uris.length) badges.push(h('span', { 'class': 'badge' }, L.noLan));
+      list.appendChild(h('div', { 'class': 'row ' + (ok && !busy ? 'sel' : 'dis'), role: ok ? 'button' : null, tabindex: ok ? '0' : null,
+        onclick: ok ? function () { if (!busy) act('choose_server', { id: s.id }, L.checking).then(function (d) { if (d.ok) { step = 2; render(); } }); } : null },
+        h('div', { 'class': 'grow' }, h('div', { 'class': 't' }, s.name || s.id), h('div', { 'class': 'muted' }, s.uris[0] || '')), badges));
+    });
+    c.appendChild(list);
+    if (!any) c.appendChild(h('p', { 'class': 'note', text: L.noServers }));
+    c.appendChild(h('button', { 'class': 'secondary', disabled: !!busy, onclick: function () { act('servers'); } }, L.reload));
+    c.appendChild(h('button', { 'class': 'secondary', disabled: !!busy, onclick: function () { act('logout'); } }, L.logout));
+    return c;
+  }
+
+  function viewProfiles() {
+    var L = t(), c = h('div', { 'class': 'card' }, h('h2', { text: L.profilesTitle }), h('p', { 'class': 'muted', text: L.profilesHint }));
+    var list = h('div', { 'class': 'list' }), boxes = [];
+    S.profiles.forEach(function (p) {
+      var usable = p.hasToken && p.libraries !== null;
+      var cb = h('input', { type: 'checkbox', checked: p.include, disabled: !usable, 'aria-label': p.title });
+      cb._id = p.id; boxes.push(cb);
+      var info = [h('span', { 'class': 'badge' }, L.kind[p.kind] || p.kind)];
+      if (p.restricted) info.push(h('span', { 'class': 'badge' }, L.restricted));
+      var sub = !p.hasToken ? L.noToken : p.libraries === null ? L.tokenBad : L.libs(p.libraries);
+      list.appendChild(h('label', { 'class': 'row ' + (usable ? 'sel' : 'dis') }, cb, avatar(p),
+        h('div', { 'class': 'grow' }, h('div', { 'class': 't' }, p.title, info), h('div', { 'class': 'muted' }, sub))));
+    });
+    c.appendChild(list);
+    var ta = h('textarea', { rows: '3', placeholder: '/Pfad/zu/MeineApp.zip' }); ta.value = (S.extraSpecs || []).join('\n');
+    var tv = h('input', { type: 'text', placeholder: '192.168.x.y' }); tv.value = S.tvAddress || '';
+    c.appendChild(h('details', { open: (S.extraSpecs || []).length ? true : null }, h('summary', { text: L.advanced }),
+      h('p', { 'class': 't', text: L.extrasTitle }), h('p', { 'class': 'muted', text: L.extrasHint }), ta,
+      h('p', { 'class': 't', text: L.tvTitle }), tv));
+    c.appendChild(h('button', { 'class': 'secondary', onclick: function () { step = 1; render(); } }, L.back));
+    c.appendChild(h('button', { 'class': 'primary', disabled: !!busy, onclick: function () {
+      var ids = boxes.filter(function (b) { return b.checked; }).map(function (b) { return b._id; });
+      var specs = ta.value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+      act('profiles', { ids: ids }).then(function (d) {
+        if (!d.ok) return;
+        return act('extras', { specs: specs }).then(function (d2) {
+          if (!d2.ok) return;
+          return act('tv', { address: tv.value.trim() }).then(function (d3) { if (d3.ok) { step = 3; render(); } });
+        });
+      });
+    } }, L.next));
+    return c;
+  }
+
+  function viewSummary() {
+    var L = t(), c = h('div', { 'class': 'card' }, h('h2', { text: L.summary }));
+    var inc = S.profiles.filter(function (p) { return p.include; }).map(function (p) { return p.title; });
+    var apps = ['__APP__'].concat(S.extras.map(function (a) { return a.title; }));
+    c.appendChild(h('dl', null, h('dt', { text: L.server }), h('dd', { text: S.server.name }),
+      h('dt', { text: L.address }), h('dd', { text: S.server.uri }),
+      h('dt', { text: L.profiles }), h('dd', { text: inc.join(', ') }),
+      h('dt', { text: L.apps }), h('dd', { text: apps.join(', ') }),
+      S.tvAddress ? h('dt', { text: 'TV' }) : null, S.tvAddress ? h('dd', { text: S.tvAddress }) : null));
+    c.appendChild(h('p', { 'class': 'note', text: L.extrasHint }));
+    // Erneute Einrichtung behaelt die App-PINs; Rettungsweg bei vergessener Hauptprofil-PIN (Nutzerentscheidung 26.10.)
+    var rp = h('input', { type: 'checkbox', checked: !!resetPins });
+    rp.addEventListener('change', function () { resetPins = rp.checked; });
+    c.appendChild(h('label', { 'class': 'row sel' }, rp, h('div', { 'class': 'grow' }, h('div', { 'class': 't' }, L.resetPins), h('div', { 'class': 'muted' }, L.resetPinsHint))));
+    // optionaler Helfer (installer/README.md "Optionaler Helfer"): Haken + Merken + andere Adresse (NAS)
+    var hp = S.helper, hon = h('input', { type: 'checkbox', checked: hp.wanted }), hrem = h('input', { type: 'checkbox', checked: hp.remember });
+    var hadr = h('input', { type: 'text', placeholder: '192.168.x.y' }); hadr.value = hp.address || '';
+    c.appendChild(h('label', { 'class': 'row sel' }, hon, h('div', { 'class': 'grow' }, h('div', { 'class': 't' }, L.helperOn), h('div', { 'class': 'muted' }, L.helperText))));
+    c.appendChild(h('details', null, h('summary', { text: L.advanced }), h('label', null, hrem, ' ', L.helperRemember), h('p', { 'class': 't', text: L.helperAddr }), hadr));
+    c.appendChild(h('button', { 'class': 'secondary', onclick: function () { step = 2; render(); } }, L.back));
+    c.appendChild(h('button', { 'class': 'primary', disabled: !!busy, onclick: function () {
+      act('helper', { on: hon.checked, remember: hrem.checked, address: hadr.value.trim() }).then(function (d0) { if (!d0.ok) return;
+      act('build', { resetPins: !!resetPins }, L.building).then(function (d) {
+        if (!d.ok) return;
+        step = 4; act('sync_start');
+      }); });
+    } }, L.build));
+    return c;
+  }
+
+  function syncLog(ev) {
+    var L = t(), box = h('div', { 'class': 'log', 'aria-live': 'polite' });
+    if (!ev.length) box.appendChild(h('div', { 'class': 'muted' }, h('span', { 'class': 'spin' }), L.waiting));
+    ev.forEach(function (e) {
+      var d = new Date(e.t * 1000), ts = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2);
+      box.appendChild(h('div', { 'class': e.status === 200 ? 'ok' : '' }, ts + '  ' + (e.status === 200 ? L.fetched(e.client, e.path.replace(/^\//, '')) : e.status === 403 ? L.denied(e.client) : e.client + ' ' + e.path + ' ' + e.status)));
+    });
+    return box;
+  }
+
+  function viewTv() {
+    var L = t(), c = h('div', { 'class': 'card' }, h('h2', { text: L.tvTitleStep }), h('p', { text: L.tvIntro }));
+    var how = h('ol', { 'class': 'howto' });
+    L.how.forEach(function (x, i) { how.appendChild(h('li', null, x, i === 3 ? h('div', { 'class': 'big' }, S.computer || '?') : null)); });
+    c.appendChild(how);
+    var sy = S.sync, got = sy.events.some(function (e) { return e.status === 200 && e.path === '/__PKG__'; });
+    c.appendChild(h('p', { 'class': sy.running ? '' : 'err', text: sy.running ? L.syncRunning : L.syncOff }));
+    c.appendChild(syncLog(sy.events));
+    if (got) c.appendChild(h('p', { 'class': 'note', text: L.gotAll }));
+    if (sy.lockedTo) c.appendChild(h('p', { 'class': 'muted' }, L.locked(sy.lockedTo), ' ', h('button', { 'class': 'secondary', onclick: function () { act('sync_unlock'); } }, L.unlock)));
+    c.appendChild(h('button', { 'class': 'secondary', onclick: function () { step = 3; render(); } }, L.back));
+    c.appendChild(h('button', { 'class': 'secondary', onclick: function () { act(sy.running ? 'sync_stop' : 'sync_start'); } }, sy.running ? L.stopSync : L.startSync));
+    c.appendChild(h('button', { 'class': got ? 'primary' : 'secondary', onclick: function () { step = 5; render(); } }, L.onTv));
+    return c;
+  }
+
+  function viewDone() {
+    var L = t(), c = h('div', { 'class': 'card' }, h('h2', { text: L.doneTitle }), h('p', { text: L.doneText }));
+    var rem = h('input', { type: 'checkbox', checked: S.remember });
+    rem.addEventListener('change', function () { api('prefs', { remember: rem.checked }); });
+    c.appendChild(h('label', null, rem, ' ', L.remember));
+    if (!finished) c.appendChild(h('div', null, h('button', { 'class': 'primary', onclick: function () { finished = true; act('finish'); } }, L.finish)));
+    else c.appendChild(h('p', { 'class': 'note', text: L.finished }));
+    var u = S.update, uc = h('div', { 'class': 'card' }, h('h2', { text: L.updTitle }), h('p', { 'class': 'muted', text: L.updText }));
+    uc.appendChild(h('button', { 'class': u.running ? 'secondary' : 'primary', onclick: function () { act(u.running ? 'update_stop' : 'update_start'); } }, u.running ? L.updStop : L.updStart));
+    if (u.running) { uc.appendChild(h('span', { 'class': 'badge ok' }, L.updOn(u.port))); uc.appendChild(syncLog(u.events)); }
+    return h('div', null, c, uc);
+  }
+
+  function helperCard() {
+    var L = t(), hp = S.helper;
+    if (!hp || !hp.configured) return null;
+    var c = h('div', { 'class': 'card' }, h('h2', { text: L.helperTitle }), h('p', { 'class': 'muted', text: L.helperText }));
+    c.appendChild(h('p', { 'class': hp.running ? '' : 'muted', text: hp.running ? L.helperRunning(hp.port) : L.helperOff }));
+    if (hp.profiles.length) c.appendChild(h('p', null, L.helperProfiles + ': ' + hp.profiles.map(function (p) { return p.title; }).join(', ')));
+    if (hp.skipped.length) c.appendChild(h('p', { 'class': 'muted' }, L.helperSkipped + ' ' + hp.skipped.join(', ')));
+    c.appendChild(h('button', { 'class': hp.running ? 'secondary' : 'primary', disabled: !!busy, onclick: function () { act(hp.running ? 'helper_stop' : 'helper_start'); } }, hp.running ? L.helperStop : L.helperStart));
+    c.appendChild(h('button', { 'class': 'secondary', disabled: !!busy, onclick: function () { act('helper', { on: false, remember: false, address: '' }); } }, L.helperForget));
+    c.appendChild(h('p', { 'class': 'muted', text: L.helperAuto }));
+    if (hp.running) c.appendChild(syncLog(hp.events));
+    return c;
+  }
+  function quitCard() {
+    var L = t();
+    return h('div', { 'class': 'quit' }, h('button', { 'class': 'secondary', disabled: !!busy, onclick: function () {
+      if (!window.confirm(L.quitConfirm)) return;
+      clearInterval(pollTimer);
+      api('quit').then(function () { quitted = true; render(); });
+    } }, L.quit));
+  }
+  function render() {
+    if (!S) return;
+    stepper();
+    var v = document.getElementById('view'); v.textContent = '';
+    if (quitted) { v.appendChild(h('div', { 'class': 'card' }, h('h2', { text: t().quitDone }))); return; }
+    var views = [viewLogin, viewServer, viewProfiles, viewSummary, viewTv, viewDone];
+    v.appendChild(views[step]());
+    var hc = helperCard();
+    if (hc) v.appendChild(hc);
+    v.appendChild(quitCard());
+    var e = errBox(), b = busyBox();
+    if (b) v.insertBefore(b, v.firstChild);
+    if (e) v.insertBefore(e, v.firstChild);
+  }
+
+  // live updates of sync/update logs
+  setInterval(function () { if (!quitted && (step === 4 || step === 5 || (step <= 1 && S && S.helper && S.helper.running)) && !busy) api('state').then(render); }, 2000);
+  api('state').then(function () { if (S && S.lang) lang = S.lang; autoStep(); render(); });
+})();
+</script>
+</body>
+</html>

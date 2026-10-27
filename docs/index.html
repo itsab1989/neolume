@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neolume – Plex client for 2014 Samsung Smart TVs (Orsay)</title>
+<meta name="description" content="Neolume is a free, open-source, unofficial client for Plex Media Server on 2014 Samsung Smart TVs with the Orsay Smart Hub (H and HU series). It fixes the broken Plex sign-in, plays HEVC via your server, and needs no Plex Pass.">
+<meta name="keywords" content="Plex Samsung 2014, Plex app Samsung H series, Samsung Orsay Plex, Plex UE48H8000, Plex Smart Hub 2014, Plex sign-in not working Samsung TV, Samsung legacy platform Plex client, Plex Media Server old Samsung TV, Samsung HU series Plex">
+<link rel="canonical" href="https://itsab1989.github.io/neolume/">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0E0F11">
+<link rel="icon" type="image/svg+xml" href="assets/icon.svg">
+<link rel="icon" type="image/png" href="assets/icon-256.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Neolume">
+<meta property="og:title" content="Neolume – watch your Plex library on a 2014 Samsung Smart TV again">
+<meta property="og:description" content="Free, open-source client for Plex Media Server on 2014 Samsung Smart TVs (Orsay). One-time setup from Windows, macOS or Linux; afterwards the TV talks only to your own server.">
+<meta property="og:url" content="https://itsab1989.github.io/neolume/">
+<meta property="og:image" content="https://itsab1989.github.io/neolume/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Neolume – a modern client for Plex Media Server on 2014 Samsung Smart TVs">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Neolume – Plex client for 2014 Samsung Smart TVs">
+<meta name="twitter:description" content="Free, open-source client for Plex Media Server on 2014 Samsung Smart TVs (Orsay). No Plex Pass needed.">
+<meta name="twitter:image" content="https://itsab1989.github.io/neolume/assets/og-image.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Neolume",
+  "alternateName": "Neolume for Samsung Smart TV",
+  "description": "Unofficial, open-source client for Plex Media Server on 2014 Samsung Smart TVs with the Orsay Smart Hub. A setup program for Windows, macOS and Linux signs in once and installs the app; afterwards the TV talks only to your own server.",
+  "applicationCategory": "MultimediaApplication",
+  "applicationSubCategory": "Media player / Plex client",
+  "operatingSystem": "Samsung Smart TV (Orsay, 2014); setup program: Windows, macOS, Linux",
+  "softwareVersion": "1.0.0",
+  "license": "https://opensource.org/licenses/MIT",
+  "isAccessibleForFree": true,
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"},
+  "url": "https://itsab1989.github.io/neolume/",
+  "downloadUrl": "https://github.com/itsab1989/neolume/releases/latest",
+  "installUrl": "https://github.com/itsab1989/neolume/blob/main/docs/INSTALL.md",
+  "softwareHelp": "https://github.com/itsab1989/neolume/blob/main/docs/FAQ.md",
+  "codeRepository": "https://github.com/itsab1989/neolume",
+  "image": "https://itsab1989.github.io/neolume/assets/og-image.png",
+  "screenshot": "https://itsab1989.github.io/neolume/screenshots/home.png",
+  "author": {"@type": "Person", "name": "itsab1989", "url": "https://github.com/itsab1989"}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "Is Neolume an official Plex app?",
+     "acceptedAnswer": {"@type": "Answer", "text": "No. Neolume is an independent open-source project and is not affiliated with, endorsed or supported by Plex, Inc. Plex is a trademark of Plex, Inc."}},
+    {"@type": "Question", "name": "Which Samsung TVs does Neolume support?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Samsung Smart TVs from 2014 with the Orsay Smart Hub (H series, tested on a UE48H8000; HU 4K models should work). 2012/2013 Orsay models are untested. Tizen TVs (most 2015 models and everything from 2016) are not supported."}},
+    {"@type": "Question", "name": "Do I need Plex Pass?",
+     "acceptedAnswer": {"@type": "Answer", "text": "No. Only extras like skip-intro markers and seek thumbnails depend on data your server creates with Plex Pass."}},
+    {"@type": "Question", "name": "Why can my 2014 Samsung TV no longer sign in to Plex?",
+     "acceptedAnswer": {"@type": "Answer", "text": "The TV only supports old encryption (TLS 1.1 and older), which plex.tv no longer accepts. Neolume signs in once from your computer; afterwards the TV only talks to your own Plex Media Server on the home network."}}
+  ]
+}
+</script>
+<style>
+:root {
+  --bg: #0E0F11; --bg2: #17191C; --card: #1F2226; --line: #2E3237;
+  --text: #F2F2F2; --text2: #B7BBC0; --text3: #858B92; --accent: #2EC4B6; --accent-ink: #141414;
+  --radius: 14px; --max: 1080px;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 Inter, "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; }
+a { color: var(--accent); }
+a:focus-visible, .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+.wrap { max-width: var(--max); margin: 0 auto; padding: 0 16px; }
+header.top { border-bottom: 1px solid var(--line); }
+header.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 14px; padding-bottom: 14px; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 700; font-size: 20px; }
+.brand img { width: 36px; height: auto; }
+.brand span { color: var(--accent); }
+nav.links { display: flex; gap: 18px; flex-wrap: wrap; font-size: 15px; }
+nav.links a { color: var(--text2); text-decoration: none; }
+nav.links a:hover { color: var(--text); }
+.hero { padding: 56px 0 40px; background: radial-gradient(60% 80% at 80% 30%, rgba(46,196,182,.12), transparent 70%); }
+.hero h1 { font-size: clamp(32px, 6vw, 54px); line-height: 1.08; margin: 0 0 16px; letter-spacing: -0.02em; }
+.hero p.lead { font-size: clamp(18px, 2.4vw, 21px); color: var(--text2); max-width: 680px; margin: 0 0 26px; }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn { display: inline-block; padding: 12px 20px; border-radius: 10px; font-weight: 600; text-decoration: none; border: 1px solid var(--line); color: var(--text); background: var(--card); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.note { margin-top: 22px; font-size: 14px; color: var(--text3); }
+.shot { margin-top: 36px; border-radius: var(--radius); border: 1px solid var(--line); overflow: hidden; background: var(--bg2); }
+.shot img { display: block; width: 100%; height: auto; }
+section { padding: 44px 0; border-top: 1px solid var(--line); }
+h2 { font-size: clamp(24px, 3.6vw, 32px); margin: 0 0 18px; letter-spacing: -0.01em; }
+h3 { font-size: 19px; margin: 0 0 6px; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; }
+.card p, .card ul { margin: 0; color: var(--text2); font-size: 16px; }
+.card ul { padding-left: 18px; }
+.gallery { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.gallery figure { margin: 0; background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.gallery img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--card); }
+.gallery figcaption { padding: 10px 14px; font-size: 14px; color: var(--text2); }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 16px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--text2); font-weight: 600; }
+code { background: var(--bg2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: .92em; word-break: break-word; }
+ol.steps { padding-left: 22px; color: var(--text2); }
+ol.steps li { margin-bottom: 10px; }
+ol.steps b { color: var(--text); }
+details { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; }
+summary { cursor: pointer; font-weight: 600; }
+details p { color: var(--text2); margin: 10px 0 0; }
+.kofi { text-align: center; }
+.kofi p { color: var(--text2); max-width: 620px; margin: 10px auto 0; font-size: 15px; }
+footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--text3); font-size: 14px; }
+footer a { color: var(--text2); }
+@media (max-width: 560px) { nav.links { display: none; } .hero { padding-top: 36px; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="assets/icon.svg" alt="" width="36" height="30">Neo<span>lume</span></a>
+    <nav class="links" aria-label="Main">
+      <a href="#features">Features</a>
+      <a href="#tvs">Supported TVs</a>
+      <a href="#install">Install</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/itsab1989/neolume">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="hero">
+  <div class="wrap">
+    <h1>Watch your Plex library on a 2014 Samsung Smart TV again</h1>
+    <p class="lead">Neolume is a free, open-source <strong>client for Plex Media Server</strong> made for Samsung Smart TVs with the
+      2014 <strong>Orsay Smart Hub</strong> (H and HU series). It fixes the sign-in that the old Plex app lost, starts in a
+      fraction of a second and plays what the TV cannot decode by letting your server convert it.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/itsab1989/neolume/releases/latest">Download the setup program</a>
+      <a class="btn" href="https://github.com/itsab1989/neolume/blob/main/docs/INSTALL.md">Step-by-step guide</a>
+    </div>
+    <p class="note">Unofficial · Not affiliated with Plex, Inc. or Samsung · MIT licensed · No Plex Pass needed</p>
+    <div class="shot"><img src="screenshots/home.png" alt="Neolume home screen on a Samsung TV: Continue Watching, Up Next and background art" width="1280" height="720"></div>
+  </div>
+</div>
+
+<section id="why">
+  <div class="wrap">
+    <h2>Why your old Samsung TV stopped working with Plex</h2>
+    <p>Samsung TVs from 2014 only speak old encryption (TLS 1.1 and older). plex.tv no longer accepts it, so the TV's original
+      Plex app can no longer sign in – and it is no longer maintained. Neolume moves the sign-in to your computer: a small setup
+      program signs in to Plex <strong>once</strong>, prepares access for your profiles and installs the app on the TV through
+      Samsung's own developer sync. From then on the TV talks <strong>only to your own Plex Media Server</strong> on your home network.</p>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Features</h2>
+    <div class="grid">
+      <div class="card"><h3>Fast and made for the remote</h3><p>Starts from its own cache in a fraction of a second. Smooth on the TV's hardware, with the normal remote or the Smart Control pointer.</p></div>
+      <div class="card"><h3>Home, libraries, search</h3><p>Continue Watching, Up Next, Recently Added, a season strip, a library grid with sort, filters and A–Z, detail pages and search.</p></div>
+      <div class="card"><h3>A player that just works</h3><p>Direct Play up to 1080p; HEVC, 10-bit and 4K are converted by your server. Audio and subtitles per show, skip intro and credits, autoplay next episode.</p></div>
+      <div class="card"><h3>Profiles for the family</h3><p>Plex Home profiles with avatars, kids profiles with reduced settings and an optional app PIN per profile.</p></div>
+      <div class="card"><h3>Music and audiobooks</h3><p>Browse artists and albums and listen on the big screen.</p></div>
+      <div class="card"><h3>Private by design</h3><p>No ads, no tracking, no telemetry. In daily use the TV talks only to your server – no cloud in between.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="screenshots">
+  <div class="wrap">
+    <h2>Screenshots</h2>
+    <div class="gallery">
+      <figure><img src="screenshots/profiles.png" alt="Profile picker" loading="lazy" width="1280" height="720"><figcaption>Profiles – Plex Home, PINs, kids profiles</figcaption></figure>
+      <figure><img src="screenshots/library.png" alt="Movie library grid with sort and filter" loading="lazy" width="1280" height="720"><figcaption>Library – grid, sort, filter, A–Z</figcaption></figure>
+      <figure><img src="screenshots/details.png" alt="Movie details page" loading="lazy" width="1280" height="720"><figcaption>Details – everything about a movie</figcaption></figure>
+      <figure><img src="screenshots/series.png" alt="Show with seasons and episodes" loading="lazy" width="1280" height="720"><figcaption>Shows – seasons, episodes, progress</figcaption></figure>
+      <figure><img src="screenshots/player.png" alt="Player with chapters and control bar" loading="lazy" width="1280" height="720"><figcaption>Player – chapters, skip, sleep timer</figcaption></figure>
+      <figure><img src="screenshots/tracks.png" alt="Audio and subtitle panel" loading="lazy" width="1280" height="720"><figcaption>Audio & subtitles – readable track names</figcaption></figure>
+      <figure><img src="screenshots/search.png" alt="Search with on-screen keyboard" loading="lazy" width="1280" height="720"><figcaption>Search – keyboard or number keys</figcaption></figure>
+      <figure><img src="screenshots/discover.png" alt="Discover screen" loading="lazy" width="1280" height="720"><figcaption>Discover – rediscover your library</figcaption></figure>
+      <figure><img src="screenshots/music.png" alt="Music albums" loading="lazy" width="1280" height="720"><figcaption>Music – artists and albums</figcaption></figure>
+      <figure><img src="screenshots/audiobooks.png" alt="Audiobook with chapters" loading="lazy" width="1280" height="720"><figcaption>Audiobooks – chapters and progress</figcaption></figure>
+      <figure><img src="screenshots/sidebar.png" alt="Side menu" loading="lazy" width="1280" height="720"><figcaption>Side menu – libraries at a glance</figcaption></figure>
+      <figure><img src="screenshots/settings.png" alt="Settings" loading="lazy" width="1280" height="720"><figcaption>Settings in plain language</figcaption></figure>
+    </div>
+    <p class="note">All titles, people and artwork in the screenshots are invented demo content.</p>
+  </div>
+</section>
+
+<section id="tvs">
+  <div class="wrap">
+    <h2>Which Samsung TVs are supported?</h2>
+    <p>Neolume runs on Samsung's Orsay Smart TV platform. The model year is the fifth character of the model number:
+      <b>E</b> = 2012, <b>F</b> = 2013, <b>H/HU</b> = 2014, <b>J</b> = 2015.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>TV</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>2014 H series (e.g. UE48H8000, UE40H6400)</td><td>Supported – developed and tested on a UE48H8000</td></tr>
+        <tr><td>2014 HU series, 4K (e.g. UE55HU7500)</td><td>Should work (same platform), not tested yet</td></tr>
+        <tr><td>2013 F series, 2012 E series</td><td>Untested – older software and a different install menu</td></tr>
+        <tr><td>2015 J series with Orsay (some J4xxx/J5xxx)</td><td>Untested</td></tr>
+        <tr><td>Tizen TVs (most 2015 models, all 2016 and later)</td><td>Not supported – use the official Plex app from the Samsung store</td></tr>
+      </tbody>
+    </table></div>
+    <p>The interface is drawn at 1280 × 720 and scaled by the TV, so it looks the same on 720p, 1080p and 4K panels. Video
+      plays at up to 1080p.</p>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <h2>How to install</h2>
+    <ol class="steps">
+      <li><b>On the TV:</b> sign in to Smart Hub once with the user <code>develop</code> (<code>MENU</code> → Smart Hub → Samsung Account → Log In).</li>
+      <li><b>On your computer:</b> download the setup program from the <a href="https://github.com/itsab1989/neolume/releases/latest">latest release</a> and start it – Windows (<code>neolume-setup-windows-x64.exe</code>), macOS (<code>neolume-setup-macos-arm64.zip</code> or <code>-macos-x64.zip</code>), Linux (<code>neolume-setup-linux-x64</code>) or any system with Python (<code>neolume-setup.pyz</code>).</li>
+      <li><b>In the browser:</b> sign in with Plex, pick your server and profiles, click <i>Create app package</i>.</li>
+      <li><b>On the TV:</b> in SAMSUNG APPS hold <code>OK</code> for 5 seconds on any app → <i>IP Setting</i> → your computer's address → <i>Start User App Sync</i>.</li>
+      <li><b>Done:</b> Neolume appears under MY APPS. Your computer is no longer needed.</li>
+    </ol>
+    <p>Every button and menu, plus troubleshooting, is in the <a href="https://github.com/itsab1989/neolume/blob/main/docs/INSTALL.md">installation guide for beginners</a>.</p>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>Frequently asked questions</h2>
+    <details><summary>Is Neolume an official Plex app?</summary><p>No. Neolume is an independent open-source project and is not affiliated with, endorsed or supported by Plex, Inc. "Plex" is a trademark of Plex, Inc.</p></details>
+    <details><summary>Do I need Plex Pass?</summary><p>No. Only extras like skip-intro markers and seek thumbnails depend on data your server creates with Plex Pass.</p></details>
+    <details><summary>Will it delete my other apps?</summary><p>Apps from the Samsung store are not touched. The TV's developer sync removes other <em>self-installed</em> apps that are not on the sync list – the setup program lets you add them so they stay.</p></details>
+    <details><summary>Does it work outside my home?</summary><p>No, by design. Neolume only connects to your server on your home network.</p></details>
+    <details><summary>Is my data safe?</summary><p>There is no telemetry or tracking. Your Plex password is only entered on plex.tv. Each profile gets access that only works with your server and can be revoked on plex.tv at any time.</p></details>
+    <p><a href="https://github.com/itsab1989/neolume/blob/main/docs/FAQ.md">All questions and answers →</a></p>
+  </div>
+</section>
+
+<section class="kofi">
+  <div class="wrap">
+    <a href="https://ko-fi.com/itsab1989"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support Neolume on Ko-fi" height="36"></a>
+    <p>Neolume is free and always will be. If it brings your old TV back to life, a coffee is a kind way to say thanks – completely optional.</p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><a href="https://github.com/itsab1989/neolume">Source code on GitHub</a> · <a href="https://github.com/itsab1989/neolume/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/itsab1989/neolume/blob/main/LICENSE">MIT License</a> · <a href="https://github.com/itsab1989/neolume/issues">Report a problem</a></p>
+    <p>Neolume is an independent project, not affiliated with, endorsed or sponsored by Plex, Inc. or Samsung Electronics Co., Ltd.
+      "Plex", "Plex Media Server" and "Plex Pass" are trademarks of Plex, Inc.; "Samsung" and "Smart Hub" are trademarks of Samsung Electronics Co., Ltd.</p>
+  </div>
+</footer>
+</body>
+</html>

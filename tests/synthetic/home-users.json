@@ -1,0 +1,50 @@
+{
+ "id": 1,
+ "name": "Synth Home",
+ "subscription": true,
+ "users": [
+  {
+   "id": 11,
+   "uuid": "aaaa1111",
+   "title": "Alex",
+   "username": "alex",
+   "thumb": "https://plex.tv/users/aaaa1111/avatar?c=1",
+   "admin": true,
+   "guest": false,
+   "restricted": false,
+   "protected": true,
+   "restrictionProfile": null
+  },
+  {
+   "id": 12,
+   "uuid": "bbbb2222",
+   "title": "Kim",
+   "thumb": "https://plex.tv/users/bbbb2222/avatar?c=1",
+   "admin": false,
+   "guest": false,
+   "restricted": true,
+   "protected": false,
+   "restrictionProfile": "little_kid"
+  },
+  {
+   "id": 13,
+   "uuid": "cccc3333",
+   "title": "Robin",
+   "thumb": "",
+   "admin": false,
+   "guest": false,
+   "restricted": true,
+   "protected": true,
+   "restrictionProfile": "teen"
+  },
+  {
+   "id": 14,
+   "uuid": "dddd4444",
+   "title": "Gast",
+   "admin": false,
+   "guest": true,
+   "restricted": false,
+   "protected": false
+  }
+ ]
+}

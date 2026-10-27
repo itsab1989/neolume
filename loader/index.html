@@ -1,0 +1,23 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Neolume</title>
+<script type="text/javascript" src="$MANAGER_WIDGET/Common/API/Widget.js"></script>
+<script type="text/javascript" src="$MANAGER_WIDGET/Common/API/TVKeyValue.js"></script>
+<script type="text/javascript" src="$MANAGER_WIDGET/Common/API/Plugin.js"></script>
+<object id="pluginObjectTVMW" border=0 classid="clsid:SAMSUNG-INFOLINK-TVMW" style="opacity:0;width:0;height:0"></object>
+<object id="pluginObjectNNavi" border=0 classid="clsid:SAMSUNG-INFOLINK-NNAVI" style="opacity:0;width:0;height:0"></object>
+<object id="pluginObjectAppCommon" border=0 classid="clsid:SAMSUNG-INFOLINK-APPCOMMON" style="opacity:0;width:0;height:0"></object>
+<object id="pluginSef" border=0 classid="clsid:SAMSUNG-INFOLINK-SEF" style="position:absolute;left:0;top:0;width:0;height:0;visibility:hidden"></object>
+<style>
+html,body{margin:0;padding:0;width:1280px;height:720px;overflow:hidden;background:#101114;color:#e8e8ea;font-family:Arial,Helvetica,sans-serif}
+#anchor{position:absolute;left:-10px;top:-10px;width:1px;height:1px}
+</style>
+<script type="text/javascript" src="boot.js"></script>
+</head>
+<body onload="Boot.onload()">
+<a id="anchor" href="javascript:void(0);" onkeydown="Boot.onKey();"></a>
+<div id="root"></div>
+</body>
+</html>
