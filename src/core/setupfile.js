@@ -102,7 +102,7 @@
     }
     var hp = d.helper, helper = null;                                          // P4: optionaler Merkliste-Helfer (docs/research/discover.md)
     if (hp && typeof hp === 'object' && lanUri(hp.url)) helper = { url: lanUri(hp.url), key: typeof hp.key === 'string' && /^[A-Za-z0-9_\-]{16,128}$/.test(hp.key) ? hp.key : '' };
-    return { ok: true, cfg: {
+    var cfg = {
       schema: 1, createdAt: str(d.createdAt, 40), setupVersion: str(d.setupVersion, 20),
       clientId: typeof d.clientIdentifier === 'string' && CID.test(d.clientIdentifier) ? d.clientIdentifier : '',
       server: { machineId: s.machineIdentifier, name: str(s.name, 64), uris: uris }, profiles: profiles, computer: computer, helper: helper,
@@ -110,7 +110,9 @@
       resetPins: d.resetAppPins === true,                                        // App-PINs einmal zuruecksetzen (s. oben)
       skipped: skipped,                                                          // Gruende uebersprungener Profile/Server (Protokoll)
       serversIgnored: !srvOk                                                     // weitere Server in neuerem Format (Protokoll)
-    } };
+    };
+    if (N.ext) N.ext.call('setup:parse', d, cfg);                              // optionale Erweiterungen lesen ihre eigenen Felder
+    return { ok: true, cfg: cfg };
   }
 
   /* Profile -> Benutzerliste wie N.auth.normUsers (kind: main/kid/teen/''), pin = App-PIN gesetzt (pinOf(uuid)) */

@@ -398,9 +398,9 @@ test('Bildformat: Flaechen und Zoom-Zuschnitt (Orca-Raster 960x540 bzw. Quellpix
 
 /* ---------- OSD-Logik (Knopfreihe, Kapitel, Mehr-Menue, Sleep, Verzoegerung) ---------- */
 test('Knopfreihe: sichtbare Knoepfe, ◀▶ ohne Umlauf, Zeiger-Treffer, Label-Mitte', function () {
-  var O = N.osd, all = O.visible({ next: true, chap: true });
-  eq(all, ['back', 'pp', 'fwd', 'next', 'chap', 'tracks', 'more']);
-  var film = O.visible({ next: false, chap: false });
+  var O = N.osd, all = O.visible({ pn: 'ep', chap: true });
+  eq(all, ['prev', 'back', 'pp', 'fwd', 'next', 'chap', 'tracks', 'more']);
+  var film = O.visible({ pn: '', chap: false });
   eq(film, ['back', 'pp', 'fwd', 'tracks', 'more']);
   assert.strictEqual(O.nav(film, 'pp', 'RIGHT'), 'fwd');
   assert.strictEqual(O.nav(film, 'fwd', 'RIGHT'), 'tracks', 'Luecke wird uebersprungen');
@@ -413,6 +413,58 @@ test('Knopfreihe: sichtbare Knoepfe, ◀▶ ohne Umlauf, Zeiger-Treffer, Label-M
   assert.strictEqual(O.hit(film, 1032, 562), null, 'Kapitel ausgeblendet');
   assert.strictEqual(O.hit(all, 1032, 562), 'chap');
   assert.strictEqual(O.hit(all, 300, 562), null);
+  assert.strictEqual(O.hit(all, 504, 562), 'prev', '⏮ links aussen in der Mitte');
+});
+/* Nutzerauftrag 28.10.: Sprungweiten auf den Knoepfen, ⏮/⏭ je nach Inhalt */
+test('Sprungweiten: Zahl oder "zurueck/vor", ungueltig -> Standard; Aufschrift mit ASCII-Vorzeichen', function () {
+  var O = N.osd;
+  eq(O.steps(15, 10), { b: 15, f: 15 });
+  eq(O.steps('30', 10), { b: 30, f: 30 });
+  eq(O.steps('10/30', 10), { b: 10, f: 30 });
+  eq(O.steps(' 15 / 30 ', 10), { b: 15, f: 30 });
+  eq(O.steps(undefined, 10), { b: 10, f: 10 });
+  eq(O.steps('quatsch', 30), { b: 30, f: 30 });
+  eq(O.steps('0/30', 30), { b: 30, f: 30 }, 'Null ist kein Sprung');
+  eq(O.stepNums({ b: 10, f: 10 }), ['-10', '+10']);
+  eq(O.stepNums({ b: 15, f: 30 }), ['-15', '+30']);
+  assert.ok(!/\u2212/.test(O.stepNums({ b: 5, f: 5 }).join('')), 'kein U+2212 (fehlt in der TV-Schrift)');
+});
+test('Vorige/Naechste: Folgen -> Folgen, sonst Kapitel (ab 2), sonst Warteschlange, sonst ausgeblendet', function () {
+  var O = N.osd;
+  assert.strictEqual(O.pnMode({ type: 'episode', qLen: 5, chapters: 4 }), 'ep', 'Folge mit Kapiteln: trotzdem Folgen');
+  assert.strictEqual(O.pnMode({ type: 'episode', qLen: 1, chapters: 4 }), '', 'Folge ohne Queue (noch nicht geladen/letzte allein): keine Knoepfe');
+  assert.strictEqual(O.pnMode({ type: 'episode', qLen: 0, chapters: 0 }), '');
+  assert.strictEqual(O.pnMode({ type: 'movie', qLen: 0, chapters: 6 }), 'chap');
+  assert.strictEqual(O.pnMode({ type: 'movie', qLen: 3, chapters: 6 }), 'chap', 'Film mit Kapiteln in "Alle abspielen": Kapitel');
+  assert.strictEqual(O.pnMode({ type: 'movie', qLen: 0, chapters: 1 }), '', 'ein Kapitel ist keins');
+  assert.strictEqual(O.pnMode({ type: 'movie', qLen: 4, chapters: 0 }), 'item');
+  assert.strictEqual(O.pnMode({ type: 'movie', qLen: 0, chapters: 0 }), '');
+  // bedienbar: erste/letzte Folge gesperrt (gedimmt, kein Fokus/Treffer)
+  eq(O.pnState({ mode: 'ep', qIdx: 0, qLen: 3 }), { prev: false, next: true });
+  eq(O.pnState({ mode: 'ep', qIdx: 2, qLen: 3 }), { prev: true, next: false });
+  var chs = [{ start: 0 }, { start: 60000 }, { start: 120000 }];
+  eq(O.pnState({ mode: 'chap', chs: chs, ms: 70000 }), { prev: true, next: true });
+  eq(O.pnState({ mode: 'chap', chs: chs, ms: 130000 }), { prev: true, next: false }, 'im letzten Kapitel kein ⏭');
+  eq(O.pnState({ mode: '' }), { prev: false, next: false });
+  var vis = O.visible({ pn: 'ep', chap: false });
+  eq(O.usable(vis, { prev: false, next: true }), ['back', 'pp', 'fwd', 'next', 'tracks', 'more']);
+  assert.strictEqual(O.nav(O.usable(vis, { prev: false, next: true }), 'back', 'LEFT'), 'back', '◀ landet nicht auf dem gesperrten ⏮');
+  assert.strictEqual(O.hit(O.usable(vis, { prev: false, next: true }), 504, 562), null, 'gesperrter ⏮ nimmt keinen Klick');
+  // Kapitel-Ziele: > 3 s im Kapitel -> dessen Anfang, sonst das vorige; erstes Kapitel -> Anfang; ⏭ im letzten -> -1
+  assert.strictEqual(O.prevChapter(chs, 70000), 60000);
+  assert.strictEqual(O.prevChapter(chs, 62000), 0);
+  assert.strictEqual(O.prevChapter(chs, 1000), 0);
+  assert.strictEqual(O.nextChapter(chs, 70000), 120000);
+  assert.strictEqual(O.nextChapter(chs, 130000), -1);
+  // TV-Test 28.10.: Sprung landet bis ~1,5 s vor dem Kapitelanfang -> zaehlt schon als dieses Kapitel
+  assert.strictEqual(O.prevChapter(chs, 58500), 0, '⏮ knapp vor Kapitel 2 -> Kapitel 1, nicht noch eins weiter');
+  assert.strictEqual(O.nextChapter(chs, 58500), 120000, '⏭ knapp vor Kapitel 2 -> Kapitel 3, nicht Kapitel 2 erneut');
+  // Labels je Modus, in beiden Sprachen vorhanden
+  ['ep', 'chap', 'item'].forEach(function (m) { ['prev', 'next'].forEach(function (id) {
+    var k = O.pnLabel(m, id);
+    assert.ok(N.t(k) !== k && N.t(k).length <= 20, k + ' vorhanden und kurz');
+  }); });
+  assert.strictEqual(N.t(O.pnLabel('ep', 'next')), N.i18n.lang() === 'de' ? 'Nächste Folge' : 'Next episode');
 });
 test('Kapitel: sortiert, Kapitel zur Zeit', function () {
   var c = N.osd.chapters([{ tag: 'B', index: 2, startTimeOffset: 600000 }, { tag: 'A', index: 1, startTimeOffset: 0 }]);

@@ -6,9 +6,9 @@
 (function (N) {
   var U = N.util, ST = 'state.json', DAY = 86400000;
   /* Wiedergabe (M3): alles abschaltbar, Standardwerte nach SPEC 10.4 bzw. Nutzer (Fortsetzen fragen, Vorschaubilder an) */
-  var DEFAULT_SETTINGS = { episodeProgress: true, reduceMotion: false,
+  var DEFAULT_SETTINGS = { episodeProgress: true, seriesProgress: true, reduceMotion: false,
     resume: 'ask', quality: '12', directPlay: true, thumbs: true, skipIntro: 'button', skipCredits: 'button', autoNext: true, countdown: 10,
-    seekArrows: 10, seekFf: 30, rememberTracks: true, audioLang: 'de', subs: 'forced', subLang: 'de', ass: 'burn', anime: false,
+    seekArrows: 10, seekFf: 30, ptrLoupe: false, loupeStyle: 'panel', rememberTracks: true, audioLang: 'de', subs: 'forced', subLang: 'de', ass: 'burn', anime: false,
     aspect: 'auto', subSize: 'medium', subPos: 'low', subBg: 'dim', stillWatching: 3,
     themeMusic: false, themeVol: 50 };   // Titelmelodie (SPEC v2.2): Nutzerentscheidung M3b Standard AUS
   var S = {
@@ -132,8 +132,12 @@
      * Untertitelsprache der Oberflaechensprache, solange das Profil nie eine gewaehlt hat (TV-Test 27.10., F12). */
     applyDefaults: function () {
       var own = S.own || {}, l = N.i18n.lang() === 'en' ? 'en' : 'de';
+      // Feinauswahl: die Form C "Feinleiste" ('bar') gibt es nicht mehr (TV-Befund 28.10.) -> gespeicherte Wahl entfernen = A (Standard)
+      if (own.loupeStyle === 'bar') { delete own.loupeStyle; if (S.profile) N.store.set('settings-' + S.profile.uuid + '.json', own); }
       S.settings = U.extend(U.extend(U.extend({}, DEFAULT_SETTINGS), { audioLang: l, subLang: l }), own);
       if (own.stillWatching === undefined && S.isKid()) S.settings.stillWatching = 2;   // Kinderprofile: nach 2 Folgen nachfragen (SPEC 7.10)
+      // Serien-Balken war bis 28.10. an "Folgen-Fortschritt" gekoppelt: wer das ausgeschaltet hatte, sieht ihn weiter nicht
+      if (own.seriesProgress === undefined && own.episodeProgress === false) S.settings.seriesProgress = false;
       if (N.comfort && S.profile) N.comfort.applyDefaults(S.settings, S.isKid());   // P5-Standardwerte auch nach Sprachwechsel
     },
     setSetting: function (key, val) {

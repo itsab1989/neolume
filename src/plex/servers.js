@@ -170,7 +170,7 @@
       function libs(uri) {
         N.http.request({ url: uri + '/library/sections', headers: N.plex.headers(sv.token), timeout: LIBT, retries: 0, no401: true, dedupe: false, nowatch: true },
           function (err, d) {
-            if (g !== gen) return;
+            if (g !== gen) { fin(); return; }   // Profil gewechselt: fin benachrichtigt die Wartenden (sonst haengen sie)
             if (err && (err.status === 401 || err.status === 403)) { sv.base = ''; fin('auth'); return; }   // Freigabe entzogen / Token ungueltig
             sv.base = uri;
             if (!err && d && d.MediaContainer) sv.libs = libsOf(d);
@@ -178,7 +178,7 @@
           });
       }
       function next() {
-        if (g !== gen) return;
+        if (g !== gen) { fin(); return; }
         while (k < sv.uris.length && tried[sv.uris[k]]) k++;
         if (k >= sv.uris.length) { fromHelper(); return; }
         var uri = sv.uris[k++];

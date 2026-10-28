@@ -1,9 +1,36 @@
 /* N.ui.hints – Hinweisleiste (SPEC 5.11): max. 5 Eintraege, Farbtaste = Quadrat mit Buchstabe A–D,
- * Tastenkappen wie aufgedruckt (RETURN als Sprite-Symbol). Aenderung nur bei Kontextwechsel. */
+ * Tastenkappen wie aufgedruckt (RETURN als Sprite-Symbol). Aenderung nur bei Kontextwechsel.
+ * Einstellung "Tastenhinweise" (settings.hints, SPEC 5.11): 'always' (Standard) | 'brief' | 'off'.
+ * - brief: sichtbar, wenn ein Bildschirm/Overlay aufgeht (router.refreshHints meldet den Kontextwechsel per wake) und nach
+ *   jeder Farbtaste, INFO oder TOOLS (router.key); nach WAKE_MS ausblenden. Nur opacity (kleine Flaeche, Klasse .hid),
+ *   ein Timer, kein Layout. Ausgeblendet ist die Leiste nicht anklickbar (hit -> null).
+ * - off: Leiste nie sichtbar. Alle Tasten bleiben unter Hilfe & Info -> Tastenbelegung erklaert (views/help.js). */
 (function (N) {
   var U = N.util, MAX = 5;
   var COLOR = { red: ['k-red', 'A'], green: ['k-green', 'B'], yellow: ['k-yellow', 'C'], blue: ['k-blue', 'D'] };
-  var H = { el: null, items: [], sig: '' };
+  var H = { el: null, items: [], sig: '' }, WAKE_MS = 4000, wakeT = 0, awake = false, hidden = false;
+  H.MODES = ['always', 'brief', 'off'];
+  /* Modus aus den Einstellungen des Profils; ohne Profil (Anmeldung, Profilwahl) und bei fehlendem/unbekanntem Wert: immer */
+  H.mode = function () {
+    var s = N.session && N.session.profile ? N.session.settings : null, m = s && s.hints;
+    return m === 'brief' || m === 'off' ? m : 'always';
+  };
+  function apply() {
+    if (!H.el) return;
+    var m = H.mode(), hid = m === 'off' || (m === 'brief' && !awake);
+    if (hid !== hidden) { hidden = hid; U.cls(H.el, 'hid', hid); }
+  }
+  function sleep() { wakeT = 0; awake = false; apply(); }
+  /* Kontextwechsel oder Farbtaste/INFO/TOOLS: im Modus "Nur kurz" einblenden und den Ausblend-Timer neu starten */
+  H.wake = function () {
+    if (H.mode() !== 'brief') { apply(); return; }
+    awake = true; apply();
+    if (wakeT) clearTimeout(wakeT);
+    wakeT = setTimeout(sleep, N.config.hintMs || WAKE_MS);
+  };
+  H.visible = function () { return !hidden; };
+  /* Einstellung geaendert / anderes Profil: sofort wirken lassen ("Nur kurz" zeigt die Leiste dabei einmal) */
+  H.applyMode = function () { awake = false; H.wake(); };
   H.init = function (parent) {
     H.el = U.el('div', '', parent); H.el.id = 'pn-hints';
     for (var i = 0; i < MAX; i++) {
@@ -18,6 +45,7 @@
   /* list: [{k:'red'|'green'|'yellow'|'blue'|'ret'|'INFO'|'TOOLS'|'DIGITS', t:'hint.key'}] */
   H.set = function (list) {
     list = list || [];
+    apply();                                          // z. B. Profil verlassen (Profilwahl): Modus "immer"
     var sig = '', i;
     for (i = 0; i < list.length; i++) sig += list[i].k + ':' + list[i].t + '|';
     sig += N.i18n.lang();
@@ -58,10 +86,12 @@
     H.rects = r;
   };
   H.hit = function (x, y) {
-    if (!H.rects || y < Y0 - PAD || y >= Y0 + 28 + PAD) return null;
+    if (!H.rects || hidden || y < Y0 - PAD || y >= Y0 + 28 + PAD) return null;
     for (var i = 0; i < H.rects.length; i++) { var r = H.rects[i]; if (r.k && x >= r.x - PAD && x < r.x + r.w + PAD) return r.k; }
     return null;
   };
   H.refresh = function () { H.sig = ''; };
+  N.evt.on('settings:changed', function (e) { if (e && e.key === 'hints') H.applyMode(); });
+  N.evt.on('profile:changed', function () { H.applyMode(); });
   N.ui.hints = H;
 })(N);

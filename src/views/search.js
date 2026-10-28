@@ -13,7 +13,7 @@
  * Reihen-Slots: 5 N.ui.Row im Wechsel (Gruppe i -> Slot i mod 5), belegt nur das Fenster g-1 .. g+3 (wie die Startseite);
  * Nachladen des Fensters in der Idle-Queue, nie im Tastenpfad. */
 (function (N) {
-  var U = N.util, M = N.model, S = N.srch, RES_X = 416, HEAD_Y = 48, PITCH = { posterQ: 316, landS: 308, castS: 260 };   // >= 24 px Luft zwischen Gruppen
+  var U = N.util, M = N.model, S = N.srch, RES_X = 416, HEAD_Y = 48, PITCH = { posterQ: 316, landS: 308, castS: 260, note: 168 };   // note: Hinweis-Reihe (Kopf + bis zu 3 Zeilen)   // >= 24 px Luft zwischen Gruppen
   var NS = 5;                                          // Reihen-Slots (Fenster g-1 .. g+3)
 
   function view(kind) { return function () {   // kind: 'search' | 'discover' (nicht "mode": so heisst unten die Tastatur-Ebene)
@@ -22,7 +22,7 @@
     var root, qT, candEl, candT, caret, bubble, bubbleEls = [], keys = [], keyEls = [], rows = [], mode = 'abc', pos = { r: 0, c: 0, col: 0 };
     var resPg, slots = [], groups = [], tops = [], g = 0, recentEl, recentEls = [], recentHeadT, stateT, stateX, tipT;
     var q = '', t9 = new S.T9(), t9T = 0, reqT = 0, task = null, cache = new N.LRU(20), shownQ = null, zone = 'kbd', rf = 0, ring, off = 0, dead = false, sugg = [], wlTask = null;
-    var slotGroup = [], colMem = {}, emptyY = HEAD_Y, emptyRec = 0, wlGroup = null, inspIds = [], inspRows = {}, inspTask = null, pendingEmpty = false;   // colMem: Spalte je Gruppen-id
+    var slotGroup = [], colMem = {}, emptyY = HEAD_Y, emptyRec = 0, wlGroup = null, inspIds = [], inspRows = {}, inspTask = null, pendingEmpty = false, onWl = null, wlDirty = false;   // colMem: Spalte je Gruppen-id
 
     /* ---------- Aufbau ---------- */
     s.create = function (el) {
@@ -49,6 +49,15 @@
       var fade = U.el('img', 'fade s-fade', root); fade.src = N.assetBase + 'fade-bottom.png';
       U.el('div', 's-fadebg', root);
       ring = new N.ui.Ring(root);
+      if (D) {                                        // Merkliste auf einer Detailseite geaendert: Reihe ohne Anfrage anpassen,
+        onWl = function (e) {                         // sichtbar beim Zurueckkehren (enter)
+          if (!e || !e.it || dead) return;
+          var items = N.disc.wl.apply(wlGroup ? wlGroup.items : [], e.it, e.on);
+          wlGroup = items.length ? { id: 'wl', tk: 'disc.group.watchlist', kind: 'posterQ', items: items } : null;
+          wlDirty = true;
+        };
+        N.evt.on('watchlist:changed', onWl);
+      }
     };
     function buildKeys() {
       for (var i = 0; i < keyEls.length; i++) if (keyEls[i].parentNode) keyEls[i].parentNode.removeChild(keyEls[i]);
@@ -174,7 +183,44 @@
         if (err) { if (err.helper === 'down') N.disc.downToast(); return; }   // "Helfer nicht erreichbar" (einmal je Ausfall)
         wlGroup = items.length ? { id: 'wl', tk: 'disc.group.watchlist', kind: 'posterQ', items: items } : null;
         N.idle.add(composeEmpty, 'disc-insp');
+        /* optionale Erweiterung: Zustand je Karte der Merkliste nachtragen (z. B. Marke/Fortschritt einer Anfrage); sie ruft repaint()
+         * im Leerlauf, dann werden nur die belegten Karten dieser Reihe neu beschriftet */
+        if (wlGroup && N.ext.has('disc:wlrow')) {
+          var grp = wlGroup;
+          N.ext.call('disc:wlrow', grp.items, function () { if (!dead) N.idle.add(function () { if (!dead) refreshGroup(grp); }, 'disc-wlrow'); });
+        }
       });
+    }
+    /* Rueckkehr mit geaenderter Merkliste und Fokus in den Reihen: die Reihen jetzt neu zusammensetzen (nicht erst, wenn der Fokus
+     * die Reihen verlaesst); der Fokus bleibt auf derselben Reihe (per id), in der Merkliste auf derselben Spalte bzw. der naechsten */
+    function wlRefocus() {
+      var id = groups[g] && groups[g].id, gs = [], i;
+      if (wlGroup) gs.push(wlGroup);
+      xRows(gs);
+      for (i = 0; i < inspIds.length; i++) { var r = inspRows[inspIds[i]]; if (r && r.items && (r.items.length || r.note)) gs.push(r); }
+      if (!gs.length) { toKbd(); composeEmpty(); return; }
+      var ng = -1;
+      for (i = 0; i < gs.length; i++) if (gs[i].id === id) ng = i;
+      if (ng < 0 || !gs[ng].items.length) ng = 0;
+      if (hasSlot(g)) { colMem[groups[g].id] = slotOf(g).f; slotOf(g).setFocused(false); }
+      zone = 'kbd';                                   // composeEmpty baut ohne Warten um ...
+      composeEmpty();
+      if (!canFocus(ng)) ng = nextG(-1, 1);
+      if (ng < 0) { toKbd(); return; }
+      toGroup(ng);                                    // ... und der Fokus kommt auf die (verschobene) Reihe zurueck
+    }
+    /* optionale Erweiterung (N.ext 'disc:rows'): eigene Reihen hinter der Merkliste (z. B. Titel, die bald kommen). Sie liefert
+     * dieselben Gruppen-Objekte, solange sich nichts aendert, und ruft repaint() erst, wenn neue Daten da sind */
+    function xRows(gs) {
+      if (!N.ext.has('disc:rows')) return;
+      var l = N.ext.call('disc:rows', function () { if (!dead) N.idle.add(composeEmpty, 'disc-insp'); }) || [];
+      for (var i = 0; i < l.length; i++) if (l[i] && l[i].items && l[i].items.length) gs.push(l[i]);
+    }
+    function refreshGroup(grp) {
+      for (var i = 0; i < groups.length; i++) if (groups[i] === grp && hasSlot(i)) {
+        var sl = slotOf(i);
+        for (var k in sl.byIdx) if (Object.prototype.hasOwnProperty.call(sl.byIdx, k)) sl.refreshItem(Number(k));
+      }
     }
     function inspLibs() { var hc = N.session.homeCache(); return hc && hc.libs || N.ui.rail.libs || []; }
     function startInsp() {
@@ -199,7 +245,8 @@
       if (dead || shownQ !== null || S.query(full())) return;
       var gs = [], i;
       if (wlGroup) gs.push(wlGroup);
-      for (i = 0; i < inspIds.length; i++) { var r = inspRows[inspIds[i]]; if (r && r.items && r.items.length) gs.push(r); }
+      xRows(gs);
+      for (i = 0; i < inspIds.length; i++) { var r = inspRows[inspIds[i]]; if (r && r.items && (r.items.length || r.note)) gs.push(r); }
       if (zone === 'res') {
         for (i = 0; i <= g; i++) if (gs[i] !== groups[i]) { pendingEmpty = true; return; }
       }
@@ -234,17 +281,27 @@
     function hasSlot(i) { return i >= 0 && slotGroup[i % NS] === i && !!groups[i]; }
     /* Fokus verlaesst die Reihen (Ansicht springt nach oben): oberes Fenster in der Idle-Queue belegen */
     function topWin() { if (g > 1) N.idle.add(function () { if (!dead && zone !== 'res') ensureWin(0); }, 'search-win'); }
+    /* TV-Test 28.10. (Entdecken: ein Frame von 59–182 ms je ▼): die neu ins Fenster kommende Reihe wurde mit allen 11 Karten auf
+     * einmal befuellt, und ihr Slot vorher erst geleert (11x display:none) und gleich wieder gezeigt. Jetzt wie die Startseite:
+     * ein Slot, der im selben Durchgang eine neue Gruppe bekommt, wird nicht geleert (setModel verwendet die Karten weiter);
+     * befuellt wird nur die fokussierte Reihe sofort, die angeschnittene darunter sichtbar sofort/Puffer im naechsten Frame
+     * (mode 1), alle weiteren (verdeckt) in Haeppchen zu einer Karte je Frame (mode 2). */
     function ensureWin(c) {
       var lo = Math.max(0, c - 1), hi = Math.min(groups.length - 1, c + NS - 2), k, i;
       for (k = 0; k < NS; k++) {
-        var gi = slotGroup[k];
-        if (gi >= 0 && (gi < lo || gi > hi || !groups[gi])) { if (slots[k].model) colMem[slots[k].model.id] = slots[k].f; slots[k].clear(); slots[k].setVisible(false); slotGroup[k] = -1; }
+        var gi = slotGroup[k], ni = lo + ((k - lo % NS) + NS) % NS;   // Gruppe, die dieser Slot im Fenster bekommt
+        if (gi >= 0 && (gi < lo || gi > hi || !groups[gi])) {
+          if (slots[k].model) colMem[slots[k].model.id] = slots[k].f;
+          if (ni <= hi && groups[ni]) { slotGroup[k] = -1; continue; }   // wird gleich neu belegt: nicht leeren/verstecken
+          slots[k].clear(); slots[k].setVisible(false); slotGroup[k] = -1;
+        }
       }
       for (i = lo; i <= hi; i++) {
         var sl = slotOf(i);
         if (slotGroup[i % NS] !== i || sl.model !== groups[i]) {
-          if (sl.model) colMem[sl.model.id] = sl.f;
-          sl.setModel(groups[i], colMem[groups[i].id] || 0); slotGroup[i % NS] = i;
+          if (sl.model && slotGroup[i % NS] >= 0) colMem[sl.model.id] = sl.f;
+          sl.focused = false;                         // recycelter Slot (nicht geleert): alter Fokus gilt nicht mehr
+          sl.setModel(groups[i], colMem[groups[i].id] || 0, i === c ? 0 : i === c + 1 ? 1 : 2); slotGroup[i % NS] = i;
           if (zone === 'res' && i === g) sl.setFocused(true);
         }
         sl.setTop(tops[i]); sl.setVisible(true);
@@ -272,9 +329,12 @@
     function hasRecent() { return !shownQ && S.recent(PFX).length > 0 && recentEl.style.display !== 'none'; }
     function toResults() {
       if (hasRecent()) { toRecent(0); return; }
-      if (!groups.length) return;
-      toGroup(0);
+      var f = nextG(-1, 1);
+      if (f >= 0) toGroup(f);
     }
+    /* Hinweis-Reihen (kind 'note', keine Karten) sind nur Text: der Fokus springt darueber hinweg */
+    function canFocus(i) { return !!(groups[i] && groups[i].items.length); }
+    function nextG(from, dir) { for (var i = from + dir; i >= 0 && i < groups.length; i += dir) if (canFocus(i)) return i; return -1; }
     function toRecent(i) {
       if (zone === 'kbd') U.cls(keys[pos.r][pos.c], 'is-focus', false);
       if (zone === 'res' && hasSlot(g)) slotOf(g).setFocused(false);
@@ -326,8 +386,9 @@
       dead = false;
       if (p && p.q && !q && shownQ === null) { q = String(p.q).slice(0, 60); changed(); }   // Messlauf (P7): Suchbegriff vorgeben
       if (shownQ === null && !q) {
-        if (D && zone === 'res' && groups.length) startInsp();   // zurueck aus einer Detailseite: Fokus in den Reihen bleibt, Reihen nur auffrischen
+        if (D && zone === 'res' && groups.length) { if (wlDirty) wlRefocus(); startInsp(); }   // zurueck aus einer Detailseite: Fokus in den Reihen bleibt, Reihen nur auffrischen
         else showEmpty();
+        wlDirty = false;
       }
       if (zone === 'kbd') U.cls(keys[pos.r][pos.c], 'is-focus', true);
       else if (zone === 'res' && hasSlot(g)) { slotOf(g).refreshItem(slotOf(g).f); placeRing(slotOf(g).ringPos()); }
@@ -339,6 +400,7 @@
       if (task) task.abort();
       if (wlTask) wlTask.abort();
       if (inspTask) inspTask.abort();
+      if (onWl) N.evt.off('watchlist:changed', onWl);
       if (reqT) clearTimeout(reqT); if (t9T) clearTimeout(t9T);
       for (var i = 0; i < slots.length; i++) slots[i].clear();
     };
@@ -365,7 +427,7 @@
         var rec = S.recent(PFX);
         switch (k) {
           case 'UP': if (rf > 0) toRecent(rf - 1); return true;
-          case 'DOWN': if (rf < rec.length - 1) toRecent(rf + 1); else if (groups.length) toGroup(0); return true;
+          case 'DOWN': if (rf < rec.length - 1) toRecent(rf + 1); else if (nextG(-1, 1) >= 0) toGroup(nextG(-1, 1)); return true;
           case 'LEFT': case 'RETURN': toKbd(); return true;
           case 'ENTER': commitT9(); q = rec[rf] || ''; toKbd(); changed(); return true;
         }
@@ -375,8 +437,8 @@
       switch (k) {
         case 'LEFT': if (R.f > 0) placeRing(R.focusCol(R.f - 1)); else toKbd(); N.idle.add(function () { N.router.refreshHints(); }, 'search-hints'); return true;
         case 'RIGHT': if (R.f < R.count() - 1) placeRing(R.focusCol(R.f + 1)); N.idle.add(function () { N.router.refreshHints(); }, 'search-hints'); return true;
-        case 'UP': if (g > 0) toGroup(g - 1); else if (hasRecent()) toRecent(S.recent(PFX).length - 1); return true;
-        case 'DOWN': if (g < groups.length - 1) toGroup(g + 1); return true;
+        case 'UP': if (nextG(g, -1) >= 0) toGroup(nextG(g, -1)); else if (hasRecent()) toRecent(S.recent(PFX).length - 1); return true;
+        case 'DOWN': if (nextG(g, 1) >= 0) toGroup(nextG(g, 1)); return true;
         case 'ENTER': case 'INFO': open(it); return true;
         case 'PLAY': if (it && M.isVideo(it) && !it.ext) open(it, 'resume'); return true;
         case 'YELLOW':

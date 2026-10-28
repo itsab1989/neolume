@@ -4,6 +4,16 @@ var H = require('./helpers/load'), S = H.synthetic;
 var N = H.load().N;
 function eq(a, b) { assert.deepStrictEqual(JSON.parse(JSON.stringify(a)), b); }   // vm-Kontext: Objekte aus anderem Realm
 function list(f) { return S(f).MediaContainer.Metadata || []; }
+test('Nach dem Player (TV-Test 28.10.): Antwort ohne den gerade gestoppten Titel in Weiterschauen gilt als zu frueh', function () {
+  var rows = [{ id: 'cw', items: [{ rk: '5' }, { rk: '7' }] }, { id: 'deck', items: [{ rk: '9' }] }, { id: 'new-1', items: [{ rk: '42' }] }];
+  assert.strictEqual(N.hubs.stale(rows, '7', ['cw', 'deck']), false, 'steht drin');
+  assert.strictEqual(N.hubs.stale(rows, '42', ['cw', 'deck']), true, 'nur in einer anderen Reihe -> noch warten');
+  assert.strictEqual(N.hubs.stale(rows.slice(1), '7', ['cw', 'deck']), true, 'Weiterschauen leer/fehlt -> warten');
+  assert.strictEqual(N.hubs.stale(rows, '9', ['deck']), false, 'ohne Weiterschauen zaehlt Naechste Folgen');
+  assert.strictEqual(N.hubs.stale(rows, '9', ['cw', 'deck']), true, 'mit Weiterschauen muss er dort stehen');
+  assert.strictEqual(N.hubs.stale(rows, '1', ['new-1']), false, 'beide Reihen aus -> nichts zu warten');
+  assert.strictEqual(N.hubs.stale(rows, '', ['cw']), false);
+});
 function data() {
   var libs = N.hubs.libraries(S('sections.json'));
   return { libs: libs, cw: list('continueWatching.json'), deck: list('onDeck.json'),

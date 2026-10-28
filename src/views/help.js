@@ -8,17 +8,19 @@
   var COLOR = { red: ['k-red', 'A'], green: ['k-green', 'B'], yellow: ['k-yellow', 'C'], blue: ['k-blue', 'D'] };
   /* Kappen als Text (Nutzer-Feedback-Regel 10: keine Pfeil-/Sonderzeichen, die TV-Schrift hat sie nicht) */
   var CAP = { DIGITS: '0–9', CH: 'CH', PP: 'PLAY · PAUSE' }, CAPT = { NAV: 'keys.cap.arrows', LR: 'keys.cap.lr', FFRW: 'keys.cap.ffrw', PTR: 'keys.cap.touchpad' };
-  /* je Bildschirm: [Kappe, Text-Schluessel keys.<screen>.<id>] */
+  /* je Bildschirm: [Kappe, Text-Schluessel keys.<screen>.<id>]. Jede Taste, die eine Hinweisleiste irgendwo zeigt, steht hier
+   * (Tastenhinweise "Nur kurz"/"Aus" duerfen nichts unauffindbar machen) */
   var KEYS = [
     ['all', [['NAV', 'nav'], ['OK', 'ok'], ['ret', 'ret'], ['INFO', 'info'], ['TOOLS', 'tools'], ['EXIT', 'exit'], ['PTR', 'ptr']]],
     ['home', [['OK', 'ok'], ['PLAY', 'play'], ['red', 'red'], ['yellow', 'yellow'], ['blue', 'blue'], ['FFRW', 'ffrw'], ['ret', 'ret']]],
     ['library', [['OK', 'ok'], ['PLAY', 'play'], ['red', 'red'], ['yellow', 'yellow'], ['blue', 'blue'], ['DIGITS', 'digits'], ['FFRW', 'ffrw'], ['CH', 'ch']]],
     ['details', [['OK', 'ok'], ['PLAY', 'play'], ['red', 'red'], ['green', 'green'], ['yellow', 'yellow'], ['blue', 'blue'], ['SUBTITLE', 'subtitle'], ['DIGITS', 'digits']]],
     ['search', [['NAV', 'nav'], ['DIGITS', 'digits'], ['red', 'red'], ['yellow', 'yellow'], ['ret', 'ret']]],
-    ['player', [['OK', 'ok'], ['LR', 'lr'], ['FFRW', 'ffrw'], ['DIGITS', 'digits'], ['PP', 'pp'], ['STOP', 'stop'], ['green', 'green'], ['yellow', 'yellow'], ['blue', 'blue'], ['TOOLS', 'tools'], ['INFO', 'info']]],
-    ['settings', [['NAV', 'nav'], ['OK', 'ok'], ['INFO', 'info'], ['ret', 'ret']]]
+    ['player', [['OK', 'ok'], ['LR', 'lr'], ['FFRW', 'ffrw'], ['DIGITS', 'digits'], ['PP', 'pp'], ['CH', 'ch'], ['STOP', 'stop'], ['green', 'green'], ['yellow', 'yellow'], ['blue', 'blue'], ['TOOLS', 'tools'], ['INFO', 'info']]],
+    ['music', [['OK', 'ok'], ['green', 'green'], ['yellow', 'yellow'], ['blue', 'blue'], ['FFRW', 'ffrw'], ['CH', 'ch'], ['INFO', 'info']]],
+    ['settings', [['NAV', 'nav'], ['OK', 'ok'], ['yellow', 'yellow'], ['INFO', 'info'], ['ret', 'ret']]]
   ];
-  var MAXK = 11;
+  var MAXK = 12;
   /* Kappe in ein Element zeichnen (wie die Hinweisleiste) */
   function cap(parent, k) {
     var c = COLOR[k];

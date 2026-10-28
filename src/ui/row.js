@@ -22,7 +22,7 @@
     this.strip = U.el('div', 'strip', this.clip);
     this.pool = [];
     for (var i = 0; i < POOL; i++) this.pool.push(this._make());
-    this.model = null; this.g = R.geom('land'); this.f = 0; this.sc = 0; this.byIdx = {}; this.focused = false; this.top = 0; this.kind = ''; this.pend = false;
+    this.model = null; this.g = R.geom('land'); this.f = 0; this.sc = 0; this.byIdx = {}; this.focused = false; this.top = 0; this.kind = ''; this.pend = false; this.vis = true;
   }
 
   Row.prototype._make = function () {
@@ -39,7 +39,7 @@
     e.cap = U.el('div', 'cap cap-land', s, 'display:none');
     e.t1 = U.txt('div', 't1', e.cap, '');
     e.t2 = U.txt('div', 't2', e.cap, '');
-    e.idx = -1; e.kind = ''; e.base = 'card card-land'; e.capBase = 'cap cap-land'; e.on = false; e.foc = false; e.x = null; e.bc = 'bdg'; e.pw = -1; e.capOn = false;
+    e.idx = -1; e.kind = ''; e.xc = ''; e.base = 'card card-land'; e.capBase = 'cap cap-land'; e.on = false; e.foc = false; e.x = null; e.bc = 'bdg'; e.pw = -1; e.capOn = false;
     return e;
   };
 
@@ -66,6 +66,11 @@
     this.render(1, mode || 0);
   };
   Row.prototype.relabel = function () {
+    /* Hinweis-Reihe (model.note = i18n-Schluessel, keine Karten; z. B. Entdecken "alles schon auf deinem Server"): Text unter dem
+     * Kopf. Element erst beim ersten Hinweis anlegen (Startseite/Details brauchen es nie). */
+    var note = this.model && this.model.note ? N.t(this.model.note) : '';
+    if (note && !this.noteT) { this.noteT = U.txt('div', 'rnote', this.el, ''); if (this.vis === false) U.vis(this.noteT.parentNode, false); }
+    if (this.noteT) { U.setText(this.noteT, note); U.show(this.noteT.parentNode, !!note); }
     if (!this.model || this.opts.noHead) { U.setText(this.headT, ''); U.setText(this.cntT, ''); return; }
     U.setText(this.headT, N.hubs.rowTitle(this.model));
     U.setText(this.cntT, this.model.kind === 'land' ? String(this.model.items.length) : '');
@@ -93,9 +98,14 @@
     if (e.idx >= 0 && e.idx !== i && this.byIdx[e.idx] === e) delete this.byIdx[e.idx];
     e.idx = i; this.byIdx[i] = e;
     if (e.kind !== this.kind) {         // Reihe hat die Art gewechselt (land/poster/cast/sq): Groesse nur fuer diese Karte umstellen
-      e.kind = this.kind; e.base = 'card card-' + e.kind; e.capBase = 'cap cap-' + e.kind;
+      e.kind = this.kind; e.xc = ''; e.base = 'card card-' + e.kind; e.capBase = 'cap cap-' + e.kind;
       e.card.className = e.base; e.cap.className = e.capBase; e.foc = false;
       e.cap.style.top = g.capY + 'px';
+    }
+    var xc = it.cls ? ' ' + it.cls : '';   // optionale Zusatzklasse je Eintrag (Erweiterungen, z. B. gedimmte Karte); nur bei Aenderung schreiben
+    if (e.xc !== xc && (xc || e.xc)) {
+      e.xc = xc; e.base = 'card card-' + e.kind + xc; e.capBase = 'cap cap-' + e.kind + xc;
+      e.card.className = e.foc ? e.base + ' is-focus' : e.base; e.cap.className = e.foc ? e.capBase + ' is-focus' : e.capBase;
     }
     if (e.x !== x) { e.x = x; e.card.style.left = x; e.cap.style.left = x; }
     var src = land ? it.still : it.thumb;
@@ -163,6 +173,16 @@
       var src = this.g.kind === 'land' ? it.still : it.thumb;
       if (src) N.img.want(e.img, N.img.url(src, this.g.tier || (this.g.kind === 'land' ? 'land' : this.g.kind === 'cast' ? 'cast' : 'poster')), 0);
     }
+  };
+  /* Bild-URLs der Spalten [a, b] (geklemmt) – fuer N.img.warm (Startseite: Karten ausserhalb des Bildschirms vorab dekodieren) */
+  Row.prototype.urls = function (a, b, out) {
+    out = out || [];
+    var n = this.count(), land = this.g.kind === 'land', tier = this.g.tier || (land ? 'land' : this.g.kind === 'cast' ? 'cast' : 'poster');
+    for (var i = Math.max(0, a); i <= Math.min(n - 1, b); i++) {
+      var it = this.model.items[i], src = it && (land ? it.still : it.thumb);
+      if (src) out.push(N.img.url(src, tier));
+    }
+    return out;
   };
   /* Fokus per Taste (Anker-Regel) */
   Row.prototype.focusCol = function (f) {
@@ -232,7 +252,24 @@
     for (var k = 0; k < POOL; k++) this._free(this.pool[k]);
     this.byIdx = {}; this.model = null; this.focused = false; this.relabel();
   };
-  Row.prototype.setVisible = function (on) { U.vis(this.el, on); };
+  /* Reihe zeigen/verbergen (Startseite: Reihe ueber der fokussierten liegt unter dem Hero-Text). TV-Nachmessung 28.10. (home 6 Frames
+   * > 50 ms, je ▼/▲ einer): vorher visibility:hidden an der ganzen Reihe – WebKit gibt dann die Ebenen-Inhalte aller Karten und
+   * Beschriftungen frei (bis zu 22 GPU-Ebenen) und malt sie beim ▲ alle neu (samt Dekodieren der Bilder) im Frame der Taste.
+   * Jetzt: Karten-Bereich per Deckkraft 0 (.rclip ist dafuer eine feste GPU-Ebene ohne eigenen Inhalt -> nur Compositor-Wert, die
+   * gemalten Karten bleiben erhalten), Kopf/Hinweis (Text in der Seiten-Ebene, klein) weiter per visibility. */
+  Row.prototype.setVisible = function (on) {
+    if (this.vis === on) return;
+    this.vis = on;
+    this.clip.style.opacity = on ? '' : '0';
+    U.vis(this.head, on);
+    if (this.noteT) U.vis(this.noteT.parentNode, on);
+  };
+  /* "Darunter geht es weiter"-Hinweis (Startseite: Kopf der angeschnittenen naechsten Reihe, HOME-11): kleiner ›, um 90 Grad
+   * gedreht, gleiche Bildsprache wie der Staffel-Pfeil der Seriendetails. Element erst beim ersten Gebrauch; nur display schreiben. */
+  Row.prototype.setMore = function (on) {
+    if (!this.moreEl) { if (!on) return; this.moreEl = U.el('span', 'more-dn', this.head); this.moreEl.appendChild(document.createTextNode('›')); }
+    U.show(this.moreEl, on);
+  };
   /* Haeppchen-Groesse je Frame (P7 perf2: per Messlauf einstellbar, 'chunks' vergleicht Varianten am TV); FAST = waehrend Tastenwiederholung */
   Row.CHUNK = 1; Row.CHUNK_FAST = 1;   // perf3: wie Grid (TV 9,8,5)
   function chunk() { return N.fx && N.fx.isFast() ? Row.CHUNK_FAST : Row.CHUNK; }

@@ -18,27 +18,30 @@
   }
   var P = DetHero.prototype;
   /* Info-Block (nach dem Seiten-Container anlegen, damit er darueber liegt) */
-  /* o.chips: Anzahl Technik-Chips unter der Beschreibung (Film/Serie) */
+  /* o.chips: Anzahl Chips unter der Beschreibung (Film/Serie: Technik; fremder Titel: Genres); o.line: kurze Textzeile hinter den
+   * Chips (fremder Titel: "Regie: …" bzw. "Sender · Idee: …") */
   P.makeInfo = function (root, o) {
     // kompakter Kopf in den Abschnitten: dunkles Band unter dem Text (Feedback-Regel 11, wie details.js)
-    this.hdr = U.el('img', 'dtop', root); this.hdr.src = N.assetBase + 'fade-bottom.png';
+    this.hdr = U.el('img', 'dtop', root); this.hdr.src = N.assetBase + (o && o.hdr || 'fade-bottom.png');   // o.hdr: Band laeuft nach rechts aus (Filme/Serien)
     var info = this.info = U.el('div', 'dinfo', root);
     U.tf(info, HERO_X, HERO_Y);
     this.ovT = U.txt('div', 'd-ov t-label cacc ell', info, '');
     this.tiEl = U.el('div', 'd-ti t-display ell', info); this.tiT = document.createTextNode(''); this.tiEl.appendChild(this.tiT);
     this.meT = U.txt('div', 'd-me t-body c2 ell', info, '');
     this.deT = U.txt('div', 'd-de clamp t-body c2', info, '');
-    var n = o && o.chips || 0, ch = n ? U.el('div', 'd-chips', info) : null;
+    var n = o && o.chips || 0, ch = n || o && o.line ? U.el('div', 'd-chips', info) : null;
     for (var i = 0; i < n; i++) { var c = U.el('span', 'chip-tech', ch, 'display:none'); c.appendChild(document.createTextNode('')); this.chipEls.push(c); }
+    if (o && o.line) this.lineT = U.txt('span', 'd-chl t-small c2 ell', ch, '');
     return info;
   };
-  /* o: {small: Titel kleiner (Folge), chips: [Text]} */
+  /* o: {small: Titel kleiner (Folge), chips: [Text], line: Text (nur mit makeInfo o.line)} */
   P.paint = function (ov, ti, me, de, o) {
     var info = this.info, fx = !N.fx.reduced(), small = !!(o && o.small), cs = o && o.chips || [];
     if (fx) U.cls(info, 'out', true);
     if (small !== !!this.small) { this.small = small; this.tiEl.className = small ? 'd-ti t-h1 ell' : 'd-ti t-display ell'; }
     U.setText(this.ovT, ov || ''); U.setText(this.tiT, ti || ''); U.setText(this.meT, me || ''); U.clampText(this.deT, de || '');
     for (var i = 0; i < this.chipEls.length; i++) { U.show(this.chipEls[i], !!cs[i]); U.setText(this.chipEls[i].firstChild, cs[i] || ''); }
+    if (this.lineT) U.setText(this.lineT, o && o.line || '');
     if (fx) U.raf(function () { U.cls(info, 'out', false); });
   };
   /* Hintergrund: Art scharf, sonst Cover unscharf (vom Server vorgerechnet). title = fuer die Farbflaeche, wenn Bilder aus sind */

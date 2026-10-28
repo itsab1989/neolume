@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="616" viewBox="0 0 800 616" role="img" aria-labelledby="t d">
+<title id="t">Neolume: Profilwahl</title>
+<desc id="d">Skizze der Profilwahl von Neolume: Überschrift „Wer schaut gerade?“, vier runde Profilbilder (Alex, Hauptkonto, markiert; Sam; Jamie, Teen; Kinder). Darunter der Hinweis „Erwachsenenprofile schützen?“ mit den Knöpfen „Verstanden“ und „Später erinnern“.</desc>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff7a1a"/></marker><linearGradient id="scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2747"/><stop offset="1" stop-color="#0c1127"/></linearGradient><linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3c8fe8"/><stop offset="1" stop-color="#1f62c8"/></linearGradient><linearGradient id="neo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16181b"/><stop offset="1" stop-color="#0e0f11"/></linearGradient></defs>
+<rect x="8" y="8" width="784" height="455" rx="18" fill="#20232a" stroke="#d5d9e0" stroke-width="4"/>
+<rect x="24" y="24" width="752" height="423" rx="4" fill="url(#neo)"/>
+<text x="400" y="92" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#f2f2f2" text-anchor="middle">Wer schaut gerade?</text>
+<circle cx="172" cy="172" r="58" fill="none" stroke="#2EC4B6" stroke-width="5"/>
+<circle cx="172" cy="172" r="50" fill="#4d8fa6"/>
+<text x="172" y="250" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">Alex</text>
+<text x="172" y="271" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#a7abb2" text-anchor="middle">Hauptkonto</text>
+<circle cx="324" cy="172" r="50" fill="#b0607a"/>
+<text x="324" y="250" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="18" font-weight="bold" fill="#c4c7cc" text-anchor="middle">Sam</text>
+<circle cx="476" cy="172" r="50" fill="#4f9a85"/>
+<text x="476" y="250" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="18" font-weight="bold" fill="#c4c7cc" text-anchor="middle">Jamie</text>
+<text x="476" y="271" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#a7abb2" text-anchor="middle">Teen</text>
+<circle cx="628" cy="172" r="50" fill="#b8a24c"/>
+<text x="628" y="250" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="18" font-weight="bold" fill="#c4c7cc" text-anchor="middle">Kinder</text>
+<rect x="150" y="304" width="500" height="132" rx="12" fill="#22252a" stroke="#5b6069" stroke-width="1.5"/>
+<text x="174" y="338" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="19" font-weight="bold" fill="#ffffff" text-anchor="start">Erwachsenenprofile schützen?</text>
+<text x="174" y="364" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#c4c7cc" text-anchor="start">Ohne PIN können Kinder in dein Profil wechseln …</text>
+<rect x="174" y="384" width="124.192" height="36" rx="8" fill="#2f3338" stroke="#2EC4B6" stroke-width="3"/>
+<text x="236.096" y="408" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="bold" fill="#ffffff" text-anchor="middle">Verstanden</text>
+<rect x="314.192" y="384" width="155.059" height="36" rx="8" fill="#2f3338"/>
+<text x="391.722" y="408" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="bold" fill="#c4c7cc" text-anchor="middle">Später erinnern</text>
+<circle cx="150" cy="304" r="13" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="150" y="308.94" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.95" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<circle cx="112" cy="112" r="13" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="112" y="116.94" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.95" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<rect x="8" y="474" width="784" height="136" rx="10" fill="#f3f4f6" stroke="#d0d4da" stroke-width="1.5"/>
+<circle cx="32" cy="497" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="501.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<text x="52" y="503" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">Profilwahl: Profil markieren und OK. Profile mit Schloss fragen nach ihrer App-PIN.</text>
+<circle cx="32" cy="527" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="531.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<text x="52" y="533" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">Nur wenn es ein Kinderprofil gibt und dein Profil noch keine PIN hat: Hinweis zur App-PIN.</text>
+<text x="24" y="563" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#4b5563" text-anchor="start">Standard: Neolume startet direkt im Hauptprofil; die Profilwahl öffnest du über die Seitenleiste.</text>
+<text x="24" y="593" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#4b5563" text-anchor="start">Namen und Bilder sind Beispiele.</text>
+</svg>

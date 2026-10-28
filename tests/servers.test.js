@@ -246,3 +246,15 @@ test('Seitenleiste: hoechstens 10 Eintraege, Start wird nie abgeschnitten', func
   assert.strictEqual(ids.length, 10);
   assert.strictEqual(ids[ids.length - 1], 'home');
 });
+
+test('Profilwechsel waehrend der Adresspruefung: Wartende bekommen trotzdem eine Antwort (Review 1.0.5)', function () {
+  var w = world(friendScript), N = w.N, S = N.session, called = 0, st = null;
+  S.activate(S.user('aaaa1111'), S.cachedToken(S.user('aaaa1111')));
+  N.srv.when(OTHER, function () { called++; });
+  N.srv.resolve(OTHER, false, function (s) { st = s; });
+  assert.strictEqual(called, 0);
+  S.activate(S.user('bbbb2222'), S.cachedToken(S.user('bbbb2222')));   // anderes Profil, /identity noch unterwegs
+  w.T.tick(30000);
+  assert.strictEqual(called, 1, 'when()-Rueckruf darf nicht haengen');
+  assert.strictEqual(st, 'none');
+});

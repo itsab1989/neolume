@@ -135,3 +135,17 @@ test('401 in einer Ansicht (Pentest P6): Kinderprofil mit PIN-Schalter -> Starts
   N.app.authLost(); s.T.tick(500);
   assert.strictEqual(R.topName(), 'profiles');
 });
+
+test('Toast (NAV-10): unten links; Bildschirm mit toastLow (Einstellungen) -> tiefer unter der Beschreibung; Option low gewinnt', function () {
+  var s = setup(), N = s.N, R = N.router, T = N.ui.toast, icon = N.ui.setIcon;
+  T.el = { className: '' }; T.txt = { nodeValue: '' }; T.ic = {};
+  N.ui.setIcon = function () {};
+  try {
+    R.reset('a');
+    T.show('x'); assert.strictEqual(T.el.className, 'on');
+    R.top().toastLow = true;
+    T.show('y'); assert.ok(/(^| )low( |$)/.test(T.el.className), T.el.className);
+    T.show('z', { low: false }); assert.ok(!/(^| )low( |$)/.test(T.el.className), T.el.className);
+    T.hide();
+  } finally { N.ui.setIcon = icon; T.el = null; }
+});

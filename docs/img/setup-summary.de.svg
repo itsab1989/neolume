@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="862" viewBox="0 0 800 862" role="img" aria-labelledby="t d">
+<title id="t">Einrichtungsprogramm: Übersicht</title>
+<desc id="d">Skizze der Seite „Übersicht“ im Einrichtungsprogramm: Server, Adresse, Profile, Apps; Kästchen „App-PINs zurücksetzen“; Bereich „Weitere Server“ mit Knopf „Freigegebene Server suchen“; Kästchen „Helfer einrichten“ (angekreuzt, hervorgehoben); unter „Erweitert“ „Zugang auf diesem Computer merken“ (angekreuzt) und ein Feld für ein anderes Gerät; Knöpfe „Zurück“ und „App-Paket erstellen“.</desc>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff7a1a"/></marker><linearGradient id="scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2747"/><stop offset="1" stop-color="#0c1127"/></linearGradient><linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3c8fe8"/><stop offset="1" stop-color="#1f62c8"/></linearGradient><linearGradient id="neo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16181b"/><stop offset="1" stop-color="#0e0f11"/></linearGradient></defs>
+<rect x="8" y="8" width="784" height="730" rx="12" fill="#f6f5f2" stroke="#b9bec6" stroke-width="2"/>
+<rect x="8" y="8" width="784" height="40" rx="12" fill="#e8eaed"/>
+<rect x="8" y="36" width="784" height="12" rx="0" fill="#e8eaed"/>
+<circle cx="32" cy="28" r="6" fill="#ff5f57"/>
+<circle cx="52" cy="28" r="6" fill="#febc2e"/>
+<circle cx="72" cy="28" r="6" fill="#28c840"/>
+<rect x="110" y="16" width="300" height="24" rx="12" fill="#ffffff" stroke="#d0d4da" stroke-width="1"/>
+<text x="126" y="33" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" font-weight="normal" fill="#4b5563" text-anchor="start">127.0.0.1:32480</text>
+<text x="40" y="84" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="20" font-weight="bold" fill="#1d1d1f" text-anchor="start">Neolume Setup</text>
+<rect x="40" y="104" width="86" height="22" rx="11" fill="none" stroke="#2f8a4a" stroke-width="1"/>
+<text x="50" y="119" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#2f8a4a" text-anchor="start">1. Anmelden</text>
+<rect x="132" y="104" width="69.92" height="22" rx="11" fill="none" stroke="#2f8a4a" stroke-width="1"/>
+<text x="142" y="119" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#2f8a4a" text-anchor="start">2. Server</text>
+<rect x="207.92" y="104" width="70.16" height="22" rx="11" fill="none" stroke="#2f8a4a" stroke-width="1"/>
+<text x="217.92" y="119" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#2f8a4a" text-anchor="start">3. Profile</text>
+<rect x="284.08" y="104" width="86.24" height="22" rx="11" fill="#2EC4B6"/>
+<text x="294.08" y="119" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#1d1d1f" text-anchor="start">4. Übersicht</text>
+<rect x="376.32" y="104" width="134.72" height="22" rx="11" fill="none" stroke="#6b6b70" stroke-width="1"/>
+<text x="386.32" y="119" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#6b6b70" text-anchor="start">5. Auf den Fernseher</text>
+<rect x="517.04" y="104" width="66.8" height="22" rx="11" fill="none" stroke="#6b6b70" stroke-width="1"/>
+<text x="527.04" y="119" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#6b6b70" text-anchor="start">6. Fertig</text>
+<rect x="40" y="140" width="720" height="586" rx="12" fill="#ffffff" stroke="#e3e1dc" stroke-width="1"/>
+<text x="60" y="174" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="19" font-weight="bold" fill="#1d1d1f" text-anchor="start">Übersicht</text>
+<text x="60" y="204" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#6b6b70" text-anchor="start">Server</text>
+<text x="210" y="204" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#1d1d1f" text-anchor="start">Demo Server</text>
+<text x="60" y="226" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#6b6b70" text-anchor="start">Adresse</text>
+<text x="210" y="226" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#1d1d1f" text-anchor="start">http://192.168.1.10:32400</text>
+<text x="60" y="248" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#6b6b70" text-anchor="start">Profile</text>
+<text x="210" y="248" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#1d1d1f" text-anchor="start">Alex, Sam, Jamie, Kinder</text>
+<text x="60" y="270" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#6b6b70" text-anchor="start">Apps auf dem TV</text>
+<text x="210" y="270" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#1d1d1f" text-anchor="start">Neolume</text>
+<rect x="60" y="292" width="680" height="40" rx="8" fill="#e6f7f5"/>
+<text x="72" y="316" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#1d1d1f" text-anchor="start">Wichtig: Beim Aufspielen entfernt der Fernseher alle eigenen Apps, die nicht in der Liste stehen …</text>
+<rect x="60" y="346" width="680" height="40" rx="10" fill="#ffffff" stroke="#e3e1dc" stroke-width="1"/>
+<rect x="72" y="358" width="16" height="16" rx="3" fill="#ffffff" stroke="#8a8f98" stroke-width="1.5"/>
+<text x="98" y="371" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#1d1d1f" text-anchor="start">App-PINs zurücksetzen</text>
+<text x="257.375" y="371" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#6b6b70" text-anchor="start">– nur bei vergessener PIN des Hauptprofils</text>
+<text x="60" y="408" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#1d1d1f" text-anchor="start">Weitere Server (optional)</text>
+<rect x="60" y="418" width="420" height="8" rx="4" fill="#6b6b70" fill-opacity="0.35"/>
+<rect x="60" y="434" width="214.56" height="34" rx="8" fill="#ffffff" stroke="#e3e1dc" stroke-width="1"/>
+<text x="167.28" y="456" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#1d1d1f" text-anchor="middle">Freigegebene Server suchen</text>
+<rect x="60" y="484" width="680" height="66" rx="10" fill="#ffffff" stroke="#ff7a1a" stroke-width="2.5"/>
+<rect x="72" y="498" width="16" height="16" rx="3" fill="#2EC4B6" stroke="#2EC4B6" stroke-width="1.5"/>
+<path d="M75.5 506.5 l4 4 l7 -8" fill="none" stroke="#1d1d1f" stroke-width="2.2"/>
+<text x="98" y="511" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#1d1d1f" text-anchor="start">Helfer einrichten</text>
+<text x="98" y="532" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#6b6b70" text-anchor="start">Optional: Merkliste und „Gerade beliebt“ / „Neu erschienen“ / „Bald verfügbar“ (Abschnitt 13)</text>
+<circle cx="60" cy="484" r="13" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="60" y="488.94" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.95" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<text x="60" y="568" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#6b6b70" text-anchor="start">▾ Erweitert</text>
+<rect x="72" y="580" width="16" height="16" rx="3" fill="#2EC4B6" stroke="#2EC4B6" stroke-width="1.5"/>
+<path d="M75.5 588.5 l4 4 l7 -8" fill="none" stroke="#1d1d1f" stroke-width="2.2"/>
+<text x="96" y="593" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#1d1d1f" text-anchor="start">Zugang auf diesem Computer merken (nötig für „Helfer dauerhaft installieren“)</text>
+<text x="72" y="620" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#1d1d1f" text-anchor="start">Helfer läuft auf einem anderen Gerät, z. B. NAS (IP-Adresse, optional)</text>
+<rect x="72" y="628" width="240" height="26" rx="6" fill="#ffffff" stroke="#e3e1dc" stroke-width="1"/>
+<circle cx="54" cy="588" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="54" y="592.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<rect x="60" y="672" width="77.08" height="34" rx="8" fill="#ffffff" stroke="#e3e1dc" stroke-width="1"/>
+<text x="98.54" y="694" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#1d1d1f" text-anchor="middle">Zurück</text>
+<rect x="145.08" y="672" width="166.747" height="34" rx="8" fill="#2EC4B6"/>
+<text x="228.454" y="694" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#1d1d1f" text-anchor="middle">App-Paket erstellen</text>
+<circle cx="145.08" cy="672" r="13" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="145.08" y="676.94" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.95" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+<rect x="8" y="750" width="784" height="106" rx="10" fill="#f3f4f6" stroke="#d0d4da" stroke-width="1.5"/>
+<circle cx="32" cy="773" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="777.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<text x="52" y="779" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">Nur für die Merkliste &amp; Trends: „Helfer einrichten“ ankreuzen (sonst leer lassen)</text>
+<circle cx="32" cy="803" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="807.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<text x="52" y="809" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">„Zugang … merken“ angekreuzt lassen – sonst geht „dauerhaft installieren“ nicht</text>
+<circle cx="32" cy="833" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="837.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+<text x="52" y="839" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">„App-Paket erstellen“ – danach geht es mit dem Fernseher weiter</text>
+</svg>

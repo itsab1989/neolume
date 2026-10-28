@@ -24,9 +24,18 @@ function FakeTimers() {
   return T;
 }
 
+/* opts.ext: Liste von Erweiterungen (brand "features", tools/build.js) – deren Module werden hinter dem Haupt-Manifest geladen
+ * (nur wo src/private/manifest.json existiert; sonst Fehler, damit kein Test still ohne seine Module laeuft) */
+function extModules(list) {
+  var mp = path.join(SRC, 'private', 'manifest.json'), m = JSON.parse(fs.readFileSync(mp, 'utf8')), out = [];
+  list.forEach(function (f) { if (!m[f]) throw new Error('Erweiterung fehlt: ' + f); (m[f].js || []).forEach(function (x) { out.push('private/' + x); }); });
+  return out;
+}
+
 function load(opts) {
   opts = opts || {};
   var manifest = JSON.parse(fs.readFileSync(path.join(SRC, 'manifest.json'), 'utf8'));
+  if (opts.ext && opts.ext.length) manifest = manifest.concat(extModules(opts.ext));
   var ctx = { console: console };
   if (opts.fakeTimers) {
     var T = FakeTimers();

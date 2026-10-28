@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="556" viewBox="0 0 800 556" role="img" aria-labelledby="t d">
+<title id="t">Smart Hub: Feld SAMSUNG APPS</title>
+<desc id="d">Skizze: Unten im Bild die Smart-Hub-Leiste. Links zuletzt genutzte Apps, rechts in der Gruppe „Featured“ das türkise Feld SAMSUNG APPS (markiert) neben Multimedia und Tutorial.</desc>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff7a1a"/></marker><linearGradient id="scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2747"/><stop offset="1" stop-color="#0c1127"/></linearGradient><linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3c8fe8"/><stop offset="1" stop-color="#1f62c8"/></linearGradient><linearGradient id="neo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16181b"/><stop offset="1" stop-color="#0e0f11"/></linearGradient></defs>
+<rect x="8" y="8" width="784" height="455" rx="18" fill="#20232a" stroke="#d5d9e0" stroke-width="4"/>
+<rect x="24" y="24" width="752" height="423" rx="4" fill="url(#scr)"/>
+<rect x="24" y="24" width="752" height="250" rx="4" fill="#2b3a55"/>
+<path d="M24 230 L200 120 L330 200 L470 90 L776 240 L776 274 L24 274 Z" fill="#3c4f6e"/>
+<rect x="44" y="40" width="109.259" height="28" rx="8" fill="#2b2f36" stroke="#e6e8eb" stroke-width="2"/>
+<text x="98.6296" y="59" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">SMART HUB</text>
+<circle cx="44" cy="40" r="12" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="44" y="44.56" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13.8" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<rect x="24" y="286" width="752" height="161" rx="0" fill="#141a2c"/>
+<rect x="56" y="302" width="70" height="10" rx="5" fill="#ffffff" fill-opacity="0.28"/>
+<text x="392" y="312" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#aab4c8" text-anchor="start">Featured</text>
+<rect x="56" y="324" width="92" height="92" rx="3" fill="#5a4a7a"/>
+<rect x="160" y="324" width="92" height="92" rx="3" fill="#7a4a4a"/>
+<rect x="264" y="324" width="92" height="92" rx="3" fill="#3f6b5a"/>
+<rect x="387" y="319" width="130" height="102" rx="6" fill="none" stroke="#ffffff" stroke-width="3"/>
+<rect x="392" y="324" width="120" height="92" rx="3" fill="#1aa7a0"/>
+<text x="452" y="376" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="bold" fill="#ffffff" text-anchor="middle">SAMSUNG</text>
+<text x="452" y="392" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="bold" fill="#ffffff" text-anchor="middle">APPS</text>
+<rect x="526" y="324" width="104" height="92" rx="3" fill="#3a4f86"/>
+<text x="578" y="376" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="bold" fill="#ffffff" text-anchor="middle">Multimedia</text>
+<rect x="644" y="324" width="104" height="92" rx="3" fill="#4b5872"/>
+<text x="696" y="376" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="bold" fill="#ffffff" text-anchor="middle">Tutorial</text>
+<circle cx="392" cy="324" r="13" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="392" y="328.94" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.95" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<rect x="8" y="474" width="784" height="76" rx="10" fill="#f3f4f6" stroke="#d0d4da" stroke-width="1.5"/>
+<circle cx="32" cy="497" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="501.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<text x="52" y="503" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">Taste SMART HUB drücken (bunte Taste in der Mitte)</text>
+<circle cx="32" cy="527" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="531.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<text x="52" y="533" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">In der Gruppe „Featured“ das türkise Feld SAMSUNG APPS wählen → OK</text>
+</svg>

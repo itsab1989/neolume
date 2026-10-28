@@ -44,6 +44,7 @@ program on your computer signs in **once**, and from then on the TV talks **only
 
 ## Table of contents
 
+**Use Neolume on your TV**
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [What you need](#what-you-need)
@@ -52,7 +53,11 @@ program on your computer signs in **once**, and from then on the TV talks **only
 - [Which TVs work?](#which-tvs-work)
 - [Privacy and security](#privacy-and-security)
 - [FAQ](#faq)
+
+**Build, port and contribute**
 - [For developers](#for-developers)
+- [Build it for your TV with an AI agent](#build-it-for-your-tv-with-an-ai-agent)
+- [Documentation](#documentation)
 - [License and trademarks](#license-and-trademarks)
 
 ---
@@ -64,13 +69,18 @@ program on your computer signs in **once**, and from then on the TV talks **only
 - Smooth navigation on the TV's modest hardware; works with the normal remote **and** the Smart Control touch pointer.
 - German and English interface (follows the TV's language, or choose in Settings).
 - Choose your accent colour per profile: seven colours, all checked for readability.
-- A screensaver that shows art from your whole libraries, with ten transitions and seven overlay styles to choose from.
+- A screensaver that shows art from your whole libraries, with nine transitions (or Random) and six overlay styles to choose from.
+- Make it calmer if you like: four styles for the home screen clock, and button hints that always show, fade out after a
+  few seconds or stay hidden (every button is still explained under Settings → Help & info → Remote control keys).
 
 **Home, libraries, details, search**
 - Home with *Continue Watching*, *Up Next*, *Recently Added* per library, background art that follows the focus, and a
-  season strip that shows at a glance how far you are in a show.
+  season strip that shows at a glance how far you are in a show; a show's page adds a bar for the whole series (both can
+  be switched off).
 - *Customize Home* per profile: turn rows on/off, reorder them, add extra rows.
 - Library grid with sort, filters, A–Z jump bar and several view sizes – remembered per library and profile.
+- Optional library background: a soft colour mood of the selected title (default), its picture, or a new random picture each
+  time you open the library – kept dark so text stays readable, or plain if you prefer.
 - Detail pages for movies, shows, seasons and episodes with cast, extras, similar titles and version choice.
 - Search across your libraries.
 
@@ -80,34 +90,42 @@ program on your computer signs in **once**, and from then on the TV talks **only
 - Audio and subtitle choice with readable track names, remembered per show; optional rule for anime (Japanese audio with subtitles).
 - Skip intro / skip credits, next-episode countdown, chapters, sleep timer, "Still watching?", seek preview thumbnails
   (markers and thumbnails need the data your server provides).
+- ⏮ / ⏭ jump to the previous/next episode, chapter or video; the skip buttons show their real length (for example -10 / +30).
+- With the Smart Control: point at the progress bar to see the time (and a preview picture) before you click, and – if you
+  like – hold still for fine scrubbing, which makes jumps in long movies much more precise.
 
 **Music, profiles and more**
 - Music and audiobooks.
 - Plex Home profiles with avatars; kids profiles with reduced settings; an optional **app PIN** per profile.
-- *Discover* rows and your Plex **watchlist** through an optional helper on your home network (everything else works without it).
-- Optional: libraries of **servers that someone shared with you** (for example a friend), shown in the side menu with their origin.
+- *Discover* rows, your Plex **watchlist** and details of titles that are not on your server through an optional helper on
+  your home network (everything else works without it). The helper can start with your computer and shows a small icon in
+  the menu bar or next to the clock; one click removes it completely.
+  The plex.tv rows (Trending now, Just released, Coming soon) suggest only titles you don't have yet – switchable under Settings → Display.
+- Optional: libraries of **servers that someone shared with you** (for example a friend), shown in the sidebar with their origin.
 - No ads, no tracking, no telemetry.
 
 Deliberately **not** included: casting, downloads, Watch Together, remote access outside your home network.
 
 ## Screenshots
 
-<p align="center"><img src="docs/screenshots/home.png" alt="Neolume home screen: Continue Watching with background art" width="900"></p>
+<p align="center"><img src="docs/screenshots/home.png" alt="Neolume home screen: a movie's background picture with the Continue Watching row and progress bars below" width="900"></p>
 
 | | |
 |---|---|
-| ![Profile picker](docs/screenshots/profiles.png) | ![Side menu](docs/screenshots/sidebar.png) |
-| **Profiles** – Plex Home, PINs, kids profiles | **Side menu** – libraries, search, Discover |
-| ![Movie library](docs/screenshots/library.png) | ![Movie details](docs/screenshots/details.png) |
-| **Library** – grid, sort and filter, A–Z | **Details** – everything about a movie |
-| ![Show with seasons](docs/screenshots/series.png) | ![Search](docs/screenshots/search.png) |
+| ![Profile picker with four profiles, two of them locked with a PIN](docs/screenshots/profiles.png) | ![Open sidebar: your own libraries plus two libraries from a friend's server, labelled "from Lakeside"](docs/screenshots/sidebar.png) |
+| **Profiles** – Plex Home, PINs, kids profiles | **Sidebar** – your libraries plus libraries shared from other servers |
+| ![Movie library grid; the background takes on the colours of the selected poster](docs/screenshots/library.png) | ![Movie details page with poster, summary and buttons](docs/screenshots/details.png) |
+| **Library** – grid, sort, filter, A–Z and a colour mood from the selected title | **Details** – everything about a movie |
+| ![Show with season tabs, episode pictures and progress](docs/screenshots/series.png) | ![Search with on-screen keyboard and results](docs/screenshots/search.png) |
 | **Shows** – seasons, episodes, progress | **Search** – on-screen keyboard or number keys |
-| ![Player](docs/screenshots/player.png) | ![Audio and subtitles](docs/screenshots/tracks.png) |
-| **Player** – chapters, skip, sleep timer | **Audio & subtitles** – readable track names |
-| ![Discover](docs/screenshots/discover.png) | ![Settings](docs/screenshots/settings.png) |
-| **Discover** – rediscover your library | **Settings** – plain language, with explanations |
-| ![Music](docs/screenshots/music.png) | ![Audiobooks](docs/screenshots/audiobooks.png) |
-| **Music** – artists and albums | **Audiobooks** – chapters and progress |
+| ![Player with chapter marks on the progress bar and the new control bar](docs/screenshots/player.png) | ![Audio track picker in the player with readable track names](docs/screenshots/tracks.png) |
+| **Player** – new control bar, chapters, skip, sleep timer | **Audio & subtitles** – readable track names |
+| ![Music library with album covers](docs/screenshots/music.png) | ![Artist page with releases in groups: singles & EPs, with live albums below](docs/screenshots/artist.png) |
+| **Music** – artists and albums | **Artist pages** – albums, singles & EPs, live, soundtracks, compilations |
+| ![Audiobook with chapter list and progress](docs/screenshots/audiobooks.png) | ![Discover screen with keyboard and suggestions](docs/screenshots/discover.png) |
+| **Audiobooks** – chapters and progress | **Discover** – rediscover your library |
+| ![Screensaver showing a movie's background picture with the clock and title in the Ambient style](docs/screenshots/screensaver.png) | ![Accent colour picker with seven colours, set to Coral](docs/screenshots/accent.png) |
+| **Screensaver** – pictures from your libraries, nine transitions (or Random), six overlay styles | **Accent colour** – seven colours, per profile; every setting explained |
 
 <sub>All titles, people and artwork in the screenshots are invented demo content.</sub>
 
@@ -144,14 +162,17 @@ Not sure which Windows you have? Press `Win` + `Pause` (or open *Settings → Sy
 
 ## Quick start
 
-The full beginner guide with every button and menu, plus troubleshooting, is here: **[Installation guide](docs/INSTALL.md)**.
+The full beginner guide with every button and menu, drawings of the TV screens, plus troubleshooting, is here: **[Installation guide](docs/INSTALL.md)**.
 
-1. **TV:** press `MENU` → **Smart Hub** → **Samsung Account** → **Log In** and sign in once with the user **`develop`**.
+1. **TV:** press `MENU` → **Smart Hub** → **Samsung Account** → **Log In** and sign in once with the user **`develop`** (no password needed).
 2. **Computer:** start the setup program you downloaded. Your browser opens the setup page.
 3. **Browser:** click **Sign in with Plex**, choose your server and profiles, click **Create app package**.
 4. **TV:** press `SMART HUB`, open **SAMSUNG APPS**, **hold `OK` for about 5 seconds** on any app →
    **IP Setting** → enter the address the setup program shows → hold `OK` again → **Start User App Sync**.
 5. **Neolume** appears under **MY APPS**. Done – you can close the setup program.
+
+The watchlist, the plex.tv rows in Discover and the details of titles that are not on your server also need the optional helper on a computer or NAS in your home network:
+[guide, section 13](docs/INSTALL.md#13-optional-the-helper-for-watchlist-and-discover).
 
 > [!WARNING]
 > The TV's sync **removes every self-installed app that is not on the sync list.** Apps from the Samsung store are not
@@ -169,6 +190,10 @@ The full beginner guide with every button and menu, plus troubleshooting, is her
 
 Neolume draws its interface at 1280×720 and the TV scales it to the full screen, so it looks the same on 720p, 1080p and
 4K (HU) panels. Video is not limited to 720p. Details in the [FAQ](docs/FAQ.md#which-tvs-does-neolume-run-on).
+
+**Newer TV?** Neolume does not run on it. Most newer TVs (Samsung Tizen, LG webOS, Android TV / Google TV …) have the
+official Plex app in their app store – try that first. If you would still like Neolume's look and features there, you can
+[let an AI coding agent build it for you](#build-it-for-your-tv-with-an-ai-agent).
 
 ## Privacy and security
 
@@ -196,10 +221,56 @@ cp local.example.json local.json           # optional: your own addresses for de
 python3 tools/dev.py build --mac-ip <your-computer-ip>   # package + widgetlist.xml for the TV's User App Sync
 python3 tools/dev.py serve                 # development sync/app/log server
 python3 -m unittest discover -s tests/installer          # setup program tests (offline)
+npm run hooks                              # optional: spec check before each commit, npm test before each push
 ```
 
 The app is plain ES5 for the TV's 2014 browser engine, without frameworks. The setup program uses only the Python 3
-standard library. Contributions are welcome – please keep the ES5 rule and run `npm test` before a pull request.
+standard library. Contributions are welcome – please read [CONTRIBUTING.md](CONTRIBUTING.md) (keep the ES5 rule, update
+the spec with every user-visible change, run `npm test` before a pull request). Working with an AI coding agent in this
+repository? It finds its rules in [CLAUDE.md](CLAUDE.md) and CONTRIBUTING.md; a ready prompt is in
+[CONTRIBUTING.md](CONTRIBUTING.md#working-with-an-ai-coding-agent).
+
+## Build it for your TV with an AI agent
+
+Neolume itself runs only on 2014 Samsung TVs. For a newer TV – Samsung Tizen, LG webOS, Android TV / Google TV, Fire TV,
+Apple TV … – an AI coding agent can build the same app for you. Everything it needs is in this repository and kept in step
+with the code. You need an AI coding agent that can use a folder and a terminal on your computer, your TV in its developer
+mode, and patience for several sessions; the agent does the programming, you do the steps on the TV.
+
+**1. Copy this prompt into your agent** and replace the part in angle brackets:
+
+<!-- gen:prompt -->
+<!-- generated by tools/spec_gen.js – do not edit; run `npm run spec` -->
+```text
+Read https://raw.githubusercontent.com/itsab1989/neolume/main/docs/PORTING-WITH-AI.md and follow it exactly to build
+the app for my TV: <brand and model, e.g. "LG OLED C1">. Work in a new folder; ask me only for things you cannot do yourself.
+```
+<!-- /gen:prompt -->
+
+**2. What happens next:** the agent finds out how apps are made for your TV, gets a first test app onto it, then builds
+the app feature by feature and checks every step with tests, screenshots and speed measurements. It asks you only for
+things on the TV (switch on developer mode, press buttons, tell it what you see). At the end it walks you through the
+acceptance tests with your remote. It never needs your Plex password, token or PIN – if it asks for one, say no.
+
+**3. More prompts** for later – continue in a new session, test with your remote, update to a new version, share your
+port – are in the [Prompts section of the playbook](docs/PORTING-WITH-AI.md#prompts).
+
+**What your agent reads** (you don't have to):
+
+| Document | What's in it |
+|---|---|
+| [Porting playbook](docs/PORTING-WITH-AI.md) | The step-by-step workflow the agent follows, the list of sources and the parts of this app it can reuse |
+| [Product specification](docs/SPEC.md) | Every screen, setting, key, server request and performance budget, platform-neutral, with requirement IDs |
+| [Acceptance test plan](docs/TEST-PLAN.md) | One test per requirement – written so a person with a remote can do it – plus a 10-minute smoke test |
+| [Design system](design/README.md) | Every colour, font size, spacing and animation value ([`tokens.json`](design/tokens.json)) and the [icons](design/icons/) as SVG |
+| [Community ports](PORTS.md) | Apps others built for their TVs (links only; each port is the responsibility of its author) – add yours with the *Port submission* issue form |
+
+`npm test` checks the specification, the playbook and the test plan against the code on every change, so they always
+describe the current app.
+
+## Documentation
+
+All guides and reference documents, sorted by what you want to do: **[documentation overview](docs/README.md)**.
 
 ## License and trademarks
 

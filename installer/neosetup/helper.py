@@ -1,4 +1,4 @@
-"""Optional helper ("Helfer"): plex.tv-only features for the TV (watchlist, Discover rows).
+"""Optional helper ("Helfer"): plex.tv-only features for the TV (watchlist, Discover rows, details of titles not on the server).
 
 The 2014 TV cannot speak TLS 1.2, so this small service on a computer/NAS in the home network talks HTTPS to plex.tv
 and offers a few FIXED plain-HTTP JSON routes to the TV. It is NOT a proxy:
@@ -26,7 +26,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import VERSION, brand
+from . import VERSION, brand, ext
 from .netutil import is_private_ipv4, other_candidate_uris
 import ipaddress
 
@@ -37,6 +37,7 @@ TIMEOUT = 10
 CACHE_DISCOVER = 15 * 60
 CACHE_WATCHLIST = 60
 CACHE_SERVERS = 60
+CACHE_DETAILS = 6 * 3600                 # catalogue data of a title changes rarely; same answer for every profile
 PLEX_TV = 'plex.tv'
 HEX = re.compile(r'^[0-9a-f]{24}$')
 UUID = re.compile(r'^[A-Za-z0-9-]{4,64}$')
@@ -54,7 +55,8 @@ UPSTREAM = (
     ('PUT', DISCOVER, r'/actions/(addToWatchlist|removeFromWatchlist)', ('ratingKey',)),
     ('GET', DISCOVER, r'/library/metadata/[0-9a-f]{24}(,[0-9a-f]{24}){0,29}/userState', ()),
     ('GET', DISCOVER, r'/hubs/sections/home/(top_watchlisted|recently-released-family|coming-soon)', _PAGING),
-    ('GET', METADATA, r'/library/metadata/[0-9a-f]{24}', ()),     # reserved: cast/summary of foreign titles (not routed yet)
+    ('GET', METADATA, r'/library/metadata/[0-9a-f]{24}', ()),     # /details: summary, genres, cast … of a title not on the server
+    ('GET', METADATA, r'/library/metadata/[0-9a-f]{24}/children', _PAGING),   # seasons/episodes of a show (edition extensions)
     ('GET', PLEX_TV, r'/api/v2/resources', ('includeHttps', 'includeRelay', 'includeIPv6')),   # "Weitere Server": fresh addresses
 )
 
@@ -83,9 +85,11 @@ class HelperError(Exception):
 # ---------------------------------------------------------------- upstream allow-list
 def upstream_allowed(method, url):
     """True only for https URLs on the allow-list (host, method, full path match, known query keys, no userinfo/port)."""
-    try: p = urllib.parse.urlsplit(url)
+    try:
+        p = urllib.parse.urlsplit(url)
+        port = p.port
     except ValueError: return False
-    if p.scheme != 'https' or p.username or p.password or p.port or p.fragment: return False
+    if p.scheme != 'https' or p.username or p.password or port or p.fragment: return False
     host = (p.hostname or '').lower()
     try: q = urllib.parse.parse_qsl(p.query, keep_blank_values=True, strict_parsing=bool(p.query))
     except ValueError: return False
@@ -123,9 +127,11 @@ def _str(v, n):
 def safe_img(url):
     """Image URLs for the TV (loaded via the PMS photo transcoder): https on known image hosts, no credentials in the query."""
     if not isinstance(url, str) or len(url) > 600: return ''
-    try: p = urllib.parse.urlsplit(url)
+    try:
+        p = urllib.parse.urlsplit(url)
+        port = p.port                    # a bad port (":x", ":99999") raises ValueError -> drop only this image
     except ValueError: return ''
-    if p.scheme != 'https' or (p.hostname or '').lower() not in IMG_HOSTS or p.username or p.port: return ''
+    if p.scheme != 'https' or (p.hostname or '').lower() not in IMG_HOSTS or p.username or port: return ''
     if 'token' in p.query.lower(): return ''
     return url
 
@@ -169,6 +175,61 @@ def pick(items, type_, when, today, size):
     return out[:size]
 
 
+def _tags(lst, n, size=80):
+    """Plex tag list (Genre/Director/Network/…) -> up to n names."""
+    out = []
+    for t in lst if isinstance(lst, list) else []:
+        name = _str(t.get('tag') if isinstance(t, dict) else None, size)
+        if name and name not in out: out.append(name)
+        if len(out) >= n: break
+    return out
+
+
+def _num(v, lo, hi):
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) and lo <= v <= hi else 0
+
+
+def details_slim(md):
+    """Full catalogue entry (metadata.provider.plex.tv/library/metadata/<id>) -> slim details for the TV, or None.
+    Only whitelisted fields, bounded sizes; images only from known hosts (the TV loads them through the PMS photo
+    transcoder). No streaming/provider/user fields."""
+    base = slim(md)
+    if not base: return None
+    d = public(base)
+    d['summary'] = _str(md.get('summary'), 1500)
+    d['tagline'] = _str(md.get('tagline'), 200)
+    d['date'] = base['date']
+    d['art'] = safe_img(md.get('art'))
+    d['contentRating'] = _str(md.get('contentRating'), 20)
+    d['duration'] = int(_num(md.get('duration'), 0, 100 * 3600 * 1000))
+    d['rating'] = round(float(_num(md.get('audienceRating'), 0, 10) or _num(md.get('rating'), 0, 10)), 1)
+    d['studio'] = _str(md.get('studio'), 100)
+    d['genres'] = _tags(md.get('Genre'), 5, 40)
+    d['network'] = (_tags(md.get('Network'), 1, 60) or [''])[0]
+    d['directors'] = _tags(md.get('Director'), 3)
+    d['writers'] = _tags(md.get('Writer'), 3)
+    cast = []
+    for r in md.get('Role') if isinstance(md.get('Role'), list) else []:
+        name = _str(r.get('tag') if isinstance(r, dict) else None, 80)
+        if not name: continue
+        cast.append({'name': name, 'role': _str(r.get('role'), 80), 'thumb': safe_img(r.get('thumb'))})
+        if len(cast) >= 15: break
+    d['cast'] = cast
+    if base['type'] == 'show':
+        d['seasons'] = int(_num(md.get('childCount'), 0, 1000))
+        d['episodes'] = int(_num(md.get('leafCount'), 0, 100000))
+        c = md.get('isContinuingSeries')
+        d['continuing'] = c if isinstance(c, bool) else None
+        d['lastAired'] = _str(md.get('lastEpisodeOriginallyAvailableAt'), 10) if re.match(r'^\d{4}-\d{2}-\d{2}$', str(md.get('lastEpisodeOriginallyAvailableAt') or '')) else ''
+    ids = {}
+    for g in md.get('Guid') if isinstance(md.get('Guid'), list) else []:
+        m = re.match(r'^(tmdb|tvdb)://(\d{1,10})$|^(imdb)://(tt\d{1,10})$', str(g.get('id') if isinstance(g, dict) else ''))
+        if m and m.group(1): ids[m.group(1)] = int(m.group(2))
+        elif m: ids['imdb'] = m.group(4)
+    d['ids'] = ids
+    return d
+
+
 def public(it):
     return dict((k, it[k]) for k in ('id', 'type', 'guid', 'title', 'year', 'summary', 'thumb'))
 
@@ -182,6 +243,9 @@ def store_path():
 PLEX_PAGE_MAX = 100        # discover.provider.plex.tv lehnt X-Plex-Container-Size > 100 mit 400 ab (live geprueft 27.10.)
 
 
+STORE_KEYS = ('kind', 'schema', 'key', 'owner', 'allow', 'profiles')
+
+
 class Store(object):
     """Helper configuration: shared key, port, allowed TV address, plex.tv token per profile uuid.
     Kept in memory; saved only on request to a file readable by the current user only (0600)."""
@@ -190,6 +254,7 @@ class Store(object):
         self.profiles = {}                # uuid -> {'token', 'title', 'kind'}
         self.owner = owner
         self.allow = allow
+        self.extra = {}                   # data of optional extensions (ext.py), kept as it is in the file
         for u, p in (profiles or {}).items(): self.add(u, p.get('token'), p.get('title', ''), p.get('kind', 'home'))
 
     def add(self, uuid, token, title='', kind='home'):
@@ -208,8 +273,10 @@ class Store(object):
         return [{'title': p['title'], 'kind': p['kind']} for p in self.profiles.values()]
 
     def to_json(self):
-        return {'kind': 'plexneo-helper', 'schema': 1, 'key': self.key, 'owner': self.owner, 'allow': self.allow,
-                'profiles': self.profiles}
+        d = dict((k, v) for k, v in self.extra.items() if k not in STORE_KEYS)
+        d.update({'kind': 'plexneo-helper', 'schema': 1, 'key': self.key, 'owner': self.owner, 'allow': self.allow,
+                  'profiles': self.profiles})
+        return d
 
     @classmethod
     def from_json(cls, d):
@@ -220,13 +287,16 @@ class Store(object):
         for u, p in (d.get('profiles') or {}).items():
             if isinstance(p, dict): s.add(u, p.get('token'), p.get('title', ''), p.get('kind', 'home'))
         if not s.profiles: raise ValueError('no profiles')
+        s.extra = dict((k, v) for k, v in d.items() if k not in STORE_KEYS and isinstance(k, str) and len(k) <= 32)
         return s
 
     def save(self, path=None):
         path = path or store_path()
         os.makedirs(os.path.dirname(path), exist_ok=True)
         tmp = path + '.tmp'
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)   # Windows: per-user %APPDATA% ACL
+        try: os.remove(tmp)                # never write the tokens through a planted file/symlink (O_EXCL below)
+        except OSError: pass
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0), 0o600)   # Windows: per-user %APPDATA% ACL
         with os.fdopen(fd, 'w', encoding='utf-8') as f: json.dump(self.to_json(), f)
         try: os.chmod(tmp, 0o600)
         except OSError: pass
@@ -276,17 +346,20 @@ class Helper(object):
         self.lock = threading.Lock()
         self.upstream = threading.BoundedSemaphore(4)
         self.update_on = False            # the update server shares the port: /neo-helper then also announces 'update'
+        self.background = False           # installed helper (background.py): the setup page then shows it as such
+        self.store_path = None            # helper.json this helper runs from (extensions may save their block there)
+        self.ext = ext.helper_apis(self)    # routes of optional extensions of the edition (ext.py); public: none
 
     # --- plex.tv ---
-    def _headers(self, token):
+    def _headers(self, token, lang='de'):
         return {'Accept': 'application/json', 'X-Plex-Product': brand.name() + ' Helper', 'X-Plex-Version': VERSION,
-                'X-Plex-Client-Identifier': self.client_id, 'X-Plex-Language': 'de', 'X-Plex-Token': token}
+                'X-Plex-Client-Identifier': self.client_id, 'X-Plex-Language': lang, 'X-Plex-Token': token}
 
-    def call(self, method, host, path, query, token):
+    def call(self, method, host, path, query, token, lang='de'):
         url = 'https://%s%s%s' % (host, path, '?' + urllib.parse.urlencode(query) if query else '')
         if not upstream_allowed(method, url): raise HelperError(403, 'not_allowed')     # defence in depth
         with self.upstream:
-            status, data = self.fetch(method, url, self._headers(token))
+            status, data = self.fetch(method, url, self._headers(token, lang))
         if len(data) > MAX_UPSTREAM: raise HelperError(502, 'too_large')
         if status in (401, 403): raise HelperError(502, 'plex_auth')
         if status == 404: raise HelperError(502, 'plex_404')
@@ -368,15 +441,51 @@ class Helper(object):
                                 for r in res if not r['owned'] and not r.get('httpsRequired')][:20]}
         return self._cached(('srv', uuid), CACHE_SERVERS, get)
 
+    def details(self, uuid, hexid, lang):
+        """Details of a title that is not on the server (Discover details page): summary, genres, cast, runtime, seasons …
+        One upstream GET of the catalogue entry, cached 6 h per title + language (catalogue data, not personal)."""
+        tok = self.store.token(uuid) or self.store.token(self.store.owner)
+        def get():
+            md, _ = metadata_list(self.call('GET', METADATA, '/library/metadata/' + hexid, None, tok, lang))
+            d = details_slim(md[0] if md else None)
+            if not d or d['id'] != hexid: raise HelperError(502, 'parse')
+            return d
+        return self._cached(('det', hexid, lang), CACHE_DETAILS, get)
+
     # --- TV-facing request handling (pure; LanServer passes method/path/headers/client) ---
     def hello(self):
-        return {'name': 'plex-neo-helper', 'version': VERSION, 'watchlist': True, 'discover': True,
-                'features': ['watchlist', 'discover', 'servers'] + (['update'] if self.update_on else [])}
+        d = {'name': 'plex-neo-helper', 'version': VERSION, 'brand': brand.CURRENT.get('slug', ''), 'watchlist': True, 'discover': True,
+             'features': ['watchlist', 'discover', 'servers', 'details'] + (['update'] if self.update_on else [])}
+        for x in self.ext: d['features'] += [f for f in x.features() if f not in d['features']]
+        if self.background: d['background'] = True
+        return d
 
-    def handle(self, method, raw_path, headers, client):
+    def open_path(self, path):
+        """An extension route that any home-network client may use right now (LanServer: beyond the TV-only allow-list)."""
+        return any(getattr(x, 'open_path', None) and x.open_path(path) for x in self.ext)
+
+    def body_limit(self, method, raw_path):
+        """Largest request body (bytes) for this route: extension routes may take JSON, built-in routes none."""
+        path = raw_path.partition('?')[0]
+        return max([1024] + [x.body_limit(method, path) for x in self.ext if x.owns(path)])
+
+    def handle(self, method, raw_path, headers, client, body=b''):
         """-> (status, dict) or None when the path is not a helper route (LanServer then tries its static files)."""
         path, _, qs = raw_path.partition('?')
-        if not (path == '/neo-helper' or path == '/watchlist' or path.startswith('/watchlist/') or path.startswith('/discover/') or path == '/servers'):
+        x = next((x for x in self.ext if x.owns(path)), None)
+        if x:
+            try:
+                if not host_ok(headers.get('Host')): raise HelperError(403, 'host')
+                opened = bool(getattr(x, 'open_path', None) and x.open_path(path))
+                if not client_ok(client, '' if opened else self.store.allow): raise HelperError(403, 'lan_only')
+                if not self.rate.ok(client): raise HelperError(429, 'rate')
+                return x.handle(method, path, qs, headers, body, client)
+            except HelperError as e:
+                return e.status, {'error': e.code}
+            except Exception:
+                return 500, {'error': 'internal'}
+        if method == 'POST': return None
+        if not (path == '/neo-helper' or path == '/watchlist' or path.startswith('/watchlist/') or path.startswith('/discover/') or path in ('/servers', '/details')):
             return None
         try:
             if not host_ok(headers.get('Host')): raise HelperError(403, 'host')     # DNS rebinding: only IP literals
@@ -396,8 +505,14 @@ class Helper(object):
         uuid = str(headers.get('X-Neo-Profile') or '')
         if not UUID.match(uuid): raise HelperError(400, 'profile')
         q = parse_qs(qs)
-        route = path if path in ('/watchlist', '/watchlist/state', '/servers') else 'item' if path.startswith('/watchlist/') else 'discover'
+        route = path if path in ('/watchlist', '/watchlist/state', '/servers', '/details') else 'item' if path.startswith('/watchlist/') else 'discover'
         check_keys(q, route)
+        if path == '/details':
+            if method != 'GET': raise HelperError(405, 'method')
+            if not self.store.token(uuid) and not self.store.token(self.store.owner): raise HelperError(404, 'profile')
+            hexid = q.get('id') or ''
+            if not HEX.match(hexid): raise HelperError(400, 'id')
+            return self.details(uuid, hexid, q_choice(q, 'lang', LANGS, 'de'))
         if path == '/servers':
             if method != 'GET': raise HelperError(405, 'method')
             self._need_profile(uuid)
@@ -446,7 +561,9 @@ def host_ok(host):
     return bool(m)
 
 
-ROUTE_KEYS = {'/watchlist': ('type', 'start', 'size'), '/watchlist/state': ('ids',), 'item': (), 'discover': ('type', 'size'), '/servers': ()}
+ROUTE_KEYS = {'/watchlist': ('type', 'start', 'size'), '/watchlist/state': ('ids',), 'item': (), 'discover': ('type', 'size'), '/servers': (),
+              '/details': ('id', 'lang')}
+LANGS = {'de': 1, 'en': 1}
 
 
 def check_keys(q, route):
@@ -509,6 +626,7 @@ def run_headless(path=None, port=HELPER_PORT, bind='0.0.0.0', out=None, wait=Fal
     cid = 'plexneo-helper-' + store.key[:8].encode().hex()[:12]
     srv = LanServer('helper', port, allow=[store.allow] if store.allow else None, bind=bind)
     srv.api = Helper(store, cid)
+    srv.api.store_path = path or store_path()
     srv.start()
     try:                                                   # Docker/systemd stop with SIGTERM -> clean shutdown
         import signal

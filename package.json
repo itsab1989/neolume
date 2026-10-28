@@ -1,14 +1,18 @@
 {
   "name": "neolume",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "private": true,
   "description": "Unofficial client for Plex Media Server on 2014 Samsung Smart TVs (Orsay), ES5",
   "scripts": {
     "build": "node tools/build.js",
     "test": "node tools/build.js",
     "unit": "node --test \"tests/*.test.js\"",
+    "spec": "node tools/spec_gen.js",
+    "spec:check": "node tools/spec_gen.js --check",
+    "hooks": "git config core.hooksPath tools/hooks && echo \"git hooks on: pre-commit = spec check, pre-push = npm test (switch off: git config --unset core.hooksPath)\"",
     "visual": "node tools/visual.js",
     "visual:approve": "node tools/visual.js --approve",
+    "layoutcheck": "node tools/visual.js --layout",
     "assets": "node tools/make_assets.js",
     "showcase": "node tools/showcase.js && node tools/showcase.js --lang de"
   },

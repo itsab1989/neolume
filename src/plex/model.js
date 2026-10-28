@@ -48,11 +48,13 @@
       if (sv) { it.thumb = N.srv.tag(sv, it.thumb); it.still = N.srv.tag(sv, it.still); it.art = N.srv.tag(sv, it.art); }
       return it;
     },
-    /* libId: Bibliothek des Containers (Bibliotheksseiten tragen librarySectionID nur am MediaContainer, nicht je Eintrag) */
-    normList: function (list, libKinds, libId) {
+    /* libId: Bibliothek des Containers (Bibliotheksseiten tragen librarySectionID nur am MediaContainer, nicht je Eintrag).
+     * ub: UltraBlurColors als 24 Hex-Zeichen mitnehmen (nur Bibliothek, "Hintergrund in Bibliotheken"; nicht im Home-Cache) */
+    normList: function (list, libKinds, libId, ub) {
       var out = [];
       for (var i = 0; list && i < list.length; i++) if (list[i] && list[i].ratingKey) {
         var it = M.norm(list[i], libKinds);
+        if (ub && list[i].UltraBlurColors && N.amb) it.ub = N.amb.pack(list[i].UltraBlurColors);
         if (!it.lib && libId) { it.lib = num(libId); it.kind = libKinds && libKinds[it.lib] || it.kind; }
         out.push(it);
       }
@@ -75,6 +77,7 @@
     unwatchedCount: function (it) { return it.type === 'show' || it.type === 'season' ? Math.max(0, it.leaf - it.vleaf) : 0; },
     /* Badge: {b:'new'|'count'|'done'|'', n:'12'} (SPEC 5.2/5.3) */
     badge: function (it) {
+      if (it.badgeText) return { b: 'mark', n: it.badgeText };   // Text-Marke einer Erweiterung (z. B. Zustand), ersetzt das Gesehen-Zeichen
       if (it.ext) return { b: '', n: '' };              // P4: Titel nicht auf dem Server -> kein Gesehen-/Ungesehen-Zeichen
       if (it.nNew > 1) return { b: 'count', n: N.t('card.newBadge', { n: it.nNew > 99 ? '99+' : it.nNew }) };   // "Neu in": Serie zusammengefasst
       if (M.isLeaf(it)) {
@@ -97,6 +100,7 @@
       return [it.title, ''];
     },
     posterCaption: function (it) {
+      if (it.ext && it.sub) return [it.title, it.sub];   // Titel ausserhalb des Servers mit Unterzeile einer Erweiterung
       if (N.music && N.music.isAudio(it)) return N.music.caption(it, false);   // M4: Album -> Interpret, Kuenstler, Track
       if (it.type === 'season') return [it.title, N.t('card.season', { n: it.s })];
       if (it.type === 'show') return [it.title, it.child ? N.tn('meta.seasons', it.child) : (it.year || '')];

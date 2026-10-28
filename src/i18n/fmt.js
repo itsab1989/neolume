@@ -31,6 +31,10 @@
     },
     /* Uhrzeit "21:58" (24 h, beide Sprachen) */
     clock: function (date) { return U.pad2(date.getHours()) + ':' + U.pad2(date.getMinutes()); },
+    /* kurzes Datum mit Wochentag: "Mi., 28. Okt." / "Wed 28 Oct" (Namen aus fmt.wd / fmt.mon, kommagetrennt) */
+    dateShort: function (date) {
+      return N.t('fmt.dateShort', { wd: N.t('fmt.wd').split(',')[date.getDay()], d: date.getDate(), m: N.t('fmt.mon').split(',')[date.getMonth()] });
+    },
     mmss: function (sec) { sec = Math.max(0, Math.floor(sec)); return Math.floor(sec / 60) + ':' + U.pad2(sec % 60); },
     /* Bewertung "8,9/10" / "8.9/10" (kein ★: fehlt in der TV-Schrift, NUTZER-FEEDBACK-REGELN 10) */
     rating: function (r) {

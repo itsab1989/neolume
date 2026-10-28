@@ -1,0 +1,4 @@
+{
+  "$comment": "Sprite column order of the icons (src/assets/icons.png, src/ui/icons.js). APPEND ONLY: app.css refers to a few columns by position (badge tick, return key cap, state block info icon). Each name needs design/icons/<name>.svg.",
+  "order": ["search", "home", "film", "tv", "star", "globe", "gear", "lock", "confirm", "ret", "backspace", "info", "person", "tick", "play", "pause", "next", "chapters", "audio", "more", "moon", "prev", "shuffle", "repeat", "repeat1", "note", "book", "compass"]
+}

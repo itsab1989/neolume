@@ -1,10 +1,10 @@
-/* N.SeasonStrip – Staffelstreifen (SPEC 5.20, v2.1 abschaltbar). layout() und seriesBar() sind rein (Node-Tests);
+/* N.SeasonStrip – Staffelstreifen (SPEC HOME-1/DET-3, abschaltbar) und Serien-Balken (DET-3, eigene Einstellung). layout() und seriesBar() sind rein (Node-Tests);
  * N.ui.SeasonStrip rendert statisch aus einem festen Pool (30 Zellen + Marker + Balken + Text), nie im Fokusschritt. */
 (function (N) {
   var U = N.util;
   var SIZES = {
     L: { cw: 12, ch: 18, step: 16, barW: 320, barH: 6, text: true },
-    M: { cw: 10, ch: 18, step: 14, barW: 416, barH: 6, text: true },
+    M: { cw: 10, ch: 18, step: 14, barW: 336, barH: 6, text: true },   // Seriendetails: Balken so breit wie der Serien-Balken darunter
     S: { cw: 8, ch: 12, step: 12, barW: 368, barH: 4, text: false }
   };
   var MAX_CELLS = 30;
@@ -43,15 +43,17 @@
       }
       return out;
     },
-    /* Gesamt-Serien-Balken (Seriendetails, Variante M-Serie): seasons [{index, leaf, vleaf}] ohne Specials.
-     * Segmente >= 4 px, Luecke 2 px; > 40 Staffeln oder Mindestbreiten passen nicht -> einfacher Balken */
+    /* Serien-Balken (Seriendetails, eigene Einstellung seriesProgress): seasons [{index, leaf, vleaf}] ohne Specials, ein Segment je
+     * Staffel. Segmente >= min px, Luecke gap px (sichtbar getrennt: liest sich als Staffeln, nicht als Schiebebalken); > 40 Staffeln
+     * oder Mindestbreiten passen nicht -> einfacher Balken. Nur EINE regulaere Staffel -> keiner (saehe aus wie die Staffel selbst).
+     * Ergebnis traegt watched/total (Folgen ohne Specials) fuer die Beschriftung. */
     seriesBar: function (seasons, selIndex, width, gap, min) {
-      width = width || 416; gap = gap === undefined ? 2 : gap; min = min || 4;
+      width = width || 336; gap = gap === undefined ? 3 : gap; min = min || 4;
       var list = [], i, sumL = 0, sumV = 0;
-      for (i = 0; i < seasons.length; i++) if (seasons[i].index !== 0 && seasons[i].leaf > 0) { list.push(seasons[i]); sumL += seasons[i].leaf; sumV += Math.min(seasons[i].vleaf, seasons[i].leaf); }
-      if (!list.length) return { mode: 'none' };
+      for (i = 0; i < seasons.length; i++) if (seasons[i].index !== 0 && seasons[i].leaf > 0) { list.push(seasons[i]); sumL += seasons[i].leaf; sumV += Math.min(seasons[i].vleaf || 0, seasons[i].leaf); }
+      if (list.length < 2) return { mode: 'none' };
       var k = list.length, avail = width - gap * (k - 1);
-      if (k > 40 || k * min > avail) return { mode: 'single', width: width, fill: Math.round(width * sumV / sumL) };
+      if (k > 40 || k * min > avail) return { mode: 'single', width: width, fill: Math.round(width * sumV / sumL), watched: sumV, total: sumL };
       var w = [], fixed = [], changed = true, rest, sumFree;
       for (i = 0; i < k; i++) { w[i] = avail * list[i].leaf / sumL; fixed[i] = false; }
       while (changed) {
@@ -70,10 +72,16 @@
       var segs = [], x = 0;
       for (i = 0; i < k; i++) {
         var s = list[i];
-        segs.push({ x: x, w: ints[i], fill: Math.round(ints[i] * Math.min(s.vleaf, s.leaf) / s.leaf), sel: s.index === selIndex });
+        segs.push({ x: x, w: ints[i], fill: Math.round(ints[i] * Math.min(s.vleaf || 0, s.leaf) / s.leaf), sel: s.index === selIndex });
         x += ints[i] + gap;
       }
-      return { mode: 'segments', width: width, segments: segs };
+      return { mode: 'segments', width: width, segments: segs, watched: sumV, total: sumL };
+    },
+    /* Beschriftung links neben dem Serien-Balken (gleiches Muster wie "{k} von {n} ungesehen" der Staffel darueber) */
+    seriesText: function (b) {
+      if (!b || !b.total) return '';
+      var k = b.total - b.watched;
+      return k > 0 ? N.t('ss.series', { k: k, n: b.total }) : N.t('ss.seriesAll', { n: b.total });
     }
   };
   N.SeasonStrip = SS;

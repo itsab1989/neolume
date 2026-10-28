@@ -1,19 +1,36 @@
 /* Ansicht 'nowplaying' – Jetzt laeuft (M4; research 3.2/3.3). Liest nur den Zustand von N.audio (Wiedergabe laeuft weiter, wenn
  * die Ansicht geschlossen wird). Hintergrund Art bzw. Cover unscharf + Scrim, Cover 400x400 links, rechts Ueberzeile, Titel, Interpret,
  * Album bzw. Kapitel, Fortschrittsbalken + Zeiten (max. 1x/s), Knopfreihe (Sprite-Symbole) mit Label unter dem fokussierten Knopf:
- *   Musik:    ⏮ · −10 · ⏯ · +10 · ⏭ · Zufall · Wiederholen (aus/alle/einen) · Warteschlange · Sleep-Timer
- *   Hoerbuch: Kapitel zurueck · −30 · ⏯ · +30 · Kapitel vor · Kapitel · Sleep-Timer (inkl. "Ende des Kapitels"); kein Zufall/Wiederholen
+ *   Musik:    ⏮ · −x · ⏯ · +x · ⏭ · Zufall · Wiederholen (aus/alle/einen) · Warteschlange · Sleep-Timer
+ *   Hoerbuch: Kapitel zurueck · −x · ⏯ · +x · Kapitel vor · Kapitel · Sleep-Timer (inkl. "Ende des Kapitels"); kein Zufall/Wiederholen
+ * Ein System mit dem Video-Player (28.10.): gleiche Mitte ⏮ −x ⏯ +x ⏭, gleiche Play-Form (64 x 56), Aufschrift mit Vorzeichen,
+ * Sprungweiten aus den Einstellungen (Musik: "Pfeiltasten & Knoepfe", Hoerbuch: "Vor-/Rueckspulen", Standard 10 bzw. 30 s),
+ * RW/FF = "Vor-/Rueckspulen"; wiederholte Spruenge sammeln (N.SeekAcc: Ziel sofort auf dem Balken, EIN Sprung nach 600 ms Ruhe).
  * Tasten: OK Knopf, PLAY/PAUSE, RW/FF Sprung, CH▲▼ Titel/Kapitel, STOP beenden, Gelb Warteschlange/Kapitel, Blau Sleep-Timer,
- * RETURN zurueck zum Stoebern (Ton laeuft weiter, Mini-Player). Zeiger: alles anklickbar, Balken = Sprung. */
+ * RETURN zurueck zum Stoebern (Ton laeuft weiter, Mini-Player). Zeiger: alles anklickbar (Knoepfe mit 8 px Toleranz), Balken = Sprung;
+ * Zeigen auf den Balken zeigt die Zeit (Blase in der Zeitzeile), ruhig halten oeffnet die Feinauswahl (Einstellung, SPEC PLAY-30) –
+ * nur bei langen Balken (Hoerbuch-Kapitel, lange Titel; Musiktitel unter ~9 Min. sind ohnehin fein genug). Hier immer in der Form
+ * "Balken dehnt sich" (B): ueber dem Balken stehen Titel/Interpret/Kapitel, darunter liegen Zeitzeile und Knopfreihe eng – eine
+ * zusaetzliche Leiste haette dort keinen sicheren Platz (TV-Befund 28.10.). */
 (function (N) {
   var U = N.util, MU = N.music, F = N.fmt, X0 = 600, BY = 488, BAR_X = 600, BAR_W = 536, BAR_Y = 404;
   N.router.define('nowplaying', function () {
     var s = { rail: N.ui.rail && N.ui.rail.cur || 'home', wheelKeys: ['LEFT', 'RIGHT'] };   // Seitenleiste sichtbar (Feedback-Regel 3)
     var root, bg, cover, cfb, cfbT, ovT, tiT, arT, alT, chT, nxT, stT, tm0, tm1, barI, lbl, lblT, btnEl = {}, ids = [], fb = 'pp', ppIc, repIc, dots = {}, timer = 0;
-    var shown = { art: null, rk: null }, lastSec = -1, hs = [];
+    var shown = { art: null, rk: null }, lastSec = -1, hs = [], numB = null, numF = null, acc = null;
+    var hv, hvOn = false, lp = null, lpv = null, lpPend = null, lpRaf = false, NP_BAND = { top: BAR_Y - 32, bottom: 548, side: BAR_Y + 16 };   // Schutzzone bis unter die Knopfreihe (Treffer 476–548)
     function C() { return N.audio.core(); }
     function book() { var c = C(); return !!(c && c.book); }
-    function step() { return book() ? 30000 : 10000; }
+    function cfg() { return N.session.settings || {}; }
+    /* Sprungweite der Knoepfe in Sekunden {b, f}: Hoerbuch wie die Spultasten (grosse Schritte), Musik wie die Pfeile im Video */
+    function step() { return book() ? N.osd.steps(cfg().seekFf, 30) : N.osd.steps(cfg().seekArrows, 10); }
+    function ffrw() { return N.osd.steps(cfg().seekFf, 30); }
+    /* Spruenge sammeln (wie im Video): Ziel sofort zeigen, EIN Sprung nach 600 ms Ruhe */
+    function seekBy(ms) {
+      var c = C(); if (!c || !c.dur()) return;
+      acc.press(ms, c.t, c.dur(), false);
+      tick(true);
+    }
 
     s.create = function (el) {
       root = el;
@@ -31,8 +48,15 @@
       tm0 = U.txt('div', 'np-tm0', root, ''); tm1 = U.txt('div', 'np-tm1', root, '');
       stT = U.txt('div', 'np-st t-small c2 ell', root, '');
       nxT = U.txt('div', 'np-nx t-small c2 ell', root, '');
-      lbl = U.el('div', 'np-lbl', root); lblT = document.createTextNode(''); lbl.appendChild(lblT);
+      lbl = U.el('div', 'np-lbl', root); lblT = U.txt('span', '', lbl, '');
+      hv = U.txt('div', 'np-hv', root, '', 'display:none');
+      lpv = new N.ui.LoupeView({ parent: root, ox: 0, oy: 0, barTop: BAR_Y - 3, barH: 6, barX: BAR_X, barW: BAR_W, islY: 0, islX: 0, islW: 0 });
+      lp = new N.Loupe({ timers: { now: U.now, set: function (f, ms) { return setTimeout(f, ms); }, clear: function (t) { clearTimeout(t); } },
+        ok: lpOk, live: function () { var P = N.pointer; return !!(P.rawT && U.now() - P.rawT < P.LIVE); },
+        pos: function () { return { x: N.pointer.x, y: N.pointer.y }; }, open: lpOpen });
       buildButtons();
+      acc = new N.SeekAcc(function (tg) { var c = C(); if (c && c.item) c.seekTo(tg); tick(true); },
+        { now: U.now, set: function (f, ms) { return setTimeout(f, ms); }, clear: function (t) { clearTimeout(t); } }, N.config.seekDelay || 600);
       hs = [['audio:track', onTrack], ['audio:state', onState], ['audio:queue', onQueue], ['audio:chapters', onTrack]];
       for (var i = 0; i < hs.length; i++) N.evt.on(hs[i][0], hs[i][1]);
     };
@@ -44,9 +68,9 @@
       btnEl = {}; dots = {}; ids = want;
       var x = X0;
       for (var i = 0; i < ids.length; i++) {
-        var id = ids[i], lg = id === 'pp', b = U.el('div', 'pl-b np-b' + (lg ? ' lg' : ''), root, 'left:' + x + 'px;top:' + (lg ? BY - 8 : BY) + 'px');
-        b._x = x; b._w = lg ? 64 : 48;
-        if (id === 'back' || id === 'fwd') U.txt('div', 'num', b, String(step() / 1000));
+        var id = ids[i], lg = id === 'pp', b = U.el('div', 'pl-b np-b' + (lg ? ' lg' : ''), root, 'left:' + x + 'px;top:' + (lg ? BY - 4 : BY) + 'px');
+        b._x = x; b._w = lg ? 64 : 48; b._y = lg ? BY - 4 : BY; b._h = lg ? 56 : 48;
+        if (id === 'back' || id === 'fwd') { var nm = U.txt('div', 'num', b, ''); if (id === 'back') numB = nm; else numF = nm; }
         else {
           var ic = N.ui.icon(b, { prev: 'prev', pp: 'pause', next: 'next', shuffle: 'shuffle', repeat: 'repeat', queue: 'chapters', chapters: 'chapters', sleep: 'moon' }[id]);
           if (id === 'pp') ppIc = ic; if (id === 'repeat') repIc = ic;
@@ -59,13 +83,15 @@
       U.cls(btnEl[fb], 'is-focus', true);
       paintLabel();
     }
+    /* Aufschrift −x/+x (Einstellung kann sich zwischendurch aendern; nur Text, kein Umbau) */
+    function paintNums() { var nm = N.osd.stepNums(step()); if (numB) U.setText(numB, nm[0]); if (numF) U.setText(numF, nm[1]); }
     function label(id) {
       var c = C(), q = c && c.q;
       switch (id) {
         case 'prev': return N.t(book() ? 'mu.b.prevCh' : 'mu.b.prev');
         case 'next': return N.t(book() ? 'mu.b.nextCh' : 'mu.b.next');
-        case 'back': return N.t('mu.b.back', { n: step() / 1000 });
-        case 'fwd': return N.t('mu.b.fwd', { n: step() / 1000 });
+        case 'back': return N.t('mu.b.back', { n: step().b });
+        case 'fwd': return N.t('mu.b.fwd', { n: step().f });
         case 'pp': return N.t(c && c.state === 'paused' ? 'mu.b.play' : 'mu.b.pause');
         case 'shuffle': return N.t(q && q.shuffle ? 'mu.b.shuffleOn' : 'mu.b.shuffleOff');
         case 'repeat': return N.t('mu.b.repeat.' + (q ? q.repeat : 'off'));
@@ -78,7 +104,9 @@
     function paintLabel() {
       var b = btnEl[fb]; if (!b) return;
       U.setText(lblT, label(fb));
-      lbl.style.left = (b._x + b._w / 2 - 150) + 'px';
+      // mittig unter dem Knopf, aber nie links aus der Inhaltsspalte (x 600) heraus – wie das Label im Video
+      var c = b._x + b._w / 2, w = lblT.parentNode.offsetWidth || 0, x = Math.max(X0, c - w / 2);
+      lbl.style.left = Math.round(x + w / 2 - 150) + 'px';
     }
     function setFb(id) { U.cls(btnEl[fb], 'is-focus', false); fb = id; U.cls(btnEl[fb], 'is-focus', true); N.fx.move(btnEl[fb]); paintLabel(); }
     function paintToggles() {
@@ -93,7 +121,9 @@
     /* ---------- Zustand -> Anzeige ---------- */
     function onTrack() {
       var c = C(), it = c && c.item;
-      buildButtons();
+      lpEnd(); hvOff();
+      if (acc) acc.cancel();                               // Titelwechsel: gesammelter Sprung gilt nicht mehr
+      buildButtons(); paintNums();
       if (!it) { U.setText(tiT, N.t('mu.np.none')); return; }
       U.setText(ovT, N.t(c.book ? 'mu.np.book' : 'mu.np.music'));
       U.setText(tiT, c.book && c.ctx && c.ctx.title && c.chs.length < 2 && c.q.size() > 1 ? c.ctx.title : it.title);
@@ -131,10 +161,11 @@
     /* Zeit/Balken max. 1x/s (SPEC 7.10) */
     function tick(force) {
       var c = C(); if (!c || !c.item) return;
-      var t = c.t, d = c.dur(), sec = Math.floor(t / 1000);
+      var t = acc && acc.active() ? acc.target : c.t, d = c.dur(), sec = Math.floor(t / 1000);
       if (!force && sec === lastSec) return;
       lastSec = sec;
-      var st = c.state, k = c.chs.length > 1 ? c.chapterAt() : -1;
+      if (lpv.on) lpv.played(t - barRange(c).a);
+      var st = c.state, k = c.chs.length > 1 ? N.osd.chapterAt(c.chs, t) : -1;
       U.setText(stT, st === 'paused' ? N.t('mu.np.paused') : st === 'loading' || st === 'buffering' ? N.t('common.loading') : st === 'done' || (st === 'stopped' && !c.errKind) ? N.t('mu.np.ended') : st === 'error' || (st === 'stopped' && c.errKind) ? N.t(c.errKind === 'unreach' ? 'mu.err.unreach' : 'mu.err.track') : '');
       if (c.book) {
         var line = '';
@@ -160,10 +191,10 @@
       var c = C(); if (!c) return;
       switch (id) {
         case 'pp': if (c.active()) c.toggle(); else N.audio.restart(); break;
-        case 'prev': c.prev(); break;
-        case 'next': c.next(); break;
-        case 'back': c.seekBy(-step()); tick(true); break;
-        case 'fwd': c.seekBy(step()); tick(true); break;
+        case 'prev': acc.cancel(); c.prev(); break;
+        case 'next': acc.cancel(); c.next(); break;
+        case 'back': seekBy(-step().b * 1000); break;
+        case 'fwd': seekBy(step().f * 1000); break;
         case 'shuffle': c.setShuffle(!(c.q && c.q.shuffle)); N.ui.toast.show(N.t(c.q.shuffle ? 'mu.b.shuffleOn' : 'mu.b.shuffleOff'), { icon: 'confirm' }); break;
         case 'repeat': var r = c.cycleRepeat(); N.ui.toast.show(N.t('mu.b.repeat.' + r), { icon: 'confirm' }); break;
         case 'queue': case 'chapters': listPanel(); break;
@@ -211,7 +242,7 @@
     };
     s.railBlur = function () { U.cls(btnEl[fb], 'is-focus', false); };
     s.railFocus = function () { U.cls(btnEl[fb], 'is-focus', true); };
-    s.leave = function () { if (timer) { clearInterval(timer); timer = 0; } return null; };
+    s.leave = function () { if (lp) { lp.leave(); lpEnd(); } if (timer) { clearInterval(timer); timer = 0; } if (acc && acc.active()) acc.commit(); return null; };
     s.destroy = function () {
       if (timer) { clearInterval(timer); timer = 0; }
       for (var i = 0; i < hs.length; i++) N.evt.off(hs[i][0], hs[i][1]);
@@ -219,35 +250,97 @@
     };
     s.onKey = function (k) {
       var c = C(), i = ids.indexOf(fb);
+      if (lp.isOpen()) { lp.cancel(); lpEnd(); if (k === 'RETURN') return true; } else lp.cancel();   // RETURN schliesst nur die Feinauswahl
+      hvOff();
       switch (k) {
         case 'LEFT': if (i > 0) setFb(ids[i - 1]); else N.ui.rail.open(); return true;
         case 'RIGHT': if (i < ids.length - 1) setFb(ids[i + 1]); return true;
         case 'ENTER': act(fb); return true;
         case 'PLAY': case 'PAUSE': act('pp'); return true;
-        case 'RW': act('back'); return true;
-        case 'FF': act('fwd'); return true;
+        case 'RW': seekBy(-ffrw().b * 1000); return true;   // wie im Video: Spultasten = "Vor-/Rueckspulen"
+        case 'FF': seekBy(ffrw().f * 1000); return true;
         case 'CH_UP': act('prev'); return true;
         case 'CH_DOWN': act('next'); return true;
         case 'YELLOW': listPanel(); return true;
         case 'BLUE': sleepPanel(); return true;
         case 'STOP': if (c) c.stop('STOP'); N.router.back(); return true;
-        case 'INFO': N.ui.panel.help(N.t('mu.np.help.title'), N.t(book() ? 'mu.np.help.book' : 'mu.np.help.music')); return true;
+        case 'INFO': var f = ffrw(); N.ui.panel.help(N.t('mu.np.help.title'), N.t(book() ? 'mu.np.help.book' : 'mu.np.help.music', { ff: f.b === f.f ? N.t('mu.np.secs', { n: f.f }) : N.t('mu.np.secsBF', { b: f.b, f: f.f }) })); return true;
         case 'RETURN': N.router.back(); return true;
       }
       return true;
     };
+    /* Bereich des Balkens in Titelzeit: ganzer Titel bzw. (Hoerbuch mit eingebetteten Kapiteln) das laufende Kapitel */
+    function barRange(c) {
+      var k = c.chs.length > 1 ? c.chapterAt() : -1, a = 0, z = c.dur();
+      if (k >= 0) { a = c.chs[k].start; z = c.chs[k].end || (c.chs[k + 1] ? c.chs[k + 1].start : z); }
+      return { a: a, z: z };
+    }
+    function hvAt(x) { var r = barRange(C()); hvShow((r.z - r.a) * U.clamp((x - BAR_X) / BAR_W, 0, 1), x); }
+    function hvShow(ms, x) {
+      U.setText(hv, MU.clock(ms));
+      hv.parentNode.style.left = Math.round(U.clamp(x - 48, BAR_X, BAR_X + BAR_W - 96)) + 'px';
+      if (!hvOn) { hvOn = true; U.show(hv.parentNode, true); }
+    }
+    function hvOff() { if (!hvOn) return; hvOn = false; U.show(hv.parentNode, false); }
+    /* ---------- Feinauswahl (wie im Video, N.Loupe + N.ui.LoupeView): immer B (Balken dehnt sich), Fenster 400 px, die Zeit-Blase zeigt
+     * die feine Zielzeit. Solange sie offen ist, gehoert ihr alles von 32 px ueber dem Balken bis unter die Knopfreihe (NP_BAND):
+     * Knoepfe reagieren dort nicht, ein Klick setzt das Ziel; seitlich verlassen nur auf Balkenhoehe ---------- */
+    function lpHalf() { var c = C(); if (!c || !c.item) return 0; var r = barRange(c); return N.Loupe.half(r.z - r.a, BAR_W); }
+    function lpOk() { return cfg().ptrLoupe === true && N.pointer.enabled() && hvOn && N.router.top() === s && !N.router.hasOverlay() && !acc.active() && lpHalf() > 0; }
+    function lpOpen(x) {
+      var c = C(), h = lpHalf();
+      if (!h) return;
+      var r = barRange(c), g = lp.open(N.Loupe.geom({ x: x, barX: BAR_X, barW: BAR_W, dur: r.z - r.a, w: 400, h: h }), null, 0);
+      U.cls(root, 'np-lp', true);
+      lpv.show(g, { style: N.Loupe.style(cfg().loupeStyle, { np: true }), fmt: MU.clock, chs: null, coff: 0, markers: null, pos: c.t - r.a });
+      var S = N.session, n = Number(S.state && S.state.loupeHints) || 0;   // gemeinsamer Zaehler mit dem Video
+      if (n < N.Loupe.K.HINTS && S.state) { U.setText(lblT, N.t('pl.loupe.hint')); S.state.loupeHints = n + 1; S.save(); }
+      else U.setText(lblT, N.t('pl.loupe.title', { t: MU.clock(h) }));
+      var w = lblT.parentNode.offsetWidth || 0;
+      lbl.style.left = Math.round(BAR_X + BAR_W / 2 - Math.max(w, 300) / 2) + 'px';
+      var p = lp.move(N.pointer.x, N.pointer.y, NP_BAND);
+      if (p && !p.exit) lpMove(p);
+    }
+    function lpMove(p) {
+      lpPend = p;
+      if (!lpRaf) { lpRaf = true; U.raf(function () { lpRaf = false; if (lpPend && lp.isOpen()) { lpv.point(lpPend); hvShow(lpPend.ms, lpPend.x); } }); }
+    }
+    function lpEnd() {
+      if (!lpv) return;
+      if (lp.isOpen()) lp.close();
+      lpPend = null;
+      if (!lpv.on) return;
+      lpv.hide(); U.cls(root, 'np-lp', false); hvOff();
+      paintLabel();
+    }
     s.pointer = function (x, y, kind) {
-      for (var i = 0; i < ids.length; i++) {
-        var b = btnEl[ids[i]], top = ids[i] === 'pp' ? BY - 8 : BY;
-        if (x >= b._x && x < b._x + b._w && y >= top && y < top + b._w) { if (fb !== ids[i]) setFb(ids[i]); if (kind === 'click') act(ids[i]); return true; }
+      var c = C();
+      if (lp.isOpen()) {                                     // Feinauswahl hat Vorrang
+        if (kind === 'click') {                             // Klick: setzt das Ziel oder schliesst nur – loest nie einen Knopf aus
+          var ms = lp.click(x, y, NP_BAND);
+          lpEnd();
+          if (ms >= 0 && c && c.item) { acc.cancel(); c.seekTo(barRange(c).a + ms); tick(true); }
+          return true;
+        } else {
+          var m = lp.move(x, y, NP_BAND);
+          if (m && !m.exit) { if (!m.same) lpMove(m); return true; }
+          lpEnd();
+        }
       }
-      if (kind === 'click' && x >= BAR_X - 8 && x < BAR_X + BAR_W + 8 && y >= BAR_Y - 14 && y < BAR_Y + 14) {
-        var c = C(); if (!c || !c.dur()) return true;
-        var k = c.chs.length > 1 ? c.chapterAt() : -1, a = 0, z = c.dur();
-        if (k >= 0) { a = c.chs[k].start; z = c.chs[k].end || (c.chs[k + 1] ? c.chs[k + 1].start : z); }
-        c.seekTo(a + (z - a) * U.clamp((x - BAR_X) / BAR_W, 0, 1)); tick(true);
+      for (var i = 0; i < ids.length; i++) {                // 8 px Toleranz wie im Video: 64er Trefferflaeche, Luecken (16) teilen sich
+        var b = btnEl[ids[i]];
+        if (x >= b._x - 8 && x < b._x + b._w + 8 && y >= b._y - 8 && y < b._y + b._h + 8) { hvOff(); lp.leave(); if (fb !== ids[i]) setFb(ids[i]); if (kind === 'click') act(ids[i]); return true; }
+      }
+      if (x >= BAR_X - 8 && x < BAR_X + BAR_W + 8 && y >= BAR_Y - 16 && y < BAR_Y + 16) {   // 32 px hoch
+        if (!c || !c.dur()) return true;
+        if (kind === 'click') {
+          lp.cancel(x, y); hvOff(); acc.cancel();
+          var r = barRange(c);
+          c.seekTo(r.a + (r.z - r.a) * U.clamp((x - BAR_X) / BAR_W, 0, 1)); tick(true);
+        } else { hvAt(x); if (cfg().ptrLoupe === true) lp.track(x, y); }
         return true;
       }
+      hvOff(); lp.leave();
       return false;
     };
     s.relabel = function () { ids = []; buildButtons(); onTrack(); };

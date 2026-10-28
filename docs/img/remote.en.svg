@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="312" viewBox="0 0 800 312" role="img" aria-labelledby="t d">
+<title id="t">Remote: the important buttons</title>
+<desc id="d">Sketch of a Samsung remote (2014). Highlighted: MENU, SMART HUB (the colourful button), the arrow buttons with OK in the middle and RETURN. Also number buttons, TOOLS, INFO, EXIT, the colour buttons A B C D and the playback buttons.</desc>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff7a1a"/></marker><linearGradient id="scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2747"/><stop offset="1" stop-color="#0c1127"/></linearGradient><linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3c8fe8"/><stop offset="1" stop-color="#1f62c8"/></linearGradient><linearGradient id="neo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16181b"/><stop offset="1" stop-color="#0e0f11"/></linearGradient></defs>
+<rect x="8" y="8" width="784" height="300" rx="12" fill="#f3f4f6" stroke="#d0d4da" stroke-width="1.5"/>
+<rect x="40" y="70" width="720" height="170" rx="60" fill="#2a2d33" stroke="#d5d9e0" stroke-width="3"/>
+<rect x="90" y="92" width="32" height="30" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="106" y="111.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<rect x="128" y="92" width="32" height="30" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="144" y="111.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<rect x="166" y="92" width="32" height="30" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="182" y="111.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+<rect x="90" y="130" width="32" height="30" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="106" y="149.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">4</text>
+<rect x="128" y="130" width="32" height="30" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="144" y="149.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">5</text>
+<rect x="166" y="130" width="32" height="30" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="182" y="149.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">6</text>
+<rect x="90" y="168" width="32" height="30" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="106" y="187.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">7</text>
+<rect x="128" y="168" width="32" height="30" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="144" y="187.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">8</text>
+<rect x="166" y="168" width="32" height="30" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="182" y="187.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">9</text>
+<rect x="250" y="92" width="70" height="30" rx="8" fill="#41454d" stroke="#ff7a1a" stroke-width="3"/>
+<text x="285" y="111.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">MENU</text>
+<rect x="250" y="132" width="70" height="30" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="285" y="151.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">TOOLS</text>
+<rect x="250" y="172" width="70" height="30" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="285" y="191.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">INFO</text>
+<rect x="342" y="92" width="116" height="116" rx="58" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="400" y="112" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#ffffff" text-anchor="middle">▲</text>
+<text x="400" y="202" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#ffffff" text-anchor="middle">▼</text>
+<text x="356" y="156" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#ffffff" text-anchor="middle">◄</text>
+<text x="444" y="156" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#ffffff" text-anchor="middle">►</text>
+<circle cx="400" cy="150" r="26" fill="#5a5f68" stroke="#ff7a1a" stroke-width="3"/>
+<text x="400" y="155" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">OK</text>
+<g transform="translate(476 118)"><rect width="66" height="56" rx="28" fill="#41454d" stroke="#ff7a1a" stroke-width="3"/><rect x="13" y="15" width="12" height="9" rx="2" fill="#e5484d"/><rect x="41" y="15" width="12" height="9" rx="2" fill="#30a46c"/><rect x="13" y="33" width="12" height="9" rx="2" fill="#f5d90a"/><rect x="41" y="33" width="12" height="9" rx="2" fill="#3e63dd"/></g>
+<text x="509" y="194" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle">SMART HUB</text>
+<rect x="560" y="92" width="80" height="30" rx="8" fill="#41454d" stroke="#ff7a1a" stroke-width="3"/>
+<text x="600" y="111.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">RETURN</text>
+<rect x="560" y="132" width="80" height="30" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="600" y="151.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">EXIT</text>
+<rect x="560" y="176" width="36" height="26" rx="8" fill="#e5484d" stroke="#5f646d" stroke-width="1"/>
+<text x="578" y="193.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">A</text>
+<rect x="602" y="176" width="36" height="26" rx="8" fill="#30a46c" stroke="#5f646d" stroke-width="1"/>
+<text x="620" y="193.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">B</text>
+<rect x="644" y="176" width="36" height="26" rx="8" fill="#f5d90a" stroke="#5f646d" stroke-width="1"/>
+<text x="662" y="193.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#1d1d1f" text-anchor="middle">C</text>
+<rect x="686" y="176" width="36" height="26" rx="8" fill="#3e63dd" stroke="#5f646d" stroke-width="1"/>
+<text x="704" y="193.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">D</text>
+<text x="690" y="140" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#c9ced6" text-anchor="middle">◄◄  ▶  ❚❚  ►►</text>
+<text x="690" y="160" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#c9ced6" text-anchor="middle">■ STOP</text>
+<text x="400" y="270" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#1f2328" text-anchor="middle">Orange outline: the buttons you need for the installation</text>
+<text x="400" y="292" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#4b5563" text-anchor="middle">(sketch – the layout of your remote may differ)</text>
+</svg>

@@ -32,13 +32,13 @@
       }
       return out;
     },
-    /* 'all' | 'home,lib' -> Liste bekannter Szenario-Namen (Praefix-Treffer: 'lib' = alle lib-*; 'all' ohne leak/chunk/nocapl/saver) */
+    /* 'all' | 'home,lib' -> Liste bekannter Szenario-Namen (Praefix-Treffer: 'lib' = alle lib-*; 'all' ohne leak/chunk/nocapl/saver/amb) */
     pick: function (spec, names) {
       var want = String(spec || 'all').split(','), out = [];
       for (var i = 0; i < names.length; i++) {
         for (var j = 0; j < want.length; j++) {
           var w = want[j].replace(/^\s+|\s+$/g, '').replace(/:\d+$/, '');
-          if (w === 'all' ? names[i] !== 'leak' && names[i].indexOf('chunk-') !== 0 && names[i].indexOf('nocapl-') !== 0 && names[i].indexOf('saver-') !== 0 : names[i] === w || names[i].indexOf(w + '-') === 0) { out.push(names[i]); break; }
+          if (w === 'all' ? names[i] !== 'leak' && names[i].indexOf('chunk-') !== 0 && names[i].indexOf('nocapl-') !== 0 && names[i].indexOf('saver-') !== 0 && names[i].indexOf('amb-') !== 0 : names[i] === w || names[i].indexOf(w + '-') === 0) { out.push(names[i]); break; }
         }
       }
       return out;

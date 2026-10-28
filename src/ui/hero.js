@@ -93,11 +93,15 @@
     if (rest < REST) { this.retryT = setTimeout(function () { self.retryT = 0; self._trySwap(gen, next); }, REST - rest + 10); return; }
     U.raf(function () {
       if (gen !== self.gen || N.idle.restFor() < REST) { if (gen === self.gen) self._trySwap(gen, next); return; }
-      var old = self.cur >= 0 ? self.imgs[self.cur] : null;
-      U.vis(next, true);
-      if (old && old !== next) U.vis(old, false);
-      self.cur = self.imgs[0] === next ? 0 : 1;
+      self._swap(next);
     });
+  };
+  /* eigener Name, damit das Frame-Protokoll des Messlaufs den Tausch zeigt ('Hero.swap') */
+  Hero.prototype._swap = function (next) {
+    var old = this.cur >= 0 ? this.imgs[this.cur] : null;
+    U.vis(next, true);
+    if (old && old !== next) U.vis(old, false);
+    this.cur = this.imgs[0] === next ? 0 : 1;
   };
   /* Bild wiederherstellen (nach Overlay, Bildschirmtastatur, Fokus-Rueckkehr): Orsay-WebKit zeichnet das nicht
    * zusammengesetzte Hero-<img> nach dem Entfernen einer Vollbild-Ebene teils nicht neu bzw. verwirft das dekodierte Bild.

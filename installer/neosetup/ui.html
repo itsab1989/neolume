@@ -84,7 +84,7 @@ dd{margin:0;word-break:break-word}
       noToken: 'kein Zugriff auf diesen Server (in Plex unter „Benutzer & Freigaben“ freigeben)', tokenBad: 'Server lehnt den Zugang ab',
       restricted: 'Kindersicherung', next: 'Weiter', back: 'Zurück',
       advanced: 'Erweitert', extrasTitle: 'Weitere eigene Apps auf dem Fernseher behalten',
-      extrasHint: 'Wichtig: Beim Aufspielen entfernt der Fernseher alle eigenen Apps, die nicht in der Liste stehen. Hast du weitere eigene Apps , trage hier je Zeile den Pfad zur .zip-Datei ein (optional „ID=Pfad“).',
+      extrasHint: 'Wichtig: Beim Aufspielen entfernt der Fernseher alle eigenen Apps, die nicht in der Liste stehen. Hast du weitere eigene Apps, trage hier je Zeile den Pfad zur .zip-Datei ein (optional „ID=Pfad“).',
       tvTitle: 'Nur dieses Gerät zulassen (IP-Adresse des Fernsehers, optional)', save: 'Übernehmen',
       resetPins: 'App-PINs zurücksetzen',
       resetPinsHint: 'Nur ankreuzen, wenn du die PIN des Hauptprofils vergessen hast: __APP__ löscht dann beim nächsten Start alle App-PINs auf dem Fernseher. Ohne Haken bleiben sie erhalten.',
@@ -93,7 +93,7 @@ dd{margin:0;word-break:break-word}
       tvTitleStep: 'App auf den Fernseher spielen',
       tvIntro: 'Lass dieses Fenster offen und mach am Fernseher (Samsung 2014, H-Serie):',
       how: [
-        'Einmalig: MENU → Smart Hub → Samsung-Konto → Anmelden → Benutzer „develop“ (Passwort füllt sich meist selbst, sonst „any“).',
+        'Einmalig: MENU → Smart Hub → Samsung-Konto → Anmeld. → Benutzer „develop“ → Anmelden (Passwort füllt sich meist selbst, sonst „any“).',
         'Taste SMART HUB → „SAMSUNG APPS“ öffnen.',
         'Auf irgendeine App gehen und OK etwa 5 Sekunden gedrückt halten, bis ein Menü erscheint.',
         'IP Setting → diese Adresse eingeben:',
@@ -112,30 +112,55 @@ dd{margin:0;word-break:break-word}
       remember: 'Einstellungen auf diesem Computer merken (ohne Zugangsdaten)', finish: 'Zugangsdaten aus dem Speicher löschen und beenden', finished: 'Zugangsdaten gelöscht. Du kannst dieses Fenster und das Programm jetzt schließen.',
       logout: 'Abmelden / neu beginnen',
       helperTitle: 'Optionaler Helfer: Merkliste & Trends',
-      helperText: 'Der Fernseher erreicht plex.tv nicht. Der Helfer läuft auf diesem Computer (oder einem NAS) und holt für ihn deine Plex-Merkliste sowie „Gerade beliebt“, „Neu erschienen“ und „Bald verfügbar“. Ohne Helfer funktioniert alles andere genauso.',
-      helperOn: 'Helfer einrichten', helperRemember: 'Zugang auf diesem Computer merken (nötig für Autostart; Datei nur für dich lesbar)',
+      helperText: 'Dein Fernseher kann plex.tv nicht selbst erreichen (seine Verschlüsselung ist zu alt). Der Helfer ist ein kleines Programm, das auf diesem Computer (oder einem NAS) läuft und für ihn nur deine Plex-Merkliste, die Reihen „Gerade beliebt“, „Neu erschienen“ und „Bald verfügbar“ sowie Infos zu Titeln holt, die nicht auf deinem Server sind (Inhalt, Genres, Besetzung). Ohne Helfer funktioniert alles andere genauso.',
+      helperWhat: 'Was macht der Helfer genau?',
+      helperWhy: [
+        'Was er holt: deine Plex-Merkliste (auch wenn du am Fernseher etwas vormerkst oder entfernst, gibt er das an plex.tv weiter), die Entdecken-Reihen „Gerade beliebt“, „Neu erschienen“ und „Bald verfügbar“ und – wenn du in Entdecken einen Titel öffnest, der nicht auf deinem Server ist – dessen Inhalt, Genres, Laufzeit und Besetzung aus dem Plex-Katalog. Nutzt du freigegebene Server anderer Leute, fragt er außerdem deren aktuelle Adresse ab. Mehr holt er nicht aus dem Internet.',
+        'Warum es ihn braucht: plex.tv verlangt eine neuere Verschlüsselung (TLS 1.2). Dein Fernseher (2014) kann nur ältere (bis TLS 1.1) und kommt deshalb nicht selbst an plex.tv heran. Der Helfer spricht verschlüsselt mit plex.tv und reicht nur diese Listen und Infos im Heimnetz an den Fernseher weiter.',
+        'Was er nicht tut: Er leitet keine Videos weiter (die kommen immer direkt von deinem Plex-Server), ist aus dem Internet nicht erreichbar und reicht keine Anfragen für andere weiter. Er antwortet nur Geräten in deinem Heimnetz, ruft im Internet nur feste plex.tv-Adressen ab und schickt Daten ins Internet nur an plex.tv.',
+        'Was gespeichert wird: die Zugangsdatei helper.json (nur für dich lesbar) im Einstellungsordner unten. Dauerhaft installiert kommen eine Programmkopie, ein Autostart-Eintrag und ein Protokoll (ohne Zugangsdaten) dazu.',
+        'Ist der Helfer aus, läuft die App ganz normal weiter – nur Merkliste, diese Reihen und die Infos zu Titeln außerhalb deines Servers fehlen. Komplett entfernen: Knopf „Helfer entfernen …“.'
+      ],
+      svcTitle: 'Dauerhaft im Hintergrund',
+      svcText: 'Startet den Helfer automatisch, sobald du dich an diesem Computer anmeldest – auch nach einem Neustart. Dieses Programm muss dafür nicht geöffnet sein.',
+      svcInstall: 'Helfer dauerhaft installieren', svcInstalling: 'Installiere …', svcRemoving: 'Entferne …',
+      svcName: { mac: function (n) { return 'Name in macOS: „' + n + '“ – zu sehen unter Systemeinstellungen → Allgemein → Anmeldeobjekte & Erweiterungen. Dort kannst du ihn auch ausschalten.'; }, win: function (n) { return 'Name in Windows: „' + n + '“ – eine Verknüpfung im Autostart-Ordner. Der Task-Manager zeigt ihn unter „Autostart-Apps“ als „__APP__ Setup & Helper“ (mit der .pyz-Datei: „Python“); dort kannst du ihn auch deaktivieren.'; } },
+      svcInstalled: { agent: 'Dauerhaft installiert – startet bei jeder Anmeldung an diesem Mac.', daemon: 'Dauerhaft installiert – startet beim Hochfahren des Macs, auch ohne Anmeldung (ohne Symbol).',
+        startup: 'Dauerhaft installiert – startet bei jeder Anmeldung an Windows.', runkey: 'Dauerhaft installiert – startet bei jeder Anmeldung an Windows.', systemd: 'Dauerhaft installiert – startet bei jeder Anmeldung (als systemd-Benutzerdienst).' },
+      svcRunning: function (p) { return 'Läuft im Hintergrund (Port ' + p + ', nur Heimnetz).'; },
+      svcStopped: 'Ist gerade beendet – startet wieder bei der nächsten Anmeldung oder mit „Jetzt starten“.',
+      svcOld: 'Die installierte Programmkopie hat eine andere Version als dieses Programm. „Helfer aktualisieren“ ersetzt sie durch diese Version.', svcUpdate: 'Helfer aktualisieren',
+      svcStart: 'Jetzt starten', svcStop: 'Beenden', svcAutostartOff: 'Autostart ausschalten',
+      svcAutostartOffConfirm: 'Autostart ausschalten? Der Helfer wird beendet, seine Programmkopie gelöscht, und er startet nicht mehr von selbst. Die Zugangsdatei bleibt: Du kannst ihn hier weiter mit „Helfer starten“ nutzen oder jederzeit wieder dauerhaft installieren.',
+      svcTray: { mac: 'Symbol in der Menüleiste zeigen', win: 'Symbol im Infobereich der Taskleiste zeigen' },
+      svcTrayHint: 'Mac: oben rechts, Windows: neben der Uhr. Am Symbol siehst du, ob der Helfer läuft, und kannst ihn pausieren, beenden oder entfernen. Ohne Symbol läuft er unsichtbar weiter.',
+      svcLinger: 'Linux: Damit der Helfer auch ohne Anmeldung läuft, einmal im Terminal ausführen: loginctl enable-linger $USER',
+      svcNas: 'Der Helfer ist für ein anderes Gerät eingerichtet (z. B. ein NAS) – starte ihn dort (Anleitung: Abschnitt „NAS / Docker“) und installiere ihn nicht hier, sonst laufen zwei Helfer.',
+      svcLocalRunning: 'Der Helfer läuft gerade in diesem Programm. Nach „Helfer dauerhaft installieren“ übernimmt der Hintergrund-Helfer.',
+      svcLog: 'Protokoll:', svcReport: 'Ergebnis:',
+      removeConfirm: 'Helfer wirklich entfernen?\n\nEntfernt werden: Autostart, Programmkopie, Einstellungen und Zugangsdatei des Helfers; bei plex.tv – wenn möglich – sein Geräteeintrag.\n\nDanach zeigt der Fernseher Merkliste, Trends und Infos zu Titeln außerhalb deines Servers nicht mehr, alles andere läuft weiter. Bis du das App-Paket ohne „Helfer einrichten“ neu erstellt und auf den Fernseher gebracht hast, meldet die App kurz „Helfer von __APP__ nicht erreichbar“, wenn sie ihn sucht. Wieder einrichten kannst du ihn jederzeit mit „Helfer einrichten“.',
+      helperOn: 'Helfer einrichten', helperRemember: 'Zugang auf diesem Computer merken (nötig für „Helfer dauerhaft installieren“; Datei nur für dich lesbar)',
       helperAddr: 'Helfer läuft auf einem anderen Gerät, z. B. NAS (IP-Adresse, optional)',
       helperStart: 'Helfer starten', helperStop: 'Helfer stoppen', helperRunning: function (p) { return 'Helfer läuft auf Port ' + p + ' (nur Heimnetz)'; },
-      helperOff: 'Helfer ist aus. Die Merkliste erscheint am Fernseher nur, solange er läuft.',
+      helperOff: 'Helfer ist aus. Merkliste, Trends und Infos zu Titeln außerhalb deines Servers erscheinen am Fernseher nur, solange er läuft – alles andere geht auch ohne ihn.',
       helperProfiles: 'Merkliste für', helperSkipped: 'Ohne Merkliste (Profil mit Plex-PIN):',
-      helperAuto: 'Damit der Helfer immer läuft: Autostart einrichten (Anleitung auf der Download-Seite, Abschnitt „Optionaler Helfer“).',
-      quit: 'Programm beenden', quitConfirm: 'Programm wirklich beenden? Sync-, Update-Server und Helfer werden gestoppt.',
+      quit: 'Programm beenden', quitConfirm: 'Programm wirklich beenden? Sync-Server, Update-Server und der hier gestartete Helfer werden gestoppt. Ein dauerhaft installierter Helfer läuft weiter.',
       quitDone: 'Das Programm ist beendet. Du kannst dieses Fenster schließen.',
-      helperForget: 'Helfer entfernen (gemerkten Zugang löschen)',
+      helperForget: 'Helfer entfernen …',
       othersTitle: 'Weitere Server (optional)',
-      othersText: 'Hat jemand seinen Plex-Server für dich freigegeben, z. B. ein Freund? Dann kann __APP__ dessen Bibliotheken zusätzlich in der Seitenleiste zeigen. Jedes Profil bekommt nur die Server, die für dieses Profil freigegeben sind. Ohne Haken bleibt alles wie bisher.',
+      othersText: 'Hat jemand seinen Plex-Server mit dir geteilt, z. B. ein Freund? Dann kann __APP__ dessen Bibliotheken zusätzlich in der Seitenleiste zeigen. Jedes Profil bekommt nur die Server, die mit genau diesem Profil geteilt sind. Ohne Haken bleibt alles wie bisher.',
       othersScan: 'Freigegebene Server suchen', othersScanning: 'Suche und prüfe Server …', othersRescan: 'Erneut suchen',
-      othersNone: 'Für die gewählten Profile ist kein fremder Server freigegeben.',
+      othersNone: 'Mit den gewählten Profilen teilt niemand einen Server.',
       othersFor: 'für', othersUse: 'Auf dem Fernseher zeigen',
       othersStatus: { ok: 'erreichbar', unreachable: 'gerade nicht erreichbar', https: 'nur sichere Verbindungen', none: 'keine Adresse' },
       othersWhy: {
         ok: 'Von diesem Computer aus ohne Verschlüsselung (http) erreichbar – so, wie der Fernseher ihn braucht.',
-        unreachable: 'Gerade nicht erreichbar: vielleicht aus, oder nur über das Plex-Relay erreichbar (das kann der Fernseher nicht). Du kannst ihn trotzdem eintragen; die App versucht es später erneut.',
-        https: 'Der Server verlangt sichere Verbindungen; dein TV (2014) kann das nicht. Der Besitzer kann in Plex unter Einstellungen › Netzwerk „Sichere Verbindungen“ auf „Bevorzugt“ stellen, dann erneut suchen.',
-        none: 'Plex kennt keine Adresse dieses Servers. Läuft er und ist er mit seinem Plex-Konto verbunden?' },
-      othersPlain: 'Wichtig: Dein Fernseher (2014) kann keine sicheren Verbindungen. Die Verbindung zu diesen Servern läuft deshalb unverschlüsselt über das Internet; der Zugang zum fremden Server könnte unterwegs mitgelesen werden. Dein eigener Server bleibt wie bisher nur im Heimnetz.',
+        unreachable: 'Gerade nicht erreichbar: Vielleicht ist er aus oder nur über das Plex-Relay erreichbar (eine verschlüsselte Umleitung über Plex, die der Fernseher nicht nutzen kann). Du kannst ihn trotzdem ankreuzen; die App versucht es später erneut.',
+        https: 'Der Server erlaubt nur verschlüsselte („sichere“) Verbindungen; die kann dein Fernseher (2014) nicht. Der Besitzer kann in Plex unter Einstellungen → Netzwerk „Sichere Verbindungen“ auf „Bevorzugt“ stellen – danach erneut suchen.',
+        none: 'Plex kennt keine Adresse dieses Servers. Läuft er, und ist er mit dem Plex-Konto seines Besitzers verbunden?' },
+      othersPlain: 'Wichtig: Dein Fernseher (2014) kann keine verschlüsselten Verbindungen. Die Verbindung zu diesen Servern läuft deshalb unverschlüsselt über das Internet; dein Zugang zum fremden Server könnte unterwegs mitgelesen werden. Dein eigener Server bleibt wie bisher nur im Heimnetz. Kreuze einen Server nur an, wenn das für dich in Ordnung ist.',
       othersSkipped: 'Nicht geprüft (Profil mit Plex-PIN – das Programm fragt nie nach PINs – oder Fehler bei plex.tv):',
-      othersAddr: 'Wechselt die Internet-Adresse des Servers, findet der optionale Helfer die neue (sonst: Programm erneut ausführen).',
+      othersAddr: 'Wechselt die Internet-Adresse des Servers, findet der optionale Helfer die neue von selbst; ohne Helfer dieses Programm erneut ausführen.',
       errors: { network: 'Keine Verbindung zu plex.tv. Ist dieser Computer online?', pin_expired: 'Die Anmeldung ist abgelaufen. Bitte erneut starten.',
         not_owner: 'Nur der Besitzer des Servers kann die Profile einrichten.', no_lan_address: 'Für diesen Server ist keine Adresse im Heimnetz bekannt.',
         unreachable: 'Der Server antwortet im Heimnetz nicht. Läuft er, und ist dieser Computer im selben Netz?', no_profiles: 'Bitte mindestens ein Profil auswählen.',
@@ -144,7 +169,7 @@ dd{margin:0;word-break:break-word}
         port_busy: 'Port ist schon belegt (läuft ein anderer Webserver oder dieses Programm zweimal?).',
         no_app: 'App-Dateien fehlen in diesem Programm.', incomplete: 'Das App-Paket ist unvollständig.',
         extra_missing: 'Datei nicht gefunden:', extra_not_app: 'Keine TV-App:', extra_bad_name: 'Ungültiger Name:',
-        http401: 'Plex hat die Anmeldung abgelehnt. Bitte neu anmelden.', no_helper: 'Der Helfer ist noch nicht eingerichtet (Übersicht → „Helfer einrichten“).', bad_input: 'Ungültige Eingabe.', csrf: 'Sitzung abgelaufen – bitte die Seite neu laden.',
+        http401: 'Plex hat die Anmeldung abgelehnt. Bitte neu anmelden.', no_helper: 'Der Helfer ist noch nicht eingerichtet (Übersicht → „Helfer einrichten“ → „App-Paket erstellen“).', helper_background: 'Der Helfer läuft schon dauerhaft im Hintergrund – hier nicht noch einmal starten.', not_installed: 'Der Helfer ist nicht dauerhaft installiert.', bad_input: 'Ungültige Eingabe.', csrf: 'Sitzung abgelaufen – bitte die Seite neu laden.',
         not_logged_in: 'Bitte zuerst bei Plex anmelden.', no_server: 'Bitte zuerst einen Server wählen.', no_package: 'Bitte zuerst das App-Paket erstellen.',
         no_pin: 'Bitte die Anmeldung neu starten.', parse: 'plex.tv hat unerwartet geantwortet. Bitte später erneut versuchen.',
         httpOther: 'plex.tv hat einen Fehler gemeldet. Bitte später erneut versuchen.', offline: 'Das Programm antwortet nicht mehr. Läuft es noch? Sonst neu starten.',
@@ -179,7 +204,7 @@ dd{margin:0;word-break:break-word}
       tvTitleStep: 'Install the app on the TV',
       tvIntro: 'Keep this window open and do this on the TV (Samsung 2014, H series):',
       how: [
-        'Once: MENU → Smart Hub → Samsung Account → Sign in → user “develop” (the password usually fills in, otherwise “any”).',
+        'Once: MENU → Smart Hub → Samsung Account → Log In → user “develop” → Log In (the password usually fills in, otherwise “any”).',
         'Press SMART HUB → open “SAMSUNG APPS”.',
         'Go to any app and hold OK for about 5 seconds until a menu appears.',
         'IP Setting → enter this address:',
@@ -198,30 +223,55 @@ dd{margin:0;word-break:break-word}
       remember: 'Remember settings on this computer (no access data)', finish: 'Clear access data from memory and finish', finished: 'Access data cleared. You can close this window and the program now.',
       logout: 'Sign out / start over',
       helperTitle: 'Optional helper: watchlist & trends',
-      helperText: 'The TV cannot reach plex.tv. The helper runs on this computer (or a NAS) and fetches your Plex watchlist plus “Trending”, “New releases” and “Coming soon” for it. Everything else works the same without it.',
-      helperOn: 'Set up the helper', helperRemember: 'Remember access on this computer (needed for autostart; file readable only by you)',
+      helperText: 'Your TV cannot reach plex.tv by itself (its encryption is too old). The helper is a small program that runs on this computer (or a NAS) and fetches only your Plex watchlist, the rows “Trending now”, “Just released” and “Coming soon”, and details of titles that are not on your server (story, genres, cast) for it. Everything else works the same without it.',
+      helperWhat: 'What exactly does the helper do?',
+      helperWhy: [
+        'What it fetches: your Plex watchlist (and when you add or remove a title on the TV, it passes that on to plex.tv), the Discover rows “Trending now”, “Just released” and “Coming soon”, and – when you open a title in Discover that is not on your server – its story, genres, runtime and cast from the Plex catalogue. If you use servers other people shared with you, it also looks up their current address. It fetches nothing else from the internet.',
+        'Why it is needed: plex.tv requires newer encryption (TLS 1.2). Your 2014 TV only knows older versions (up to TLS 1.1), so it cannot reach plex.tv by itself. The helper talks to plex.tv encrypted and passes only these lists and details on to the TV in your home network.',
+        'What it does not do: it never passes on video (videos always come straight from your Plex server), it cannot be reached from the internet, and it does not pass on requests for anyone else. It only answers devices in your home network, only calls fixed plex.tv addresses on the internet and sends data to the internet only to plex.tv.',
+        'What is stored: the access file helper.json (readable only by you) in the settings folder below. When installed permanently, a program copy, an autostart entry and a log (without access data) are added.',
+        'When the helper is off, the app keeps working as usual – only the watchlist, these rows and the details of titles outside your server are missing. To remove it completely: button “Remove helper …”.'
+      ],
+      svcTitle: 'Permanently in the background',
+      svcText: 'Starts the helper automatically whenever you log in to this computer – also after a restart. This program does not need to be open for it.',
+      svcInstall: 'Install helper permanently', svcInstalling: 'Installing …', svcRemoving: 'Removing …',
+      svcName: { mac: function (n) { return 'Name in macOS: “' + n + '” – see System Settings → General → Login Items & Extensions. You can also switch it off there.'; }, win: function (n) { return 'Name in Windows: “' + n + '” – a shortcut in the Startup folder. Task Manager → Startup apps lists it as “__APP__ Setup & Helper” (with the .pyz file: “Python”); you can also disable it there.'; } },
+      svcInstalled: { agent: 'Installed permanently – starts every time you log in to this Mac.', daemon: 'Installed permanently – starts when the Mac boots, even without a login (no icon).',
+        startup: 'Installed permanently – starts every time you log in to Windows.', runkey: 'Installed permanently – starts every time you log in to Windows.', systemd: 'Installed permanently – starts every time you log in (as a systemd user service).' },
+      svcRunning: function (p) { return 'Running in the background (port ' + p + ', home network only).'; },
+      svcStopped: 'Stopped right now – starts again at the next login or with “Start now”.',
+      svcOld: 'The installed program copy is a different version from this program. “Update helper” replaces it with this version.', svcUpdate: 'Update helper',
+      svcStart: 'Start now', svcStop: 'Stop', svcAutostartOff: 'Turn autostart off',
+      svcAutostartOffConfirm: 'Turn autostart off? The helper stops, its program copy is deleted and it no longer starts by itself. The access file stays: you can still use “Start helper” here or install it permanently again at any time.',
+      svcTray: { mac: 'Show icon in the menu bar', win: 'Show icon in the taskbar notification area' },
+      svcTrayHint: 'Mac: top right, Windows: next to the clock. The icon shows whether the helper is running and lets you pause, quit or remove it. Without the icon, the helper keeps running invisibly.',
+      svcLinger: 'Linux: to keep the helper running without a login, run this once in a terminal: loginctl enable-linger $USER',
+      svcNas: 'The helper is set up for another device (e.g. a NAS) – start it there (see section “NAS / Docker”) and don’t install it here, otherwise two helpers would run.',
+      svcLocalRunning: 'The helper is currently running inside this program. After “Install helper permanently” the background helper takes over.',
+      svcLog: 'Log:', svcReport: 'Result:',
+      removeConfirm: 'Really remove the helper?\n\nThis removes the helper\'s autostart, program copy, settings and access file and, if possible, its device entry at plex.tv.\n\nAfterwards the TV no longer shows the watchlist, trends and details of titles outside your server; everything else keeps working. Until you create the app package again without “Set up the helper” and put it on the TV, the app briefly shows “__APP__ helper not reachable” when it looks for it. You can set it up again at any time with “Set up the helper”.',
+      helperOn: 'Set up the helper', helperRemember: 'Remember access on this computer (needed for “Install helper permanently”; file readable only by you)',
       helperAddr: 'The helper runs on another device, e.g. a NAS (IP address, optional)',
       helperStart: 'Start helper', helperStop: 'Stop helper', helperRunning: function (p) { return 'Helper running on port ' + p + ' (home network only)'; },
-      helperOff: 'The helper is off. The TV only shows the watchlist while it runs.',
+      helperOff: 'The helper is off. The TV shows the watchlist, trends and details of titles outside your server only while it runs – everything else works without it.',
       helperProfiles: 'Watchlist for', helperSkipped: 'No watchlist (profile with a Plex PIN):',
-      helperAuto: 'To keep the helper running: set up autostart (instructions on the download page, section “Optional helper”).',
-      quit: 'Quit program', quitConfirm: 'Really quit? The sync server, update server and helper will stop.',
+      quit: 'Quit program', quitConfirm: 'Really quit? The sync server, the update server and the helper started here will stop. A permanently installed helper keeps running.',
       quitDone: 'The program has stopped. You can close this window.',
-      helperForget: 'Remove helper (delete remembered access)',
+      helperForget: 'Remove helper …',
       othersTitle: 'Other servers (optional)',
-      othersText: 'Has someone shared their Plex server with you, e.g. a friend? Then __APP__ can also show its libraries in the sidebar. Each profile only gets the servers shared with that profile. Without a tick everything stays as before.',
+      othersText: 'Has someone shared their Plex server with you, e.g. a friend? Then __APP__ can also show its libraries in the sidebar. Each profile only gets the servers shared with exactly that profile. Without a tick, everything stays as before.',
       othersScan: 'Search shared servers', othersScanning: 'Searching and checking servers …', othersRescan: 'Search again',
-      othersNone: 'No server of someone else is shared with the chosen profiles.',
+      othersNone: 'Nobody shares a server with the chosen profiles.',
       othersFor: 'for', othersUse: 'Show on the TV',
       othersStatus: { ok: 'reachable', unreachable: 'not reachable right now', https: 'secure connections only', none: 'no address' },
       othersWhy: {
         ok: 'Reachable from this computer without encryption (http) – the way the TV needs it.',
-        unreachable: 'Not reachable right now: maybe off, or only reachable through the Plex relay (the TV cannot use it). You can still add it; the app tries again later.',
-        https: 'The server requires secure connections; your TV (2014) cannot do that. The owner can set “Secure connections” to “Preferred” in Plex under Settings › Network, then search again.',
-        none: 'Plex knows no address for this server. Is it running and linked to its Plex account?' },
-      othersPlain: 'Important: your TV (2014) cannot use secure connections. The connection to these servers therefore goes over the internet without encryption; the access to the other server could be read on the way. Your own server stays on your home network as before.',
+        unreachable: 'Not reachable right now: maybe it is off, or only reachable through the Plex relay (an encrypted detour via Plex that the TV cannot use). You can still tick it; the app tries again later.',
+        https: 'The server only allows encrypted (“secure”) connections, which your TV (2014) cannot use. The owner can set “Secure connections” to “Preferred” in Plex under Settings → Network – then search again.',
+        none: 'Plex knows no address for this server. Is it running and linked to its owner’s Plex account?' },
+      othersPlain: 'Important: your TV (2014) cannot use encrypted connections. The connection to these servers therefore goes over the internet without encryption; someone on the way could read your access to the other server. Your own server stays on your home network as before. Only tick a server if you are fine with that.',
       othersSkipped: 'Not checked (profile with a Plex PIN – this program never asks for PINs – or a plex.tv error):',
-      othersAddr: 'If the server’s internet address changes, the optional helper finds the new one (otherwise run this program again).',
+      othersAddr: 'If the server’s internet address changes, the optional helper finds the new one by itself; without the helper, run this program again.',
       errors: { network: 'No connection to plex.tv. Is this computer online?', pin_expired: 'The sign-in expired. Please start again.',
         not_owner: 'Only the owner of the server can set up profiles.', no_lan_address: 'No home network address is known for this server.',
         unreachable: 'The server does not answer on your network. Is it running and is this computer on the same network?', no_profiles: 'Please choose at least one profile.',
@@ -230,7 +280,7 @@ dd{margin:0;word-break:break-word}
         port_busy: 'The port is already in use (another web server, or this program running twice?).',
         no_app: 'App files are missing in this program.', incomplete: 'The app package is incomplete.',
         extra_missing: 'File not found:', extra_not_app: 'Not a TV app:', extra_bad_name: 'Invalid name:',
-        http401: 'Plex refused the sign-in. Please sign in again.', no_helper: 'The helper is not set up yet (Summary → “Set up the helper”).', bad_input: 'Invalid input.', csrf: 'Session expired – please reload the page.',
+        http401: 'Plex refused the sign-in. Please sign in again.', no_helper: 'The helper is not set up yet (Summary → “Set up the helper” → “Create app package”).', helper_background: 'The helper is already running permanently in the background – do not start it here a second time.', not_installed: 'The helper is not installed permanently.', bad_input: 'Invalid input.', csrf: 'Session expired – please reload the page.',
         not_logged_in: 'Please sign in with Plex first.', no_server: 'Please choose a server first.', no_package: 'Please create the app package first.',
         no_pin: 'Please start the sign-in again.', parse: 'plex.tv sent an unexpected answer. Please try again later.',
         httpOther: 'plex.tv reported an error. Please try again later.', offline: 'The program does not answer any more. Is it still running? Otherwise start it again.',
@@ -413,12 +463,13 @@ dd{margin:0;word-break:break-word}
     c.appendChild(h('details', null, h('summary', { text: L.advanced }), h('label', null, hrem, ' ', L.helperRemember), h('p', { 'class': 't', text: L.helperAddr }), hadr));
     c.appendChild(h('button', { 'class': 'secondary', onclick: function () { step = 2; render(); } }, L.back));
     c.appendChild(h('button', { 'class': 'primary', disabled: !!busy, onclick: function () {
+      extBefore().then(function (de) { if (!de.ok) return;
       (S.others.scanned ? act('others', { ids: oc.ids() }) : Promise.resolve({ ok: true })).then(function (dx) { if (!dx.ok) return;
       act('helper', { on: hon.checked, remember: hrem.checked, address: hadr.value.trim() }).then(function (d0) { if (!d0.ok) return;
       act('build', { resetPins: !!resetPins }, L.building).then(function (d) {
         if (!d.ok) return;
         step = 4; act('sync_start');
-      }); }); });
+      }); }); }); });
     } }, L.build));
     return c;
   }
@@ -482,18 +533,78 @@ dd{margin:0;word-break:break-word}
     return h('div', null, c, uc);
   }
 
+  /* "What exactly does the helper do?" – an extension (EXT, see ext.py) may add a paragraph after the first one */
+  function helperWhy(L) {
+    var out = L.helperWhy.slice(), extra = EXT.map(function (x) { return x.helperWhy ? x.helperWhy() : ''; }).filter(Boolean);
+    out.splice.apply(out, [1, 0].concat(extra));
+    return out;
+  }
   function helperCard() {
-    var L = t(), hp = S.helper;
-    if (!hp || !hp.configured) return null;
-    var c = h('div', { 'class': 'card' }, h('h2', { text: L.helperTitle }), h('p', { 'class': 'muted', text: L.helperText }));
-    c.appendChild(h('p', { 'class': hp.running ? '' : 'muted', text: hp.running ? L.helperRunning(hp.port) : L.helperOff }));
+    var L = t(), hp = S.helper, sv = hp && hp.service;
+    if (!hp || (!hp.configured && !hp.report)) return null;
+    if (!hp.configured) return h('div', { 'class': 'card', id: 'helper' }, h('h2', { text: L.helperTitle }), reportBox(L, hp.report));   // after "Remove helper"
+    var bgRun = !!(sv && sv.background);
+    var c = h('div', { 'class': 'card', id: 'helper' }, h('h2', { text: L.helperTitle }), h('p', { 'class': 'muted', text: L.helperText }));
+    c.appendChild(h('details', null, h('summary', { text: L.helperWhat }), helperWhy(L).map(function (x) { return h('p', { 'class': 'muted', text: x }); }),
+      sv ? h('p', { 'class': 'muted' }, h('code', { text: sv.settingsDir })) : null));
     if (hp.profiles.length) c.appendChild(h('p', null, L.helperProfiles + ': ' + hp.profiles.map(function (p) { return p.title; }).join(', ')));
     if (hp.skipped.length) c.appendChild(h('p', { 'class': 'muted' }, L.helperSkipped + ' ' + hp.skipped.join(', ')));
-    c.appendChild(h('button', { 'class': hp.running ? 'secondary' : 'primary', disabled: !!busy, onclick: function () { act(hp.running ? 'helper_stop' : 'helper_start'); } }, hp.running ? L.helperStop : L.helperStart));
-    c.appendChild(h('button', { 'class': 'secondary', disabled: !!busy, onclick: function () { act('helper', { on: false, remember: false, address: '' }); } }, L.helperForget));
-    c.appendChild(h('p', { 'class': 'muted', text: L.helperAuto }));
-    if (hp.running) c.appendChild(syncLog(hp.events));
+    if (!bgRun) {
+      c.appendChild(h('p', { 'class': hp.running ? '' : 'muted', text: hp.running ? L.helperRunning(hp.port) : L.helperOff }));
+      c.appendChild(h('button', { 'class': 'secondary', disabled: !!busy, onclick: function () { act(hp.running ? 'helper_stop' : 'helper_start'); } }, hp.running ? L.helperStop : L.helperStart));
+    }
+    if (sv) c.appendChild(serviceBox(L, hp, sv));
+    c.appendChild(h('button', { 'class': 'secondary', disabled: !!busy, onclick: function () {
+      if (!window.confirm(L.removeConfirm)) return;
+      act('helper_uninstall', { keep: false }, L.svcRemoving);
+    } }, L.helperForget));
+    if (hp.report) c.appendChild(reportBox(L, hp.report));
+    if (hp.running && !bgRun) c.appendChild(syncLog(hp.events));
     return c;
+  }
+  /* "Dauerhaft im Hintergrund": installieren / Symbol / starten-beenden / Autostart aus (service.py) */
+  function serviceBox(L, hp, sv) {
+    var b = h('div', { 'class': 'note' }, h('p', null, h('strong', { text: L.svcTitle })));
+    if (hp.address) { b.appendChild(h('p', { text: L.svcNas })); return b; }
+    if (!sv.installed) {
+      b.appendChild(h('p', { text: L.svcText }));
+      var tr = null;
+      if (L.svcTray[sv.os]) {
+        tr = h('input', { type: 'checkbox', checked: true });
+        b.appendChild(h('label', null, tr, ' ', L.svcTray[sv.os]));
+        b.appendChild(h('p', { 'class': 'muted', text: L.svcTrayHint }));
+      }
+      if (hp.running) b.appendChild(h('p', { 'class': 'muted', text: L.svcLocalRunning }));
+      b.appendChild(h('button', { 'class': 'primary', disabled: !!busy, onclick: function () {
+        act('helper_install', { tray: tr ? tr.checked : false, lang: lang }, L.svcInstalling);
+      } }, L.svcInstall));
+      if (sv.os === 'linux') b.appendChild(h('p', { 'class': 'muted', text: L.svcLinger }));
+      return b;
+    }
+    b.appendChild(h('p', { text: L.svcInstalled[sv.mode] || L.svcInstalled.agent }));
+    if (sv.name && L.svcName[sv.os]) b.appendChild(h('p', { 'class': 'muted', text: L.svcName[sv.os](sv.name) }));
+    if (!sv.sameVersion) b.appendChild(h('p', null, L.svcOld + ' ', h('button', { 'class': 'primary', disabled: !!busy, onclick: function () {
+      act('helper_install', { tray: !!sv.tray, lang: lang }, L.svcInstalling); } }, L.svcUpdate)));
+    b.appendChild(h('p', { 'class': sv.background ? '' : 'muted', text: sv.background ? L.svcRunning(sv.port) : L.svcStopped }));
+    if (sv.trayPossible && L.svcTray[sv.os]) {
+      var tc = h('input', { type: 'checkbox', checked: !!sv.tray, disabled: !!busy });
+      tc.addEventListener('change', function () { act('helper_tray', { on: tc.checked }); });
+      b.appendChild(h('label', null, tc, ' ', L.svcTray[sv.os]));
+      b.appendChild(h('p', { 'class': 'muted', text: L.svcTrayHint }));
+    }
+    b.appendChild(h('button', { 'class': 'secondary', disabled: !!busy, onclick: function () { act('helper_bg', { run: !sv.background }); } }, sv.background ? L.svcStop : L.svcStart));
+    b.appendChild(h('button', { 'class': 'secondary', disabled: !!busy, onclick: function () {
+      if (window.confirm(L.svcAutostartOffConfirm)) act('helper_uninstall', { keep: true }, L.svcRemoving);
+    } }, L.svcAutostartOff));
+    if (sv.os === 'linux') b.appendChild(h('p', { 'class': 'muted', text: L.svcLinger }));
+    b.appendChild(h('p', { 'class': 'muted' }, L.svcLog + ' ', h('code', { text: sv.log })));
+    return b;
+  }
+  function reportBox(L, r) {
+    var lines = (r.lines && r.lines[lang]) || [];
+    var box = h('div', { 'class': 'log', role: 'status' }, h('div', { 'class': 't' }, L.svcReport + ' ' + (r.head && r.head[lang] || '')));
+    lines.forEach(function (x) { box.appendChild(h('div', { 'class': x.kind === 'done' ? 'ok' : x.kind === 'error' ? 'err' : '' }, x.text)); });
+    return box;
   }
   function quitCard() {
     var L = t();
@@ -510,6 +621,7 @@ dd{margin:0;word-break:break-word}
     if (quitted) { v.appendChild(h('div', { 'class': 'card' }, h('h2', { text: t().quitDone }))); return; }
     var views = [viewLogin, viewServer, viewProfiles, viewSummary, viewTv, viewDone];
     v.appendChild(views[step]());
+    EXT.forEach(function (x) { var el = x.card && x.card(step); if (el) v.appendChild(el); });
     var hc = helperCard();
     if (hc) v.appendChild(hc);
     v.appendChild(quitCard());
@@ -518,9 +630,20 @@ dd{margin:0;word-break:break-word}
     if (e) v.insertBefore(e, v.firstChild);
   }
 
+  /* optional extensions of the edition (installer/neosetup/ext.py): extra cards per step (card(step) -> element) and work
+     before "Create app package" (beforeBuild() -> promise of an api() answer); the public edition has none */
+  var EXT = [];
+  function extBefore() {
+    return EXT.reduce(function (p, x) { return p.then(function (d) { return d.ok && x.beforeBuild ? x.beforeBuild() : d; }); }, Promise.resolve({ ok: true }));
+  }
+  /*__EXT__*/
+
   // live updates of sync/update logs
   setInterval(function () { if (!quitted && (step === 4 || step === 5 || (step <= 1 && S && S.helper && S.helper.running)) && !busy) api('state').then(render); }, 2000);
-  api('state').then(function () { if (S && S.lang) lang = S.lang; autoStep(); render(); });
+  api('state').then(function () {
+    if (S && S.lang) lang = S.lang; autoStep(); render();
+    if (location.hash === '#helper') { var hc0 = document.getElementById('helper'); if (hc0) hc0.scrollIntoView(); }
+  });
 })();
 </script>
 </body>

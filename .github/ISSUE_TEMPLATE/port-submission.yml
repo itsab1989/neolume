@@ -1,0 +1,85 @@
+name: Port submission
+description: Add your port of the app for another TV to the community ports list (PORTS.md). We only link to it.
+title: "Port: <name> for <TV / OS>"
+labels: ["port-submission"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for building the app for another TV! Please read the **policy** in [PORTS.md](https://github.com/itsab1989/neolume/blob/main/PORTS.md) first:
+        we only link (no binaries here), the port is your responsibility, no "Plex" in the name or icon, and the privacy and
+        security rules of [SPEC.md](https://github.com/itsab1989/neolume/blob/main/docs/SPEC.md) (section A18) apply. A pull request that adds your entry to
+        `ports.json` is even faster – see "Add your port" in PORTS.md.
+  - type: input
+    id: name
+    attributes:
+      label: Name of the port
+      description: Must not contain "Plex" and must not look like an official Plex app.
+    validations:
+      required: true
+  - type: input
+    id: brand
+    attributes:
+      label: TV brand
+      placeholder: "LG"
+    validations:
+      required: true
+  - type: input
+    id: models
+    attributes:
+      label: Tested TV models or model years
+      placeholder: "OLED C1 (2021), NANO80 (2022)"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: TV operating system and version
+      placeholder: "webOS 6.0"
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Link to the repository or releases page (https)
+    validations:
+      required: true
+  - type: input
+    id: specVersion
+    attributes:
+      label: Spec version you built against
+      description: The version shown at the top of docs/SPEC.md when you built the port, e.g. 1.0.4.
+    validations:
+      required: true
+  - type: input
+    id: licence
+    attributes:
+      label: Licence
+      placeholder: "MIT"
+    validations:
+      required: true
+  - type: textarea
+    id: features
+    attributes:
+      label: Feature status per SPEC section (A1 – A19)
+      description: For each Part A section of SPEC.md – done, partial, planned or n/a. A link to your REQUIREMENTS.md checklist is welcome.
+      placeholder: |
+        A1 done, A2 done, A3 done, A4 partial, …
+    validations:
+      required: true
+  - type: textarea
+    id: checks
+    attributes:
+      label: How can users verify the download?
+      description: Where are the source code and the checksums of your releases?
+  - type: checkboxes
+    id: policy
+    attributes:
+      label: Policy
+      options:
+        - label: The port does not use the Plex name or logo and does not claim to be an official app.
+          required: true
+        - label: The port has no telemetry and never sends tokens anywhere but the user's own server (SPEC A18).
+          required: true
+        - label: I am the maintainer (or have the maintainer's permission) and will keep the entry up to date.
+          required: true

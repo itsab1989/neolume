@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<!-- Selbsttest der Layout-Pruefung (tools/layout_probe.js): jede Art von Befund einmal absichtlich eingebaut (id x-…),
+     dazu gewollte Faelle, die NICHT gemeldet werden duerfen (id ok-…). tools/visual.js laedt die Seite vor den Szenen und
+     prueft, dass genau die erwarteten Befunde kommen – sonst ist die Pruefung blind geworden. Nicht Teil des TV-Pakets. -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Layout-Selbsttest</title>
+<style>
+  html, body { margin: 0; padding: 0; width: 1280px; height: 720px; overflow: hidden; background: #101114; color: #eee; font: 20px/28px sans-serif; }
+  #root { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; }
+  #root div { position: absolute; white-space: nowrap; }
+  .btn { background: #333; height: 48px; line-height: 48px; padding: 0 20px; border-radius: 8px; }
+  .ell { overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<div id="root">
+  <!-- Befunde -->
+  <div id="x-ov-a" style="left:200px;top:80px">Zweizeiliges Etikett</div>
+  <div id="x-ov-b" style="left:240px;top:96px">Titel darunter</div>
+  <div id="x-clip" style="left:600px;top:80px;width:80px;overflow:hidden">Viel zu langer Text ohne Punkte</div>
+  <div id="x-btn" class="btn" style="left:200px;top:200px;padding:0 40px">Abspielen</div>
+  <div id="x-btn-hint" style="left:170px;top:200px;font-size:14px;line-height:16px">Hinweis</div>
+  <div id="x-off" style="left:1180px;top:300px">Laeuft rechts hinaus</div>
+  <div id="x-safe" style="left:400px;top:8px">Zu weit oben</div>
+  <div id="x-scr" style="left:0;top:0">
+    <div id="x-pa" style="left:200px;top:420px;width:200px;height:100px;background:#345"></div>
+    <div id="x-pb" style="left:350px;top:470px;width:200px;height:100px;background:#543"></div>
+    <div id="ok-ovl" style="left:500px;top:540px;width:200px;height:100px;background:#455;z-index:5"></div>
+    <div id="ok-card" class="card" style="left:760px;top:420px;width:300px;height:72px;background:#333"></div>
+    <div id="ok-cap" class="cap" style="left:780px;top:440px">Beschriftung der Karte</div>
+  </div>
+  <div id="x-edge" data-layout-edge="l,b" style="left:0;top:600px;width:300px;height:104px;background:#000"></div>
+  <div id="x-note-under" style="left:580px;top:360px">Beschreibung darunter</div>
+  <div id="x-note" data-layout-notice style="left:560px;top:350px;width:220px;height:48px;background:#2a2e33;z-index:8">
+    <div id="x-note-t" style="left:16px;top:10px">Gespeichert</div>
+  </div>
+  <!-- gewollt, darf nicht gemeldet werden -->
+  <div id="ok-note" data-layout-notice style="left:1000px;top:200px;width:200px;height:48px;background:#2a2e33;z-index:8">
+    <div id="ok-note-t" style="left:16px;top:10px">Frei platziert</div>
+  </div>
+  <div id="ok-note-off" data-layout-notice style="left:780px;top:290px;width:300px;height:48px;background:#2a2e33;z-index:8;opacity:0"></div>
+  <div id="ok-edge" data-layout-edge="r,b" style="left:980px;top:620px;width:300px;height:100px;opacity:0.5;background:#000;-webkit-transform:scale(-1,1);transform:scale(-1,1)"></div>
+  <div id="ok-ell" class="ell" style="left:600px;top:160px;width:80px">Gekuerzt mit Punkten am Ende</div>
+  <div id="ok-under" style="left:800px;top:120px">Verdeckter Text</div>
+  <div id="ok-dlg" style="left:780px;top:100px;width:300px;height:80px;background:#222">
+    <div id="ok-dlg-t" style="left:30px;top:24px">Dialog darueber</div>
+  </div>
+  <div id="ok-row" style="left:144px;top:600px;width:1400px;height:40px">
+    <div id="ok-bleed" style="left:1000px;top:0">Karte am Rand laeuft bewusst hinaus</div>
+  </div>
+  <div id="ok-attr" data-layout-ok="overlap" style="left:800px;top:300px">Absichtlich</div>
+  <div id="ok-attr2" style="left:820px;top:306px">uebereinander</div>
+  <div id="ok-hidden" style="left:200px;top:80px;opacity:0">Unsichtbar</div>
+</div>
+<script src="layout_probe.js"></script>
+<script>
+  (function () {
+    var q = {}; location.search.replace(/^\?/, '').split('&').forEach(function (p) { var kv = p.split('='); if (kv[0]) q[kv[0]] = decodeURIComponent(kv[1] || ''); });
+    window.PN_Q = q;
+    window.PN_PROBE();
+  })();
+</script>
+</body>
+</html>

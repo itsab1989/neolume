@@ -7,6 +7,9 @@
 (function (N) {
   var U = N.util, M = N.model, H = N.hubs, RM = N.RowMath;
   var HEAD_Y = 320, CARD_Y = 372, SLOTS = 4, HERO_REST = 300, TTL = 60000;
+  /* Rueckkehr aus dem Player: erst nach PLAY_SETTLE laden (Timeline "stopped" ist dann beim PMS), fehlt der Titel noch in
+   * Weiterschauen, die Antwort NICHT anwenden (nichts verschwindet) und nach PLAY_RETRY erneut fragen; danach gilt der Server */
+  var PLAY_SETTLE = 1500, PLAY_RETRY = [2500, 5000];
   var PITCH = { land: 288, poster: 360, sq: 280 };   // sq: Musik/Hoerbuecher (quadratisch, M4)
 
   N.router.define('home', function () {
@@ -16,6 +19,7 @@
     var undo = null, hideCommit = null, retryT = 0, retryN = 0, offline = false, pingT = 0, railOpen = false;
     var seasonCache = new N.LRU(10), stripTask = null, drawn = false;
     var skel = null, away = false, parked = null, resume = false, prepRaf = false, dead = false, onFlush = null, onSet = null, onBack = null, onPlayed = null, onScanned = null, onAnime = null, cfgDirty = false;
+    var played = null, playT = 0;                     // {rk, n}: gerade gestoppter Film/Folge, auf den Weiterschauen warten soll
 
     /* ---------- Aufbau ---------- */
     s.create = function (el) {
@@ -35,7 +39,13 @@
       onBack = function () { if (!away && !dead && rows.length && !sb.on) heroBack(); };
       N.evt.on('overlay:closed', onBack);             // Hero nach Dialog/Menue/Bildschirmtastatur immer wiederherstellen
       N.evt.on('app:refocus', onBack);
-      onPlayed = function () { loadedAt = 0; interacted = false; };
+      onPlayed = function (e) {
+        loadedAt = 0; interacted = false;
+        parked = null;                                // Antwort von vor/waehrend der Wiedergabe: veraltet
+        if (task) { task.abort(); task = null; }
+        if (playT) { clearTimeout(playT); playT = 0; }
+        played = e && e.video && e.rk && !e.done && !e.srv ? { rk: e.rk, n: 0, wait: true } : null;
+      };
       N.evt.on('playback:stopped', onPlayed);         // Rueckkehr aus dem Player: Weiterschauen neu laden (SPEC 6.3.2)
       onScanned = function () { loadedAt = 0; if (!away && !dead) refresh(); };
       N.evt.on('library:scanned', onScanned);         // "Mediathek aktualisieren" fertig: still neu laden
@@ -89,11 +99,16 @@
       sl.setTop(tops[r]);
       sl.setVisible(r >= R);
       if (prio === 0) sl.boost();
+      markMore();
     }
+    /* Hinweis "darunter geht es weiter" (HOME-11): nur am Kopf der angeschnittenen naechsten Reihe; an der letzten Reihe keiner.
+     * Je Slot nur ein display-Wechsel, wenn er sich aendert (kein Messen im Fokusschritt) */
+    function markMore() { for (var k = 0; k < SLOTS; k++) slots[k].setMore(slotRow[k] >= 0 && slotRow[k] === R + 1); }
     function recycleLater() {
       N.idle.add(function () {
         for (var r = R - 1; r <= R + 2; r++) ensure(r, r === R ? 0 : 2, r > R + 1 || r < R);
         for (var k = 0; k < SLOTS; k++) { var rr = slotRow[k]; if (rr >= 0 && (rr < R - 1 || rr > R + 2 || rr >= rows.length)) { slots[k].clear(); slotRow[k] = -1; } }
+        markMore();
       }, 'home-recycle');
     }
     function pageY() { return rows.length ? tops[R] - HEAD_Y : 0; }
@@ -106,6 +121,7 @@
       showSkel(false);
       layoutTops();
       for (var k = 0; k < SLOTS; k++) { slots[k].clear(); slotRow[k] = -1; }
+      markMore();
       if (!rows.length) { ring.hide(); hero.clear(); showEmpty(); return; }
       sb.hide();
       R = U.clamp(R, 0, rows.length - 1);
@@ -116,6 +132,7 @@
       placeRing(sl.ringPos(), true);
       scheduleHero(0);
       N.idle.add(updateHints, 'home-hints');
+      N.idle.add(warm, 'home-warm');
     }
     function placeRing(p) { if (p && !railOpen && !sb.on) ring.to(p.shape, p.x, CARD_Y); }
     function curItem() { var sl = slotFor(R); return rows.length ? sl.item(sl.f) : null; }
@@ -174,7 +191,21 @@
     };
 
     /* ---------- Fokus-Schritte ---------- */
-    function afterMove() { scheduleHero(); N.idle.add(updateHints, 'home-hints'); }
+    function afterMove() { scheduleHero(); N.idle.add(updateHints, 'home-hints'); N.idle.add(warm, 'home-warm'); }
+    /* Vorab-Dekodieren (Runde 5, N.img.warm): Der TV malt Karten-Ebenen unter dem Bildschirmrand bzw. rechts ausserhalb des Clips
+     * erst, wenn sie hereinkommen – samt Dekodieren ihrer Bilder im Frame nach ▼/▶ (56–75 ms ohne DOM-Aenderung). In Ruhe: sichtbare
+     * Spalten von R+1 und R+2 (kommen mit ▼ herein) und die naechsten Karten rechts/links in R (kommen mit ▶/◀). */
+    function warm() {
+      if (dead || away || !rows.length) return;
+      var out = [], sl, k;
+      for (var r = R; r <= R + 2; r++) {
+        k = r % SLOTS; sl = slots[k];
+        if (r >= rows.length || slotRow[k] !== r) continue;
+        if (r === R) { sl.urls(sl.sc + sl.g.visible, sl.sc + sl.g.visible + 1, out); sl.urls(sl.sc - 1, sl.sc - 1, out); }
+        else sl.urls(sl.sc, sl.sc + sl.g.visible - 1, out);
+      }
+      N.img.warm(out);
+    }
     function moveCol(f) {
       var sl = slotFor(R), p = sl.focusCol(f);
       placeRing(p); afterMove();
@@ -189,6 +220,7 @@
       ensure(R, 0);                                   // meist schon da (Fenster R-1 … R+2)
       ensure(R + 1, 1);                               // angeschnittene naechste Reihe muss sofort stimmen
       if (down) slots[(R - 1 + SLOTS) % SLOTS].setVisible(false); else slotFor(R).setVisible(true);
+      markMore();
       var sl = slotFor(R);
       if (f !== undefined) sl.f = f;
       sl.setFocused(true);
@@ -385,6 +417,10 @@
       for (var i = 0; i < a.length; i++) if (!H.sameRow(a[i], b[i])) return false;
       return true;
     }
+    function later(ms) {
+      if (playT) clearTimeout(playT);
+      playT = setTimeout(function () { playT = 0; if (dead) return; if (away) loadedAt = 0; else refresh(); }, ms);
+    }
     function refresh() {
       if (task) return;
       task = H.fetch(function (err, res) {
@@ -398,6 +434,10 @@
     }
     function handle(err, res) {
       if (err) { onLoadError(err); return; }
+      if (played) {                                   // Rueckkehr aus dem Player (TV-Test 28.10.): Titel nie voreilig entfernen
+        if (played.n < PLAY_RETRY.length && H.stale(res.rows, played.rk, order())) { later(PLAY_RETRY[played.n++]); return; }
+        played = null;
+      }
       retryN = 0;
       if (offline) { offline = false; N.ui.toast.show(N.t('toast.online'), { icon: 'confirm' }); }
       applyNetwork(res);
@@ -458,6 +498,9 @@
     /* ---------- Lebenszyklus ---------- */
     s.enter = function (params, restore) {
       var redraw = false;
+      // TV-Test 28.10.: Start -> Seitenleiste -> anderer Bildschirm -> zurueck zur Startseite liess railOpen (aus railBlur) stehen,
+      // der Fokusring blieb unsichtbar. Beim Betreten ist die Seitenleiste zu (activate schliesst sie vor dem Wechsel).
+      railOpen = !!(N.ui.rail && N.ui.rail.isOpen && N.ui.rail.isOpen());
       if (pending) { rows = pending; pending = null; redraw = true; }
       if (cfgDirty && drawn) {                        // Reihen-Auswahl geaendert: sofort umordnen, dann frisch laden
         cfgDirty = false; rows = H.pick(rows, order()); R = 0; colMem = {}; interacted = false; loadedAt = 0; redraw = true; parked = null;
@@ -480,19 +523,22 @@
       away = false;
       if (parked) { var pk = parked; parked = null; handle(pk.err, pk.res); }
       else if (resume) { resume = false; refresh(); }
-      if (!loadedAt || U.now() - loadedAt > TTL) refresh();
+      if (played && played.wait) { played.wait = false; later(PLAY_SETTLE); }   // nach dem Player: PMS erst kurz nachziehen lassen
+      else if (!loadedAt || U.now() - loadedAt > TTL) { if (!playT) refresh(); }
       N.session.refreshUsersLater();
     };
     s.leave = function () {
       away = true;                                    // Wiederholungen/Toasts/Neuzeichnen ruhen, solange etwas anderes oben ist (L2)
       if (retryT) { clearTimeout(retryT); retryT = 0; resume = true; }
       if (heroT) { clearTimeout(heroT); heroT = 0; }
+      if (playT) { clearTimeout(playT); playT = 0; loadedAt = 0; }   // Nachladen nach dem Player: beim Zurueckkehren
       if (stripTask) { stripTask.abort(); stripTask = null; }
       colMem[R] = rows.length ? slotFor(R).f : 0;
       return { R: R, colMem: U.extend({}, colMem) };
     };
     s.destroy = function () {
       dead = true;
+      if (playT) { clearTimeout(playT); playT = 0; }
       if (onFlush) N.evt.off('app:flush', onFlush);
       if (onSet) N.evt.off('settings:changed', onSet);
       if (onAnime) N.evt.off('anime:changed', onAnime);
@@ -571,6 +617,13 @@
       if (!sl.canPage(dir)) return;
       placeRing(sl.page(dir)); afterMove();
       if (N.pointer) N.pointer.syncArrows();
+    };
+    /* Messlauf (dev/bench.js): gleicher Ausgangspunkt fuer jeden Lauf (TV 28.10.: home/home-hero hingen von der zuletzt fokussierten
+     * Reihe ab). top() = Reihe 0, Spalte 0 (wie RETURN); row() = fokussierte Reihe; counts() = Kartenzahl je Reihe */
+    s.bench = {
+      top: function () { if (rows.length) toTop(); },
+      row: function () { return R; },
+      counts: function () { var c = []; for (var i = 0; i < rows.length; i++) c.push(rows[i].items.length); return c; }
     };
     s.relabel = function () { for (var k = 0; k < SLOTS; k++) if (slotRow[k] >= 0) slots[k].relabel(); };
     return s;

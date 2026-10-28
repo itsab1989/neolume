@@ -7,8 +7,9 @@ with everything it needs onto the TV. Afterwards the TV only talks to your own P
 > Kurz auf Deutsch: Passende Datei unten herunterladen, doppelklicken (Linux: im Terminal starten), die Seite im
 > Browser führt durch alles – auf Wunsch auf Deutsch (Knopf „DE“ oben rechts). Beenden: Knopf „Programm beenden“.
 
-Status: tested with mocked plex.tv/Plex server, in a real browser and on the real home network (server discovery);
-**not yet tested end-to-end with a real plex.tv account and a TV** (see `docs/P2-TV-TEST.md`).
+Status: used for the public releases; the TV side (develop sign-in, IP Setting, User App Sync) is verified on a real 2014
+TV (UE48H8000), the program itself by automated tests with a mocked plex.tv/Plex server in a real browser. The beginner guide with drawings of every TV screen is
+`public/docs/INSTALL.md` (in the public repository: `docs/INSTALL.md`, German `docs/INSTALL.de.md`).
 
 Contents: [Download](#1-download) · [Start](#2-start) · [What happens](#3-what-the-program-does) · [Stop & uninstall](#4-stop-and-uninstall)
 · [Privacy](#5-privacy-what-is-sent-where) · [Optional helper](#6-optional-helper-watchlist--trends) · [NAS / Docker](#7-nas-docker-synology)
@@ -87,13 +88,14 @@ The page guides you through six steps (English or German, button at the top righ
    "Secure connections: Required" – the 2014 TV cannot do TLS 1.2, so it cannot be ticked). Ticked servers go into
    `setup.json` per profile (see schema). The page explains that these connections go over the internet without encryption.
 5. **To the TV** – keep the page open and follow the steps shown (Samsung 2014):
-   1. Once: `MENU` → **Smart Hub** → **Samsung Account** → **Sign in** → user **`develop`** (password usually fills in, otherwise `any`).
+   1. Once: `MENU` → **Smart Hub** → **Samsung Account** → **Log In** (German TV: *Anmeld.*) → user **`develop`** (password usually fills in, otherwise `any`).
    2. Press **SMART HUB** → open **SAMSUNG APPS**.
    3. Go to any app and **hold OK for about 5 seconds** → a menu appears.
    4. **IP Setting** → enter the computer address shown large on the page.
    5. Open the menu again (hold OK) → **Start User App Sync** → press OK **once**.
    6. The page shows "TV … fetched Neolume.zip". "Neolume" appears under **MY APPS** (otherwise close and reopen Smart Hub).
-6. **Done** – click *"Clear access data from memory and finish"*, then **Quit program**.
+6. **Done** – click *"Clear access data from memory and finish"*, then **Quit program** (with the helper: install it
+   permanently first, section 6).
 
 Run it again when a profile is added, you share a library with a new profile, change your Plex password or use
 "Sign out of all devices" – the app on the TV then says "run the setup on the computer again". App PINs are kept.
@@ -103,12 +105,17 @@ network only, no access data inside).
 
 ## 4. Stop and uninstall
 - **Stop:** button **Quit program** at the bottom of the page, or close the black/Terminal window, or `Ctrl+C` in it.
-  Everything stops: setup page, the TV sync server (port 80), update server and helper.
+  Everything stops: setup page, the TV sync server (port 80), update server and helper (a helper installed permanently
+  keeps running in the background – that is its purpose).
+- **Helper installed permanently?** Remove it first: **Remove helper …** in the helper card or the icon menu, or
+  `neolume-setup --uninstall-helper` (section 6). It reports what was removed and what is left.
 - **Uninstall:** delete the downloaded file. If you ticked *"Remember settings"* or set up the helper with
   *"Remember access"*, also delete the settings folder:
   - Windows: `%APPDATA%\NeolumeSetup` (paste into the Explorer address bar)
   - Mac: `~/Library/Application Support/NeolumeSetup` (Finder → *Go → Go to Folder…*)
   - Linux: `~/.config/NeolumeSetup` (with `sudo` it is `/root/.config/NeolumeSetup`)
+- **Firewall entries** (Windows/Mac) that you allowed stay in the system's list; harmless once the file is gone. Remove them
+  under *Allow an app through firewall* (Windows) or *Firewall → Options* (Mac) if you like.
 - **Revoke access:** plex.tv → *Account → Authorized Devices* → remove "Neolume" (and "Neolume Helper").
   The TV app then asks for a new setup.
 - **Remove the app from the TV:** on the TV, like any other app (or sync again without it).
@@ -120,6 +127,9 @@ The program has **no telemetry, no update check and no own server**. It talks on
 |---|---|---|
 | **plex.tv** (HTTPS, certificate checked, fixed `https://plex.tv/api/…` addresses only) | sign-in code; then with your sign-in: your account name and avatar, server list, Plex Home profiles, per-profile server access. With the helper: one "switch profile" request per Home profile without a Plex PIN | during the setup |
 | **discover.provider.plex.tv** (HTTPS) | only with the optional helper: watchlist and the three Discover lists, per profile | while the helper runs |
+| **metadata.provider.plex.tv** (HTTPS) | only with the optional helper: the details (story, genres, runtime, cast) of a title that is not on your server, when you open it in Discover – one request per title, kept for 6 hours | while the helper runs |
+| **plex.tv:443** (TLS handshake only, no request) | only the installed helper: "is plex.tv reachable?" for the icon/log | at start, then every 10 min |
+| **plex.tv** (HTTPS, `/devices.xml`, `DELETE /devices/<id>.xml`) | only when removing the helper: finds and removes the helper's own device entry (never the entry whose access the TV uses) | on **Remove helper** |
 | **servers shared with you** (plain HTTP, only after *Search shared servers*) | `GET /identity` without any token (is it reachable, right machine?). With *Search shared servers* the program also switches to each Home profile without a Plex PIN once (like the helper) to read that profile's server list | during the setup |
 | **your Plex server** (home network, HTTP) | `/identity` (no token) and `/library/sections` once per profile token (read only, to count libraries) | during the setup |
 | **home network broadcast** (UDP 32414) | "where is a Plex server?" (Plex GDM) | during the setup |
@@ -134,29 +144,52 @@ action needs a random per-start key (blocks other websites), host name checked. 
 network addresses only, fixed list of files/functions, no folders.
 
 ## 6. Optional helper (watchlist & trends)
-Without the helper everything works with your Plex server. Only the **Plex watchlist** and the Discover rows
-**"Trending", "New releases", "Coming soon"** come from plex.tv – the helper fetches them for the TV.
+**What it is:** the 2014 TV cannot reach plex.tv by itself (plex.tv requires TLS 1.2, the TV only knows up to TLS 1.1).
+Without the helper everything works with your Plex server; only the **Plex watchlist** and the Discover rows
+**"Trending now", "Just released", "Coming soon"** and the details of a title that is not on your server (story, genres,
+cast – Discover details page) come from plex.tv – the helper fetches exactly these for the TV (and passes
+"add to / remove from watchlist" from the TV on to plex.tv; with *Other servers* it also looks up their current
+addresses). No video traffic, not reachable from the internet, does not pass on requests for anyone else, home network only, data goes only to
+plex.tv. When it is off, the app keeps working without these rows.
 
-- **Turn on:** in the *Summary* tick **Set up the helper** → *Create app package* → sync to the TV as usual → on the last
-  page click **Start helper**. It runs as long as the program runs; the TV hides the watchlist while it is off.
+- **Turn on:** in the *Summary* tick **Set up the helper** (keep *Remember access on this computer* under *Advanced*) →
+  *Create app package* → sync to the TV as usual → **Start helper** in the helper card. It runs as long as the program runs.
 - **Profiles:** the owner and Plex Home profiles **without** a Plex PIN (the PIN is never asked for or stored).
-- **Run it permanently:** keep *"Remember access on this computer"* ticked (under *Advanced*, default on), then start
-  only the helper with `--helper` (no browser, no sign-in):
-  - Windows: Task Scheduler → *Create Basic Task* → "When I log on" → *Start a program* → the `.exe`, argument `--helper`.
-  - Mac: *System Settings → General → Login Items* does not take arguments, so create
-    `~/Library/LaunchAgents/de.neolume.helper.plist` (Label `de.neolume.helper`, ProgramArguments = full path to
-    `neolume-setup`, `--helper`; RunAtLoad and KeepAlive true) and run `launchctl load -w ~/Library/LaunchAgents/de.neolume.helper.plist`.
-  - Linux: systemd user unit with `ExecStart=/path/to/neolume-setup-linux-x64 --helper` (no `sudo` needed for the
-    helper), `systemctl --user enable --now neolume-helper`, `loginctl enable-linger $USER`. If the setup ran with
-    `sudo`, `helper.json` is in `/root/.config/NeolumeSetup/`: copy it to `~/.config/NeolumeSetup/`, `chown` it to
-    yourself and keep it `chmod 600`.
-  - NAS: see section 7.
+- **Install permanently:** button **Install helper permanently** in the helper card, or `neolume-setup --install-helper`
+  (headless, e.g. over SSH). It copies the program to a stable place and registers autostart – no admin rights:
+
+  | System | Program copy | Autostart | Icon |
+  |---|---|---|---|
+  | macOS | `~/Library/Application Support/NeolumeSetup/bin/` + app bundle `Neolume Helper.app` (German: `… Helfer.app`) | LaunchAgent `~/Library/LaunchAgents/io.github.itsab1989.neolume.helper.plist` (at login; `KeepAlive` on crash), started through the bundle so Login Items show "Neolume Helper" with its icon (`AssociatedBundleIdentifiers`) | menu bar |
+  | Windows | `%LOCALAPPDATA%\NeolumeSetup\bin\` – `.exe`: `neolume-setup.exe` (console, command line) plus `neolume-helper.exe` (same program marked as windowed: no console window or taskbar button at login) | shortcut "Neolume Helper.lnk" (German: "… Helfer.lnk") in the user's Startup folder (at login). Task Manager → Startup apps does not show the shortcut's name but the program's description, "Neolume Setup & Helper", publisher "Neolume" (`.pyz`: "Python"); the firewall prompt shows the same name. `.pyz`: started with `pythonw.exe` (no console) | notification area |
+  | Linux | `~/.local/share/NeolumeSetup/bin/` | systemd user unit `neolume-helper.service` (+ `loginctl enable-linger $USER` for no-login) | – |
+
+  `--no-tray` hides the icon (or untick **Show icon …** in the helper card later). The icon menu: status (running,
+  plex.tv reachable, TV last seen), **Pause/Resume**, **Open setup program …**, **What does the helper do?**, **Quit helper**,
+  **Remove helper …**. Mac without a login (always-on Mac): turn on automatic login, or
+  `sudo neolume-setup --install-helper --at-boot` (LaunchDaemon as your user, no icon; removal then needs `sudo` too).
+  `--helper-status` shows the state. The installed helper writes `helper.log` (no tokens) and `helper.pid` next to
+  `helper.json`, re-reads `helper.json` after a new setup, and waits if port 32499 is busy.
+- **Update:** start the new program version → **Update helper** in the helper card, or run the new file with
+  `--install-helper`.
+- **Remove completely:** **Remove helper …** (helper card or icon menu) or `neolume-setup --uninstall-helper`: stops it and
+  deletes autostart, program copy, `helper-service.json`, log, pid and `helper.json`; removes the helper's own plex.tv device
+  entry if it has one (never the one whose access the TV shares); deletes the settings folder if nothing else is in it;
+  prints what was removed and what is left. `--uninstall-helper --keep-access` (button **Turn autostart off**) keeps
+  `helper.json`.
+- **Linux with sudo:** if the setup ran with `sudo`, `helper.json` is in `/root/.config/NeolumeSetup/`: copy it to
+  `~/.config/NeolumeSetup/`, `chown` it to yourself, keep it `chmod 600` and run `--install-helper` without `sudo`.
+- **NAS:** see section 7.
 - **Security:** the helper is not a proxy – the TV can only call a few fixed functions, each mapped to one fixed plex.tv
   address (`design/reviews/helper-security.md`); home network only (with a TV address under *Advanced*: only the TV),
-  only with the key from `setup.json`, rate-limited, never forwards plex.tv tokens to the TV.
+  only with the key from `setup.json`, rate-limited, never forwards plex.tv tokens to the TV. The access file is written
+  with mode 0600 (Windows: inside the per-user profile).
 - **Other servers:** with the helper running, the TV can ask `GET /servers` (key + profile) for the current plain-http
   addresses of the servers shared with that profile (`https://plex.tv/api/v2/resources`, cached 60 s). The answer holds
   only machine ids and addresses – never a token.
+- Step-by-step guide for beginners (exact button names, an always-on Mac over SSH, firewall prompts):
+  `public/docs/INSTALL.md` section 13 / `INSTALL.de.md` Abschnitt 13.
+
   **Never forward port 32499 in your router.**
 
 ## 7. NAS (Docker, Synology)

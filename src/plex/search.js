@@ -98,6 +98,7 @@
     },
     /* Kartenzeile 2 in der Suche: "Serie · 2023" / "Film · 2002" / "S1 · F4" */
     caption: function (it) {
+      if (it.sub) return [it.title, it.sub];          // Unterzeile einer Erweiterung (z. B. Stand einer Anfrage)
       if (it.mark) return [it.title, N.fmt.join([N.t(it.mark), it.year || ''])];   // Entdecken Stufe 2: "Auf deinem Server · 2025"
       if (it.type === 'person') return [it.title, it.role || N.t('search.person')];
       if (it.type === 'episode') return [it.epTitle || it.title, N.t('card.sub.episode', { s: it.s, e: it.e })];

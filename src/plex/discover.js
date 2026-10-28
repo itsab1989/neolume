@@ -8,7 +8,7 @@
   var U = N.util, M = N.model;
   var AGENT = { movie: 'tv.plex.agents.movie', show: 'tv.plex.agents.series' }, LTYPE = { movie: 1, show: 2 };
   var GUID = /^plex:\/\/(movie|show)\/([0-9a-f]{12,40})$/, HEX = /^[0-9a-f]{12,40}$/;
-  var anchors = {}, helperOk = null, helperDisc = false, helperFeat = [], helperT = null, helperBase = '', helperDownAt = 0, noWl = {}, downShown = false, PORT = '32499';   // anchors je Profil-uuid: {movie: rk|'' , show: rk|''}
+  var infoCache = new N.LRU(30), anchors = {}, helperOk = null, helperDisc = false, helperFeat = [], helperT = null, helperBase = '', helperDownAt = 0, noWl = {}, downShown = false, PORT = '32499';   // anchors je Profil-uuid: {movie: rk|'' , show: rk|''}
 
   var D = {
     DELAY: 700, MAX_EXT: 30, TIMEOUT: 15000,
@@ -134,8 +134,10 @@
     },
     extItem: function (x, type) {
       var thumb = typeof x.thumb === 'string' && /^https?:\/\/[^\s"'<>]+$/.test(x.thumb) ? x.thumb : '';
-      return { rk: 'x' + D.hexOf(x.guid), ext: true, type: type, guid: x.guid, title: String(x.name || x.title || ''), year: Number(x.year) || 0,
+      var it = { rk: 'x' + D.hexOf(x.guid), ext: true, type: type, guid: x.guid, title: String(x.name || x.title || ''), year: Number(x.year) || 0,
         sum: U.trim(String(x.summary || ''), 600), thumb: thumb, still: thumb, art: '', lib: 0, kind: '', vc: 0, off: 0, dur: 0, leaf: 0, vleaf: 0, child: 0 };
+      if (N.ext) N.ext.call('disc:item', it);              // optionale Erweiterung (z. B. Marke an der Karte)
+      return it;
     },
     /* GUID-Liste fuer /library/all?guid= (eindeutig, gueltig, max. MAX_EXT) */
     guidParam: function (exts) {
@@ -191,6 +193,118 @@
     },
     /* Ueberzeile der Detailseite fremder Titel */
     overline: function (it) { return N.t(it.type === 'show' ? 'search.kind.show' : 'search.kind.movie') + ' · ' + N.t('disc.notOnServer'); },
+    /* ---------- Details eines fremden Titels (Detailseite 'extdetails') ----------
+     * Gemeinsames Modell fuer alle Quellen (Plex-Katalog ueber den Helfer, optional eine Erweiterung der Ausgabe):
+     * {src, sum, tagline, date, thumb, art, cr, dur (ms), rating (0-10), studio, network, genres [Text], directors, creators,
+     *  writers [Name], cast [{name, role, thumb}], seasons, episodes, status 'running'|'ended'|'', lastAired, nextAir,
+     *  release {cinema, digital, physical} (Datum je Art; nur eine Erweiterung liefert es)}
+     * Bilder sind https-Adressen bekannter Bild-Hosts; der Fernseher laedt sie ueber den Foto-Umrechner des PMS (N.img.url),
+     * nie direkt (kein TLS 1.2). Reine Funktionen, in Node getestet (tests/extinfo.test.js). */
+    IMG: /^https:\/\/(images\.plex\.tv|metadata-static\.plex\.tv|image\.tmdb\.org|artworks\.thetvdb\.com)\/[^\s"'<>]{1,500}$/,
+    img: function (u) { return typeof u === 'string' && D.IMG.test(u) ? u : ''; },
+    emptyInfo: function () {
+      return { src: '', sum: '', tagline: '', date: '', thumb: '', art: '', cr: '', dur: 0, rating: 0, studio: '', network: '', genres: [], directors: [],
+        creators: [], writers: [], cast: [], seasons: 0, episodes: 0, status: '', lastAired: '', nextAir: '', release: null };
+    },
+    /* Antwort von GET <helfer>/details -> Modell (unbekannte/kaputte Felder fallen weg) */
+    infoFromHelper: function (d) {
+      if (!d || typeof d !== 'object') return null;
+      function s(v, n) { return typeof v === 'string' ? U.trim(v, n) : ''; }
+      function arr(l) { return Object.prototype.toString.call(l) === '[object Array]' ? l : []; }
+      function names(l, n) { var o = []; l = arr(l); for (var i = 0; i < l.length && o.length < n; i++) if (typeof l[i] === 'string' && l[i]) o.push(U.trim(l[i], 80)); return o; }
+      function day(v) { return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : ''; }
+      var x = D.emptyInfo(), c = arr(d.cast);
+      x.src = 'plex'; x.sum = s(d.summary, 1500); x.tagline = s(d.tagline, 200); x.date = day(d.date); x.thumb = D.img(d.thumb); x.art = D.img(d.art);
+      x.cr = s(d.contentRating, 20); x.dur = Number(d.duration) > 0 ? Number(d.duration) : 0; x.rating = Number(d.rating) > 0 && Number(d.rating) <= 10 ? Number(d.rating) : 0;
+      x.studio = s(d.studio, 100); x.network = s(d.network, 60);
+      x.genres = names(d.genres, 5); x.directors = names(d.directors, 3); x.writers = names(d.writers, 3);
+      for (var i = 0; i < c.length && x.cast.length < 15; i++) if (c[i] && typeof c[i].name === 'string' && c[i].name) x.cast.push({ name: U.trim(c[i].name, 80), role: s(c[i].role, 80), thumb: D.img(c[i].thumb) });
+      x.seasons = Number(d.seasons) > 0 ? Math.floor(Number(d.seasons)) : 0; x.episodes = Number(d.episodes) > 0 ? Math.floor(Number(d.episodes)) : 0;
+      x.status = d.continuing === true ? 'running' : d.continuing === false ? 'ended' : '';
+      x.lastAired = day(d.lastAired);
+      return x;
+    },
+    /* zwei Quellen zusammenfuehren: a hat Vorrang, leere Felder kommen aus b (Listen nur, wenn a keine hat) */
+    mergeInfo: function (a, b) {
+      if (!a) return b || null;
+      if (!b) return a;
+      var o = D.emptyInfo(), k;
+      for (k in o) if (Object.prototype.hasOwnProperty.call(o, k)) {
+        var va = a[k], vb = b[k];
+        o[k] = va && (typeof va !== 'object' || va.length === undefined || va.length) ? va : vb !== undefined ? vb : o[k];
+      }
+      if (/^[a-z]{2}\//.test(b.cr || '') && !/^[a-z]{2}\//.test(a.cr || '')) o.cr = b.cr;   // Freigabe mit Land ("de/16" = FSK 16) vor der US-Angabe des Katalogs
+      o.src = a.src && b.src ? a.src + '+' + b.src : a.src || b.src;
+      return o;
+    },
+    /* Metazeile: "1978 · 1 Std. 31 Min. · R · 8,9/10" bzw. "2022 · 6 Staffeln · Läuft noch · TV-MA" (+ Zusatz, z. B. "Hier nicht abspielbar") */
+    extMeta: function (it, x, tail) {
+      var F = N.fmt, p = [it.year || ''];
+      if (x) {
+        if (it.type === 'show') {
+          if (x.seasons) p.push(N.tn('meta.seasons', x.seasons));
+          if (x.status) p.push(N.t('disc.det.st.' + x.status));
+        } else if (x.dur) p.push(F.dur(x.dur));
+        p.push(F.rated(x.cr));
+        if (x.rating) p.push(F.rating(x.rating));
+      }
+      p.push(tail === undefined ? N.t('disc.det.note') : tail);
+      return F.join(p);
+    },
+    /* Zeile unter der Beschreibung: Film "Regie: …", Serie "Sender · Idee: …" */
+    extLine: function (it, x) {
+      if (!x) return '';
+      if (it.type === 'show') return N.fmt.join([x.network ? N.t('disc.det.network', { name: x.network }) : '', x.creators.length ? N.t('disc.det.creator', { names: x.creators.slice(0, 2).join(', ') }) : '']);
+      return x.directors.length ? N.t('det.info.director', { names: x.directors.slice(0, 2).join(', ') }) : x.studio ? N.t('det.info.studio', { name: x.studio }) : '';
+    },
+    extChips: function (x) { var o = []; for (var i = 0; x && i < x.genres.length && o.length < 3; i++) o.push(N.fmt.genre(x.genres[i])); return o; },
+    /* Besetzung als Karten (Reihe 'cast' wie bei eigenen Titeln) */
+    extCast: function (x) {
+      var o = [];
+      for (var i = 0; x && i < x.cast.length; i++) o.push({ rk: 'xc' + i, type: 'person', id: 0, title: x.cast[i].name, role: x.cast[i].role, thumb: x.cast[i].thumb, vc: 0, off: 0, dur: 0, leaf: 0, vleaf: 0 });
+      return o;
+    },
+    /* INFO-Panel: Leitsatz, ganze Beschreibung, Regie/Idee/Drehbuch, Sender/Studio, Genres, Staffeln/Folgen, Erstausstrahlung.
+     * ext {ov, state} (optional, Erweiterung): eigene Ueberzeile (z. B. "Film · Bald da") und Stand als Zeile darunter – wie auf der Seite */
+    extInfoText: function (it, x, sum, note, ext) {
+      var F = N.fmt, head = [F.join([ext && ext.ov || D.overline(it), it.year || ''])], p = [];
+      if (ext && ext.state) head.push(ext.state);
+      if (x && x.tagline) head.push(x.tagline);
+      if (x) {
+        if (x.directors.length && it.type !== 'show') p.push(N.t('det.info.director', { names: x.directors.join(', ') }));
+        if (x.creators.length) p.push(N.t('disc.det.creator', { names: x.creators.join(', ') }));
+        if (x.writers.length && it.type !== 'show') p.push(N.t('det.info.writer', { names: x.writers.join(', ') }));
+        if (x.network) p.push(N.t('disc.det.network', { name: x.network }));
+        if (x.studio) p.push(N.t('det.info.studio', { name: x.studio }));
+        if (x.genres.length) p.push(x.genres.slice(0, 5).map(function (g) { return F.genre(g); }).join(', '));
+        if (it.type === 'show' && x.episodes) p.push(N.t('disc.det.episodes', { s: N.tn('meta.seasons', x.seasons || 1), n: x.episodes }));
+        if (x.date) p.push(N.t(it.type === 'show' ? 'disc.det.firstAired' : 'disc.det.released', { date: N.det.date(x.date) }));
+        if (x.release && x.release.digital) p.push(N.t('disc.det.digital', { date: N.det.date(x.release.digital) }));
+        if (x.release && x.release.physical) p.push(N.t('disc.det.physical', { date: N.det.date(x.release.physical) }));
+        if (x.nextAir) p.push(N.t('disc.det.nextAir', { date: N.det.date(x.nextAir) }));
+      }
+      /* Fakten und Hinweis bleiben ganz; die Beschreibung bekommt den Rest der 700 Zeichen (mind. 160) */
+      var tail = [], used;
+      if (p.length) tail.push(p.join('\n'));
+      if (note) tail.push(note);
+      used = head.join('\n\n').length + tail.join('\n\n').length + 4 * (tail.length + 1);
+      return U.trim(head.concat([U.trim(sum, Math.max(160, Math.min(600, 700 - used)))], tail).join('\n\n'), 700);
+    },
+    /* Details ueber den Helfer: EINE Anfrage je Titel + Sprache, im Speicher gehalten. cb(err, info|null).
+     * Ohne Helfer bzw. Helfer ohne 'details' (aelterer Helfer): sofort cb({type:'nohelper'}) – keine Anfrage. */
+    details: function (it, cb) {
+      var hex = D.hexOf(it && it.guid), lang = N.i18n.lang() === 'en' ? 'en' : 'de', key = hex + '|' + lang, v = infoCache.get(key);
+      function later(e, r) { setTimeout(function () { cb(e, r); }, 0); return { abort: function () {} }; }
+      if (!HEX.test(hex)) return later({ type: 'guid' }, null);
+      if (v) return later(null, v);
+      if (!D.helperHas('details')) return later({ type: 'nohelper' }, null);
+      return D.helperGet('/details?id=' + hex + '&lang=' + lang, function (err, d) {
+        var x = err ? null : D.infoFromHelper(d);
+        if (x) infoCache.set(key, x);
+        cb(err || (x ? null : { type: 'parse' }), x);
+      });
+    },
+    _resetInfo: function () { infoCache = new N.LRU(30); },
     /* ---------- Anfragen ---------- */
     /* Anker je Typ aus den Film-/Serien-Bibliotheken des aktiven Profils (einmal je Profil) */
     anchor: function (type, libs, cb) {
@@ -302,6 +416,16 @@
         return { abort: function () { dead = true; t.abort(); if (sub) sub.abort(); } };
       },
       has: function (it) { return !!D.wl.ids[D.hexOf(it.guid)]; },
+      /* Reihe "Deine Merkliste" nach Hinzufuegen/Entfernen auf einer Detailseite ohne neue Anfrage anpassen (TV-Test 28.10.: sie
+       * aenderte sich erst beim naechsten Oeffnen von Entdecken). items: bisherige Reihe (wird nicht veraendert) -> neue Liste;
+       * hinzugefuegt = vorne (wie die Merkliste, neueste zuerst), entfernt = alle Eintraege mit derselben GUID raus */
+      apply: function (items, it, on) {
+        var hex = D.hexOf(it && it.guid), out = [], i;
+        if (!HEX.test(hex)) return items || [];
+        if (on) { var c = U.extend({}, it); c.wl = true; out.push(c); }
+        for (i = 0; items && i < items.length; i++) if (D.hexOf(items[i].guid) !== hex) out.push(items[i]);
+        return out;
+      },
       state: function (it, cb) {
         var hex = D.hexOf(it.guid);
         if (!HEX.test(hex)) { cb(false); return { abort: function () {} }; }
@@ -313,7 +437,10 @@
       set: function (it, on, cb) {
         var hex = D.hexOf(it.guid);
         if (!HEX.test(hex)) { cb({ type: 'guid' }); return { abort: function () {} }; }
-        return D.wl.req(on ? 'PUT' : 'DELETE', '/watchlist/' + hex, function (err) { if (!err) D.wl.ids[hex] = on; cb(err); });
+        return D.wl.req(on ? 'PUT' : 'DELETE', '/watchlist/' + hex, function (err) {
+          if (!err) { D.wl.ids[hex] = on; N.evt.emit('watchlist:changed', { it: it, on: on }); }   // Entdecken: Reihe "Deine Merkliste" sofort anpassen
+          cb(err);
+        });
       }
     }
   };

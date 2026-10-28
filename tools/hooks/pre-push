@@ -1,0 +1,9 @@
+#!/bin/sh
+# Optional git hook (install once with: npm run hooks). Before each push: the same checks as CI (build gates, unit tests,
+# spec check), so a push never turns CI red. Skip once with: git push --no-verify
+cd "$(git rev-parse --show-toplevel)" || exit 1
+if ! npm test --silent || ! node tools/spec_gen.js --check; then
+  echo "" >&2
+  echo "Push stopped: npm test or the spec check failed – see the messages above." >&2
+  exit 1
+fi

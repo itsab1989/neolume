@@ -1,0 +1,10 @@
+{
+  "_doc": "Gewollte Layout-Befunde (tools/layoutcheck.js). type: overlap|clip|button|offscreen|safe|panel|*. scene/a/b/detail = regulaere Ausdruecke; a/b gegen den Elementpfad (z. B. 'div.layer > div.panel > div.px'), bei Paaren in beiden Reihenfolgen; detail gegen die Beschreibung (z. B. 'rechts'). reason ist Pflicht: warum das so gewollt ist. Nie eintragen, nur damit der Lauf gruen wird.",
+  "allow": [
+    { "type": "safe", "a": "div\\.panel( > |\\.)", "detail": "rechts", "reason": "Rechtes Seitenpanel (x 840–1280, NAV-12) liegt bewusst am Bildschirmrand; sein Inhalt hat 32 px Innenabstand und endet bei x 1248 – Design des Panels, nicht verrutschter Text." },
+    { "type": "safe", "scene": "^(details-.*cast|p4-ext-details-cast)", "a": "div\\.cap\\.cap-cast > ", "detail": "rechts", "reason": "Besetzungsreihe laeuft wie alle Reihen bewusst bis an den rechten Rand (A16.1: rows may bleed over the right edge); die letzte Beschriftung steht unter ihrem Bild." },
+    { "type": "safe", "scene": "^(search-|p4-|rq-disc-)", "a": "div\\.cap\\.cap-poster-q > ", "detail": "rechts", "reason": "Kleines Posterraster in Suche/Entdecken endet bei x 1224 (5 Karten zu 120 px + 16 px Abstand ab x 560); die Beschriftung der letzten Karte steht 8 px im Rand unter ihrer Karte." },
+    { "type": "safe", "scene": "^srv-", "a": "div\\.a\\.t-label\\.cacc\\.ell$", "detail": "oben", "reason": "Herkunftszeile 'Weiterer Server · …' ueber dem Bibliothekstitel (y 16); bewusst so, damit Titel und Raster an derselben Stelle wie bei eigenen Bibliotheken bleiben. Offene Design-Frage: liegt 20 px im oberen Sicherheitsrand." },
+    { "type": "panel", "scene": "^player-(lp|loupe)", "a": "div\\.lpv-w$", "b": "div\\.pl-isl\\.pl-bot", "reason": "Feinauswahl (Lupe) sitzt als Reiter auf der unteren Player-Insel und geht nahtlos in sie ueber (verbunden durch die Linien zur Zeitleiste) – gewollte Verbindung, keine verrutschte Flaeche." }
+  ]
+}

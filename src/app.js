@@ -67,6 +67,7 @@
       N.i18n.set(st.lang || tvLanguage());
       N.accent.apply(st.accent);                       // zuletzt genutzte Akzentfarbe vor dem ersten Bild (kein Farbsprung)
       mark('i18n');
+      N.img.decoder(chrome);                           // Vorab-Dekodieren (Runde 5): 1x1-Ebene fuer Bilder ausserhalb des Bildschirms
       N.ui.hints.init(chrome);
       N.ui.toast.init(chrome);
       N.ui.mini.init(chrome);                          // M4: Mini-Player (Musik/Hoerbuch beim Stoebern)
@@ -81,8 +82,11 @@
       N.ui.saver.init(root, chrome);                  // P5: Bildschirmschoner, Uhr auf der Startseite, Willkommenskarte
       N.net.init(); N.ui.netbar.init(chrome);         // P5: Server nicht erreichbar -> Leiste + automatische Wiederholung
       mark('saver+net');
-      // SUBTITLE-Taste registriert der Lader nicht -> zur Laufzeit (kein Lader-Update noetig, research 7)
-      try { if (ctx.pluginAPI && ctx.tvKey && ctx.tvKey.KEY_SUBTITLE !== undefined) ctx.pluginAPI.registKey(ctx.tvKey.KEY_SUBTITLE); } catch (e0) { N.log('registKey SUBTITLE ' + e0.message); }
+      // SUBTITLE und CH▲/CH▼ registriert der Lader nicht -> zur Laufzeit (kein Lader-Update noetig, research/player.md 7).
+      // CH▲/▼: vorige/naechste Folge bzw. Kapitel im Player, Titel in Jetzt laeuft, Seiten in Listen (sonst wechselt der TV ggf. den Sender)
+      ['KEY_SUBTITLE', 'KEY_CH_UP', 'KEY_CH_DOWN'].forEach(function (k) {
+        try { if (ctx.pluginAPI && ctx.tvKey && ctx.tvKey[k] !== undefined) ctx.pluginAPI.registKey(ctx.tvKey[k]); } catch (e0) { N.log('registKey ' + k + ' ' + e0.message); }
+      });
       window.onunload = A.flush;
       window.onerror = function (msg, url, line, col, err) {
         N.diag.error('JS-Fehler ' + msg + ' @' + String(url || '').split('/').pop() + ':' + line + ':' + (col || 0), err);
@@ -151,6 +155,7 @@
       N.i18n.set(l);
       if (N.session.settings) N.session.applyDefaults();   // Ton/UT-Sprache ohne eigene Wahl folgen der Oberflaeche (F12)
       N.router.rebuild();
+      if (N.ui.saver && N.ui.saver.relabel) N.ui.saver.relabel();   // Datum der Startseiten-Uhr in der neuen Sprache
     },
     /* Beenden/EXIT/onunload: ausstehende Schreibzugriffe (Ausblenden) senden, Protokoll und Speicher sofort schreiben */
     flush: function () {

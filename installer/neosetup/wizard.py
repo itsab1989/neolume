@@ -5,7 +5,7 @@ import uuid
 
 from . import brand
 from . import helper as helpermod
-from . import netutil, package, settings
+from . import ext, netutil, package, service, settings
 from .lanserver import LanServer, SYNC_PORT, UPDATE_PORT, port_in_use, sync_files, update_files
 from .plextv import PlexError, PlexTV, build_profiles
 
@@ -22,7 +22,7 @@ class StepError(Exception):
 class Wizard(object):
     def __init__(self, base_loader, extras=None, prefs=None, plextv_factory=PlexTV, http_get=netutil.http_get,
                  gdm=netutil.gdm_discover, lan_ip=netutil.own_lan_ip, sync_port=SYNC_PORT, update_port=UPDATE_PORT,
-                 settings_file=None, helper_file=None, helper_fetch=None):
+                 settings_file=None, helper_file=None, helper_fetch=None, service_ctx=None):
         prefs = prefs or {}
         self.base_loader = base_loader          # callable -> list of (name, bytes) (release package entries)
         self.settings_file = settings_file
@@ -47,6 +47,8 @@ class Wizard(object):
         self.helper_address = ''               # other device (NAS) running the helper; '' = this computer
         self.helper_skipped = []               # profile titles without watchlist (Plex PIN)
         self.helper = None
+        self._service_ctx = service_ctx        # installed helper (service.py); created on first use
+        self.service_report = None             # last install/remove report for the page
         self.reset()
 
     # ---------- helpers ----------
@@ -69,6 +71,7 @@ class Wizard(object):
         self.others_scanned = False
         self.others_skipped = []                # profile titles that could not be checked (Plex PIN)
         if getattr(self, 'sync', None) and self.sync.running: self.sync.stop()
+        ext.reset(self)
 
     def _need(self, what):
         if what == 'login' and not self.token: raise StepError('not_logged_in')
@@ -237,6 +240,7 @@ class Wizard(object):
             hcfg = self._prepare_helper(ip) if self.helper_wanted else None
             cfg = package.make_config(self.client_id, self.server, self.uris, self.profiles, ip, self.update.port,
                                       reset_pins=bool(reset_pins), helper=hcfg, others=self.others)
+            ext.config(self, cfg)                 # optional extensions of the edition (ext.py); public: nothing
             data = package.build_package(base, cfg)
         except package.PackageError as e:
             raise StepError(e.code, e.detail)
@@ -297,6 +301,8 @@ class Wizard(object):
         self.package = None
         if not enabled:
             self.helper_stop()
+            if self.helper_store and service.load_prefs(self.service_ctx()):
+                self.helper_uninstall()             # installed permanently: remove all of it, not only the access file
             self.helper_store = None
             helpermod.Store.forget(self.helper_file)
 
@@ -316,6 +322,8 @@ class Wizard(object):
             try: store.add(p['uuid'], self.plex.switch_home_user(self.token, p['id']), p['title'], 'home')
             except Exception: skipped.append(p['title'])
         if not store.profiles: return None
+        if old: store.extra = dict(old.extra)
+        ext.helper_store(self, store)
         self.helper_store, self.helper_skipped = store, skipped
         if self.helper_remember: store.save(self.helper_file)
         else: helpermod.Store.forget(self.helper_file)
@@ -323,10 +331,66 @@ class Wizard(object):
         host = self.helper_address or ip
         return {'url': 'http://%s:%d' % (host, self.update.port or helpermod.HELPER_PORT), 'key': store.key}
 
+    # ---------- installed helper (background service, service.py) ----------
+    def service_ctx(self):
+        if self._service_ctx is None: self._service_ctx = service.Ctx()
+        return self._service_ctx
+
+    def service_state(self):
+        try:
+            st = service.status(self.service_ctx(), self.helper_file)
+        except Exception:                       # never break the page because of the system check
+            return {'installed': False, 'running': False, 'background': False, 'os': service.platform_key(), 'error': True}
+        return dict((k, st[k]) for k in ('os', 'installed', 'autostart', 'running', 'background', 'tray', 'trayPossible',
+                                         'mode', 'port', 'log', 'program', 'settingsDir', 'sameVersion', 'name'))
+
+    def helper_install(self, tray=True, lang=None):
+        """Button "Helfer dauerhaft installieren": needs the remembered access file (made by "Create app package").
+        lang: language of the page = language of the helper's name ("<Name> Helfer"/"<Name> Helper") in the system."""
+        if not self.helper_store: raise StepError('no_helper')
+        ctx = self.service_ctx()
+        if lang in ('de', 'en') or self.lang: ctx.lang = lang if lang in ('de', 'en') else self.lang
+        if not self.helper_remember:
+            self.helper_remember = True
+        hfile = self.helper_store.save(self.helper_file)
+        if self.helper: self.helper_stop()                    # free the port for the background helper
+        r = service.install(ctx, hfile, self.update.port if self.update.port else helpermod.HELPER_PORT, bool(tray))
+        self.service_report = r.to_json()
+        return self.service_report
+
+    def helper_uninstall(self, keep_access=False):
+        """Button "Helfer entfernen": autostart, program copy, its settings, access file, plex.tv device entry."""
+        if not keep_access: self.helper_stop()
+        r = service.uninstall(self.service_ctx(), keep_access=bool(keep_access), helper_file=self.helper_file or helpermod.store_path())
+        if not keep_access:
+            self.helper_store, self.helper_wanted = None, False
+            self.package = None
+        self.service_report = r.to_json()
+        return self.service_report
+
+    def helper_tray(self, on):
+        try: service.set_tray(self.service_ctx(), bool(on))
+        except service.ServiceError as e: raise StepError(e.code)
+
+    def helper_bg(self, run):
+        """Start/stop the installed helper now (autostart stays as it is)."""
+        ctx = self.service_ctx()
+        try:
+            if run:
+                if self.helper: self.helper_stop()
+                service.start_now(ctx)
+                service.wait_running(ctx, self.service_state()['port'], 8.0)
+            else:
+                service.stop_running(ctx)
+        except service.ServiceError as e:
+            raise StepError(e.code)
+
     def helper_start(self):
         if not self.helper_store: raise StepError('no_helper')
+        if self.service_state().get('background'): raise StepError('helper_background')
         self.helper = helpermod.Helper(self.helper_store, 'plexneo-helper-' + self.client_id[-12:], fetch=self.helper_fetch)
         self.helper.update_on = '/update/app.js' in self.update.files
+        if self.helper_remember: self.helper.store_path = self.helper_file
         if self.helper_store.allow: self.update.allow = set([self.helper_store.allow])
         self.update.api = self.helper
         try: self.update.start()
@@ -395,5 +459,7 @@ class Wizard(object):
             'helper': {'configured': bool(self.helper_store), 'wanted': self.helper_wanted, 'remember': self.helper_remember,
                        'address': self.helper_address, 'running': bool(self.update.running and self.update.api),
                        'port': self.update.port, 'profiles': self.helper_store.summary() if self.helper_store else [],
-                       'skipped': self.helper_skipped, 'events': ev(self.update) if self.update.api else []},
+                       'skipped': self.helper_skipped, 'events': ev(self.update) if self.update.api else [],
+                       'service': self.service_state(), 'report': self.service_report},
+            'ext': ext.state(self),
         }

@@ -1,6 +1,8 @@
-/* N.ui.icon – Sprite-Spalten (Reihenfolge aus tools/make_assets.js / src/assets/icons.json) */
+/* N.ui.icon – Sprite-Spalten (Quelle: design/icons/<name>.svg, Reihenfolge design/icons/order.json; Sprite: tools/make_assets.js) */
 (function (N) {
+  /* gen:icons – Spalte je Symbol aus design/icons/order.json (tools/design_doc.js --write); nicht von Hand aendern */
   var COLS = { search: 0, home: 1, film: 2, tv: 3, star: 4, globe: 5, gear: 6, lock: 7, confirm: 8, ret: 9, backspace: 10, info: 11, person: 12, tick: 13, play: 14, pause: 15, next: 16, chapters: 17, audio: 18, more: 19, moon: 20, prev: 21, shuffle: 22, repeat: 23, repeat1: 24, note: 25, book: 26, compass: 27 };
+  /* /gen:icons */
   N.ui.ICONS = COLS;
   /* Icon-Element (32x32) erzeugen; state: 's1' (text-2), 's2' (text-1), 's3' (on-accent) oder '' (text-3, bzw. per Klasse am Elternteil) */
   N.ui.icon = function (parent, name, state, css) {

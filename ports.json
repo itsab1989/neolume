@@ -1,0 +1,22 @@
+{
+  "$schema": "./ports.schema.json",
+  "ports": [
+    {
+      "name": "Neolume (reference implementation)",
+      "reference": true,
+      "brand": "Samsung",
+      "models": "2014 H/HU series with Smart Hub (Orsay), tested on UE48H8000",
+      "os": "Orsay Smart Hub (2014)",
+      "url": "https://github.com/itsab1989/neolume",
+      "maintainer": "itsab1989",
+      "licence": "MIT",
+      "lastVerified": "2026-10-28",
+      "features": {
+        "A1": "done", "A2": "done", "A3": "done", "A4": "done", "A5": "done", "A6": "done", "A7": "done", "A8": "done",
+        "A9": "done", "A10": "done", "A11": "done", "A12": "done", "A13": "done", "A14": "done", "A15": "done", "A16": "done",
+        "A17": "done", "A18": "done", "A19": "partial"
+      },
+      "notes": "The app this spec is written from. Accessibility: no screen-reader support on the 2014 TV (SPEC A19)."
+    }
+  ]
+}

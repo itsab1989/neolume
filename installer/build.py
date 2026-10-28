@@ -74,18 +74,41 @@ def stamp_version(v):
     print('version %s' % v)
 
 
+BINARY_EXT = ('.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.bmp', '.woff', '.woff2', '.ttf', '.otf', '.mp3', '.mp4', '.zip')
+_NOT_PRIVATE = ('localhost', '127.0.0.1', '0.0.0.0')
+
+
+def _hosts(v):
+    """Bare host/IP parts of a local.json value ("http://192.0.2.10:32400" -> "192.0.2.10", "192.0.2.11:8099" -> "192.0.2.11")."""
+    out = set(re.findall(r'(?<![0-9.])(?:\d{1,3}\.){3}\d{1,3}(?![0-9])', v))
+    m = re.match(r'^(?:[a-z][a-z0-9+.-]*://)?(?:[^@/]*@)?([A-Za-z0-9.-]+)(?::\d+)?(?:/|$)', v)
+    if m and '.' in m.group(1): out.add(m.group(1))
+    return set(h for h in out if h.lower() not in _NOT_PRIVATE and len(h) >= 7)
+
+
 def local_values_in(blobs, root=None):
-    """Keys of local.json whose values (home network addresses) occur in the given build outputs. tools/build.js bakes
-    local.json into app.js; a release payload built on a developer machine would ship them (pentest: privacy)."""
+    """Keys of local.json whose values (home network addresses) occur in the given build outputs: the whole value and its
+    bare host/IP part (an IP only as a whole number, so 192.0.2.1 does not match inside 192.0.2.10). tools/build.js bakes
+    local.json into app.js; a release payload built on a developer machine would ship them (pentest: privacy). Example
+    addresses in texts (e.g. 192.168.1.20) are fine as long as they are not in local.json."""
     try:
         with open(os.path.join(root or ROOT, 'local.json'), encoding='utf-8') as f: loc = json.load(f)
     except (OSError, ValueError):
         return []
-    vals = []
+    hits = set()
     for k, v in (loc.items() if isinstance(loc, dict) else []):
         for x in (v if isinstance(v, list) else [v]):
-            if isinstance(x, str) and len(x) >= 7: vals.append((k, x.encode('utf-8')))
-    return sorted(set(k for k, x in vals if any(x in b for b in blobs)))
+            if not isinstance(x, str): continue
+            pats = [re.escape(x.encode('utf-8'))] if len(x) >= 7 and x not in _hosts(x) else []   # bare IP: boundaries below
+            pats += [b'(?<![0-9A-Za-z.-])' + re.escape(h.encode('utf-8')) + b'(?![0-9A-Za-z-]|\\.[0-9A-Za-z])' for h in _hosts(x)]
+            if any(re.search(pt, b) for pt in pats for b in blobs): hits.add(k)
+    return sorted(hits)
+
+
+def payload_texts(entries):
+    """All text files of a payload (everything except known image/font/media files, e.g. also widget.info and config.xml) –
+    every one of them is checked for local.json values."""
+    return [d for n, d in entries if not n.lower().endswith(BINARY_EXT)]
 
 
 def build_payload():
@@ -104,13 +127,13 @@ def build_payload():
     data = buf.getvalue()
     for n, d in entries:                     # never ship development hosts or local network values
         if n == 'boot.js' and b"DEV_HOST = ''" not in d: sys.exit('boot.js still has a DEV_HOST')
-    leak = local_values_in([d for n, d in entries if n == 'app.js'])
-    if leak: sys.exit('app.js contains values from local.json (%s) - build without local.json for a release' % ', '.join(leak))
+    leak = local_values_in(payload_texts(entries))
+    if leak: sys.exit('the payload contains values from local.json (%s) - build without local.json for a release' % ', '.join(leak))
     for old in ('PlexNeo.zip',):                # older payload name: never ship two apps
         if os.path.exists(os.path.join(PAYLOAD_DIR, old)): os.remove(os.path.join(PAYLOAD_DIR, old))
     with open(PAYLOAD, 'wb') as f: f.write(data)
     with open(PAYLOAD_BRAND, 'w', encoding='utf-8') as f:
-        json.dump({k: brand.CURRENT[k] for k in ('id', 'name', 'widgetId', 'slug', 'repo', 'accent', 'softLight', 'softDark', 'description', 'icons', 'defaultIcon')}, f, indent=1)
+        json.dump({k: brand.CURRENT[k] for k in ('id',) + brand.KEYS}, f, indent=1)
     print('brand %s (%s, package %s)' % (brand.CURRENT['id'], brand.name(), brand.package_name()))
     print('payload %s (%d KB, app %s)' % (os.path.relpath(PAYLOAD, ROOT), len(data) // 1024, package.app_version(entries)))
 
@@ -118,6 +141,13 @@ def build_payload():
 def _need_payload():
     if not os.path.isfile(PAYLOAD) or not os.path.isfile(PAYLOAD_BRAND):
         sys.exit('payload missing: run "python3 installer/build.py payload" first')
+    # stale payload (built for another brand profile or before a brand change, e.g. new "features") -> the setup program and
+    # helper would run without the edition's extensions (seen 28.10.: helper without the routes of an optional extension)
+    from neosetup import brand
+    with open(PAYLOAD_BRAND, encoding='utf-8') as f: pb = json.load(f)
+    want = {k: brand.CURRENT[k] for k in ('id',) + brand.KEYS}
+    if pb != json.loads(json.dumps(want)):
+        sys.exit('payload is stale (built for another brand profile): run "python3 installer/build.py payload" first')
 
 
 def build_pyz(out):
@@ -136,6 +166,23 @@ def build_pyz(out):
     return dst
 
 
+def win_version_info(b, version):
+    """PyInstaller --version-file. Checked on Windows 11 25H2 (German): Task Manager -> Startup apps and Settings -> Apps
+    -> Startup list the helper's Startup shortcut by the FileDescription of the program it starts ("<Name> Setup & Helper",
+    not the shortcut's name) with CompanyName as the publisher; the firewall prompt and the Processes tab show the
+    FileDescription too. ProductName/InternalName/OriginalFilename only appear in the file's properties. One name for both
+    roles, because the windowed helper copy (service.helper_program) is the same file with the same resource."""
+    nums = [int(x) for x in re.findall(r'\d+', version)[:4]] + [0, 0, 0, 0]
+    t = tuple(nums[:4])
+    desc = '%s Setup & Helper' % b['name']
+    sv = lambda k, v: 'StringStruct(%r, %r)' % (k, v)
+    return ('VSVersionInfo(ffi=FixedFileInfo(filevers=%r, prodvers=%r, mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, '
+            'subtype=0x0, date=(0, 0)), kids=[StringFileInfo([StringTable(%r, [%s])]), VarFileInfo([VarStruct(%r, [1033, 1200])])])\n') % (
+        t, t, '040904B0', ', '.join([sv('CompanyName', b['name']), sv('FileDescription', desc), sv('FileVersion', version),
+                                     sv('InternalName', name()), sv('OriginalFilename', name('.exe')), sv('ProductName', b['name']),
+                                     sv('ProductVersion', version)]), 'Translation')
+
+
 def build_exe(out):
     _need_payload()
     tgt = target()
@@ -147,8 +194,23 @@ def build_exe(out):
             '--add-data', '%s%sneosetup' % (os.path.join(PKG, 'ui.html'), sep),
             '--add-data', '%s%sneosetup/payload' % (PAYLOAD, sep),
             '--add-data', '%s%sneosetup/payload' % (PAYLOAD_BRAND, sep),
-            '--hidden-import', 'neosetup.helper', '--paths', HERE,
+            '--hidden-import', 'neosetup.helper', '--hidden-import', 'neosetup.service', '--hidden-import', 'neosetup.background',
+            '--hidden-import', 'neosetup.tray', '--hidden-import', 'ctypes.wintypes', '--paths', HERE,
             os.path.join(HERE, 'plexneo_setup.py')]
+    ext_dir = os.path.join(PKG, 'private')
+    if os.path.isdir(ext_dir):           # optional extensions of an edition (neosetup/ext.py); the public tree has none
+        args[-1:-1] = ['--add-data', '%s%sneosetup/private' % (ext_dir, sep), '--collect-submodules', 'neosetup.private']
+    if sys.platform == 'win32':
+        from neosetup import brand
+        with open(os.path.join(PKG, '__init__.py'), encoding='utf-8') as f:     # read again: stamp_version may have changed it
+            version = re.search(r"VERSION = '([^']*)'", f.read()).group(1)
+        vf = os.path.join(work, 'version.txt')
+        with open(vf, 'w', encoding='utf-8') as f: f.write(win_version_info(brand.CURRENT, version))
+        ico = os.path.join(work, 'app.ico')        # the helper's app icon: Startup apps, firewall prompt, Explorer
+        from neosetup import tray
+        rgb = tuple(int(brand.CURRENT['accent'][i:i + 2], 16) for i in (1, 3, 5))
+        with open(ico, 'wb') as f: f.write(tray.ico(rgb, (16, 20, 24, 32, 40, 48, 64, 256), tray.app_icon_pixels))
+        args[-1:-1] = ['--version-file', vf, '--icon', ico]
     print(' '.join(args)); sys.stdout.flush()
     subprocess.check_call(args)
     os.makedirs(out, exist_ok=True)

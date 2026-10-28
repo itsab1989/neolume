@@ -74,6 +74,20 @@
       for (i = 0; i < tabX.length; i++) if (tabX[i][0] === o) { ok = true; break; }
       return ok ? o : l;
     },
+    /* Reiter-Fenster mit Ueberlauf-Pfeilen: nur ganz sichtbare Reiter zeigen, angeschnittene ausblenden und stattdessen
+     * am Rand einen Pfeil (hint px breit) – sonst bleibt z. B. nur das "S" von "Staffel 5" stehen (TV-Befund 28.10.).
+     * Ergebnis: o = Strip-Versatz, shift = Platz fuer den linken Pfeil, first/last = ganz sichtbare Reiter. */
+    tabView: function (tabX, f, cur, w, hint) {
+      var n = tabX.length, i;
+      if (!n) return { o: 0, shift: 0, first: 0, last: -1, left: false, right: false };
+      if (tabX[n - 1][0] + tabX[n - 1][1] <= w) return { o: 0, shift: 0, first: 0, last: n - 1, left: false, right: false };
+      var o = this.tabOffset(tabX, f, cur, w - 2 * hint), shift = o > 0 ? hint : 0, first = 0, last = -1;
+      for (i = 0; i < n; i++) if (tabX[i][0] >= o) { first = i; break; }
+      var end = o + w - shift;
+      for (i = first; i < n; i++) if (tabX[i][0] + tabX[i][1] <= end) last = i;
+      if (last < n - 1) { end -= hint; last = first - 1; for (i = first; i < n; i++) if (tabX[i][0] + tabX[i][1] <= end) last = i; }
+      return { o: o, shift: shift, first: first, last: last, left: first > 0, right: last < n - 1 };
+    },
     tabLabel: function (s) { return s.index === 0 ? N.t('det.tab.specials') : N.t('det.tab.season', { n: s.index }); },
     /* Folgen-Fokus: Wunsch (Folgen-index) > angefangene > erste ungesehene > erste */
     pickEpisode: function (eps, wish) {
@@ -94,6 +108,7 @@
     },
     /* Beschriftung der Folgenkarte (SPEC 7.7): "F5 · Tote Magier" / "24 Min. · noch 9 Min." bzw. "· Gesehen" */
     epCaption: function (ep) {
+      if (ep && ep.cap) return ep.cap;                 // fertige Beschriftung (Erweiterungen, z. B. Karte ohne Datei)
       if (!ep || ep.ph) return ['', ''];
       var l2 = [];
       if (ep.dur) l2.push(F.dur(ep.dur));
@@ -191,6 +206,15 @@
       var out = [];
       for (var i = 0; i < eps.length; i++) if (eps[i] && !eps[i].ph) out.push({ index: eps[i].e, vc: eps[i].vc, off: eps[i].off, dur: eps[i].dur });
       return out;
+    },
+    /* Eingabe des Staffelstreifens: nur Folgen auf dem Server. Karten fehlender Folgen (Erweiterung, .miss) zaehlen weder als
+     * geladen noch zur Gesamtzahl (TV-Befund 28.10.: sonst nie "vollstaendig" -> Balken "Folge 1 von 12" statt der Felder).
+     * -> {eps: geladene Folgen fuer layout(), n: Folgen auf dem Server in der Liste, full: alle geladen} */
+    stripSource: function (eps) {
+      var srv = [];
+      for (var i = 0; i < eps.length; i++) if (!eps[i] || !eps[i].miss) srv.push(eps[i]);
+      var loaded = this.stripEps(srv);
+      return { eps: loaded, n: srv.length, full: loaded.length === srv.length && srv.length > 0 };
     }
   };
   N.det = D;

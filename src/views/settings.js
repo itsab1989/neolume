@@ -14,14 +14,14 @@
       var S = st(), c = S.hubCatalog(), hc = S.homeCache(), libs = hc && hc.libs || [];
       return N.homeRows.enabled(S.settings && S.settings.homeRows || null, N.homeRows.avail(libs, c)).length;
     }
-    /* Auswahlzeile: Wert aus den Einstellungen, OK oeffnet das Auswahl-Panel. opts: [wert, text, farbfeld (optional, .sw-<id>)] */
+    /* Auswahlzeile: Wert aus den Einstellungen, OK oeffnet das Auswahl-Panel. opts: [wert, text, farbfeld (optional, .sw-<id>), unterzeile (optional)] */
     function choice(id, opts, label) {
       var S = st();
       function cur() { var v = S.settings ? S.settings[id] : null; for (var i = 0; i < opts.length; i++) if (String(opts[i][0]) === String(v)) return opts[i]; return opts[0]; }
       return { id: id, type: 'list', label: 'set.' + id, desc: 'set.' + id + '.desc', val: function () { return cur()[1]; },
         sw: opts[0][2] ? function () { return cur()[2]; } : null,
         open: function () {
-          var e = []; for (var i = 0; i < opts.length; i++) e.push({ id: String(opts[i][0]), t: opts[i][1], sw: opts[i][2] });
+          var e = []; for (var i = 0; i < opts.length; i++) e.push({ id: String(opts[i][0]), t: opts[i][1], sw: opts[i][2], s: opts[i][3] });
           N.ui.panel.select({ title: N.t('set.' + id), selected: String(cur()[0]), entries: e, onSelect: function (v) {
             for (var j = 0; j < opts.length; j++) if (String(opts[j][0]) === v) S.setSetting(id, opts[j][0]);
             paintAll();
@@ -36,6 +36,8 @@
     function v(key) { return N.t('set.v.' + key); }
     function vals(keys) { var o = []; for (var i = 0; i < keys.length; i++) o.push([keys[i], v(keys[i])]); return o; }
     function secs(list) { var o = []; for (var i = 0; i < list.length; i++) o.push([list[i], N.t('set.v.sec', { n: list[i] })]); return o; }
+    /* zurueck kuerzer als vor (wie Plex/Podcast-Apps): ein zusaetzlicher Wert in derselben Liste statt einer zweiten Zeile */
+    function secBF(v) { var st = N.osd.steps(v, 10); return [[v, N.t('set.v.secBF', { b: st.b, f: st.f })]]; }
     function stills() { var o = []; N.osd.STILL.forEach(function (n) { o.push([n, n ? N.tn('set.v.afterEp', n) : v('off')]); }); return o; }
     function quals() { var o = [], q = N.decision.QUAL; ['20', '12', '8', '4'].forEach(function (k) { o.push([k, N.t('set.v.q', { n: k, r: q[k][1] === '1920x1080' ? '1080p' : '720p' })]); }); return o; }
     function playRows() {
@@ -43,8 +45,8 @@
         toggle('passthrough'), boostRow(), toggle('thumbs'),
         choice('skipIntro', vals(['off', 'button', 'auto'])), choice('skipCredits', vals(['off', 'button', 'auto'])), toggle('autoNext'),
         choice('countdown', secs([5, 8, 10, 15, 20, 30])), choice('stillWatching', stills()), choice('stillTime', hours()), choice('sleepDefault', sleeps()),
-        toggle('lowerOffer'), choice('seekArrows', secs([5, 10, 15, 30])), choice('seekFf', secs([10, 30, 60])),
-        choice('aspect', [['auto', v('auto')], ['orig', v('orig')], ['fill', v('fill')], ['43', v('a43')], ['zoom', v('zoom')]])];
+        toggle('lowerOffer'), choice('seekArrows', secs([5, 10, 15, 30]).concat(secBF('10/30'))), choice('seekFf', secs([10, 30, 60]).concat(secBF('15/30'))),
+        loupeRow(), loupeStyleRow(), choice('aspect', [['auto', v('auto')], ['orig', v('orig')], ['fill', v('fill')], ['43', v('a43')], ['zoom', v('zoom')]])];
     }
     /* ===== P5 Einstellungen & Komfort (SPEC 10.4): Ton & Untertitel, Anime, Oberflaeche, Hilfe & Info ===== */
     function rewinds() { var o = []; N.comfort.REWIND.forEach(function (n) { o.push([n, n ? N.t('set.v.sec', { n: n }) : v('off')]); }); return o; }
@@ -54,6 +56,24 @@
       var r = choice('audioBoost', [[100, v('off')], [150, v('boostS')], [200, v('boostM')], [300, v('boostL')]]);
       r.disabled = function () { var S = st(); return !(S.settings && S.settings.passthrough === false); };
       r.ddesc = 'set.audioBoost.disabled';
+      return r;
+    }
+    /* Feinauswahl am Fortschrittsbalken (SPEC PLAY-30, Standard aus): nur mit Zeiger-Steuerung bedienbar, INFO erklaert Bedienung */
+    function loupeRow() {
+      var r = toggle('ptrLoupe');
+      r.disabled = function () { return st().state.pointer === false; };
+      r.ddesc = 'set.ptrLoupe.off.desc'; r.help = 'help.ptrLoupe';
+      return r;
+    }
+    /* Darstellung der Feinauswahl (SPEC PLAY-31): drei Formen (A Standard, B, D; C entfallen) auf derselben Logik, je mit Unterzeile; gedimmt ohne Zeiger bzw. ohne
+     * Feinauswahl. Filmstreifen ohne Vorschaubilder -> Panel; Jetzt laeuft immer B (INFO erklaert beides) */
+    function loupeStyleRow() {
+      var o = [];
+      N.Loupe.STYLES.forEach(function (k) { var c = 'lp' + k.charAt(0).toUpperCase() + k.slice(1); o.push([k, v(c), null, v(c + '.s')]); });
+      var r = choice('loupeStyle', o);
+      r.disabled = function () { var S = st(); return S.state.pointer === false || !(S.settings && S.settings.ptrLoupe === true); };
+      r.ddesc = function () { return st().state.pointer === false ? 'set.ptrLoupe.off.desc' : 'set.loupeStyle.off.desc'; };
+      r.help = 'help.loupeStyle';
       return r;
     }
     function delays() { var o = []; N.osd.DELAYS.forEach(function (ms) { o.push([ms, N.osd.delayText(ms)]); }); return o; }
@@ -86,11 +106,27 @@
       return choice('accent', o);
     }
     function displayRows(S) {
-      var out = [toggle('backgrounds'), toggle('spoiler'), toggle('clock')];
+      var out = [toggle('backgrounds')].concat(libBgRows(), [toggle('spoiler'), toggle('clock'), clockStyleRow(), hintsRow()]);
       if (!S.isKid()) out = out.concat(discRows());   // P4 Entdecken + Merkliste (Kinderprofile: nicht vorhanden)
       if (!S.isKid()) out.push(choice('screensaver', [[0, v('off')]].concat(N.comfort.SAVER_MIN.slice(1).map(function (n) { return [n, N.t('set.v.min', { n: n })]; }))));
       if (!S.isKid()) out = out.concat(saverRows());
       return out;
+    }
+    /* Uhr auf der Startseite (ui/saver.js, N.comfort.CLOCK_STYLES): vier Stile mit Unterzeile, gedimmt bei "Uhrzeit anzeigen" aus */
+    function clockStyleRow() {
+      var S = st(), o = [];
+      N.comfort.CLOCK_STYLES.forEach(function (k) { var c = 'cs' + k.charAt(0).toUpperCase() + k.slice(1); o.push([k, v(c), null, v(c + '.s')]); });
+      var r = choice('clockStyle', o);
+      r.val = function () { var k = N.comfort.clockStyle(S.settings); return v('cs' + k.charAt(0).toUpperCase() + k.slice(1)); };
+      r.disabled = function () { return !!(S.settings && S.settings.clock === false); };
+      r.ddesc = 'set.clockStyle.off.desc'; r.help = 'help.clockStyle';
+      return r;
+    }
+    /* Tastenhinweise (N.ui.hints): Immer / Nur kurz / Aus; INFO erklaert, wo die Tasten sonst stehen (Tastenbelegung) */
+    function hintsRow() {
+      var r = choice('hints', [['always', v('hAlways'), null, v('hAlways.s')], ['brief', v('hBrief'), null, v('hBrief.s')], ['off', v('hOff'), null, v('hOff.s')]]);
+      r.help = 'help.hints';
+      return r;
     }
     /* Bildschirmschoner (ui/saver.js, core/saverlogic.js): Quelle, Bibliotheken, Ungesehenes, Takt, Uebergang, Einblendung, unscharf.
      * Schoner aus -> alle gedimmt; Bibliotheken/Ungesehenes nur bei Quelle "Bibliotheken". */
@@ -106,8 +142,10 @@
       function opts(list, pre) { var o = []; for (var i = 0; i < list.length; i++) o.push([list[i], v(pre + list[i])]); return o; }
       var fx = dim(choice('saverFx', opts(SL.FX, 'fx_'))), info = dim(choice('saverInfo', opts(SL.INFOS, 'inf_')));
       fx.help = 'help.saverFx'; info.help = 'help.saverInfo';      // INFO: jede Moeglichkeit erklaert (zu lang fuer die Beschreibungszeile)
+      var pics = dim(choice('saverPics', opts(SL.PICS, 'pics_')));   // SAV-5: echte Hintergrundbilder / auch Standbilder / Poster
+      pics.help = 'help.saverPics';
       return [dim(choice('saverSrc', [['libs', v('src_libs')], ['home', v('src_home')]])), dimLib(saverLibsRow()), dimLib(toggle('saverUnwatched')),
-        dim(choice('saverInterval', secs(SL.SEC))), fx, info, dim(toggle('saverBlur'))];   // saverBlur (F21): weich (Standard) oder scharf
+        dim(choice('saverInterval', secs(SL.SEC))), fx, info, dim(toggle('saverBlur')), pics];   // saverBlur (F21): weich (Standard) oder scharf
     }
     /* Mehrfachauswahl der Bibliotheken (Panel mit Haken); keine Auswahl = Standard (alle Film- und Serien-Bibliotheken) */
     function saverLibsRow() {
@@ -128,6 +166,18 @@
           } });
         } };
     }
+    /* Hintergrund in Bibliotheken (N.amb, ui/ambient.js): Modus und Staerke mit Erklaerung je Wert; Staerke gedimmt bei "Aus" */
+    function libBgRows() {
+      var S = st(), A = N.amb;
+      function opt(val, k) { return [val, v(k), null, v(k + '.s')]; }
+      var m = choice('libBg', [opt(A.MODES[0], 'bgOff'), opt(A.MODES[1], 'bgMood'), opt(A.MODES[2], 'bgTitle'), opt(A.MODES[3], 'bgRandom')]);
+      var str = choice('libBgStrength', [opt(A.STRENGTHS[0], 'bgSoft'), opt(A.STRENGTHS[1], 'bgStrong')]);
+      m.val = function () { return v(['bgOff', 'bgMood', 'bgTitle', 'bgRandom'][A.MODES.indexOf(A.mode(S.settings))]); };   // fehlend/unbekannt = Standard
+      str.val = function () { return v(A.strength(S.settings) === 'strong' ? 'bgStrong' : 'bgSoft'); };
+      str.disabled = function () { return A.mode(S.settings) === 'off'; };
+      str.ddesc = 'set.libBgStrength.off.desc';
+      return [m, str];
+    }
     /* P4 (docs/research/discover.md): Entdecken an/aus (Standard: an im Hauptprofil). Merkliste nur mit Helfer; ohne Helfer eine
      * Wertzeile "Nicht eingerichtet", deren Satz erklaert, wie man sie einschaltet – sonst ist die Merkliste nirgends sichtbar. */
     function discRows() {
@@ -142,7 +192,22 @@
       return [d, { id: 'watchlist', type: 'toggle', label: 'set.watchlist', desc: 'set.watchlist.desc',
         get: function () { return D.watchlistOn(); }, set: function (x) { S.setSetting('watchlist', x); },
         disabled: function () { return D.helperState() === 'down' || !D.enabled(); },
-        ddesc: function () { return D.helperState() === 'down' ? 'set.watchlist.down.desc' : 'set.watchlist.off.desc'; } }, ir];
+        ddesc: function () { return D.helperState() === 'down' ? 'set.watchlist.down.desc' : 'set.watchlist.off.desc'; } }, ir].concat(hideRows());
+    }
+    /* "Nur Titel, die du noch nicht hast" (N.insp.hide): wirkt nur auf die plex.tv-Reihen (Helfer) -> nur mit eingetragenem Helfer.
+     * Standard AN (fehlender Wert = an). Mit Weiteren Servern eine zweite Zeile: auch deren Titel ausblenden (Standard an). */
+    function hideRows() {
+      var S = st(), D = N.disc;
+      function on(k) { return !(S.settings && S.settings[k] === false); }
+      function why() { return !D.enabled() ? 'set.inspHideOwn.off.desc' : D.helperState() === 'down' ? 'set.watchlist.down.desc' : 'set.inspHideOwn.nodisc.desc'; }
+      function off() { return !N.insp.helperOn(); }
+      var own = { id: 'inspHideOwn', type: 'toggle', label: 'set.inspHideOwn', desc: 'set.inspHideOwn.desc', help: 'help.inspHideOwn',
+        get: function () { return on('inspHideOwn'); }, set: function (x) { S.setSetting('inspHideOwn', x); }, disabled: off, ddesc: why };
+      if (!N.srv || !N.srv.has()) return [own];
+      return [own, { id: 'inspHideShared', type: 'toggle', label: 'set.inspHideShared', desc: 'set.inspHideShared.desc',
+        get: function () { return on('inspHideShared'); }, set: function (x) { S.setSetting('inspHideShared', x); },
+        disabled: function () { return off() || !on('inspHideOwn'); },
+        ddesc: function () { return off() ? why() : 'set.inspHideShared.off.desc'; } }];
     }
     function inspCount() {
       var S = st(), hc = S.homeCache();
@@ -186,6 +251,9 @@
           } },
         { id: 'ep', type: 'toggle', label: 'set.episodeProgress', desc: 'set.episodeProgress.desc',
           get: function () { return !!(S.settings && S.settings.episodeProgress); }, set: function (v) { S.setSetting('episodeProgress', v); } },
+        // TV-Befund 28.10.: Serien-Balken einzeln abschaltbar (vorher an "Folgen-Fortschritt" gekoppelt)
+        { id: 'sp', type: 'toggle', label: 'set.seriesProgress', desc: 'set.seriesProgress.desc',
+          get: function () { return !!(S.settings && S.settings.seriesProgress); }, set: function (v) { S.setSetting('seriesProgress', v); } },
         choice('libView', [['L', N.t('lib.view.L')], ['M', N.t('lib.view.M')], ['S', N.t('lib.view.S')], ['list', N.t('lib.view.list')]]),   // Bibliotheksansicht (Feedback-Regel 2)
         toggle('themeMusic'),                         // Titelmelodie (SPEC v2.2, M3b: Standard aus)
         choice('themeVol', [[25, N.t('set.v.pct', { n: 25 })], [50, N.t('set.v.pct', { n: 50 })], [75, N.t('set.v.pct', { n: 75 })], [100, N.t('set.v.pct', { n: 100 })]]),
@@ -243,6 +311,7 @@
       ] });
       if (S.isAdmin() && !S.isKid()) acc.push(startRow());   // P5: Startprofil (Nutzer-Feedback-Regel 9), gilt fuer diesen Fernseher
       list.push({ id: 'help', rows: helpRows() });
+      N.ext.call('settings:cats', list, S, paintAll);   // optionale Erweiterungen: eigene Kategorie (core/ext.js)
       return list;
     }
     s.create = function (root) {
@@ -324,14 +393,16 @@
     }
     s.enter = function (params, restore) {
       var rc = restore ? Math.min(restore.c || 0, cats.length - 1) : 0;
+      for (var j = 0; restore && restore.id && j < cats.length; j++) if (cats[j].id === restore.id) rc = j;   // Kategorie wieder finden, auch wenn sich die Liste geaendert hat
       c = rc; for (var i = 0; i < catEls.length; i++) U.cls(catEls[i], 'is-cur', i === c);
       for (i = 0; i < rowEls.length; i++) paintRow(i);
       off = -1; scrollTo(restore && restore.zone === 'row' ? restore.r || 0 : 0);
       if (restore && restore.zone === 'row' && rowsOf()[restore.r]) { zone = 'cat'; focusRow(restore.r); } else { zone = 'cat'; focusCat(c); }
     };
-    s.leave = function () { return { c: c, zone: zone, r: r }; };
+    s.leave = function () { return { c: c, zone: zone, r: r, id: cats[c] ? cats[c].id : '' }; };
     s.railBlur = function () { if (zone === 'cat') U.cls(catEls[c], 'is-focus', false); else U.cls(rowEls[r].el, 'is-focus', false); };
     s.railFocus = function () { if (zone === 'cat') U.cls(catEls[c], 'is-focus', true); else U.cls(rowEls[r].el, 'is-focus', true); };
+    s.toastLow = true;              // Toast unter der Beschreibung (.set-desc), nie darueber (NAV-10)
     s.hints = function () { return [{ k: 'ret', t: 'hint.back' }, { k: 'INFO', t: 'hint.learnMore' }]; };
     s.onKey = function (k) {
       var n;
@@ -345,7 +416,7 @@
       if (k === 'UP' || k === 'DOWN') { n = N.nav.list(r, rowsOf().length, k, true); if (n >= 0) focusRow(n); }
       else if (k === 'LEFT' || k === 'RETURN') focusCat(c);
       else if (k === 'ENTER') activate();
-      else if (k === 'INFO') { var d = rowsOf()[r]; N.ui.panel.help(N.t(d.label), N.t(d.help && !(d.disabled && d.disabled()) ? d.help : descKey(d))); }
+      else if (k === 'INFO') { var d = rowsOf()[r], on = !(d.disabled && d.disabled()); N.ui.panel.help(N.t(d.label), d.info && on ? d.info() : N.t(d.help && on ? d.help : descKey(d))); }   // info(): fertiger Text (z. B. mit Werten)
       return true;
     };
     /* Zeiger: Kategorien und Zeilen per Index-Mathe */

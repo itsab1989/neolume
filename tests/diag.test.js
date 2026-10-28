@@ -9,6 +9,7 @@ test('Schwaerzung: Token, PINs und Codes vor dem Speichern', function () {
   assert.ok(!/SECRET/.test(D.redact('{"authToken":"SECRET","x":1}')));
   assert.ok(!/SECRET/.test(D.redact('{"X-Plex-Token": "SECRET"}')));
   assert.ok(!/SECRET/.test(D.redact('accessToken=SECRET token=SECRET')));
+  assert.ok(!/SECRET/.test(D.redact('{"X-Api-Key":"SECRET"} apikey=SECRET api_key: SECRET X-Neo-Key=SECRET')));   // Schluessel anderer Dienste
   assert.ok(!/4711/.test(D.redact('switch?pin=4711')));
   assert.ok(!/4711/.test(D.redact('{"pin":"4711"}')));
   assert.ok(!/AB12/.test(D.redact('{"id":5,"code":"AB12"}')));
@@ -100,4 +101,11 @@ test('config.json: Hosts werden geprueft (kein Schema, keine Zugangsdaten, keine
   ['', 'http://x', 'a@b:1', 'x:1/?url=y', 'x:1#f', 'a b', 5].forEach(function (h) { assert.ok(!C.validHost(h), String(h)); });
   C.apply({ pms: 'http://u:p@x:1' }); assert.strictEqual(C.pmsFallback, '');
   C.apply({ pms: 'http://192.0.2.20:32400/' }); assert.strictEqual(C.pmsFallback, 'http://192.0.2.20:32400');
+});
+
+test('Schwaerzung: oeffentliche IPv4 aus 192.0.x.x, Doku-/Heimnetz bleiben (Review 1.0.5)', function () {
+  var D = H.load().N.diag;
+  assert.strictEqual(D.redact('GET http://192.0.78.24:32400/identity'), 'GET http://<fern>:32400/identity');
+  assert.strictEqual(D.redact('GET http://203.0.113.7:32400/identity'), 'GET http://<fern>:32400/identity');
+  assert.strictEqual(D.redact('http://192.0.2.5:32499 http://192.168.1.2'), 'http://192.0.2.5:32499 http://192.168.1.2');
 });

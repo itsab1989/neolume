@@ -2,15 +2,18 @@
  * Kosten zur Laufzeit: genau EINE Klasse am <html> (ac-<id>). tools/build.js erzeugt aus jeder CSS-Regel mit @accent@/@pointer@
  * je Palettenfarbe eine Variante ".ac-<id> <selektor>{...}"; die Standardfarbe der Marke (N.brand.accent) bleibt die
  * unbeschriftete Grundregel und braucht keine Klasse. Kein CSS-Text zur Laufzeit, keine Inline-Farben.
- * PALETTE ist die einzige Quelle der Farben (Build, make_assets.js, Tests). Jede Farbe erfuellt (tests/accent.test.js):
+ * Quelle der Farben ist design/tokens.json (Gruppe accent; Build, make_assets.js und Tests lesen dort), PALETTE unten ist daraus
+ * erzeugt (Test prueft Gleichstand). Jede Farbe erfuellt (tests/accent.test.js):
  * dunkle Schrift #141414 darauf >= 4.5:1 (Knopf-Beschriftung, Icons Zeile "on-accent") und sie selbst >= 4.5:1 auf #121316
  * (Akzent als Schriftfarbe, Fokusrahmen). Die Standardfarbe einer Marke kommt aus brand/<id>.json ("accent") und ersetzt den
  * Palettenwert ihrer Farbe (accentId) – so steht die Markenfarbe der privaten Fassung nur in deren Markenprofil. */
 (function (N) {
+  /* gen:palette – erzeugt aus design/tokens.json (Gruppe accent) von tools/design_doc.js --write; nicht von Hand aendern */
   var PALETTE = [
     ['amber', '#F2A93B'], ['coral', '#FF7A5C'], ['rose', '#F78FB3'], ['violet', '#A78BFA'],
     ['blue', '#5AA9FF'], ['teal', '#2EC4B6'], ['green', '#5CCB7A']
   ];
+  /* /gen:palette */
   var RE = /(^|\s)ac-[a-z]+/g, cur = null;
   var A = {
     PALETTE: PALETTE,

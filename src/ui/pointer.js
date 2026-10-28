@@ -119,6 +119,10 @@
     if (P.locked(x, y)) { edgeCheck(scrollOwner()); return; }   // gesperrt: kein Hover-Fokus, Randzone aber weiter (Wiedereintritt)
     if (Math.abs(x - P.rx) + Math.abs(y - P.ry) < JITTER) return;   // Zittern des Luftmaus-Punkts
     P.rx = x; P.ry = y;
+    // Runde 5: ein Zeiger-Schritt zaehlt fuer die Ruhe wie eine Taste (N.idle: Nacharbeit, Bildlader, Speichern, Hero/Hintergrund
+    // warten auf Ruhe). Bisher nur der Klick -> waehrend der Feinauswahl (40-ms-Schritte) liefen Idle-Arbeit und Bild-Zuweisungen
+    // zwischen den Schritten (Messlauf loupe: 2–7 Frames > 50 ms). Zittern unter JITTER zaehlt nicht (Finger ruht).
+    if (N.idle) N.idle.touch();
     var t = scrollOwner(), before = sig(t);
     N.fx.step(true);                                 // Zeiger: Ring/Karten springen ohne Gleiten
     route(x, y, 'move', null);

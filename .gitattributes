@@ -1,0 +1,12 @@
+# LF line ends in every checkout (also Windows with core.autocrlf): the generated parts of the docs are compared with
+# the code byte for byte by npm test / CI, and the TV and the setup program expect LF files.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.zip binary
+*.wgt binary
+*.woff2 binary
+*.ttf binary

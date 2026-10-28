@@ -187,6 +187,19 @@ test('Ton-/UT-Sprache ohne eigene Wahl folgen der Oberflaeche; gespeichert wird 
   N.i18n.set('de');
 });
 
+test('Feinauswahl: gespeicherte Darstellung "Feinleiste" (C, entfallen) wird zu A (Standard Panel), andere Wahl bleibt', function () {
+  var files = { 'settings-a.json': { loupeStyle: 'bar', thumbs: false }, 'settings-b.json': { loupeStyle: 'film' } };
+  N.store.get = function (f) { return files[f] || null; }; N.store.set = function (f, v) { files[f] = v; };
+  N.session.state = { profiles: {}, server: { uri: 'http://192.0.2.1:32400' } };
+  N.session.activate({ uuid: 'a', kind: 'main' }, 'T');
+  assert.strictEqual(N.session.settings.loupeStyle, 'panel');
+  assert.deepStrictEqual(files['settings-a.json'], { thumbs: false });    // dauerhaft entfernt -> folgt dem Standard
+  N.session.activate({ uuid: 'b', kind: 'main' }, 'T');
+  assert.strictEqual(N.session.settings.loupeStyle, 'film');
+  N.session.activate({ uuid: 'c', kind: 'main' }, 'T');
+  assert.strictEqual(N.session.settings.loupeStyle, 'panel');
+});
+
 test('HLS-Wartezeit vor InitPlayer: Standard 300 ms, per config.json einstellbar', function () {
   assert.strictEqual(N.config.hls.wait, 300);
   N.config.apply({ hlsWait: 1000 }); assert.strictEqual(N.config.hls.wait, 1000);

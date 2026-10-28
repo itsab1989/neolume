@@ -237,7 +237,11 @@ test('Merkliste mit Helfer: Erkennung /neo-helper, Kopfzeilen ohne Token, aus be
     var h = seen[seen.length - 1].headers;
     H.eq([h['X-Neo-Profile'], h['X-Neo-Key']], ['a', 'k0123456789abcdefXYZ']);
     assert.ok(!('X-Plex-Token' in h), 'nie ein Plex-Token an den Helfer');
+    var evs = [], onEv = function (e) { evs.push([e.it.guid, e.on]); };
+    N.evt.on('watchlist:changed', onEv);
     D.wl.set({ guid: G1 }, false, function () {});
+    N.evt.off('watchlist:changed', onEv);
+    H.eq(evs, [[G1, false]]);                             // Entdecken passt die Merkliste-Reihe ohne Anfrage an
     var last = seen[seen.length - 1];
     H.eq([last.method, last.url], ['DELETE', 'http://192.0.2.5:32499/watchlist/5eb8f25e3f398b00402fbe55']);
     assert.ok(!D.wl.has({ guid: G1 }));
@@ -251,6 +255,16 @@ test('Merkliste mit Helfer: Erkennung /neo-helper, Kopfzeilen ohne Token, aus be
   } finally { N.http.request = req; N.session.pkg = pkg; D._resetHelper(); }
 });
 
+test('Merkliste-Reihe nach Aenderung auf einer Detailseite: hinzugefuegt vorne, entfernt raus, ohne Anfrage', function () {
+  var a = { guid: G1, title: 'A', ext: true, wl: true }, b = { guid: G2, title: 'B', rk: '7' };
+  H.eq(D.wl.apply([a, b], { guid: G2 }, false).map(function (x) { return x.title; }), ['A']);
+  var r = D.wl.apply([a, b], { guid: G3, title: 'C', ext: true }, true);
+  H.eq(r.map(function (x) { return [x.title, !!x.wl]; }), [['C', true], ['A', true], ['B', false]]);
+  H.eq(D.wl.apply([a], { guid: G1, title: 'A2', ext: true }, true).map(function (x) { return x.title; }), ['A2'], 'nie doppelt');
+  H.eq(D.wl.apply(null, { guid: G1, title: 'A' }, true).length, 1, 'erste Merkliste-Reihe');
+  H.eq(D.wl.apply([a], { guid: 'bad' }, false).length, 1, 'ungueltige GUID: unveraendert');
+  var src = [a, b]; D.wl.apply(src, { guid: G1 }, false); H.eq(src.length, 2, 'alte Liste bleibt unveraendert');
+});
 test('setup.json "helper": nur http:// + private IPv4, Schluessel optional; config.json helperUrl gleich streng', function () {
   function cfg(helper) {
     var d = { kind: 'plexneo-setup', schema: 1, server: { machineIdentifier: 'abcdef123456', uris: ['http://172.16.5.2:32400'] },

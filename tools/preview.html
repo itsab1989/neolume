@@ -5,7 +5,7 @@
      Parameter: ?keys=DOWN,RIGHT,ENTER (automatische Tastenfolge, 400 ms Abstand, Start nach &wait=ms)
                 &seed=<URL einer JS-Datei, die window.PN_SEED = {'state.json': '…'} (und optional window.PN_SETUP = setup.json-Text) setzt> (lokal, nie einchecken)
                 &src=dev (ctx.source, schaltet Dev-Funktionen ein)  &min=1 (app.min.js = Release-Build statt app.js)  &clear=1 (Speicher leeren)  &hold=ms (Screenshot-Hilfe)
-                &moves=x:y,click@x:y (Zeiger)  &gap=ms (Tastenabstand)
+                &moves=x:y,click@x:y (Zeiger)  &gap=ms (Tastenabstand)  &probe=<URL> (Layout-Pruefung vor dem Screenshot, tools/layout_probe.js)
                 &bench=all|home,lib,leak:20 (P7-Messlauf, braucht &src=dev)  &logurl=<URL> (Protokollzeilen per POST, tools/bench.js) -->
 <html>
 <head>
@@ -18,7 +18,9 @@
     window.PN_Q = q;
     if (q.seed) document.write('<script src="' + q.seed.replace(/"/g, '') + '"><\/script>');
     // &hold=ms: haelt das load-Ereignis auf (fuer Kopflos-Screenshots); braucht einen lokalen Sleep-Server auf :8765
-    if (q.hold) document.write('<img style="display:none" src="' + (q.holdurl || 'http://127.0.0.1:8765/sleep').replace(/"/g, '') + '?ms=' + Number(q.hold) + '">');
+    // &probe=<URL>: Layout-Pruefung (tools/layout_probe.js) direkt vor dem Screenshot, Ergebnis per POST an die URL
+    if (q.probe) document.write('<script src="layout_probe.js"><\/script>');
+    if (q.hold) document.write('<img style="display:none"' + (q.probe ? ' onload="window.PN_PROBE&amp;&amp;PN_PROBE()"' : '') + ' src="' + (q.holdurl || 'http://127.0.0.1:8765/sleep').replace(/"/g, '') + '?ms=' + Number(q.hold) + '">');
   })();
 </script>
 </head>
@@ -48,7 +50,7 @@
     // setup.json (PMS-only, P2): der Seed kann window.PN_SETUP = '<JSON-Text>' setzen; ohne -> wie Entwicklungs-Paket ohne setup.json
     App.start({ source: (q.src || 'vorschau') + ' 0ms', log: log, store: store, widgetAPI: { sendReturnEvent: function () { log('EXIT'); } },
       setupText: window.PN_SETUP !== undefined ? window.PN_SETUP : null });
-    var CODES = { UP: 29460, DOWN: 29461, LEFT: 4, RIGHT: 5, ENTER: 29443, RETURN: 88, RED: 108, GREEN: 20, YELLOW: 21, BLUE: 22, INFO: 31, TOOLS: 75, PLAY: 71, PAUSE: 74, STOP: 70, FF: 72, RW: 69, SUBTITLE: 652,
+    var CODES = { UP: 29460, DOWN: 29461, LEFT: 4, RIGHT: 5, ENTER: 29443, RETURN: 88, RED: 108, GREEN: 20, YELLOW: 21, BLUE: 22, INFO: 31, TOOLS: 75, PLAY: 71, PAUSE: 74, STOP: 70, FF: 72, RW: 69, SUBTITLE: 652, CH_UP: 68, CH_DOWN: 65,
       '0': 17, '1': 101, '2': 98, '3': 6, '4': 8, '5': 9, '6': 10, '7': 12, '8': 13, '9': 14 };
     var KB = { ArrowUp: 'UP', ArrowDown: 'DOWN', ArrowLeft: 'LEFT', ArrowRight: 'RIGHT', Enter: 'ENTER', Backspace: 'RETURN', Escape: 'RETURN',
       r: 'RED', g: 'GREEN', y: 'YELLOW', b: 'BLUE', i: 'INFO', t: 'TOOLS', p: 'PLAY', ' ': 'PAUSE', s: 'STOP', f: 'FF', w: 'RW', u: 'SUBTITLE' };

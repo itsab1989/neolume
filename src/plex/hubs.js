@@ -134,6 +134,21 @@
       }
       return true;
     },
+    /* TV-Test 28.10.: direkt nach dem Stoppen fehlt der gerade gespielte Titel manchmal in der Antwort von Weiterschauen (die
+     * Timeline "stopped" ist beim PMS noch nicht verarbeitet), kurz danach steht er dort an erster Stelle. true = die Antwort
+     * ist noch zu frueh: Weiterschauen (bzw. ohne sie Naechste Folgen) ist eingeschaltet, enthaelt den Titel rk aber nicht.
+     * ids: eingeschaltete Reihen (H.order) */
+    stale: function (rows, rk, ids) {
+      var want = [], i, j;
+      if (!rk) return false;
+      if (ids.indexOf('cw') >= 0) want.push('cw'); else if (ids.indexOf('deck') >= 0) want.push('deck');
+      if (!want.length) return false;
+      for (i = 0; rows && i < rows.length; i++) {
+        if (want.indexOf(rows[i].id) < 0) continue;
+        for (j = 0; j < rows[i].items.length; j++) if (rows[i].items[j].rk === rk) return false;
+      }
+      return true;
+    },
     sameLayout: function (a, b) {
       if (!a || !b || a.length !== b.length) return false;
       for (var i = 0; i < a.length; i++) if (a[i].id !== b[i].id) return false;

@@ -118,7 +118,7 @@
       var tx = srv ? N.srv.errText(srv, err) : k === 'server' ? { title: N.t('err.server.title'), text: N.t('lib.err.text', { server: N.session.state.server && N.session.state.server.name || '' }) } : N.errs.texts('generic', null, N.session.isKid());
       U.vis(pg, false); hero.vis(false);
       sb.show({ title: tx.title, text: tx.text, buttons: [{ id: 'retry', t: N.t('err.btn.retry') }, { id: 'back', t: N.t('err.btn.back') }],
-        onSelect: function (id) { if (id === 'back') { N.router.back(); return; } sb.hide(); U.vis(pg, true); hero.vis(true); zone = 'btn'; load(); } });
+        onSelect: function (id) { if (id === 'back') { N.router.back(); return; } sb.hide(); U.vis(pg, true); hero.vis(true); to('btn'); load(); } });   // to: Kopf/Knoepfe wieder sichtbar (Review 1.0.5)
       zone = 'state';
     }
     function paint() {
@@ -208,7 +208,8 @@
       pop.clear(); hero.destroy();
     };
     s.railBlur = function () { leave(); };
-    s.railFocus = function () { var z = zone; zone = ''; if (z === 'btn') { zone = 'btn'; U.cls(btns[bf], 'is-focus', true); } else to(z); };
+    s.railFocus = function () { var z = zone; if (z === 'state') return; zone = '';   // Fehlermeldung bleibt fokussiert (Review 1.0.5)
+      if (z === 'btn') { zone = 'btn'; U.cls(btns[bf], 'is-focus', true); } else to(z); };
     s.onKey = function (k) {
       if (k === 'BLUE') { N.router.push('search'); return true; }
       if (zone === 'state') { if (sb.onKey(k)) return true; return k !== 'RETURN'; }

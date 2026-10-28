@@ -24,6 +24,13 @@ UPDATE_PORT = 32499          # shared with the optional helper (neosetup/helper.
 _HOST_OK = re.compile(r'(\d{1,3}(?:\.\d{1,3}){3}|localhost|\[[0-9A-Fa-f:.]+\])(?::\d{1,5})?')
 
 
+class Raw(object):
+    """Answer of a helper route that is not JSON (e.g. a small page of an edition extension): bytes, content type and extra
+    headers (Content-Security-Policy etc.). Built-in routes always answer JSON."""
+    def __init__(self, data, ctype, headers=None):
+        self.data, self.ctype, self.headers = data, ctype, list(headers or [])
+
+
 def host_ok(host):
     """Host header absent (HTTP/1.0) or an IP literal/localhost with optional port."""
     return host is None or bool(_HOST_OK.fullmatch(host.strip()))
@@ -47,15 +54,19 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if not api: return False
         try: n = int(self.headers.get('Content-Length') or 0)
         except ValueError: n = -1
-        if n < 0 or n > 1024:
+        limit = api.body_limit(method, self.path) if hasattr(api, 'body_limit') else 1024   # extension routes may take a JSON body
+        if n < 0 or n > limit:
             self.send_error(413); return True
-        if n: self.rfile.read(n)                 # requests carry no body; drain a tiny one
-        res = api.handle(method, self.path, self.headers, self.client_address[0])
+        body = self.rfile.read(n) if n else b''  # built-in routes carry no body (a tiny one is drained)
+        res = api.handle(method, self.path, self.headers, self.client_address[0], body) if limit > 1024 else \
+            api.handle(method, self.path, self.headers, self.client_address[0])
         if res is None: return False
         status, obj = res
-        body = json.dumps(obj, ensure_ascii=False).encode('utf-8')
+        raw = obj if isinstance(obj, Raw) else None
+        body = raw.data if raw else json.dumps(obj, ensure_ascii=False).encode('utf-8')
         self.send_response(status)
-        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Content-Type', raw.ctype if raw else 'application/json; charset=utf-8')
+        for k, v in (raw.headers if raw else []): self.send_header(k, v)
         self.send_header('Content-Length', str(len(body)))
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
@@ -88,7 +99,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
 def _deny(self):
     self.send_error(405)
-for _m in ('POST', 'PATCH', 'OPTIONS', 'CONNECT', 'TRACE'):
+for _m in ('PATCH', 'OPTIONS', 'CONNECT', 'TRACE'):
     setattr(_Handler, 'do_' + _m, _deny)
 
 
@@ -96,6 +107,7 @@ def _write(method):
     def do(self):                              # PUT/DELETE only for helper routes (watchlist add/remove)
         if not self._api(method): self.send_error(405)
     return do
+_Handler.do_POST = _write('POST')               # only routes of optional extensions (helper ext_routes) accept POST
 _Handler.do_PUT = _write('PUT')
 _Handler.do_DELETE = _write('DELETE')
 
@@ -132,7 +144,11 @@ class LanServer(object):
         """LAN filter + TV lock. With a lock path (sync server) every other file - the packages with the profile tokens -
         is served only to the device that fetched the lock path first (pentest P2: before, any LAN device could download
         PlexNeo.zip directly while the server waited for the TV)."""
-        if not lan_client_ok(addr, self.allow or None): return False
+        if not lan_client_ok(addr, self.allow or None):
+            # a route of an optional extension may be open to every home-network client for a short time (e.g. a phone page
+            # while a pairing code is shown on the TV); never public addresses
+            opener = getattr(self.api, 'open_path', None) if self.api is not None else None
+            return bool(path and opener and opener(path) and lan_client_ok(addr, None))
         loop = addr.startswith('127.') or addr == '::1'
         if self.locked_to and addr != self.locked_to and not loop: return False
         if self.lock_path and path is not None and path != self.lock_path and not loop and addr != self.locked_to: return False

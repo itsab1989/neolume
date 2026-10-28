@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Build a Plex Media Server client for your TV with an AI agent – Neolume</title>
+<meta name="description" content="Have a TV Neolume doesn't run on? Paste one prompt into an AI coding agent and it builds the app for your TV – webOS, Tizen, Android TV and more – from Neolume's open specification.">
+<link rel="canonical" href="https://itsab1989.github.io/neolume/port.html">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0E0F11">
+<link rel="icon" type="image/svg+xml" href="assets/icon.svg">
+<link rel="icon" type="image/png" href="assets/icon-256.png">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Neolume">
+<meta property="og:title" content="Build Neolume for your TV with an AI coding agent">
+<meta property="og:description" content="One prompt, an AI coding agent and your TV in developer mode: the agent rebuilds Neolume – an unofficial Plex Media Server client – for your TV from an open, tested specification.">
+<meta property="og:url" content="https://itsab1989.github.io/neolume/port.html">
+<meta property="og:image" content="https://itsab1989.github.io/neolume/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Neolume – a modern client for Plex Media Server">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Build Neolume for your TV with an AI coding agent">
+<meta name="twitter:description" content="An open specification, a step-by-step playbook and an acceptance test plan let an AI coding agent rebuild Neolume for your TV.">
+<meta name="twitter:image" content="https://itsab1989.github.io/neolume/assets/og-image.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "Build a Plex Media Server client for your TV with an AI coding agent",
+  "description": "How an AI coding agent rebuilds Neolume, an unofficial client for Plex Media Server, for another TV platform from its open product specification, porting playbook and acceptance test plan.",
+  "url": "https://itsab1989.github.io/neolume/port.html",
+  "image": "https://itsab1989.github.io/neolume/assets/og-image.png",
+  "inLanguage": "en",
+  "isAccessibleForFree": true,
+  "author": {"@type": "Person", "name": "itsab1989", "url": "https://github.com/itsab1989"},
+  "about": {"@type": "SoftwareApplication", "name": "Neolume", "url": "https://itsab1989.github.io/neolume/"}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Neolume", "item": "https://itsab1989.github.io/neolume/"},
+    {"@type": "ListItem", "position": 2, "name": "Build it for your TV", "item": "https://itsab1989.github.io/neolume/port.html"}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "Can I download a ready-made Neolume for my LG, Android TV or newer Samsung TV here?",
+     "acceptedAnswer": {"@type": "Answer", "text": "No. Neolume itself runs only on 2014 Samsung TVs. For other TVs an AI coding agent builds the app for you; apps that others built are listed as community ports. Most newer TVs also have the official Plex app in their app store."}},
+    {"@type": "Question", "name": "Do I need to be able to program?",
+     "acceptedAnswer": {"@type": "Answer", "text": "No. The agent does the programming. You do the steps on the TV (developer mode, pressing buttons, saying what you see) and approve what the agent wants to install or change."}},
+    {"@type": "Question", "name": "Will the agent ask for my Plex password?",
+     "acceptedAnswer": {"@type": "Answer", "text": "It must not. Sign-in always happens on plex.tv in a browser or on the TV. If an agent asks for a password, token or PIN in the chat, say no."}}
+  ]
+}
+</script>
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="assets/icon.svg" alt="" width="36" height="30">Neo<span>lume</span></a>
+    <nav class="links" aria-label="Main">
+      <a href="./#features">Features</a>
+      <a href="./#tvs">Supported TVs</a>
+      <a href="./#install">Install</a>
+      <a href="./#faq">FAQ</a>
+      <a href="port.html" aria-current="page">Other TVs</a>
+      <a href="https://github.com/itsab1989/neolume/blob/main/docs/README.md">Docs</a>
+      <a href="https://github.com/itsab1989/neolume">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="hero">
+  <div class="wrap">
+    <p class="crumbs"><a href="./">Neolume</a> › Build it for your TV</p>
+    <h1>Build a Plex Media Server client for your TV with an AI agent</h1>
+    <p class="lead">Neolume runs on 2014 Samsung TVs. For any other TV there is <strong>no ready-made app here</strong> – but
+      everything needed to rebuild it is: an open product specification, a step-by-step playbook written for AI coding agents
+      and an acceptance test plan. Paste one prompt into your agent; it does the programming, you do the steps on the TV.</p>
+    <div class="cta">
+      <a class="btn primary" href="#prompt-section">Get the prompt</a>
+      <a class="btn" href="https://github.com/itsab1989/neolume/blob/main/docs/PORTING-WITH-AI.md">Read the playbook</a>
+    </div>
+    <p class="note">Unofficial · Not affiliated with Plex, Inc. or any TV maker · MIT licensed</p>
+  </div>
+</div>
+
+<section id="first">
+  <div class="wrap">
+    <h2>Try the official app first</h2>
+    <p class="lede-note">Most newer TVs – Samsung Tizen, LG webOS, Android TV / Google TV, Fire TV, Apple TV – have the official
+      Plex app in their app store. If it works for you, that is the easiest way. A port is for people who want Neolume's look,
+      features and privacy rules on their TV (no ads, no telemetry, in daily use only your own server), or whose TV has no
+      working Plex app.</p>
+  </div>
+</section>
+
+<section id="need">
+  <div class="wrap">
+    <h2>What you need</h2>
+    <div class="grid">
+      <div class="card"><h3>An AI coding agent</h3><p>One that may use a folder and a terminal on your computer – not just a chat window. It writes the code, runs the tests and installs the app on your TV.</p></div>
+      <div class="card"><h3>Your TV in developer mode</h3><p>The agent finds out how this works for your model and tells you what to press. Some TV makers need a free developer account for it.</p></div>
+      <div class="card"><h3>A Plex Media Server</h3><p>On your home network, with some movies or shows to test with – the same server you watch today.</p></div>
+      <div class="card"><h3>Time</h3><p>A port is built over several sessions, one feature at a time. You can stop any time and continue later with a short prompt.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="prompt-section">
+  <div class="wrap">
+    <h2>The prompt</h2>
+    <p>Paste this into your agent, replace the part in angle brackets with your TV's brand and model, and answer its questions:</p>
+<!-- gen:prompt-html -->
+<!-- generated by tools/spec_gen.js – do not edit; run `npm run spec` -->
+<pre class="prompt" id="prompt"><code>Read https://raw.githubusercontent.com/itsab1989/neolume/main/docs/PORTING-WITH-AI.md and follow it exactly to build the app for my TV: &lt;brand and model, e.g. &quot;LG OLED C1&quot;&gt;. Work in a new folder; ask me only for things you cannot do yourself.</code></pre>
+<!-- /gen:prompt-html -->
+    <button class="btn copy" type="button" data-copy="prompt" hidden>Copy prompt</button>
+    <p>Later prompts – continue in a new session, test with your remote, update to a new version, share your port – are in the
+      <a href="https://github.com/itsab1989/neolume/blob/main/docs/PORTING-WITH-AI.md#prompts">Prompts section of the playbook</a>.</p>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2>How it goes</h2>
+    <ol class="steps">
+      <li><b>Find out about your TV.</b> The agent researches how apps are made and installed for your model and asks you to read a few things off the TV.</li>
+      <li><b>A first test app.</b> It puts a small test app on the TV that shows your remote's keys and talks to your Plex Media Server once – proof that the way works.</li>
+      <li><b>Feature by feature.</b> Home, libraries, details, player, search, settings, music, screensaver … in a fixed order, each checked with tests, screenshots and speed measurements against the specification.</li>
+      <li><b>Acceptance test with you.</b> At the end – and whenever it is unsure – the agent walks you through the test plan with your remote, step by step, in plain words. No technical knowledge needed.</li>
+    </ol>
+    <p><b>Your passwords stay yours:</b> sign-in always happens on plex.tv in a browser or on the TV. The agent must never ask
+      for your Plex password, token or PIN in the chat – if it does, say no.</p>
+  </div>
+</section>
+
+<section id="reads">
+  <div class="wrap">
+    <h2>What your agent reads</h2>
+    <p>You don't have to read any of this. All of it is checked against Neolume's code on every change, so it always describes the current app.</p>
+    <div class="grid">
+      <div class="card"><h3><a href="https://github.com/itsab1989/neolume/blob/main/docs/PORTING-WITH-AI.md">Porting playbook</a></h3><p>The workflow the agent follows, the sources to read and the parts of Neolume it can reuse.</p></div>
+      <div class="card"><h3><a href="https://github.com/itsab1989/neolume/blob/main/docs/SPEC.md">Product specification</a></h3><p>Every screen, setting, key, server request and speed target, with an ID per requirement.</p></div>
+      <div class="card"><h3><a href="https://github.com/itsab1989/neolume/blob/main/docs/TEST-PLAN.md">Acceptance test plan</a></h3><p>One test per requirement for a person with a remote, plus a 10-minute smoke test.</p></div>
+      <div class="card"><h3><a href="https://github.com/itsab1989/neolume/blob/main/design/README.md">Design system</a></h3><p>Every colour, font size, spacing and animation value, and the icons as SVG files.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="community">
+  <div class="wrap">
+    <h2>Community ports</h2>
+    <p>Apps that others built for their TVs are listed on the <a href="https://github.com/itsab1989/neolume/blob/main/PORTS.md">community ports page</a>
+      and <a href="./#ports">on the home page</a>. They are links only – each port is the responsibility of its author, so
+      please read the policy there before installing one. Built your own? The last prompt in the playbook helps you add it.</p>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>Questions</h2>
+    <details><summary>Can I download a ready-made Neolume for my LG, Android TV or newer Samsung TV here?</summary><p>No. Neolume itself runs only on 2014 Samsung TVs. For other TVs an AI coding agent builds the app for you; apps that others built are listed as community ports. Most newer TVs also have the official Plex app in their app store.</p></details>
+    <details><summary>Do I need to be able to program?</summary><p>No. The agent does the programming. You do the steps on the TV (developer mode, pressing buttons, saying what you see) and approve what the agent wants to install or change.</p></details>
+    <details><summary>Will the agent ask for my Plex password?</summary><p>It must not. Sign-in always happens on plex.tv in a browser or on the TV. If an agent asks for a password, token or PIN in the chat, say no.</p></details>
+    <details><summary>May I call my port "Plex …"?</summary><p>No. "Plex" is a trademark of Plex, Inc. Give your app its own name and describe it as "an unofficial client for Plex Media Server" – the playbook and the community-ports policy explain the rules.</p></details>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><a href="./">Neolume home</a> · <a href="https://github.com/itsab1989/neolume">Source code on GitHub</a> · <a href="https://github.com/itsab1989/neolume/blob/main/docs/README.md">Documentation</a> · <a href="https://github.com/itsab1989/neolume/blob/main/CONTRIBUTING.md">Contributing</a> · <a href="https://github.com/itsab1989/neolume/blob/main/LICENSE">MIT License</a></p>
+    <p>Neolume is an independent project, not affiliated with, endorsed or sponsored by Plex, Inc., Samsung Electronics Co., Ltd.
+      or any other TV maker. "Plex" and "Plex Media Server" are trademarks of Plex, Inc.; other names are trademarks of their owners.</p>
+  </div>
+</footer>
+<script src="assets/copy.js" defer></script>
+</body>
+</html>

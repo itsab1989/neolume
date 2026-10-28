@@ -54,6 +54,25 @@ HUBS = {
 }
 
 
+def full(hexid, typ, title, **extra):
+    """Catalogue entry like metadata.provider.plex.tv/library/metadata/<id> (fields as in the live check 28.10.2026, invented content)."""
+    m = md(hexid, typ, title, '2024-05-01', 2024, summary='Eine erfundene Geschichte.', tagline='Kurz gesagt.',
+           art='https://metadata-static.plex.tv/a/art.jpg', contentRating='de/12', duration=5460000, audienceRating=7.8, rating=9.1,
+           studio='Demo Studio', Genre=[{'tag': 'Drama', 'id': 'g1'}, {'tag': 'Krimi'}, {'tag': 'Drama'}, {'x': 1}],
+           Director=[{'tag': 'Rita Regie', 'thumb': 'https://metadata-static.plex.tv/p/r.jpg'}], Writer=[{'tag': 'Bo Buch'}],
+           Role=[{'tag': 'Person %d' % i, 'role': 'Rolle %d' % i, 'thumb': 'https://metadata-static.plex.tv/p/%d.jpg' % i} for i in range(20)]
+           + [{'tag': 'Evil', 'thumb': 'http://evil.example/x.jpg'}],
+           Guid=[{'id': 'imdb://tt0000001'}, {'id': 'tmdb://4242'}, {'id': 'tvdb://77'}, {'id': 'evil://1'}],
+           Similar=[{'guid': 'plex://movie/' + B}], CommonSenseMedia={'x': 1}, Media=[{'url': 'https://vod.example/x.m3u8'}])
+    if typ == 'show': m.update(childCount=3, leafCount=24, isContinuingSeries=True, Network=[{'tag': 'Demo TV'}],
+                               lastEpisodeOriginallyAvailableAt='2026-10-01')
+    m.update(extra)
+    return m
+
+
+DETAILS = {A: full(A, 'movie', 'Film A'), B: full(B, 'show', 'Serie B')}
+
+
 class FakeTV(object):
     """plex.tv discover/metadata mock; records calls; rejects anything not on the allow-list like the real helper would."""
     def __init__(self):
@@ -79,6 +98,8 @@ class FakeTV(object):
             return 200, json.dumps({'MediaContainer': {'size': len(us), 'UserState': us}}).encode()
         if path == '/actions/addToWatchlist': self.watch.add(q.split('=')[1]); return 200, b''
         if path == '/actions/removeFromWatchlist': self.watch.discard(q.split('=')[1]); return 200, b''
+        if path.startswith('/library/metadata/') and url.startswith('https://metadata.provider.plex.tv/') and path[18:] in DETAILS:
+            return 200, mc([DETAILS[path[18:]]])
         return 404, b''
 
 
@@ -106,6 +127,19 @@ class AllowList(unittest.TestCase):
               ('GET', 'https://metadata.provider.plex.tv/library/metadata/' + A)]
         for m, u in ok: self.assertTrue(HP.upstream_allowed(m, u), u)
 
+    def test_details_upstream_narrow(self):
+        bad = [('GET', 'https://metadata.provider.plex.tv/library/metadata/%s?includeUserState=1' % A),   # no query keys at all
+               ('GET', 'https://metadata.provider.plex.tv/library/metadata/%s/children?includeUserState=1' % A),   # children: paging keys only
+               ('PUT', 'https://metadata.provider.plex.tv/library/metadata/%s/children' % A),
+               ('GET', 'https://metadata.provider.plex.tv/library/metadata/%s/related' % A),
+               ('GET', 'https://metadata.provider.plex.tv/library/metadata/' + A.upper()),
+               ('GET', 'https://metadata.provider.plex.tv/library/metadata/%s,%s' % (A, B)),
+               ('PUT', 'https://metadata.provider.plex.tv/library/metadata/' + A),
+               ('GET', 'https://metadata.provider.plex.tv/library/people/' + A),
+               ('GET', 'https://metadata.provider.plex.tv/library/metadata/%s/../../../api/v2/user' % A),
+               ('GET', 'https://image.tmdb.org/library/metadata/' + A)]
+        for m, u in bad: self.assertFalse(HP.upstream_allowed(m, u), u)
+
     def test_refused(self):
         bad = [('GET', 'http://discover.provider.plex.tv/library/sections/watchlist/all'),          # no TLS
                ('GET', 'https://evil.example/library/sections/watchlist/all'),
@@ -128,11 +162,12 @@ class AllowList(unittest.TestCase):
         h = make(f)
         for path, m in (('/watchlist?type=all', 'GET'), ('/watchlist?type=movie&start=0&size=10', 'GET'),
                         ('/watchlist/state?ids=%s,%s' % (A, B), 'GET'), ('/watchlist/' + B, 'PUT'), ('/watchlist/' + B, 'DELETE'),
-                        ('/discover/trending?type=movie', 'GET'), ('/discover/new?type=show', 'GET'), ('/discover/soon?type=movie', 'GET')):
+                        ('/discover/trending?type=movie', 'GET'), ('/discover/new?type=show', 'GET'), ('/discover/soon?type=movie', 'GET'),
+                        ('/details?id=' + A, 'GET'), ('/details?id=%s&lang=en' % B, 'GET')):
             st, body = h.handle(m, path, hdr(), '10.0.0.50')
             self.assertEqual(st, 200, (path, body))
         self.assertTrue(f.calls)
-        self.assertTrue(all(c[1].startswith('https://discover.provider.plex.tv/') for c in f.calls))
+        self.assertTrue(all(c[1].startswith(('https://discover.provider.plex.tv/', 'https://metadata.provider.plex.tv/library/metadata/')) for c in f.calls))
 
 
 class Lan(unittest.TestCase):
@@ -182,6 +217,15 @@ class Params(unittest.TestCase):
         self.assertEqual(self.r('DELETE', '/discover/new?type=movie')[0], 405)
         self.assertIsNone(self.r('GET', '/update/app.js'))         # not a helper route -> static files
         self.assertIsNone(self.r('GET', '/https://plex.tv/api/v2/user'))
+        for p in ('/details', '/details?id=' + A.upper(), '/details?id=' + A[:23], '/details?id=%s,%s' % (A, B), '/details?id=%s&lang=fr' % A,
+                  '/details?id=%s&url=https://evil.example' % A, '/details?id=%s&id=%s' % (A, B), '/details?id=../../api/v2/user',
+                  '/details?id=%s&type=movie' % A):
+            self.assertEqual(self.r('GET', p)[0], 400, p)
+        self.assertEqual(self.r('PUT', '/details?id=' + A)[0], 405)
+        self.assertEqual(self.r('DELETE', '/details?id=' + A)[0], 405)
+        self.assertIsNone(self.r('POST', '/details?id=' + A))
+        self.assertIsNone(self.r('GET', '/details/' + A))                 # not a helper route
+        self.assertEqual(self.r('GET', '/details?id=' + A, HOST), (401, {'error': 'key'}))
         self.assertFalse(self.f.calls)
 
     def test_host_header(self):
@@ -267,6 +311,66 @@ class Mapping(unittest.TestCase):
         self.assertEqual(make(big).handle('GET', '/watchlist', hdr(), '10.0.0.50'), (502, {'error': 'too_large'}))
         def garbage(*a, **k): return 200, b'<html>'
         self.assertEqual(make(garbage).handle('GET', '/watchlist', hdr(), '10.0.0.50'), (502, {'error': 'parse'}))
+
+    def test_details(self):
+        st, d = self.r('GET', '/details?id=' + A)
+        self.assertEqual(st, 200)
+        self.assertEqual(self.f.calls[-1][:2], ('GET', 'https://metadata.provider.plex.tv/library/metadata/' + A))
+        self.assertEqual((d['id'], d['type'], d['title'], d['year'], d['summary'], d['tagline']), (A, 'movie', 'Film A', 2024, 'Eine erfundene Geschichte.', 'Kurz gesagt.'))
+        self.assertEqual((d['contentRating'], d['duration'], d['rating'], d['studio'], d['date']), ('de/12', 5460000, 7.8, 'Demo Studio', '2024-05-01'))
+        self.assertEqual(d['genres'], ['Drama', 'Krimi'])                  # deduped, malformed dropped
+        self.assertEqual((d['directors'], d['writers'], d['network']), (['Rita Regie'], ['Bo Buch'], ''))
+        self.assertEqual(len(d['cast']), 15)
+        self.assertEqual(d['cast'][0], {'name': 'Person 0', 'role': 'Rolle 0', 'thumb': 'https://metadata-static.plex.tv/p/0.jpg'})
+        self.assertEqual(d['ids'], {'imdb': 'tt0000001', 'tmdb': 4242, 'tvdb': 77})
+        self.assertEqual(d['art'], 'https://metadata-static.plex.tv/a/art.jpg')
+        self.assertNotIn('seasons', d)
+        dump = json.dumps(d)
+        for bad in ('vod.example', 'Similar', 'CommonSense', 'evil', PLEX_TOK, 'publicPagesURL', 'userState'): self.assertNotIn(bad, dump)
+        n = len(self.f.calls)
+        self.r('GET', '/details?id=' + A, 'u-teen')
+        self.assertEqual(len(self.f.calls), n)                             # cached (catalogue data, same for every profile)
+        self.r('GET', '/details?id=%s&lang=en' % A)
+        self.assertEqual(len(self.f.calls), n + 1)                         # per language
+        self.assertEqual(self.f.calls[-1][1], 'https://metadata.provider.plex.tv/library/metadata/' + A)
+
+    def test_details_show_and_language(self):
+        seen = []
+        f = FakeTV()
+        def fetch(m, u, h, timeout=10): seen.append(h.get('X-Plex-Language')); return f(m, u, h)
+        h = make(fetch)
+        d = h.handle('GET', '/details?id=%s&lang=en' % B, hdr(), '10.0.0.50')[1]
+        self.assertEqual(seen, ['en'])
+        self.assertEqual((d['type'], d['seasons'], d['episodes'], d['continuing'], d['network'], d['lastAired']), ('show', 3, 24, True, 'Demo TV', '2026-10-01'))
+        h.handle('GET', '/details?id=' + A, hdr(), '10.0.0.50')
+        self.assertEqual(seen[-1], 'de')                                    # default
+
+    def test_details_errors(self):
+        self.assertEqual(self.r('GET', '/details?id=' + C), (502, {'error': 'plex_404'}))
+        def wrong(*a, **k): return 200, mc([full(B, 'movie', 'Anderer Titel')])   # answer for another id -> refused
+        self.assertEqual(make(wrong).handle('GET', '/details?id=' + A, hdr(), '10.0.0.50'), (502, {'error': 'parse'}))
+        def empty(*a, **k): return 200, mc([])
+        self.assertEqual(make(empty).handle('GET', '/details?id=' + A, hdr(), '10.0.0.50'), (502, {'error': 'parse'}))
+        def big(*a, **k): return 200, b'x' * (HP.MAX_UPSTREAM + 1)
+        self.assertEqual(make(big).handle('GET', '/details?id=' + A, hdr(), '10.0.0.50'), (502, {'error': 'too_large'}))
+        self.assertIn('details', self.h.hello()['features'])
+        s = HP.Store(KEY); s.add(OWNER, PLEX_TOK, 'Owner', 'owner')
+        hh = HP.Helper(s, 'x', fetch=FakeTV(), clock=lambda: NOW, rate=HP.RateLimit(1000, 1))
+        self.assertEqual(hh.handle('GET', '/details?id=' + A, hdr('u-pin-profile'), '10.0.0.50')[0], 200)   # owner token: not personal
+
+    def test_details_bad_image_port(self):
+        """L7b: a broken port in one image URL drops only that image (no 500 for the whole /details)."""
+        self.assertEqual(HP.safe_img('https://metadata-static.plex.tv:abc/x.jpg'), '')
+        self.assertEqual(HP.safe_img('https://metadata-static.plex.tv:99999/x.jpg'), '')
+        self.assertFalse(HP.upstream_allowed('GET', 'https://metadata.provider.plex.tv:x/library/metadata/' + A))
+        def bad(*a, **k):
+            m = full(A, 'movie', 'Film A')
+            m['Role'][0]['thumb'] = 'https://metadata-static.plex.tv:abc/p/0.jpg'
+            m['art'] = 'https://metadata-static.plex.tv:99999/a.jpg'
+            return 200, mc([m])
+        st, d = make(bad).handle('GET', '/details?id=' + A, hdr(), '10.0.0.50')
+        self.assertEqual(st, 200)
+        self.assertEqual((d['art'], d['cast'][0]['thumb'], d['cast'][1]['thumb']), ('', '', 'https://metadata-static.plex.tv/p/1.jpg'))
 
     def test_slim(self):
         self.assertIsNone(HP.slim({'guid': 'plex://movie/' + A, 'type': 'show', 'title': 'x'}))     # type mismatch
@@ -404,7 +508,7 @@ class WizardHelper(unittest.TestCase):
         self.w.helper_start()
         self.assertTrue(self.w.public_state()['helper']['running'])
         base = 'http://127.0.0.1:%d' % self.w.update.port
-        with urllib.request.urlopen(base + '/neo-helper', timeout=5) as r: self.assertEqual(json.loads(r.read())['features'], ['watchlist', 'discover', 'servers'])
+        with urllib.request.urlopen(base + '/neo-helper', timeout=5) as r: self.assertEqual(json.loads(r.read())['features'], ['watchlist', 'discover', 'servers', 'details'])
         self.w.update_start()
         with urllib.request.urlopen(base + '/neo-helper', timeout=5) as r: self.assertIn('update', json.loads(r.read())['features'])
         self.w.update_stop()

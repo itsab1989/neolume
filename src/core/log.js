@@ -7,19 +7,20 @@
 (function (N) {
   var U = N.util, RING = 500, MAX = 65536, LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
   var D = {
-    ring: [], dev: false, sink: null, backend: null, files: { a: '', b: '' }, cur: 'a', pending: [], timer: 0, loaded: false,
+    ring: [], dev: false, sink: null, backend: null, files: { a: '', b: '' }, cur: 'a', pending: [], timer: 0, loaded: false, hold: false,
     /* reine Funktion: Geheimnisse schwaerzen */
     /* auch URL-kodiert (Proxy-URL ?url=https%3A…%3Fpin%3D1234%26X-Plex-Token%3D…): Trenner %3D / %3A, Grenze %3F / %26 / %22 */
     redact: function (s) {
       var SEP = '((?:%22)?(?:%3D|%3A)(?:%22)?|["\']?\\s*[:=]\\s*["\']?)', PRE = '(^|%3F|%26|%22|%2C|[^A-Za-z0-9_])';
       return String(s)
-        .replace(new RegExp('(X-Plex-Token|accessToken|authToken|authenticationToken|token)' + SEP + '[^&"\'\\s,;}%]+', 'gi'), '$1$2***')
+        .replace(new RegExp('(X-Plex-Token|accessToken|authToken|authenticationToken|token|X-Api-Key|api[_-]?key|X-Neo-Key|X-Neo-Sig)' + SEP + '[^&"\'\\s,;}%]+', 'gi'), '$1$2***')
         .replace(new RegExp(PRE + '(pin)' + SEP + '[^&"\'\\s,;}%]+', 'gi'), '$1$2$3***')
         .replace(new RegExp(PRE + '(code)' + SEP + '[A-Za-z0-9]{4,8}(?![A-Za-z0-9])', 'gi'), '$1$2$3***')
         // oeffentliche IPv4-Adressen (weitere Server uebers Internet) nie ins Protokoll; Heimnetz-Adressen bleiben (Fehlersuche)
-        .replace(/(^|[^0-9.])(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?![0-9.])/g, function (m, pre, a, b) {
-          a = Number(a); b = Number(b);
-          var lan = a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254) || (a === 192 && b === 0) || a === 0;
+        .replace(/(^|[^0-9.])(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?![0-9.])/g, function (m, pre, a, b, c) {
+          a = Number(a); b = Number(b); c = Number(c);
+          // 192.0.0.x/192.0.2.x: Sonder-/Dokumentationsnetz; der Rest von 192.0.x.x ist oeffentlich (Review 1.0.5)
+          var lan = a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254) || (a === 192 && b === 0 && (c === 0 || c === 2)) || a === 0;
           return lan ? m : pre + '<fern>';
         });
     },
@@ -65,8 +66,11 @@
     },
     schedule: function () {
       if (D.timer || !D.backend) return;
-      D.timer = setTimeout(function () {
+      D.timer = setTimeout(function tick() {
         D.timer = 0;
+        // D.hold (setzt nur der Messlauf im Entwicklungs-Build): Dev schreibt JEDE Zeile in die Datei (bis 64 KB am Stueck, synchron) –
+        // das gibt es im Release nicht (nur warn/error) und verfaelschte die Frames (Runde 5). Waehrend des Laufs warten, danach schreiben.
+        if (D.hold) { D.timer = setTimeout(tick, 3000); return; }
         if (N.idle) N.idle.add(D.flush, 'diag-flush'); else D.flush();
       }, 3000);
     },

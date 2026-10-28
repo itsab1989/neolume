@@ -2,9 +2,19 @@
 /* visuelle Regression (Nutzer-Anforderung M2).
  *   node tools/visual.js            Ansichten mit synthetischen Daten rendern -> tests/visual/current/, mit baseline/ vergleichen
  *   node tools/visual.js --approve  aktuelle Bilder als neue Baseline uebernehmen
- *   node tools/visual.js --only home,login
+ *   node tools/visual.js --only home,login,saver-*   nur diese Szenen (Namen oder Muster mit * und ?)
+ *   node tools/visual.js --changed   nur Szenen, die von Aenderungen gegenueber main betroffen sein koennen (PN_VIS_BASE=<ref>);
+ *                                    schnelles Nachsehen beim Arbeiten – die volle Suite bleibt Pflicht vor dem Release
+ *   node tools/visual.js --list …    nur die ausgewaehlten Szenen auflisten, nichts rendern
+ *   PN_VIS_JOBS=n   Szenen gleichzeitig (Standard min(8, Kerne/2)); jeder Worker hat eigenen Mock-Server und eigenes Profil
+ *   PN_VIS_MAX=n    hoechstens n Firefox rechnerweit ueber alle gleichzeitigen Laeufe (Standard 10, 0 = ohne; Sperrordner
+ *                   $TMPDIR/pnvis-slots, verwaiste Eintraege werden selbst aufgeraeumt)
  *   PN_VIS_OUT=/pfad node tools/visual.js --only …   Ausgabe in eigenen Ordner (parallele Laeufe teilen sonst tests/visual/current)
  *   node tools/visual.js --readable   gegen app/app.js statt app/app.min.js (Standard: der minifizierte Release-Build, P7)
+ *   node tools/visual.js --layout     nur die Layout-Pruefung (ohne Pixelvergleich) = npm run layoutcheck;  --no-layout schaltet sie ab
+ * Layout-Pruefung (Standard bei jedem Lauf): direkt vor jedem Screenshot untersucht tools/layout_probe.js das sichtbare DOM
+ * (ueberlappender/abgeschnittener Text, Text ueber fremden Knoepfen, ueber Bildschirm-/Sicherheitsrand, ueberlappende Flaechen);
+ * tools/layoutcheck.js wertet aus (Erlaubnisliste tools/layout_allow.json), Bericht in <Ausgabe>/layout/index.html.
  * Rendert tools/preview.html in Firefox headless (1280x720) gegen einen lokalen Mock (PMS + plex.tv-Proxy + Bilder),
  * daher ohne Netz und ohne Geheimnisse. Vergleich pixelweise (Kanal-Toleranz 24, Schwelle 0,2 % der Flaeche, Masken
  * fuer zeitabhaengige Bereiche). Ausgabe: Bericht + diff-*.png (rot = Abweichung). */
@@ -14,9 +24,13 @@ var ROOT = path.join(__dirname, '..'), SYN = path.join(ROOT, 'tests', 'synthetic
 var CUR = process.env.PN_VIS_OUT ? path.resolve(process.env.PN_VIS_OUT) : path.join(VIS, 'current'), BASE = path.join(VIS, 'baseline');   // PN_VIS_OUT: eigener Ausgabeordner (parallele Laeufe)
 var FIREFOX = process.env.FIREFOX || '/Applications/Firefox.app/Contents/MacOS/firefox';
 var TOL = 24, MAX_RATIO = 0.002;
-var args = process.argv.slice(2), APPROVE = args.indexOf('--approve') >= 0;
-var ONLY = (function () { var i = args.indexOf('--only'); return i >= 0 ? args[i + 1].split(',') : null; })();
+var args = process.argv.slice(2), APPROVE = args.indexOf('--approve') >= 0, WORKER = args.indexOf('--worker') >= 0, CHANGED = args.indexOf('--changed') >= 0;
+var ONLY = (function () { var i = args.indexOf('--only'); return i >= 0 ? String(args[i + 1] || '').split(',').filter(Boolean) : null; })();   // Namen oder Muster (* ?)
 var MIN = args.indexOf('--readable') < 0, APPFILE = MIN ? 'app.min.js' : 'app.js';
+var LAYOUT_ONLY = args.indexOf('--layout') >= 0, LAYOUT = LAYOUT_ONLY || args.indexOf('--no-layout') < 0, layoutRes = {};
+var JOBS = Math.max(1, Number(process.env.PN_VIS_JOBS) || Math.min(8, Math.floor(os.cpus().length / 2)) || 1);   // gleichzeitige Firefox je Lauf
+var MAX_TOTAL = process.env.PN_VIS_MAX === undefined ? 10 : Number(process.env.PN_VIS_MAX);                    // rechnerweit (alle Laeufe zusammen), 0 = ohne Grenze
+var LOCKDIR = process.env.PN_VIS_LOCKDIR || path.join(os.tmpdir(), 'pnvis-slots');
 if (require.main === module && !fs.existsSync(path.join(ROOT, 'app', APPFILE))) { console.error('app/' + APPFILE + ' fehlt – zuerst "npm run build" (wird nicht eingecheckt).'); process.exit(1); }
 
 /* ---------- PNG lesen/schreiben (8 Bit, RGB/RGBA, ohne Interlace) ---------- */
@@ -66,6 +80,18 @@ function busyPng(w, h) {
   for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
     var c = C[((x >> 3) * 7 + (y >> 3) * 3 + ((x >> 5) ^ (y >> 4))) % C.length], o = (y * w + x) * 4;
     px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2]; px[o + 3] = 255;
+  }
+  return writePng(w, h, px);
+}
+/* Ecke unten links (Seitenleiste + Band unten, Seed ambCorner): knallbuntes, helles Titelbild (abgedunkelt wie am PMS, f = darken) –
+ * weicher Verlauf aus vier Eckfarben, damit Staerke und Form des Rahmens auf ruhigem, buntem Grund sichtbar sind */
+function gradPng(w, h, f) {
+  var C = [[255, 45, 110], [255, 212, 0], [0, 229, 255], [124, 255, 0]], px = Buffer.alloc(w * h * 4);   // oben links, oben rechts, unten rechts, unten links
+  for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+    var u = x / (w - 1), v = y / (h - 1), o = (y * w + x) * 4;
+    var c = [0, 1, 2].map(function (k) { return Math.round((C[0][k] * (1 - u) + C[1][k] * u) * (1 - v) + (C[3][k] * (1 - u) + C[2][k] * u) * v); });
+    c = f ? f(c) : c; px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2];
+    px[o + 3] = 255;
   }
   return writePng(w, h, px);
 }
@@ -132,10 +158,10 @@ var MUS = (function () {
     thumb: '/t/al' + al.length, art: '/a/ar2', addedAt: 1700000000, summary: '', hub: 'live' });
   al.sort(function (a, b) { return a.titleSort < b.titleSort ? -1 : 1; });
   function tracks(alb) {
-    var k = Number(alb.ratingKey) - 9200, out = [];
+    var k = Number(alb.ratingKey) - 9200, out = [], lg = /^bookLoupe/.test(curSeed);   // Feinauswahl im Hoerbuch: lange Kapitel-Dateien (45 Min.)
     for (var t = 1; t <= 9; t++) out.push({ ratingKey: String(9300 + k * 20 + t), type: 'track', title: 'Lied Nummer ' + t, index: t, parentIndex: 1, parentTitle: alb.title,
-      parentRatingKey: alb.ratingKey, grandparentTitle: alb.parentTitle, grandparentRatingKey: alb.parentRatingKey, parentThumb: alb.thumb, grandparentArt: alb.nocover ? alb.art : undefined, duration: 180000 + t * 7000,
-      Media: [{ audioCodec: 'mp3', container: 'mp3', Part: [{ id: 9300 + k * 20 + t, key: '/library/parts/' + (9300 + k * 20 + t) + '/1/file.mp3', duration: 180000 + t * 7000 }] }] });
+      parentRatingKey: alb.ratingKey, grandparentTitle: alb.parentTitle, grandparentRatingKey: alb.parentRatingKey, parentThumb: alb.thumb, grandparentArt: alb.nocover ? alb.art : undefined, duration: lg ? 2700000 : 180000 + t * 7000,
+      Media: [{ audioCodec: 'mp3', container: 'mp3', Part: [{ id: 9300 + k * 20 + t, key: '/library/parts/' + (9300 + k * 20 + t) + '/1/file.mp3', duration: lg ? 2700000 : 180000 + t * 7000 }] }] });
     return out;
   }
   return { ar: ar, al: al, tracks: tracks };
@@ -143,7 +169,7 @@ var MUS = (function () {
 function musicRoute(p, q) {
   var m = /^\/library\/sections\/3\/(all|firstCharacter|collections|prefs)$/.exec(p), list, i;
   if (m) {
-    if (m[1] === 'prefs') return { MediaContainer: { Setting: [{ id: 'enableTrackOffsets', value: false }] } };
+    if (m[1] === 'prefs') return { MediaContainer: { Setting: [{ id: 'enableTrackOffsets', value: /^book/.test(curSeed) }] } };   // Seeds book*: Musik als Hoerbuch-Bibliothek
     if (m[1] === 'collections') return page([], q);
     list = q.get('type') === '9' ? MUS.al.slice() : MUS.ar.slice();
     if (/titleSort:desc/.test(String(q.get('sort')))) list.reverse();
@@ -243,13 +269,48 @@ function matchesFor(q) {
   var own = (movie ? LIB[1] : LIB[2]).filter(function (m) { return m.title.toLowerCase().indexOf(ql) === 0; }).slice(0, 2);
   own.forEach(function (m) { out.push({ guid: sguid(type, m.ratingKey), name: m.title + ' (Originaltitel)', year: m.year, type: type, thumb: 'https://images.example/' + m.ratingKey }); });
   var names = movie ? ['Abendland', 'Abenteuer im Eis', 'Aberglaube', 'Abflug 22:10', 'Abgrund'] : ['Abenteuer Nordsee', 'Abendschule'];
-  names.forEach(function (n, i) { out.push({ guid: sguid(type, 70000 + (movie ? 0 : 100) + i), name: n, year: 2020 + i, type: type, summary: 'Synthetische Beschreibung eines Titels, der nicht auf dem Server liegt.', thumb: i === 2 ? undefined : 'https://images.example/' + type + i }); });
+  names.forEach(function (n, i) { out.push({ guid: sguid(type, 70000 + (movie ? 0 : 100) + i), name: n, year: 2020 + i, type: type, summary: i === 4 ? undefined : 'Synthetische Beschreibung eines Titels, der nicht auf dem Server liegt.', thumb: i === 2 ? undefined : 'https://images.example/' + type + i }); });
   return { MediaContainer: { size: out.length, SearchResult: ql.length >= 2 ? out : [] } };
 }
 function byGuid(list) {
   var want = String(list || '').split(','), out = [];
   [1, 2].forEach(function (id) { LIB[id].forEach(function (m) { if (want.indexOf(sguid(m.type, m.ratingKey)) >= 0) { var c = JSON.parse(JSON.stringify(m)); c.guid = sguid(m.type, m.ratingKey); out.push(c); } }); });
   return { MediaContainer: { size: out.length, Metadata: out } };
+}
+
+/* Helfer /details (DISC-5): erfundene Katalogdaten fremder Titel aus matchesFor – 70000 Film voll, 70100 Serie voll, sonst minimal */
+function extDetails(id) {
+  var n = parseInt(String(id).replace(/^a+/, ''), 16) || 0, show = n >= 70100 && n < 70200, img = 'https://metadata-static.plex.tv/people/p';
+  var base = { id: id, type: show ? 'show' : 'movie', guid: 'plex://' + (show ? 'show' : 'movie') + '/' + id, year: 2020 + n % 100, cast: [], genres: [], directors: [], writers: [] };
+  function cast(names) { return names.map(function (x, i) { return { name: x[0], role: x[1], thumb: i === 3 ? '' : img + n + '-' + i + '.jpg' }; }); }
+  if (n === 70000) return Object.assign(base, { title: 'Abendland', summary: 'Als die Fischerin Ilka Brandt nach zwanzig Jahren in ihr Heimatdorf an der Küste zurückkehrt, findet sie das Haus ihrer Mutter leer und die Nachbarn schweigsam. Ein altes Logbuch führt sie auf die Spur eines Unglücks, über das im Dorf niemand sprechen will – und zu der Frage, wem sie noch trauen kann. Synthetischer Testtext.',
+    tagline: 'Manche Wellen kommen zurück.', date: '2020-03-12', thumb: 'https://image.tmdb.org/t/p/original/poster70000.jpg', art: 'https://image.tmdb.org/t/p/original/art70000.jpg',
+    contentRating: 'de/12', duration: 7020000, rating: 7.4, studio: 'Nordlicht Film', genres: ['Drama', 'Thriller', 'Mystery', 'Krimi'], directors: ['Mara Lindqvist', 'Jonas Feld'], writers: ['Pia Sander'],
+    cast: cast([['Lena Albers', 'Ilka Brandt'], ['Tom Wieland', 'Jens Kröger'], ['Ruth Hansen', 'Marta'], ['Ole Petersen', 'Hafenmeister'], ['Nina Vogt', 'Svenja'], ['Paul Behrens', 'Pastor'], ['Kim Lorenz', 'Junge Ilka'], ['Erik Dahl', 'Fischer']]) });
+  if (n === 70100) return Object.assign(base, { title: 'Abenteuer Nordsee', summary: 'Vier Jugendliche entdecken auf einer Hallig ein verlassenes Forschungsschiff. Jede Staffel ein neues Rätsel zwischen Ebbe und Flut. Synthetischer Testtext.',
+    tagline: '', date: '2020-09-01', thumb: 'https://image.tmdb.org/t/p/original/poster70100.jpg', art: 'https://image.tmdb.org/t/p/original/art70100.jpg', contentRating: 'de/12', duration: 2700000, rating: 8.1,
+    studio: 'Hallig Pictures', network: 'Kanal Nord', genres: ['Abenteuer', 'Familie'], seasons: 4, episodes: 38, continuing: true, lastAired: '2026-09-30',
+    cast: cast([['Mia Kruse', 'Frieda'], ['Jan Ohlsen', 'Bent'], ['Ayla Demir', 'Nesrin'], ['Lukas Hein', 'Matti'], ['Greta Möller', 'Kapitänin']]) });
+  return Object.assign(base, { title: 'Titel', summary: '', thumb: '', art: '', contentRating: '', duration: 0, rating: 0, studio: '', network: '' });
+}
+
+/* Entdecken: Helfer-Attrappe (nur Seeds mit config.helperUrl) – plex.tv-Listen gemischt aus eigenen Titeln (GUID wie byGuid) und
+ * fremden. "Gerade beliebt · Serien" enthaelt NUR eigene Serien -> mit Filter "Nur Titel, die du noch nicht hast" die Hinweis-Reihe. */
+function helperRoute(p, q) {
+  if (p === '/neo-helper') return { name: 'plex-neo-helper', version: 'visual', watchlist: true, discover: true, features: ['watchlist', 'discover', 'details'] };
+  if (p === '/watchlist') return { items: [], total: 0 };
+  if (p === '/details') return extDetails(q.get('id') || '');
+  var m = /^\/discover\/(trending|new|soon)$/.exec(p);
+  if (!m) return null;
+  var type = q.get('type') === 'show' ? 'show' : 'movie', lib = LIB[type === 'movie' ? 1 : 2], out = [], i;
+  var names = { trending: ['Sternenstaub', 'Kalte Spur', 'Das letzte Signal', 'Wellenbrecher', 'Nachtzug', 'Funkstille', 'Grenzland', 'Sommerhitze'],
+    new: ['Leuchtfeuer', 'Unter Null', 'Spiegelstadt', 'Die Brücke', 'Tiefsee', 'Rote Linie'], soon: ['Morgenrot', 'Zeitsprung', 'Schattenland', 'Weiße Nächte'] }[m[1]];
+  function ext(n, k) { var off = { trending: 0, new: 20, soon: 40 }[m[1]] + (type === 'show' ? 100 : 0) + k; return { guid: sguid(type, 80000 + off), title: n, year: 2026, summary: 'Synthetischer plex.tv-Titel, der nicht auf dem Server liegt.', thumb: 'https://images.example/disc' + off }; }
+  function own(x) { return { guid: sguid(type, x.ratingKey), title: x.title, year: x.year, summary: '', thumb: 'https://images.example/own' + x.ratingKey }; }
+  if (m[1] === 'trending' && type === 'show') { for (i = 0; i < 5; i++) out.push(own(lib[i])); }       // alles schon da -> Hinweis
+  else if (m[1] === 'trending') { for (i = 0; i < names.length; i++) { if (i % 2 === 0) out.push(own(lib[i + 3])); out.push(ext(names[i], i)); } }
+  else names.forEach(function (n, k) { out.push(ext(n, k)); });
+  return { items: out.slice(0, Number(q.get('size')) || 20) };
 }
 
 /* Entdecken: Inspiration – Server-Hubs fuer Film- (1) und Serienbibliothek (2), nur bei count=20 (Startseite/Katalog bleiben unveraendert) */
@@ -265,6 +326,28 @@ function inspHubs(lib) {
 function syn(f) { return JSON.parse(fs.readFileSync(path.join(SYN, f), 'utf8')); }
 function colorFor(s) { if (s.indexOf('/hell') >= 0) return [244, 244, 242];   // sehr helles Foto (F24)
   var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return [60 + h % 140, 60 + (h >> 8) % 140, 60 + (h >> 16) % 140]; }
+/* Hintergrund in Bibliotheken (nur Seeds amb*): UltraBlurColors je Titel wie am PMS 1.43 (kommt mit /library/sections/<id>/all);
+ * schwierigste Faelle vorn: erster Titel fast weiss (Farben + sehr helle Art /a/hell…), zweiter knallbunt */
+var UB_HARD = [['f4f1e8', 'fffef5', 'e8e4d8', 'f9f6ee'], ['ff2d6e', 'ffd400', '00e5ff', '7cff00']];
+function hex6(c) { return c.map(function (v) { return ('0' + Math.round(v * 0.6).toString(16)).slice(-2); }).join(''); }
+function ambData(o, p) {
+  if (!/^amb/.test(curSeed) || !/^\/library\/(sections|collections)\//.test(p) || !o || !o.MediaContainer || !o.MediaContainer.Metadata) return o;
+  var x = JSON.parse(JSON.stringify(o)), off = Number(x.MediaContainer.offset) || 0;
+  x.MediaContainer.Metadata.forEach(function (m, k) {
+    if (!m.ratingKey) return;
+    var c = UB_HARD[off + k] || ['tl', 'tr', 'br', 'bl'].map(function (e) { return hex6(colorFor('/ub/' + e + m.ratingKey)); });
+    m.UltraBlurColors = { topLeft: c[0], topRight: c[1], bottomRight: c[2], bottomLeft: c[3] };
+    if (off + k === 0 && m.art) m.art = '/a/hell' + m.ratingKey;
+  });
+  return x;
+}
+/* PMS /photo/:/transcode opacity=<%>&background=<hex>: Bild ueber der Farbe abgedunkelt (am PMS 27.10. geprueft) */
+function darken(rgb, q) {
+  var op = Number(q.get('opacity')), bg = /^[0-9a-f]{6}$/i.test(q.get('background') || '') ? q.get('background') : '000000';
+  if (!(op > 0 && op < 100)) return rgb;
+  var b = [0, 2, 4].map(function (i) { return parseInt(bg.slice(i, i + 2), 16); });
+  return rgb.map(function (v, i) { return Math.round(v * op / 100 + b[i] * (1 - op / 100)); });
+}
 /* F25: Seitenleiste mit langen Bibliotheksnamen (nur Szenen mit Seed longLib*) */
 var curSeed = '';
 function longSections() {
@@ -284,11 +367,15 @@ function startServer(cb) {
   function handle(req, res) {
     var u = new URL(req.url, 'http://x'), p = u.pathname;
     function cors() { res.setHeader('Access-Control-Allow-Origin', '*'); res.setHeader('Access-Control-Allow-Headers', '*'); res.setHeader('Access-Control-Allow-Methods', '*'); }
-    function json(o, code) { cors(); res.writeHead(code || 200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); }
+    function json(o, code) { o = ambData(o, p); cors(); res.writeHead(code || 200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); }
     if (req.method === 'OPTIONS') { cors(); res.writeHead(200); return res.end(); }
     if (p === '/log' && req.method === 'POST') {
       var body = ''; req.on('data', function (c) { body += c; });
       return req.on('end', function () { cors(); res.writeHead(200); res.end(); if (sink.on) body.split('\n').forEach(function (l) { if (l) sink.on(l); }); });
+    }
+    if (p === '/layout' && req.method === 'POST') {             // Layout-Pruefung (tools/layout_probe.js) je Szene
+      var lb = ''; req.on('data', function (c) { lb += c; });
+      return req.on('end', function () { cors(); res.writeHead(200); res.end(); try { layoutRes[u.searchParams.get('scene')] = JSON.parse(lb); } catch (e) { layoutRes[u.searchParams.get('scene')] = { err: 'JSON: ' + e.message }; } });
     }
     if (p === '/sleep') return setTimeout(function () { res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(solidPng(1, 1, [0, 0, 0])); }, Number(u.searchParams.get('ms') || 3000));
     if (p.indexOf('/seed/') === 0) { curSeed = p.slice(6, -3); res.writeHead(200, { 'Content-Type': 'application/javascript' }); return res.end(seeds[curSeed] || ''); }
@@ -299,6 +386,8 @@ function startServer(cb) {
       if (/\/switch$/.test(t.pathname)) return t.searchParams.get('pin') === '1234' ? json({ authToken: 'u' }, 201) : json({}, 403);
       return json({}, 404);
     }
+    var hr = helperRoute(p, u.searchParams);                     // Helfer-Attrappe (Entdecken: plex.tv-Reihen)
+    if (hr) return json(hr);
     var empty = p.indexOf('/leer') === 0, friend = p.indexOf('/friend') === 0;   // Server ohne Inhalte (Leerzustand) / Server des Freundes
     if (!empty && !friend && p.indexOf('/pms') !== 0) { res.writeHead(404); return res.end(); }
     p = p.slice(empty ? 5 : friend ? 7 : 4);
@@ -309,11 +398,17 @@ function startServer(cb) {
     if (p === '/photo/:/transcode') {
       var w = Math.min(1280, Number(u.searchParams.get('width')) || 100), h = Math.min(720, Number(u.searchParams.get('height')) || 100);
       var src = u.searchParams.get('url') || '';
-      if (u.searchParams.get('blur') && w >= 640 && !/\/a\/|\/art\//.test(src)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(posterPng(w, colorFor(src))); }
+      // SAV-5 (Seeds svPic*): Poster als buntes Bild im Plakat-Format 2:3 (unscharf: wie am PMS abgedunkelt) – kein zweifarbiges
+      // Ersatzbild, dessen harte Mittelkante im Schoner wie ein Fehler aussieht; Hintergrundbilder: ungerade rk = Standbild (unruhig), gerade = echt
+      if (/^svPic/.test(curSeed) && /^\/t\//.test(src)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(gradPng(w, Math.round(w * 1.5), function (c) { return darken(c, u.searchParams); })); }
+      if (u.searchParams.get('blur') && w >= 640 && !/\/a\/|\/art\//.test(src)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(posterPng(w, darken(colorFor(src), u.searchParams))); }
+      var pa0 = /^svPic/.test(curSeed) && /^\/library\/metadata\/(\d+)\/art\//.exec(src);
+      if (pa0) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(Number(pa0[1]) % 2 ? busyPng(w, h) : gradPng(w, h, function (c) { return darken(c, u.searchParams); })); }
       var sv = /^sv[A-Z]/.test(curSeed) && /^\/a\//.test(src);   // Bildschirmschoner-Szenen: helles, dunkles, unruhiges Bild
+      if (curSeed === 'ambCorner' && /^\/a\//.test(src)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(gradPng(w, h, function (c) { return darken(c, u.searchParams); })); }
       if (sv && /Busy/.test(curSeed)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(busyPng(w, h)); }
       if (sv) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(solidPng(w, h, /Bright/.test(curSeed) ? [246, 246, 244] : [14, 14, 16])); }
-      cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(solidPng(w, h, colorFor(u.searchParams.get('url') || '')));
+      cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(solidPng(w, h, darken(colorFor(u.searchParams.get('url') || ''), u.searchParams)));
     }
     if (p === '/library/sections') return json(/^longLib/.test(curSeed) ? longSections() : syn('sections.json'));
     if (p === '/hubs/continueWatching/items') return json(noArt(withVersions(syn('continueWatching.json'))));
@@ -323,7 +418,7 @@ function startServer(cb) {
     if (p === '/hubs') return json({ MediaContainer: { size: 1, Hub: [{ hubIdentifier: 'home.playlists', type: 'playlist', title: 'Zuletzt genutzte Playlists', size: 0 }] } });
     if (p === '/hubs/home/recentlyAdded') { var f = 'recent-' + u.searchParams.get('sectionID') + '.json'; return json(fs.existsSync(path.join(SYN, f)) ? syn(f) : { MediaContainer: { size: 0 } }); }
     if (p === '/video/:/transcode/universal/decision') return json(syn('decision-direct.json'));
-    if (p === '/playQueues' && req.method === 'POST') return json(playQueue(new URL(u.searchParams.get('uri').replace('server://', 'http://')).pathname.split('/').pop()));
+    if (p === '/playQueues' && req.method === 'POST') return json(playQueue((u.searchParams.get('key') || new URL(u.searchParams.get('uri').replace('server://', 'http://')).pathname).split('/').pop()));   // wie der PMS: key = gewaehlte Folge (uri = Serie)
     var mr = musicRoute(p, u.searchParams);
     if (mr) return json(mr);
     if (p === '/music/:/transcode/universal/decision') return json(syn('decision-direct.json'));
@@ -335,6 +430,7 @@ function startServer(cb) {
         pa.MediaContainer.librarySectionID = Number(ls[1]);
         pa.MediaContainer.Metadata = pa.MediaContainer.Metadata.map(function (m) { var c = JSON.parse(JSON.stringify(m)); delete c.librarySectionID; return c; });
         if (/^sv[A-Z].*Long/.test(curSeed)) pa.MediaContainer.Metadata.forEach(function (m) { m.title = 'Die unglaublich lange Reise des kleinen Leuchtturmwärters ' + m.title + ' bis ans Ende der Welt'; });
+        if (/^svPic/.test(curSeed)) pa.MediaContainer.Metadata.forEach(function (m) { if (m.art) m.art = '/library/metadata/' + m.ratingKey + '/art/1'; });   // SAV-5: PMS-Pfade
         return json(pa);
       }
       if (ls[2] === 'firstCharacter') return json(firstChars(libAll(ls[1], q)));
@@ -345,6 +441,9 @@ function startServer(cb) {
       return json({ MediaContainer: { size: 1, Directory: [{ key: '1080', title: '1080p' }] } });
     }
     if (/^\/library\/collections\/\d+\/children$/.test(p)) return json(page(LIB[1].slice(0, 6), u.searchParams));
+    var arm = /^\/library\/metadata\/(\d+)\/arts$/.exec(p);   // SAV-5: Bildauswahl wie am PMS – ungerade rk: Standbild (media://) ausgewaehlt
+    if (arm) return json({ MediaContainer: { size: 2, Metadata: [{ ratingKey: 'https://image.example.org/a.jpg', selected: false, provider: 'tmdb' },
+      { ratingKey: Number(arm[1]) % 2 ? 'media://1/ab.bundle/Contents/Art/art1.jpg' : 'metadata://art/tv.plex.agents.movie_ab', selected: true }] } });
     if (p === '/hubs/search') return json(search(u.searchParams.get('query')));
     if (/^\/library\/metadata\/\d+\/matches$/.test(p)) return setTimeout(function () { json(matchesFor(u.searchParams)); }, 300);   // P4 (echter PMS: 2,5-5 s)
     if (p === '/library/all' && u.searchParams.get('guid')) return json(byGuid(u.searchParams.get('guid')));
@@ -452,10 +551,32 @@ function makeSeeds(port) {
   seeds.play = seed({}, null, cfgPlay);
   seeds.playsub = seed({}, { 'settings-aaaa1111.json': { ass: 'text' } }, cfgPlay);
   seeds.playEn = seed({ lang: 'en' }, null, cfgPlay);
+  seeds.bookPlay = seed({}, null, cfgPlay); seeds.bookPlayEn = seed({ lang: 'en' }, null, cfgPlay);   // Jetzt laeuft als Hoerbuch (Kapitel = Titel)
+  seeds.playAsym = seed({}, { 'settings-aaaa1111.json': { seekArrows: '10/30', seekFf: '15/30' } }, cfgPlay);   // -10/+30 auf den Knoepfen
   // Zeiger-Randzone: Verweilen loest nie aus (ptrEdgeDwell) -> stehende Anzeige-Pille; Zeiger aus -> abhaengige Einstellung grau
   seeds.ptrHold = seed({}, null, JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, ptrEdgeDwell: 600000 }));
   seeds.ptrHoldPlay = seed({}, null, JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', sefFake: 'still', seekDelay: 600000, fixedClock: '21:34', welcome: false, ptrEdgeDwell: 600000 }));
   seeds.ptrOff = seed({ pointer: false });
+  // Feinauswahl am Balken (SPEC PLAY-30): Einstellung an, Zeiger-Verweilen echt (700 ms), heller "Film" (fakeBg) und Vorschaubilder aus
+  // sub: feste Untertitel-Zeile (config.fakeSub, nur Bildtest) – Kollision Lasche/Untertitel sichtbar machen
+  var cfgLp = function (bg, sub) { return JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', sefFake: 'still', seekDelay: 600000, fixedClock: '21:34', welcome: false, ptrEdgeDwell: 600000, fakeBg: bg || undefined, fakeSub: sub || undefined }); };
+  var SUB_DE = 'Wir müssen los, bevor der Sturm kommt.', SUB_EN = 'We have to go before the storm hits.';
+  // Darstellungen der Feinauswahl (SPEC PLAY-31): A panel, B stretch, D film (mit/ohne Vorschaubilder), de/en, dunkel/hell, Untertitel
+  [['lpA', 'panel', {}, null, SUB_DE, {}], ['lpAEn', 'panel', { accent: 'violet' }, '#E4DCC8', SUB_EN, { lang: 'en', accent: 'violet' }],
+    ['lpB', 'stretch', {}, null, SUB_DE, {}], ['lpBEn', 'stretch', { thumbs: false }, '#E4DCC8', SUB_EN, { lang: 'en', loupeHints: 3 }],
+    ['lpD', 'film', {}, null, SUB_DE, {}], ['lpDEn', 'film', { accent: 'violet' }, '#E4DCC8', SUB_EN, { lang: 'en', accent: 'violet' }],
+    ['lpDNo', 'film', { thumbs: false }, '#E4DCC8', SUB_DE, { loupeHints: 3 }]].forEach(function (d) {
+    var x = { ptrLoupe: true, loupeStyle: d[1] }; for (var k in d[2]) x[k] = d[2][k];
+    seeds[d[0]] = seed(d[5], { 'settings-aaaa1111.json': x }, cfgLp(d[3], d[4]));
+  });
+  seeds.lpStyleOn = seed({}, { 'settings-aaaa1111.json': { ptrLoupe: true, loupeStyle: 'film' } });
+  seeds.loupe = seed({}, { 'settings-aaaa1111.json': { ptrLoupe: true } }, cfgLp());
+  seeds.loupeSeen = seed({ loupeHints: 3 }, { 'settings-aaaa1111.json': { ptrLoupe: true, thumbs: false } }, cfgLp('#E4DCC8'));     // 4. Mal: Titel statt Hinweis; ohne Vorschaubilder; helles Bild
+  seeds.loupeSeenEn = seed({ loupeHints: 3, lang: 'en' }, { 'settings-aaaa1111.json': { ptrLoupe: true } }, cfgLp('#E4DCC8'));
+  seeds.bookLoupe = seed({}, { 'settings-aaaa1111.json': { ptrLoupe: true } }, cfgLp());   // Hoerbuch mit 45-Min.-Dateien
+  seeds.bookLoupeEn = seed({ lang: 'en' }, { 'settings-aaaa1111.json': { ptrLoupe: true } }, cfgLp());
+  seeds.musicLoupe = seed({}, { 'settings-aaaa1111.json': { ptrLoupe: true } }, cfgLp());   // kurze Musiktitel: nur die Zeit-Blase, keine Feinauswahl
+  seeds.ptrOffEn = seed({ pointer: false, lang: 'en' });
   seeds.ptrEn = seed({ lang: 'en' });
   seeds.playEnLong = seed({ lang: 'en', accent: 'violet' }, { 'settings-aaaa1111.json': { accent: 'violet' } }, cfgPlay);   // eingebettete UT als Text -> Mehr zeigt "Untertitel-Darstellung"
   // P2: PMS-only (setup.json im Paket, preview.html: window.PN_SETUP) + App-PIN (pins.json, gleiche PBKDF2-Pruefsumme wie N.appPin)
@@ -481,13 +602,31 @@ function makeSeeds(port) {
   seeds.pkgSrvMetaFail = seed(pkgState) + pkgWith(['http://127.0.0.1:' + friendPort]);
   seeds.pkgSrvDown = seed(pkgState, { 'srv-aaaa1111.json': { v: 1, s: { 'friend-machine-0001': { uri: '', ts: 1, libs: [{ id: 1, title: 'Kino', type: 'movie', kind: 'movie' }] } } } }) +
     pkgWith(['http://127.0.0.1:9']);
+  // Entdecken mit Helfer (plex.tv-Reihen): Filter "Nur Titel, die du noch nicht hast" an (Standard) / aus; Weitere Server + Helfer
+  var cfgHelper = JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false,
+    helperUrl: 'http://127.0.0.1:' + port, helperKey: 'visual-helper-key-0001' });
+  seeds.inspNew = seed({}, null, cfgHelper);
+  seeds.inspNewEn = seed({ lang: 'en' }, null, cfgHelper);
+  seeds.inspNewOff = seed({}, { 'settings-aaaa1111.json': { inspHideOwn: false } }, cfgHelper);
+  seeds.pkgSrvHelper = seed(pkgState, null, cfgHelper) + pkgWith(['http://127.0.0.1:' + friendPort]);
   seeds.noart = seed();                                                                               // Hero ohne Art: Poster unscharf
   seeds.noartOff = seed({}, { 'settings-aaaa1111.json': { backgrounds: false } });                   // ... Hintergrundbilder aus: einfarbig
+  // DET-3 (TV-Befund 28.10.): Felder und Serien-Balken einzeln abschaltbar
+  seeds.epOff = seed({}, { 'settings-aaaa1111.json': { episodeProgress: false, seriesProgress: true } });
+  seeds.seriesOff = seed({}, { 'settings-aaaa1111.json': { seriesProgress: false } });
   seeds.empty = seed({ server: { uri: base + '/leer', machineId: 'mid', name: 'Leer', token: 'T' } });
   // P5: Willkommenskarte (erster Start des Profils), Bildschirmschoner nach 1,5 s, Spoilerschutz + Uhr aus
   seeds.welcome = seed(null, null, JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34' }));
   seeds.saver = seed(null, null, JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, saverMs: 1500 }));
   seeds.spoiler = seed({}, { 'settings-aaaa1111.json': { spoiler: true, clock: false } });
+  // Uhr auf der Startseite (settings.clockStyle) je Stil, de + en; Tastenhinweise "Nur kurz" (nach 1,5 s weg) und "Aus"
+  ['box', 'free', 'date', 'small'].forEach(function (cs) {
+    seeds['clock_' + cs] = seed({}, { 'settings-aaaa1111.json': { clockStyle: cs } });
+    seeds['clock_' + cs + 'En'] = seed({ lang: 'en' }, { 'settings-aaaa1111.json': { clockStyle: cs, backgrounds: false } });   // dunkler Kopf
+  });
+  var hintCfg = JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, hintMs: 1500 });
+  seeds.hintsBrief = seed({}, { 'settings-aaaa1111.json': { hints: 'brief' } }, hintCfg);
+  seeds.hintsOff = seed({}, { 'settings-aaaa1111.json': { hints: 'off' } });
   // Bildschirmschoner: Einblendung je Stil auf hellem (lange Titel, de), dunklem (lange Titel, en) und unruhigem Bild (de); Quelle Filme
   var svCfg = JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, saverMs: 1500 });
   SAVER_STYLES.forEach(function (st) {
@@ -496,9 +635,26 @@ function makeSeeds(port) {
     seeds['svDark' + cap + 'LongEn'] = seed({ lang: 'en' }, { 'settings-aaaa1111.json': set }, svCfg);
     seeds['svBusy' + cap] = seed({}, { 'settings-aaaa1111.json': set }, svCfg);
   });
+  // jede Lage der Einblendung (TV-Befund 28.10.: Abdunklung nicht buendig am Rand) – Lage 0 zeigen die Szenen oben
+  SAVER_STYLES.forEach(function (st) {
+    var cap = st.charAt(0).toUpperCase() + st.slice(1);
+    [1, 2, 3].forEach(function (k) {
+      seeds['svBusyPos' + cap + k] = seed({}, { 'settings-aaaa1111.json': { saverInfo: st, saverLibs: [1], saverFx: 'cut' } },
+        JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, saverMs: 1500, saverPos: k }));
+    });
+  });
   seeds.svBrightNoclockLongEn = seed({ lang: 'en' }, { 'settings-aaaa1111.json': { saverInfo: 'ambient', saverLibs: [1], saverFx: 'cut', clock: false } }, svCfg);
   seeds.svBusyOff = seed({}, { 'settings-aaaa1111.json': { saverInfo: 'off', saverLibs: [1], saverFx: 'cut' } }, svCfg);
   seeds.svDarkFade = seed({}, { 'settings-aaaa1111.json': { saverLibs: [1] } }, svCfg);   // Standard: Ueberblenden + Ambient
+  // SAV-5 "Bilder im Bildschirmschoner": Standard (Standbilder uebersprungen), Auch Standbilder, Poster je Einblendung (+ Lage 1, en)
+  seeds.svPicArt = seed({}, { 'settings-aaaa1111.json': { saverLibs: [1], saverFx: 'cut' } }, svCfg);
+  seeds.svPicStills = seed({}, { 'settings-aaaa1111.json': { saverLibs: [1], saverFx: 'cut', saverPics: 'stills' } }, svCfg);
+  SAVER_STYLES.concat(['off']).forEach(function (st) {
+    var cap = st.charAt(0).toUpperCase() + st.slice(1);
+    seeds['svPicPoster' + cap] = seed({}, { 'settings-aaaa1111.json': { saverLibs: [1], saverFx: 'cut', saverPics: 'poster', saverInfo: st } }, svCfg);
+    seeds['svPicPoster' + cap + 'En1'] = seed({ lang: 'en' }, { 'settings-aaaa1111.json': { saverLibs: [1], saverFx: 'cut', saverPics: 'poster', saverInfo: st } },
+      JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, saverMs: 1500, saverPos: 1 }));
+  });
   // Anime je Titel: alle synthetischen Serien per eigener Markierung als Anime; Variante mit ausgeblendeter Kategorie
   var animeOv = { 900: 1, 910: 1 };
   for (var ai = 0; ai < 30; ai++) animeOv[5100 + ai * 10] = 1;
@@ -507,6 +663,12 @@ function makeSeeds(port) {
   seeds.violet = seed({ accent: 'violet' }, { 'settings-aaaa1111.json': { accent: 'violet' } });
   seeds.coral = seed({ accent: 'coral' }, { 'settings-aaaa1111.json': { accent: 'coral' } });
   seeds.coralPlay = seed({ accent: 'coral' }, { 'settings-aaaa1111.json': { accent: 'coral' } }, cfgPlay);
+  // Hintergrund in Bibliotheken: Farbstimmung (Standard, ohne Eintrag), kraeftiger, Titelbild, Zufallsbild, aus, ohne Hintergrundbilder
+  function amb(o, l) { return seed(l ? { lang: l } : {}, { 'settings-aaaa1111.json': o }); }
+  seeds.ambMood = amb({}); seeds.ambStrong = amb({ libBgStrength: 'strong' }); seeds.ambArt = amb({ libBg: 'art' });
+  seeds.ambArtStrong = amb({ libBg: 'art', libBgStrength: 'strong' }); seeds.ambRandom = amb({ libBg: 'random' }); seeds.ambOff = amb({ libBg: 'off' });
+  seeds.ambCorner = amb({ libBg: 'art', libBgStrength: 'strong' });   // Titelbild knallbunt und hell (gradPng): Ecke unten links
+  seeds.ambNoBg = amb({ libBg: 'art', backgrounds: false }); seeds.ambEn = amb({}, 'en'); seeds.ambRm = amb({ reduceMotion: true });
   seeds.animeHidden = seed({}, { 'anime-aaaa1111.json': animeOv, 'settings-aaaa1111.json': { animeShow: false } });
 }
 var LOGIN_MASK = [[144, 476, 640, 70]];
@@ -528,6 +690,7 @@ var SCENES = [
   { name: 'home', seed: 'home' },
   { name: 'home-en', seed: 'en' },
   { name: 'home-row2', seed: 'home', keys: 'DOWN,RIGHT' },
+  { name: 'home-last', seed: 'home', keys: 'DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // HOME-11: letzte Reihe, kein "darunter"-Pfeil
   { name: 'home-poster', seed: 'home', keys: 'DOWN,DOWN,RIGHT,RIGHT', mask: [[320, 270, 600, 34]] },   // "Ende um HH:MM" haengt von der Uhr ab
   { name: 'home-rail', seed: 'home', keys: 'LEFT,DOWN' },
   { name: 'home-tools', seed: 'home', keys: 'TOOLS' },
@@ -536,6 +699,10 @@ var SCENES = [
   { name: 'home-noart', seed: 'noart' },                 // TV 27.10.: Titel ohne Art -> Serienposter unscharf (Server-blur), mittig beschnitten
   { name: 'home-noart-off', seed: 'noartOff' },          // Einstellung Hintergrundbilder aus -> einfarbig wie bisher
   { name: 'settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT' },
+  // DET-3: "Serien-Fortschritt anzeigen" mit Erklaerung (DE/EN)
+  { name: 'settings-seriesprog', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-seriesprog-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-epprog-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN' },
   { name: 'settings-diag', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT' },
   { name: 'search', seed: 'home', keys: 'BLUE' },
   { name: 'search-123', seed: 'home', keys: 'BLUE,wait600,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
@@ -546,11 +713,28 @@ var SCENES = [
   { name: 'p4-discover-results', seed: 'home', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT' },
   { name: 'p4-discover-ext', seed: 'home', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN' },
   { name: 'p4-ext-details', seed: 'home', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,ENTER,wait1200' },
+  // DISC-5 Details fremder Titel: mit Helfer (Plex-Katalog) Film/Serie voll, Film minimal, Besetzung fokussiert, INFO; ohne Helfer ohne Beschreibung
+  { name: 'p4-ext-details-full', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,ENTER,wait1500' },
+  { name: 'p4-ext-details-full-info', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,ENTER,wait1500,INFO,wait400' },
+  { name: 'p4-ext-details-cast', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,ENTER,wait1500,DOWN,wait900' },
+  { name: 'p4-ext-details-show', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,ENTER,wait1500' },
+  { name: 'p4-ext-details-show-en', seed: 'inspNewEn', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,ENTER,wait1500' },
+  { name: 'p4-ext-details-min', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,RIGHT,ENTER,wait1500' },
+  { name: 'p4-ext-details-nohelper', seed: 'home', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,RIGHT,RIGHT,RIGHT,RIGHT,ENTER,wait1200' },
   { name: 'p4-insp-rows', seed: 'home', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,DOWN,wait800' },   // Inspiration: Fokus in der 4. Reihe
   { name: 'p4-insp-back', seed: 'home', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,RIGHT,ENTER,wait1200,RETURN,wait900' },   // Detailseite und zurueck: Fokus bleibt in der Reihe
   { name: 'p4-insp-cleared', seed: 'home', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RED,wait1500' },   // Eingabe geloescht -> Reihen wieder da
-  { name: 'p4-insprows', seed: 'insp', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait600' },   // Einstellungen > Inspiration anpassen
-  { name: 'p4-settings-watchlist', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p4-insprows', seed: 'insp', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait600' },   // Einstellungen > Inspiration anpassen
+  { name: 'p4-settings-watchlist', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  // "Nur Titel, die du noch nicht hast" (Entdecken, plex.tv-Reihen ueber den Helfer): Einstellung de/en, mit Weiteren Servern, Reihen mit Filter
+  { name: 'p4-settings-insphide', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 19) + ',wait600' },
+  { name: 'p4-settings-insphide-info', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 19) + ',wait600,INFO' },   // INFO: alles erklaert
+  { name: 'p4-settings-insphide-en', seed: 'inspNewEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 19) + ',wait600' },
+  { name: 'p4-settings-insphide-srv', seed: 'pkgSrvHelper', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 20) + ',wait600' },   // zweite Zeile: auch Weitere Server
+  { name: 'p4-insp-new', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,wait800' },          // Filter an: nur fremde Titel + Hinweis-Reihe
+  { name: 'p4-insp-new-en', seed: 'inspNewEn', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,wait800' },
+  { name: 'p4-insp-new-skip', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,wait800' },   // DOWN springt ueber den Hinweis
+  { name: 'p4-insp-new-off', seed: 'inspNewOff', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,wait800' },   // Filter aus: Marken wie bisher
   { name: 'settings-homerows', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,ENTER,DOWN' },
   { name: 'settings-homerows-move', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,ENTER,DOWN,DOWN,DOWN,YELLOW,UP' },
   { name: 'home-custom', seed: 'custom' },
@@ -580,17 +764,17 @@ var SCENES = [
   // P5 Einstellungen & Komfort
   { name: 'p5-settings-subs', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'p5-settings-anime', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,RIGHT,DOWN' },
-  { name: 'p5-settings-display', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-settings-display', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   // Zeiger-Scrollen beschleunigen (abhaengig von Zeiger-Steuerung): an, Zeiger-Steuerung selbst (Erklaerung mit "Aus: …"), Zeiger aus = grau, englisch
-  { name: 'settings-ptraccel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP' },
-  { name: 'settings-pointer', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP,UP' },
-  { name: 'settings-ptraccel-off', seed: 'ptrOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP' },
-  { name: 'settings-ptraccel-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP' },
-  { name: 'settings-pointer-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP,UP' },
+  { name: 'settings-ptraccel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP' },
+  { name: 'settings-pointer', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP,UP' },
+  { name: 'settings-ptraccel-off', seed: 'ptrOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP' },
+  { name: 'settings-ptraccel-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP' },
+  { name: 'settings-pointer-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP,UP' },
   { name: 'p5-settings-help', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN' },
   { name: 'p5-settings-boost', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'p5-keys', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'p5-conntest', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER,wait1500', mask: [[872, 112, 376, 30]] },
+  { name: 'p5-conntest', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER,wait1500', mask: [[872, 112, 376, 48]] },   // Antwortzeit (gemessen, 0/1 ms; bricht in die 2. Zeile um)
   // Anime je Titel (docs/TODO.md "Anime-Erkennung"): Ueberzeile, Grund im INFO-Panel, TOOLS-Eintraege, Kategorie ausgeblendet
   { name: 'p5-anime-details', seed: 'anime', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800' },
   { name: 'p5-anime-info', seed: 'anime', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,INFO' },
@@ -602,11 +786,25 @@ var SCENES = [
   { name: 'saver-off-busy', seed: 'svBusyOff', keys: 'wait6000' },
   { name: 'saver-fade-done', seed: 'svDarkFade', keys: 'wait7000' },                   // Standard (Ueberblenden) nach dem ersten Bild
   // Einstellungen: Schoner-Zeilen, Auswahl Uebergang/Einblendung, Mehrfachauswahl Bibliotheken
-  { name: 'saver-settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,' + rep('DOWN', 19) },
-  { name: 'saver-fx-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,' + rep('DOWN', 22) + ',ENTER' },
-  { name: 'saver-info-picker-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,' + rep('DOWN', 23) + ',ENTER' },
-  { name: 'saver-libs-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,' + rep('DOWN', 19) + ',ENTER,DOWN,DOWN,DOWN,ENTER' },   // Musik dazu
+  { name: 'saver-settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 21) },
+  { name: 'saver-fx-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 24) + ',ENTER' },
+  { name: 'saver-info-picker-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 25) + ',ENTER' },
+  { name: 'saver-libs-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 21) + ',ENTER,DOWN,DOWN,DOWN,ENTER' },   // Musik dazu
   { name: 'p5-spoiler', seed: 'spoiler', keys: 'DOWN' },
+  // Uhr auf der Startseite: je Stil hell (de, Hero-Bild), dunkel (en, Hintergrundbilder aus), kraeftig gruen (de, Film-Reihe)
+  { name: 'clock-box', seed: 'clock_box' }, { name: 'clock-free', seed: 'clock_free' }, { name: 'clock-date', seed: 'clock_date' }, { name: 'clock-small', seed: 'clock_small' },
+  { name: 'clock-free-en', seed: 'clock_freeEn' }, { name: 'clock-date-en', seed: 'clock_dateEn' }, { name: 'clock-small-en', seed: 'clock_smallEn' },
+  { name: 'clock-free-green', seed: 'clock_free', keys: 'DOWN,DOWN,RIGHT,RIGHT', mask: [[320, 270, 600, 34]] },
+  { name: 'clock-date-green', seed: 'clock_date', keys: 'DOWN,DOWN,RIGHT,RIGHT', mask: [[320, 270, 600, 34]] },
+  { name: 'clock-small-green', seed: 'clock_small', keys: 'DOWN,DOWN,RIGHT,RIGHT', mask: [[320, 270, 600, 34]] },
+  // Tastenhinweise: "Nur kurz" nach dem Ausblenden, wieder da nach TOOLS (neues Menue); "Aus"; Einstellungszeile + Auswahl + INFO
+  { name: 'hints-brief-faded', seed: 'hintsBrief', keys: 'wait3000' },
+  { name: 'hints-brief-tools', seed: 'hintsBrief', keys: 'wait3000,TOOLS' },
+  { name: 'hints-off', seed: 'hintsOff' },
+  { name: 'settings-clockstyle', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,' + rep('DOWN', 16) + ',ENTER' },
+  { name: 'settings-clockstyle-off', seed: 'spoiler', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,' + rep('DOWN', 16) },   // Uhr aus: Zeile gedimmt, Satz erklaert warum
+  { name: 'settings-hints-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,' + rep('DOWN', 17) + ',ENTER' },
+  { name: 'settings-hints-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,' + rep('DOWN', 17) + ',INFO' },
   // Akzentfarbe: Einstellung (Farbfeld), Auswahl mit Farbfeldern, Wechsel wirkt sofort; Startseite/Seitenleiste in anderen Farben
   { name: 'accent-setting', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN' },
   { name: 'accent-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN' },
@@ -643,6 +841,14 @@ var SCENES = [
   { name: 'details-show-noart', seed: 'home', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,9,9,9,9,wait1500,ENTER,wait800' },
   { name: 'details-show-noart-eps', seed: 'home', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,9,9,9,9,wait1500,ENTER,wait800,DOWN,DOWN', mask: [[144, 124, 1000, 26]] },
   { name: 'details-show-cells', seed: 'home', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,RIGHT,wait800,DOWN' },
+  // DET-3: nach dem Zurueck zu den Knoepfen bleiben es Felder, Marker = naechste Folge; Einstellungen einzeln
+  { name: 'details-show-cells-up', seed: 'home', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,RIGHT,wait800,DOWN,RIGHT,RIGHT,wait800,UP,UP,wait800' },
+  { name: 'details-show-epoff', seed: 'epOff', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,RIGHT,wait800,DOWN' },
+  { name: 'details-show-seriesoff', seed: 'seriesOff', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,RIGHT,wait800,DOWN' },
+  { name: 'details-show-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,RIGHT,wait800,DOWN' },
+  // Nutzerbefund 28.10.: Zeiger ueber dem Staffel-Pfeil › bzw. ‹ -> hinterlegt wie ein Reiter
+  { name: 'details-tabs-ptr-r', seed: 'ptrHold', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN', mwait: 6500, moves: '600:200,480:350,486:352' },
+  { name: 'details-tabs-ptr-l', seed: 'ptrHold', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,RIGHT,RIGHT,RIGHT,wait800', mwait: 7500, moves: '600:200,150:350,148:352' },
   { name: 'settings-play-end', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   // M4 Musik (Bibliothek 3 "Musik"): quadratische Karten, Alben-Reiter, Album-/Kuenstlerseite, Jetzt laeuft, Mini-Player
   { name: 'music-artists', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800' },
@@ -658,12 +864,92 @@ var SCENES = [
   { name: 'music-mini', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait1500' },
   // TV-Test 27.10. nachmittags (F24–F30): heller Hintergrund, Titelkarten ohne Cover, Mini-Player (Pause, Platz, A–Z), lange Namen
   { name: 'music-np-nocover', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,RIGHT,RIGHT,ENTER,wait800,ENTER,wait800' },
+  // Nutzerauftrag 28.10. (docs/research/player-controls.md): eine Knopf-Familie fuer Video, Musik, Hoerbuch; ⏮/⏭ nach Inhalt; Zeiger-Vorschau am Balken
+  { name: 'music-np-en', seed: 'playEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800' },
+  { name: 'music-np-prev', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,LEFT,LEFT' },
+  { name: 'music-np-asym', seed: 'playAsym', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,LEFT' },
+  { name: 'book-np', seed: 'bookPlay', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800' },
+  { name: 'book-np-en', seed: 'bookPlayEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RIGHT,RIGHT' },
+  { name: 'book-mini', seed: 'bookPlay', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait1500' },
+  { name: 'music-mini-en', seed: 'playEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait1500' },
+  { name: 'player-pn-prev', seed: 'play', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,LEFT,LEFT', mask: CLOCK },                 // Film mit Kapiteln: ⏮ Voriges Kapitel
+  { name: 'player-pn-next-en', seed: 'playEnLong', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,RIGHT,PAUSE', mask: CLOCK },      // lang + en + violett: ⏭ Next chapter, Pause-Hinweise
+  { name: 'player-asym', seed: 'playAsym', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,RIGHT', mask: CLOCK },                    // -10 / +30
+  { name: 'player-ep-pn', seed: 'play', keys: 'ENTER,ENTER,wait800,UP,DOWN,LEFT,LEFT', mask: CLOCK },     // Folge: erste der Queue -> ⏮ gedimmt, Fokus bleibt auf -10; Skip-Knopf sichtbar
+  { name: 'player-hover', seed: 'ptrHoldPlay', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,700:486', mask: CLOCK },   // Zeiger ueber dem Balken: Zeit + Vorschaubild
+  { name: 'player-hover-skip', seed: 'ptrHoldPlay', keys: 'ENTER,ENTER,wait800,UP', mwait: 5600, moves: '600:300,1150:486', mask: CLOCK },   // Vorschau am rechten Rand ueber dem Skip-Knopf
+  { name: 'player-click-bar', seed: 'ptrHoldPlay', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,900:486,click@900:486', mask: CLOCK },   // Klick: Ziel steht, Sprung erst nach Ruhe
+  { name: 'player-upnext-hover', seed: 'ptrHoldPlay', keys: 'RIGHT,ENTER,ENTER', mwait: 5200, moves: '600:300,1000:486', mask: [[832, 334, 176, 10]].concat(CLOCK) },   // Vorschau + Countdown-Karte
+  // Feinauswahl am Balken (docs/research/player-controls.md "Feinauswahl", SPEC PLAY-30): Zeiger ruht 700 ms (kleinste Bewegungen = Finger
+  // auf dem Touchpad), dann 60 px weiter. Standard-Form A (Lasche); Mitte/Balkenanfang/Skip/Countdown: player-lpA*. Hier: ohne
+  // Vorschaubilder/hell, Klick, nach oben weg, Schutzzone (Zeiger rutscht auf die Knopfreihe: kein Knopf reagiert, Klick setzt das Ziel)
+  { name: 'player-loupe-plain', seed: 'loupeSeen', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,700:486,701:486,700:486,701:486,700:486,760:486', mask: CLOCK },   // ohne Vorschaubilder, helles Bild, Titel statt Hinweis
+  { name: 'player-loupe-plain-en', seed: 'loupeSeenEn', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,700:486,701:486,700:486,701:486,700:486,760:486', mask: CLOCK },
+  { name: 'player-loupe-click', seed: 'loupe', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,700:486,701:486,700:486,701:486,700:486,760:486,click@760:486', mask: CLOCK },   // Klick: Lasche zu, Ziel steht (+x), ein Sprung nach Ruhe
+  { name: 'player-loupe-guard', seed: 'loupe', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,700:486,701:486,700:486,701:486,700:486,720:512,740:540,760:562,900:562,1000:562', mask: CLOCK },   // Schutzzone: auf der Knopfreihe weiter offen, kein Knopf fokussiert, Zeit haftet am Fensterende
+  { name: 'player-loupe-guard-click', seed: 'loupe', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,700:486,701:486,700:486,701:486,700:486,680:512,620:540,580:562,click@580:562', mask: CLOCK },   // Klick auf Play/Pause: setzt das Ziel, keine Pause
+  { name: 'player-loupe-up', seed: 'loupe', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,700:486,701:486,700:486,701:486,700:486,760:486,760:360', mask: CLOCK },   // nach oben ueber die Lasche weg: zu, grobe Ansicht
+  // Darstellungen (PLAY-31): je Form Film 2 h Mitte (+ Untertitel), Balkenanfang (en, hell, violett), Folge mit Skip-Knopf links/rechts,
+  // Countdown-Karte; D ohne Vorschaubilder -> Panel. Kollisionsmatrix: docs/research/player-controls.md "Darstellungen"
+  { name: 'player-lpA', seed: 'lpA', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,700:486,701:486,700:486,701:486,700:486,760:486', mask: CLOCK },
+  { name: 'player-lpA-en', seed: 'lpAEn', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,300:486,301:486,300:486,301:486,300:486,250:486', mask: CLOCK },
+  { name: 'player-lpA-skip', seed: 'lpA', keys: 'ENTER,ENTER,wait800,UP', mwait: 5600, moves: '600:300,400:486,401:486,400:486,401:486,400:486,430:470', mask: CLOCK },   // Lasche links: Skip-Knopf bleibt
+  { name: 'player-lpA-skip-r', seed: 'lpA', keys: 'ENTER,ENTER,wait800,UP', mwait: 5600, moves: '600:300,1100:486,1101:486,1100:486,1101:486,1100:486,1150:470', mask: CLOCK },   // rechts: Skip-Knopf weicht
+  { name: 'player-lpA-upnext', seed: 'lpA', keys: 'RIGHT,ENTER,ENTER', mwait: 5200, moves: '600:300,1000:486,1001:486,1000:486,1001:486,1000:486,1040:440', mask: [[832, 334, 176, 10]].concat(CLOCK) },
+  // Keil-Linien an den Balkenenden (TV-Befund 28.10.: Enden gleich weich): Fenster ganz am Anfang/Ende, Ausschnitt an der Balkenkante
+  { name: 'player-lpA-start', seed: 'lpA', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,100:486,101:486,100:486,101:486,100:486,110:486', mask: CLOCK },
+  { name: 'player-lpA-end', seed: 'lpA', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,1180:486,1181:486,1180:486,1181:486,1180:486,1170:486', mask: CLOCK },
+  { name: 'player-lpB', seed: 'lpB', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,700:486,701:486,700:486,701:486,700:486,760:486', mask: CLOCK },
+  { name: 'player-lpB-en', seed: 'lpBEn', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,300:486,301:486,300:486,301:486,300:486,250:486', mask: CLOCK },   // ohne Bilder: Zeit-Blase
+  { name: 'player-lpB-guard', seed: 'lpB', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,700:486,701:486,700:486,701:486,700:486,710:512,715:540,720:562', mask: CLOCK },   // B: Schutzzone auf der Knopfreihe
+  { name: 'player-lpB-skip', seed: 'lpB', keys: 'ENTER,ENTER,wait800,UP', mwait: 5600, moves: '600:300,1100:486,1101:486,1100:486,1101:486,1100:486,1150:470', mask: CLOCK },
+  { name: 'player-lpD', seed: 'lpD', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6800, moves: '600:300,700:486,701:486,700:486,701:486,700:486,760:486', mask: CLOCK },
+  { name: 'player-lpD-en', seed: 'lpDEn', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6800, moves: '600:300,300:486,301:486,300:486,301:486,300:486,250:420', mask: CLOCK },   // Zeiger in den Bildern
+  { name: 'player-lpD-skip', seed: 'lpD', keys: 'ENTER,ENTER,wait800,UP', mwait: 6200, moves: '600:300,1100:486,1101:486,1100:486,1101:486,1100:486,1150:470', mask: CLOCK },
+  { name: 'player-lpD-upnext', seed: 'lpD', keys: 'RIGHT,ENTER,ENTER', mwait: 5800, moves: '600:300,1000:486,1001:486,1000:486,1001:486,1000:486,1040:440', mask: [[832, 334, 176, 10]].concat(CLOCK) },
+  { name: 'player-lpD-end', seed: 'lpD', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6800, moves: '600:300,1180:486,1181:486,1180:486,1181:486,1180:486,1170:486', mask: CLOCK },   // Keil am Balkenende
+  { name: 'player-lpD-nothumbs', seed: 'lpDNo', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,700:486,701:486,700:486,701:486,700:486,760:486', mask: CLOCK },   // -> Panel
+  { name: 'player-lpD-up', seed: 'lpD', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6800, moves: '600:300,700:486,701:486,700:486,701:486,700:486,760:486,760:280', mask: CLOCK },   // ueber die Lasche hinaus: zu
+  { name: 'settings-loupe-style', seed: 'lpStyleOn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,' + rep('DOWN', 18) + ',ENTER' },
+  { name: 'settings-loupe-style-off-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,' + rep('DOWN', 18) },
+  { name: 'book-np-loupe', seed: 'bookLoupe', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,860:404,861:404,860:404,861:404,860:404,900:404' },
+  { name: 'book-np-loupe-en', seed: 'bookLoupeEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,640:404,641:404,640:404,641:404,640:404,620:420' },
+  { name: 'book-np-loupe-guard', seed: 'bookLoupe', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,860:404,861:404,860:404,861:404,860:404,870:440,880:480,890:510' },   // Jetzt laeuft (B): Zeiger auf der Knopfreihe, Knoepfe reagieren nicht
+  { name: 'music-np-hover', seed: 'musicLoupe', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,860:404,861:404,860:404,861:404,860:404' },   // Musiktitel 3 Min.: nur Zeit-Blase
+  { name: 'settings-loupe-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,' + rep('DOWN', 17) + ',INFO' },
+  { name: 'settings-loupe-off-en', seed: 'ptrOffEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,' + rep('DOWN', 17) },
   { name: 'music-mini-nocover', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,RIGHT,RIGHT,ENTER,wait800,ENTER,wait800,PAUSE,RETURN,wait1500' },
   { name: 'music-mini-list', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait1500,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait800' },
   { name: 'music-mini-lib', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait800,RETURN,wait1500' },
   { name: 'music-artist-groups', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,RIGHT,RIGHT,ENTER,wait800,DOWN' },   // Alben + Live + Kompilation
   { name: 'music-artist-groups2', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,RIGHT,RIGHT,ENTER,wait800,DOWN,DOWN,DOWN' },
   { name: 'music-artist-bright', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800' },
+  // Hintergrund in Bibliotheken: je Modus/Staerke die schwierigsten Titel (fast weiss, knallbunt), Liste, A–Z, Chips, Musik, Einstellungen
+  { name: 'amb-mood-bright', seed: 'ambMood', keys: 'LEFT,DOWN,ENTER,wait1800' },
+  { name: 'amb-mood-colour', seed: 'ambMood', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,wait1800' },
+  { name: 'amb-mood-normal', seed: 'ambMood', keys: 'LEFT,DOWN,ENTER,wait800,DOWN,RIGHT,wait1800' },
+  { name: 'amb-strong-colour', seed: 'ambStrong', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,wait1800' },
+  { name: 'amb-strong-bright', seed: 'ambStrong', keys: 'LEFT,DOWN,ENTER,wait1800' },
+  { name: 'amb-mood-list', seed: 'ambMood', keys: 'LEFT,DOWN,ENTER,wait800,RED,RIGHT,RIGHT,DOWN,DOWN,DOWN,ENTER,RETURN,wait800,DOWN,wait1800' },
+  { name: 'amb-strong-list', seed: 'ambStrong', keys: 'LEFT,DOWN,ENTER,wait800,RED,RIGHT,RIGHT,DOWN,DOWN,DOWN,ENTER,RETURN,wait1800' },
+  { name: 'amb-mood-small', seed: 'ambStrong', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RED,RIGHT,RIGHT,DOWN,DOWN,ENTER,RETURN,wait800,RIGHT,wait1800' },
+  { name: 'amb-mood-reg', seed: 'ambStrong', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,wait1800' },
+  { name: 'amb-mood-chips', seed: 'ambStrong', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,wait1500,UP,wait600' },
+  { name: 'amb-art-bright', seed: 'ambArt', keys: 'LEFT,DOWN,ENTER,wait1800' },
+  { name: 'amb-art-strong', seed: 'ambArtStrong', keys: 'LEFT,DOWN,ENTER,wait1800' },
+  { name: 'amb-art-normal', seed: 'ambArtStrong', keys: 'LEFT,DOWN,ENTER,wait800,DOWN,RIGHT,wait1800' },
+  { name: 'amb-corner', seed: 'ambCorner', keys: 'LEFT,DOWN,ENTER,wait1800' },   // Seitenleiste + Band unten als ein Rahmen, weiche Ecke unten links (TV-Befund 28.10.)
+  { name: 'amb-random', seed: 'ambRandom', keys: 'LEFT,DOWN,ENTER,wait800,DOWN,RIGHT,wait1800' },
+  { name: 'amb-nobg-art', seed: 'ambNoBg', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,wait1800' },   // Hintergrundbilder aus: Titelbild -> Farbstimmung
+  { name: 'amb-off', seed: 'ambOff', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,wait1800' },
+  { name: 'amb-rm', seed: 'ambRm', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,wait1000' },          // Reduzierte Bewegung: sofortiger Tausch
+  { name: 'amb-music', seed: 'ambStrong', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,RIGHT,wait1800' },
+  { name: 'amb-settings', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'amb-settings-panel', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'amb-settings-strength', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'amb-settings-off', seed: 'ambOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'amb-settings-en', seed: 'ambEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'amb-settings-panel-en', seed: 'ambEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
   { name: 'rail-long', seed: 'longLib', keys: 'LEFT' },
   // Weitere Server: Seitenleiste mit Bibliotheken eines freigegebenen Servers (Herkunft), Bibliothek/Details mit Herkunft,
   // Seitenleiste anpassen, Einstellungszeile, nicht erreichbarer Server (Meldung nur fuer ihn)
@@ -681,24 +967,187 @@ SAVER_STYLES.forEach(function (st) {
   var cap = st.charAt(0).toUpperCase() + st.slice(1);
   SCENES.push({ name: 'saver-' + st + '-bright', seed: 'svBright' + cap + 'Long', keys: 'wait6000' },
     { name: 'saver-' + st + '-dark-en', seed: 'svDark' + cap + 'LongEn', keys: 'wait6000' },
-    { name: 'saver-' + st + '-busy', seed: 'svBusy' + cap, keys: 'wait6000' });
+    { name: 'saver-' + st + '-busy', seed: 'svBusy' + cap, keys: 'wait6000' },
+    { name: 'saver-' + st + '-pos1', seed: 'svBusyPos' + cap + '1', keys: 'wait6000' }, { name: 'saver-' + st + '-pos2', seed: 'svBusyPos' + cap + '2', keys: 'wait6000' },
+    { name: 'saver-' + st + '-pos3', seed: 'svBusyPos' + cap + '3', keys: 'wait6000' });
+});
+/* SAV-5: Einstellung (Zeile, Auswahl en, INFO-Erklaerung), Standard ueberspringt Standbilder, Auch Standbilder, Poster je Einblendung */
+var SV_SET = 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 27);
+SCENES.push({ name: 'saver-pics-setting', seed: 'home', keys: SV_SET }, { name: 'saver-pics-picker-en', seed: 'en', keys: SV_SET + ',ENTER' },
+  { name: 'saver-pics-info', seed: 'home', keys: SV_SET + ',wait600,INFO' }, { name: 'saver-pics-art', seed: 'svPicArt', keys: 'wait6000' },
+  { name: 'saver-pics-stills', seed: 'svPicStills', keys: 'wait6000' });
+SAVER_STYLES.concat(['off']).forEach(function (st) {
+  var cap = st.charAt(0).toUpperCase() + st.slice(1);
+  SCENES.push({ name: 'saver-pics-poster-' + st, seed: 'svPicPoster' + cap, keys: 'wait6000' }, { name: 'saver-pics-poster-' + st + '-en1', seed: 'svPicPoster' + cap + 'En1', keys: 'wait6000' });
 });
 
+var running = null;                                          // laufender Firefox (der Worker beendet ihn beim Abbruch)
 function shot(port, sc, done) {
   var prof = fs.mkdtempSync(path.join(os.tmpdir(), 'pnvis-'));
   var keys = (sc.keys ? '&keys=' + sc.keys + '&wait=1800' : '') + (sc.moves ? '&moves=' + sc.moves + '&mwait=' + (sc.mwait || 2500) : '');
   var hold = sc.hold || 3500 + (sc.keys ? sc.keys.split(',').length * 400 + 1800 : 0) + (sc.moves ? sc.moves.split(',').length * 300 : 0);
   var url = 'file://' + path.join(ROOT, 'tools', 'preview.html') + '?clear=1&seed=' + encodeURIComponent('http://127.0.0.1:' + port + '/seed/' + sc.seed + '.js') +
-    '&hold=' + hold + '&holdurl=' + encodeURIComponent('http://127.0.0.1:' + port + '/sleep') + keys + (MIN ? '&min=1' : '');
+    '&hold=' + hold + '&holdurl=' + encodeURIComponent('http://127.0.0.1:' + port + '/sleep') + keys + (MIN ? '&min=1' : '') +
+    (LAYOUT ? '&probe=' + encodeURIComponent('http://127.0.0.1:' + port + '/layout?scene=' + encodeURIComponent(sc.name)) : '');
   var out = path.join(CUR, sc.name + '.png');
   try { fs.unlinkSync(out); } catch (e) {}
-  cp.execFile(FIREFOX, ['--headless', '-no-remote', '-profile', prof, '--window-size=1280,720', '--screenshot', out, url], { timeout: 60000 }, function () {
+  running = cp.execFile(FIREFOX, ['--headless', '-no-remote', '-profile', prof, '--window-size=1280,720', '--screenshot', out, url], { timeout: 60000 }, function () {
+    running = null;
     try { fs.rmSync(prof, { recursive: true, force: true }); } catch (e) {}
     done(fs.existsSync(out));
   });
 }
 
+/* Selbsttest der Layout-Pruefung (tools/layout_selftest.html): genau diese Befunde muessen kommen, sonst ist sie blind */
+var LAYOUT_EXPECT = ['button x-btn x-btn-hint', 'clip x-clip', 'edge x-edge', 'notice x-note x-note-under', 'offscreen x-off', 'overlap x-ov-a x-ov-b', 'panel x-pa x-pb', 'safe x-safe'];
+function layoutSelftest(port, done) {
+  var prof = fs.mkdtempSync(path.join(os.tmpdir(), 'pnvis-')), out = path.join(CUR, 'layout-selftest.png');
+  var url = 'file://' + path.join(ROOT, 'tools', 'layout_selftest.html') + '?probe=' + encodeURIComponent('http://127.0.0.1:' + port + '/layout?scene=_selftest');
+  cp.execFile(FIREFOX, ['--headless', '-no-remote', '-profile', prof, '--window-size=1280,720', '--screenshot', out, url], { timeout: 60000 }, function () {
+    try { fs.rmSync(prof, { recursive: true, force: true }); fs.unlinkSync(out); } catch (e) {}
+    var r = layoutRes._selftest, got = [];
+    delete layoutRes._selftest;
+    ((r && r.v) || []).forEach(function (v) {
+      var ids = [v.a, v.b].filter(Boolean).map(function (x) { var m = /#((?:x|ok)-[\w-]+)(?!.*#)/.exec(x.p); return m ? m[1] : '?'; }).sort();
+      got.push(v.t + ' ' + ids.join(' '));
+    });
+    got.sort();
+    var ok = JSON.stringify(got) === JSON.stringify(LAYOUT_EXPECT);
+    if (!ok) console.log('Layout-Selbsttest FEHLGESCHLAGEN (tools/layout_selftest.html)\n  erwartet: ' + LAYOUT_EXPECT.join(' | ') + '\n  bekommen: ' + (r && r.err ? r.err : got.join(' | ')));
+    done(ok);
+  });
+}
+
+/* ---------- Parallelbetrieb ----------
+ * Jeder Worker ist ein eigener Node-Prozess (node tools/visual.js --worker) mit eigenem Mock-Server und Port: der Mock haelt
+ * Zustand je Szene (curSeed, Seeds mit Port) und darf deshalb nie von zwei Szenen gleichzeitig benutzt werden.
+ * Jeder Firefox bekommt wie bisher ein eigenes, frisches Profil -> gleiche Bilder wie nacheinander.
+ * Gemessen 28.10.2026 (16 Kerne, Firefox 158, andere Agenten aktiv): 227 Szenen nacheinander 3029 s, 8 parallel 309-341 s;
+ * 243 Szenen + Layout-Pruefung nacheinander 2614 s, 8 parallel 332 s. Bilder ausserhalb der zeitabhaengigen Masken pixelgleich
+ * (201 von 243 byte-identisch, Rest nur Uhr/"Ende um"/Antwortzeit), Layout-Bericht gleich bis auf die Messdauer der Sonde.
+ * Die Zeit steckt fast ganz im Warten der Szenen (Summe hold = 2241 s -> Untergrenze bei 8 parallel ~280 s); der Start eines
+ * Firefox kostet ~0,75 s je Szene. Ein dauerhafter Browser je Worker (WebDriver BiDi) spart damit hoechstens ~20 s je Lauf,
+ * liefert die Bilder aber ueber einen anderen Weg (captureScreenshot statt --screenshot) und teilt Zustand zwischen Szenen –
+ * bewusst nicht umgesetzt. */
+function worker() {
+  startServer(function (srv, port) {
+    makeSeeds(port);
+    process.on('message', function (m) {
+      var sc = SCENES.filter(function (s) { return s.name === m.name; })[0];
+      if (m.selftest) return layoutSelftest(port, function (ok) { process.send({ selftest: ok }); });
+      if (!sc) return process.send({ i: m.i, ok: false });
+      shot(port, sc, function (ok) { var lr = layoutRes[sc.name]; delete layoutRes[sc.name]; process.send({ i: m.i, ok: ok, layout: lr }); });   // Layout-Befund kommt per POST vor dem Screenshot
+    });
+    process.on('disconnect', function () { if (running) try { running.kill('SIGKILL'); } catch (e) {} srv.close(); process.exit(0); });
+    process.send({ ready: true });
+  });
+}
+
+/* Rechnerweite Grenze fuer gleichzeitige Firefox (mehrere Laeufe, Agenten, Worktrees): je Szene ein Eintrag in LOCKDIR
+ * '<zeit>-<pid>-<zufall>'. Die aeltesten MAX_TOTAL Eintraege duerfen rendern, spaetere warten (Warteschlange nach Zeit).
+ * Verwaist = Prozess tot oder Eintrag > 3 min nicht aufgefrischt (Wartende frischen beim Nachsehen auf, Szenen dauern < 1 min). */
+var held = {}, lastTs = 0;
+function slotAcquire(cb, max, dir) {
+  max = max === undefined ? MAX_TOTAL : max; dir = dir || LOCKDIR;
+  if (!(max > 0)) return cb(function () {});
+  try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+  lastTs = Math.max(Date.now(), lastTs + 1);                    // eindeutig und aufsteigend je Prozess
+  var name = ('000000000000000' + lastTs).slice(-15) + '-' + process.pid + '-' + Math.random().toString(36).slice(2, 10), me = path.join(dir, name);
+  try { fs.writeFileSync(me, '', { flag: 'wx' }); } catch (e) { return cb(function () {}); }   // Sperrordner unbrauchbar -> ohne Grenze weiter
+  held[me] = 1;
+  function release() { delete held[me]; try { fs.unlinkSync(me); } catch (e) {} }
+  (function check() {
+    var live = [];
+    try {
+      fs.readdirSync(dir).forEach(function (f) {
+        if (f === name) return live.push(f);
+        var p = path.join(dir, f), stale = false;
+        try { process.kill(Number(f.split('-')[1]), 0); } catch (e) { stale = e.code === 'ESRCH'; }
+        try { if (Date.now() - fs.statSync(p).mtimeMs > 180000) stale = true; } catch (e) { return; }
+        if (stale) { try { fs.unlinkSync(p); } catch (e) {} } else live.push(f);
+      });
+    } catch (e) { return cb(release); }
+    live.sort();
+    if (live.indexOf(name) < max) return cb(release);
+    try { var t = new Date(); fs.utimesSync(me, t, t); } catch (e) {}
+    setTimeout(check, 200 + Math.random() * 300);
+  })();
+}
+process.on('exit', function () { for (var f in held) try { fs.unlinkSync(f); } catch (e) {} });
+
+/* Auswahl: --only a,b,saver-*  (Namen oder Muster mit * und ?) */
+function globRe(g) { return new RegExp('^' + g.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$'); }
+function matchAny(name, globs) { return globs.some(function (g) { return globRe(g).test(name); }); }
+
+/* --changed: nur Szenen, die von Aenderungen gegenueber main (oder PN_VIS_BASE) betroffen sein koennen – schnelles Nachsehen beim
+ * Arbeiten; die volle Suite bleibt Pflicht vor dem Release. Gemeinsam genutzte/unbekannte Dateien (core, css, i18n, ui …) -> alle. */
+var CHANGE_MAP = [
+  [/^(docs|design|public|installer|loader)\/|^[^/]+\.md$|^tests\/(?!visual\/|synthetic\/)|^tools\/(?!visual\.js|preview\.html|build\.js|layout)|^src\/dev\//, []],
+  [/^src\/(player\/|views\/player\.js|ui\/loupeview\.js)/, ['player-*', 'p5-player-*', 'accent-player-*', 'book-*', 'music-*']],
+  [/^src\/(plex\/music\.js|views\/(album|artist|nowplaying)\.js|ui\/(miniplayer|tracklist|trackpanel)\.js)/, ['music-*', 'book-*', 'amb-music']],
+  [/^src\/views\/(settings|pinsettings|help)\.js/, ['*settings*', 'p5-keys', 'p2-*', 'accent-*']],
+  [/^src\/(views|plex)\/search\.js|^src\/plex\/subsearch\.js/, ['search*', 'p4-discover*', 'p5-player-subs']],
+  [/^src\/(plex\/discover\.js|views\/(extdetails|soon)\.js)/, ['p4-*']],
+  [/^src\/(plex\/inspire\.js|views\/insprows\.js)/, ['p4-insp*', 'p4-settings-insp*']],
+  [/^src\/(ui\/saver\.js|core\/saverlogic\.js|plex\/saverlib\.js)/, ['saver-*', 'p5-saver']],
+  [/^src\/(views\/(login|profiles|start)\.js|plex\/(login|auth)\.js|ui\/(pinpad|pinlogic)\.js|core\/(apppin|setupfile)\.js)/, ['login', 'profiles', 'pin*', 'p2-*']],
+  [/^src\/(views\/library\.js|plex\/library\.js|ui\/(grid|gridmath)\.js)/, ['library-*', 'amb-*', 'srv-library', 'accent-*']],
+  [/^src\/(views\/details\.js|plex\/details\.js|ui\/(dethero|seasonstrip)\.js)/, ['details-*', 'p5-anime-*', 'srv-details*', 'p4-ext-details']],
+  [/^src\/(core|ui)\/ambient\.js/, ['amb-*']],
+  [/^src\/core\/accent\.js/, ['accent-*']],
+  [/^src\/plex\/(servers|conntest)\.js/, ['srv-*', 'p5-conntest']],
+  [/^src\/plex\/anime\.js/, ['p5-anime-*', 'p5-settings-anime']],
+  [/^src\/(views\/home(rows)?\.js|plex\/(homerows|hubs)\.js|ui\/(hero|row|rowmath)\.js)/, ['home*', 'p4-insp*', 'accent-home-*', 'rail-*']],
+  [/^src\/ui\/rail\.js/, ['rail-*', 'home-rail', 'srv-rail*', 'p4-discover-rail', 'accent-rail-*']]
+];
+function changedScenes() {
+  var base = process.env.PN_VIS_BASE || 'main', files, mb;
+  function vcs(a) { return cp.execFileSync('git', a, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); }
+  function all() { console.log('--changed: ' + why + ' -> alle Szenen.'); return null; }
+  var why = '';
+  try {
+    mb = vcs(['merge-base', base, 'HEAD']).trim();
+    files = vcs(['diff', '--name-only', mb]).split('\n').concat(vcs(['ls-files', '--others', '--exclude-standard']).split('\n')).filter(Boolean);
+  } catch (e) { why = 'Vergleich mit ' + base + ' nicht moeglich'; return all(); }
+  var names = SCENES.map(function (s) { return s.name; }), pick = {};
+  function add(globs) { names.forEach(function (n) { if (matchAny(n, globs)) pick[n] = 1; }); }
+  for (var k = 0; k < files.length; k++) {
+    var f = files[k], m = /^tests\/visual\/baseline\/(.+)\.png$/.exec(f), hit = null;
+    if (m) { pick[m[1]] = 1; continue; }
+    if (/^tests\/visual\//.test(f)) continue;
+    if (f === 'tools/visual.js') {               // neue/geaenderte Szenen (Definition oder Seed) gegenueber dem Stand an der Abzweigung
+      var d = null;
+      try { d = sceneDiff(vcs(['show', mb + ':tools/visual.js'])); } catch (e) {}
+      if (d && d.length) { add(d); continue; }
+      why = 'tools/visual.js geaendert, aber keine Szene/kein Seed (Mock?)'; return all();
+    }
+    for (var r = 0; r < CHANGE_MAP.length && !hit; r++) if (CHANGE_MAP[r][0].test(f)) hit = CHANGE_MAP[r][1];
+    if (!hit) { why = f + ' betrifft viele Ansichten'; return all(); }
+    add(hit);
+  }
+  names.forEach(function (n) { if (!fs.existsSync(path.join(BASE, n + '.png'))) pick[n] = 1; });   // Szenen ohne Baseline immer
+  console.log('--changed: ' + files.length + ' geaenderte Datei(en) gegenueber ' + base + ' -> ' + Object.keys(pick).length + ' Szene(n).');
+  return Object.keys(pick);
+}
+function seedsFor(port) { makeSeeds(port); return seeds; }
+/* Szenen, deren Definition oder Seed sich zwischen zwei Staenden von tools/visual.js unterscheidet (Zeitstempel ausgeblendet) */
+function sceneSig(mod, withSeeds) {
+  var sd = withSeeds ? mod.seedsFor(1) : null, o = {};
+  mod.SCENES.forEach(function (s) { o[s.name] = JSON.stringify(s) + (sd ? String(sd[s.seed]).replace(/\d{13}/g, 'T') : ''); });
+  return o;
+}
+function sceneDiff(oldSrc) {
+  var tmp = path.join(__dirname, '.visual-base-' + process.pid + '.js');
+  try {
+    fs.writeFileSync(tmp, oldSrc);
+    var old = require(tmp), both = !!old.seedsFor, a = sceneSig(old, both), b = sceneSig({ SCENES: SCENES, seedsFor: seedsFor }, both), out = [];
+    for (var n in b) if (a[n] !== b[n]) out.push(n);
+    return out;
+  } catch (e) { return null; } finally { try { fs.unlinkSync(tmp); } catch (e) {} }
+}
+
 function main() {
+  if (WORKER) return worker();
   if (APPROVE) {
     fs.mkdirSync(BASE, { recursive: true });
     var n = 0;
@@ -708,20 +1157,52 @@ function main() {
   }
   if (!fs.existsSync(FIREFOX)) { console.error('Firefox nicht gefunden (' + FIREFOX + '), FIREFOX=… setzen.'); process.exit(2); }
   fs.mkdirSync(CUR, { recursive: true });
-  console.log('Build: app/' + APPFILE);
-  var scenes = SCENES.filter(function (s) { return !ONLY || ONLY.indexOf(s.name) >= 0; });
-  startServer(function (srv, port) {
-    makeSeeds(port);
-    var i = 0, results = [];
-    (function next() {
-      if (i >= scenes.length) { srv.close(); report(results); return; }
-      var sc = scenes[i++];
-      process.stdout.write('rendere ' + sc.name + ' … ');
-      shot(port, sc, function (ok) { console.log(ok ? 'ok' : 'FEHLT'); results.push({ sc: sc, ok: ok }); next(); });
-    })();
-  });
+  var pick = CHANGED ? changedScenes() : null;
+  var scenes = SCENES.filter(function (s) { return (!ONLY || matchAny(s.name, ONLY)) && (!pick || pick.indexOf(s.name) >= 0); });
+  if (!scenes.length) {
+    if (ONLY && !CHANGED) { console.error('Keine Szene passt zu --only ' + ONLY.join(',') + '.'); process.exit(2); }
+    return console.log('Keine betroffene Szene – nichts zu rendern.');
+  }
+  if (args.indexOf('--list') >= 0) return console.log(scenes.map(function (s) { return s.name; }).join('\n'));
+  var jobs = Math.min(JOBS, scenes.length), t0 = Date.now(), results = new Array(scenes.length), next = 0, selfPending = LAYOUT, done = 0, exited = 0, W = String(scenes.length).length;
+  console.log('Build: app/' + APPFILE + ' · ' + scenes.length + ' Szene(n) · ' + jobs + ' parallel (PN_VIS_JOBS)' +
+    (MAX_TOTAL > 0 ? ' · rechnerweit hoechstens ' + MAX_TOTAL + ' Firefox (PN_VIS_MAX)' : ''));
+  process.on('SIGINT', function () { process.exit(130); });
+  process.on('SIGTERM', function () { process.exit(143); });
+  for (var w = 0; w < jobs; w++) spawnWorker();
+  function spawnWorker() {
+    var ch = cp.fork(__filename, ['--worker'].concat(MIN ? [] : ['--readable'], LAYOUT ? [] : ['--no-layout']), { stdio: ['ignore', 'inherit', 'inherit', 'ipc'] }), cur = -1, rel = null, ts = 0;
+    function free() { if (rel) { rel(); rel = null; } }
+    function feed() {
+      if (selfPending) { selfPending = false; cur = -2; return slotAcquire(function (r) { rel = r; ch.send({ selftest: true }); }); }   // Selbsttest der Layout-Pruefung zuerst
+      if (next >= scenes.length) return ch.disconnect();
+      cur = next++;
+      slotAcquire(function (r) { rel = r; ts = Date.now(); ch.send({ i: cur, name: scenes[cur].name }); });
+    }
+    ch.on('message', function (m) {
+      if (m.ready) return feed();
+      free();
+      if (m.selftest !== undefined) { if (!m.selftest) process.exitCode = 1; cur = -1; return feed(); }
+      if (m.layout) layoutRes[scenes[m.i].name] = m.layout;
+      results[m.i] = { sc: scenes[m.i], ok: m.ok }; cur = -1; done++;
+      console.log('[' + ('    ' + done).slice(-W) + '/' + scenes.length + '] ' + scenes[m.i].name + ' ' + (m.ok ? 'ok' : 'FEHLT') + ' (' + ((Date.now() - ts) / 1000).toFixed(1) + ' s)');
+      feed();
+    });
+    ch.on('exit', function () {
+      free();
+      if (cur >= 0 && !results[cur]) { results[cur] = { sc: scenes[cur], ok: false }; done++; }
+      if (++exited === jobs) finish();
+    });
+  }
+  function finish() {
+    for (var i = 0; i < scenes.length; i++) if (!results[i]) results[i] = { sc: scenes[i], ok: false };   // Worker abgestuerzt
+    console.log('Gerendert in ' + Math.round((Date.now() - t0) / 1000) + ' s.');
+    report(results);                                                                                       // Bericht in fester Szenen-Reihenfolge
+  }
 }
 function report(results) {
+  var lay = LAYOUT ? layoutReport(results) : 0;
+  if (LAYOUT_ONLY) { if (lay) process.exit(1); return; }
   var fail = 0, missing = 0;
   console.log('\nSzene                 Abweichung   Ergebnis');
   results.forEach(function (r) {
@@ -734,8 +1215,18 @@ function report(results) {
     console.log(line + (pct + '          ').slice(0, 13) + (bad ? 'ABWEICHUNG (tests/visual/current/diff-' + name + '.png)' : 'gleich'));
   });
   console.log('\n' + (results.length - fail - missing) + ' gleich, ' + fail + ' abweichend/fehlerhaft, ' + missing + ' ohne Baseline.');
-  if (fail || missing) process.exit(1);
+  if (fail || missing || lay) process.exit(1);
+}
+/* Layout-Pruefung auswerten -> Anzahl neuer Befunde (+ Szenen ohne Ergebnis) */
+function layoutReport(results) {
+  var LC = require('./layoutcheck.js'), list = LC.loadAllow();
+  var rep = LC.report(CUR, results.map(function (r) { return { name: r.sc.name, res: layoutRes[r.sc.name], png: path.join(CUR, r.sc.name + '.png') }; }), list,
+    { readPng: readPng, writePng: writePng }, results.length === SCENES.length);   // nur voller Lauf meldet unbenutzte Erlaubnisse
+  console.log('');
+  LC.print(rep);
+  return rep.fail + rep.missing.length;
 }
 
 if (require.main === module) main();
-module.exports = { compare: compare, readPng: readPng, writePng: writePng, solidPng: solidPng, startServer: startServer, makeSeeds: makeSeeds, SCENES: SCENES };
+module.exports = { compare: compare, readPng: readPng, writePng: writePng, solidPng: solidPng, startServer: startServer, makeSeeds: makeSeeds, SCENES: SCENES,
+  slotAcquire: slotAcquire, matchAny: matchAny, seedsFor: seedsFor };

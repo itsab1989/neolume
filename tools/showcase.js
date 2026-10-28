@@ -6,9 +6,12 @@
  * Baut vorher app/app.min.js mit der gewaehlten Marke (Standard: public) – danach fuer private Pakete neu "npm run build".
  *   node tools/showcase.js --only home,player  nur diese Szenen      --out <dir> anderes Zielverzeichnis
  *   node tools/showcase.js --serve             nur den Mock starten (Port ausgeben, zum Ausprobieren im Browser)
+ *   --no-optimize                              PNGs nicht verkleinern (sonst pngquant + oxipng, falls installiert: brew install pngquant oxipng)
  * Wie tools/visual.js: tools/preview.html in Firefox headless (1280x720) gegen einen lokalen Mock (PMS + plex.tv + Bilder),
  * aber mit tests/showcase/data.js (erfundene Titel, Personen, Profile) und generiertem SVG-Artwork (tests/showcase/art.js).
- * Keine Medien oder Namen des echten Servers. Braucht den Release-Build (npm run build). */
+ * Keine Medien oder Namen des echten Servers. Braucht den Release-Build (npm run build).
+ * "Weitere Server" (Szene sidebar): ein zweiter Mock auf eigenem Port spielt den freigegebenen Server eines Freundes (D.FRIEND);
+ * diese Szene laeuft wie ein Paket mit setup.json (window.PN_SETUP), Profilbilder dann als https-Adressen ueber /photo/:/transcode. */
 'use strict';
 var fs = require('fs'), path = require('path'), http = require('http'), cp = require('child_process'), os = require('os');
 var ROOT = path.join(__dirname, '..');
@@ -17,7 +20,7 @@ var FIREFOX = process.env.FIREFOX || '/Applications/Firefox.app/Contents/MacOS/f
 var args = process.argv.slice(2);
 function arg(n, def) { var i = args.indexOf(n); return i >= 0 ? args[i + 1] : def; }
 var LANG = arg('--lang', 'en'), ONLY = arg('--only', null), SERVE = args.indexOf('--serve') >= 0;
-var BRAND = arg('--brand', 'public'), NOBUILD = args.indexOf('--no-build') >= 0;
+var BRAND = arg('--brand', 'public'), NOBUILD = args.indexOf('--no-build') >= 0, OPTIMIZE = args.indexOf('--no-optimize') < 0;
 var SHOTDIR = BRAND === 'public' ? 'public/docs/screenshots' : 'docs/screenshots';
 var OUT = path.resolve(ROOT, arg('--out', LANG === 'en' ? SHOTDIR : SHOTDIR + '/' + LANG));
 ONLY = ONLY ? ONLY.split(',') : null;
@@ -140,7 +143,7 @@ function artFor(url) {
   if (a) return ART.svg(a.kind, JSON.parse(JSON.stringify(a.info)));
   var m;
   if ((m = /^\/sc\/person\/(\d+)$/.exec(url))) return ART.svg('person', { seed: D.PEOPLE[Number(m[1])] || url });
-  if ((m = /^\/sc\/avatar\/(\w+)$/.exec(url))) return ART.svg('avatar', { seed: m[1], shape: { alex: 'mountain', sam: 'planet', jamie: 'wave', kids: 'star' }[m[1]], palette: { alex: 'sea', sam: 'dusk', jamie: 'mint', kids: 'candy' }[m[1]] });
+  if ((m = /^(?:https:\/\/avatars\.example\.com)?\/sc\/avatar\/(\w+)$/.exec(url))) return ART.svg('avatar', { seed: m[1], shape: { alex: 'mountain', sam: 'planet', jamie: 'wave', kids: 'star' }[m[1]], palette: { alex: 'sea', sam: 'dusk', jamie: 'mint', kids: 'candy' }[m[1]] });
   if ((m = /^\/sc\/still\/x(\d+)/.exec(url))) return ART.svg('still', { theme: (D.ITEMS[m[1]] || {})._theme, seed: url });
   if ((m = /^\/library\/media\/(\d+)\/chapterImages\/(\d+)/.exec(url))) return ART.svg('chapter', { theme: (D.ITEMS[m[1]] || {})._theme, seed: url });
   if ((m = /^\/library\/parts\/(\d+)\/indexes\/sd\/(\d+)/.exec(url))) return ART.svg('chapter', { theme: (D.ITEMS[m[1]] || {})._theme || 'sea', seed: 'i' + Math.floor(Number(m[2]) / 600000) });
@@ -149,7 +152,7 @@ function artFor(url) {
 }
 
 /* ---------- Mock-Server ---------- */
-var seeds = {};
+var seeds = {}, friendPort = 0;
 function startServer(cb) {
   var srv = http.createServer(function (req, res) {
     var u = new URL(req.url, 'http://x'), p = u.pathname, q = u.searchParams;
@@ -166,8 +169,11 @@ function startServer(cb) {
       if (t.pathname.indexOf('/api/v2/pins/') === 0) return json({ id: 1, authToken: null });
       return json({}, 404);
     }
-    if (p.indexOf('/pms') !== 0) { res.writeHead(404); return res.end(); }
-    p = p.slice(4);
+    var friend = p.indexOf('/friend') === 0;          // zweiter Port: Server des Freundes ("Weitere Server")
+    if (!friend && p.indexOf('/pms') !== 0) { res.writeHead(404); return res.end(); }
+    p = p.slice(friend ? 7 : 4);
+    if (friend && p === '/identity') return json({ MediaContainer: { machineIdentifier: D.FRIEND.machineId } });
+    if (friend && p === '/library/sections') return json(DE ? D.FRIEND.sectionsDe : D.FRIEND.sections);
     if (p === '/photo/:/transcode') { cors(); res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=3600' }); return res.end(artFor(q.get('url') || '')); }
     if (p === '/library/sections') return json(DE ? D.SECTIONS_DE : D.SECTIONS);
     if (p === '/hubs/continueWatching/items') return json(mc(D.CONTINUE));
@@ -194,8 +200,13 @@ function startServer(cb) {
     if (p === '/hubs/search') return json(search(q.get('query')));
     if (/^\/library\/metadata\/\d+\/matches$/.test(p)) return setTimeout(function () { json(matchesFor(q)); }, 300);
     if (p === '/library/all' && q.get('guid')) return json(byGuid(q.get('guid')));
-    var lm = /^\/library\/metadata\/(\d+)(\/children|\/allLeaves)?$/.exec(p);
+    var lm = /^\/library\/metadata\/(\d+)(\/children|\/allLeaves|\/related)?$/.exec(p);
     if (lm) {
+      if (lm[2] === '/related') {                       // Kuenstlerseite: weitere Veroeffentlichungen als Hubs artist.albums.* (wie PMS)
+        var rel = D.RELATED[lm[1]] || {};
+        return json({ MediaContainer: { size: 6, Hub: ['singles', 'live', 'soundtrack', 'compilation', 'demo', 'remix'].map(function (h) {
+          var l = (rel[h] || []).map(clean); return { hubIdentifier: 'artist.albums.' + h, type: 'album', size: l.length, Metadata: l }; }) } });
+      }
       if (lm[2] === '/children') return json(page(D.CHILDREN[lm[1]] || [], q));
       if (lm[2] === '/allLeaves') return json(page(allLeaves(lm[1]), q));
       var fm = fullMeta(lm[1]);
@@ -204,7 +215,12 @@ function startServer(cb) {
     if (/^\/(:\/|actions)/.test(p)) return json({});
     return json({ MediaContainer: { size: 0 } });
   });
-  srv.listen(Number(process.env.PORT || 0), '127.0.0.1', function () { cb(srv, srv.address().port); });
+  var fsrv = http.createServer(function (req, res) { req.url = '/friend' + req.url; srv.emit('request', req, res); });
+  srv.on('close', function () { fsrv.close(); });
+  fsrv.listen(0, '127.0.0.1', function () {
+    friendPort = fsrv.address().port;
+    srv.listen(Number(process.env.PORT || 0), '127.0.0.1', function () { cb(srv, srv.address().port); });
+  });
 }
 
 /* ---------- Seeds (Zustand wie nach der Einrichtung) ---------- */
@@ -234,8 +250,25 @@ function makeSeeds(port) {
   }
   // englische Oberflaeche: auch Ton/Untertitel bevorzugt Englisch (Standard der App ist Deutsch, unabhaengig von der Menuesprache)
   var prefs = DE ? null : { 'settings-aaaa1111.json': { audioLang: 'en', subLang: 'en' } };
+  function withPrefs(o) { var x = {}, k, p0 = prefs ? prefs['settings-aaaa1111.json'] : {}; for (k in p0) x[k] = p0[k]; for (k in o) x[k] = o[k]; return { 'settings-aaaa1111.json': x }; }
   seeds.home = seed({ startProfile: 'main' }, prefs);
   seeds.profiles = seed({ startProfile: 'picker' });
+  // Akzentfarbe (Einstellungen > Oberflaeche): Profil mit eigener Farbe (state.accent = Startbild ohne Farbsprung)
+  seeds.coral = seed({ startProfile: 'main', accent: 'coral' }, withPrefs({ accent: 'coral' }));
+  // Bildschirmschoner: nach 1,5 s statt Minuten (config.saverMs, nur Vorschau), Bilder aus der Filmbibliothek, Einblendung "Ambient"
+  cfg.saverMs = 1500;
+  seeds.saver = seed({ startProfile: 'main' }, withPrefs({ saverInfo: 'ambient', saverLibs: [1], saverFx: 'cut' }));
+  delete cfg.saverMs;
+  // Weitere Server: wie ein Paket mit setup.json; Alex hat Zugang zum Server "Lakeside" eines Freundes (zweiter Mock-Port)
+  function av(n) { return 'https://avatars.example.com/sc/avatar/' + n; }
+  var setup = { schema: 1, serversSchema: 1, kind: 'plexneo-setup', createdAt: '2026-10-26T12:00:00Z', setupVersion: '0.1.0', clientIdentifier: 'showcase',
+    server: { machineIdentifier: 'showcase-home-0001', name: 'Living Room', uris: [base + '/pms'] }, computer: null,
+    profiles: [{ id: 11, uuid: 'aaaa1111', title: 'Alex', thumb: av('alex'), kind: 'owner', restricted: false, restrictionProfile: '', token: 'showcase-token',
+      servers: [{ machineIdentifier: D.FRIEND.machineId, name: D.FRIEND.name, uris: ['http://127.0.0.1:' + friendPort], token: 'showcase-token' }] },
+      { id: 12, uuid: 'bbbb2222', title: 'Sam', thumb: av('sam'), kind: 'home', restricted: false, restrictionProfile: '', token: 'showcase-token' },
+      { id: 13, uuid: 'cccc3333', title: 'Jamie', thumb: av('jamie'), kind: 'home', restricted: true, restrictionProfile: 'teen', token: 'showcase-token' },
+      { id: 14, uuid: 'dddd4444', title: 'Kids', thumb: av('kids'), kind: 'home', restricted: true, restrictionProfile: 'little_kid', token: 'showcase-token' }] };
+  seeds.servers = seed({ account: null, server: null, users: null, profiles: {}, startProfile: 'main' }, prefs) + 'window.PN_SETUP=' + JSON.stringify(JSON.stringify(setup)) + ';';
 }
 
 /* ---------- Szenen ---------- */
@@ -244,8 +277,8 @@ function down(n) { var a = []; for (var i = 0; i < n; i++) a.push('DOWN'); retur
 var SCENES = [
   { name: 'profiles', seed: 'profiles' },
   { name: 'home', seed: 'home' },
-  { name: 'sidebar', seed: 'home', keys: 'LEFT' },
-  { name: 'library', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait900,RIGHT,RIGHT' },
+  { name: 'sidebar', seed: 'servers', keys: 'wait3000,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN' },   // mit Weitere Server: Bibliothek eines Freundes
+  { name: 'library', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait900,RIGHT,RIGHT,RIGHT' },                                   // Farbstimmung des Titels
   { name: 'details', seed: 'home', keys: 'INFO,wait1200' },
   { name: 'series', seed: 'home', keys: 'LEFT,DOWN,DOWN,ENTER,wait900,RIGHT,RIGHT,RIGHT,RIGHT,ENTER,wait1200,DOWN,DOWN' },
   { name: 'search', seed: 'home', keys: 'BLUE,wait600,DOWN,DOWN,ENTER,RIGHT,RIGHT,ENTER,ENTER,LEFT,ENTER,wait1500' },   // "moon"
@@ -254,6 +287,9 @@ var SCENES = [
   { name: 'tracks', seed: 'home', keys: 'ENTER,ENTER,wait900,GREEN' },
   { name: 'settings', seed: 'home', keys: 'LEFT,' + down(8) + ',ENTER,DOWN,DOWN,DOWN,RIGHT' },
   { name: 'music', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,ENTER,wait900,UP,LEFT,ENTER,wait1200,DOWN,RIGHT' },              // Alben
+  { name: 'artist', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,ENTER,wait900,RIGHT,RIGHT,RIGHT,RIGHT,ENTER,wait1500,DOWN,DOWN' },   // Kuenstlerin mit Gruppen
+  { name: 'accent', seed: 'coral', keys: 'LEFT,' + down(8) + ',ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER' },                  // Akzentfarbe: Auswahl
+  { name: 'screensaver', seed: 'saver', keys: 'wait6000' },                                                                    // Einblendung Ambient
   { name: 'audiobooks', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait900,RIGHT,ENTER,wait1200,DOWN' }               // Buch mit Kapiteln
 ];
 
@@ -271,6 +307,19 @@ function shot(port, sc, done) {
   });
 }
 
+/* PNGs verkleinern: pngquant (Palette mit 256 Farben, Qualitaet 85-98 – an Verlaeufen/Unschaerfe nicht sichtbar, ~70 % kleiner;
+ * schafft es die Qualitaet nicht, bleibt die Datei unveraendert) und danach oxipng (verlustfrei). Fehlt ein Werkzeug: Hinweis. */
+function have(tool) { var r = cp.spawnSync(tool, ['--version'], { stdio: 'ignore' }); return !r.error; }
+function optimize(files) {
+  if (!OPTIMIZE || !files.length) return;
+  var before = files.reduce(function (n, f) { return n + fs.statSync(f).size; }, 0);
+  if (have('pngquant')) cp.spawnSync('pngquant', ['--quality', '85-98', '--speed', '1', '--strip', '--force', '--ext', '.png'].concat(files), { stdio: 'inherit' });
+  else console.log('Hinweis: pngquant fehlt – Bilder bleiben gross (brew install pngquant)');
+  if (have('oxipng')) cp.spawnSync('oxipng', ['-o', '4', '--strip', 'safe', '-q'].concat(files), { stdio: 'inherit' });
+  var after = files.reduce(function (n, f) { return n + fs.statSync(f).size; }, 0);
+  console.log('verkleinert: ' + Math.round(before / 1024) + ' KB -> ' + Math.round(after / 1024) + ' KB');
+}
+
 function main() {
   if (!NOBUILD && !SERVE) {                      // Release-Build mit der gewaehlten Marke (Name, Wortmarke, Texte)
     var r = cp.spawnSync(process.execPath, [path.join(ROOT, 'tools', 'build.js'), '--brand', BRAND, '--no-test'], { stdio: 'inherit' });
@@ -285,12 +334,12 @@ function main() {
     }
     if (!fs.existsSync(FIREFOX)) { console.error('Firefox nicht gefunden (' + FIREFOX + '), FIREFOX=… setzen.'); process.exit(2); }
     fs.mkdirSync(OUT, { recursive: true });
-    var scenes = SCENES.filter(function (s) { return !ONLY || ONLY.indexOf(s.name) >= 0; }), i = 0, bad = 0;
+    var scenes = SCENES.filter(function (s) { return !ONLY || ONLY.indexOf(s.name) >= 0; }), i = 0, bad = 0, done = [];
     (function next() {
-      if (i >= scenes.length) { srv.close(); console.log(scenes.length - bad + ' Bilder in ' + path.relative(ROOT, OUT) + '/' + (bad ? ', ' + bad + ' fehlgeschlagen' : '')); process.exit(bad ? 1 : 0); }
+      if (i >= scenes.length) { srv.close(); optimize(done); console.log(scenes.length - bad + ' Bilder in ' + path.relative(ROOT, OUT) + '/' + (bad ? ', ' + bad + ' fehlgeschlagen' : '')); process.exit(bad ? 1 : 0); }
       var sc = scenes[i++];
       process.stdout.write(sc.name + ' … ');
-      shot(port, sc, function (ok) { if (!ok) bad++; console.log(ok ? 'ok' : 'FEHLT'); next(); });
+      shot(port, sc, function (ok) { if (!ok) bad++; else done.push(path.join(OUT, sc.name + '.png')); console.log(ok ? 'ok' : 'FEHLT'); next(); });
     })();
   });
 }

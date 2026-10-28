@@ -1,24 +1,29 @@
 #!/usr/bin/env node
 /* erzeugt die statischen Bilder in src/assets/ (einmalig bzw. bei Aenderungen; Ergebnis wird eingecheckt).
  *   node tools/make_assets.js
- * - icons.png      PNG-Sprite (SPEC 5.21): 32-px-Raster, Spalte = Icon, Zeile = Farbzustand
- * - fade-bottom.png 1280x88 (SPEC 2: transparent bei y 632 -> deckend ab y 652)
- * - rail.png       120x720 (Rail-Hintergrund, #0E0F11 -> transparent)
+ * - icons.png      PNG-Sprite (SPEC 5.21): 32-px-Raster, Spalte = Icon, Zeile = Farbzustand (Quelle design/icons/*.svg, + icons.svg/.json)
+ * - fade-bottom.png 1280x88 (SPEC 2: transparent bei y 632 -> deckend ab y 652; Start, Details, Suche, Album, Kuenstler, DetHero-Kopfband)
+ * - fade-frame.png 1280x108 Band unten der Mediathek (transparent bei y 612 -> deckend ab y 652, smoothstep ueber 40 px = rail.png)
+ * - rail.png       120x720 Seitenleiste (deckend c.bg bis x 80 -> transparent bei x 120, dieselbe Kurve wie fade-frame:
+ *                  zusammen ein Rahmen mit weicher Ecke unten links, siehe "Rahmen links + unten")
+ * - scrim-hdr.png  1280x88 Kopfband Film/Serie in den Abschnitten: wie fade-bottom, nach rechts auf 30 % auslaufend
  * - qr.png         264x264 QR-Code fuer https://plex.tv/link (Inhalt ist fest -> kein QR-Code zur Laufzeit)
  * - scrim.png      wird aus app/scrim.png uebernommen (am TV abgestimmte Ueberblendmaske)
  * - <pointer>[-press].png  Smart-Control-Zeiger je Marke und pointer-<id>[-press].png je Akzentfarbe der Palette
  *                  (src/core/accent.js; siehe unten; --pointers erzeugt nur diese). Einziges Bild in der Akzentfarbe:
- *                  icons.png, rail.png, fade/scrims und qr.png sind farbneutral (Icons auf dem Akzent: Zeile on-accent #141414).
+ *                  icons.png, rail.png, fade/scrims und qr.png sind farbneutral (Icons auf dem Akzent: Zeile on-accent).
  * - scrim-det.png  1280x720 Detailseiten (DetHero): scrim.png + kraeftigere Abdunklung hinter Titel/Infos/Beschreibung
  *                  (TV-Test 27.10., F5/F17: Text auf hellen Hintergruenden lesbar); eine Ebene statt zwei
  * - scrim-np.png   1280x720 Jetzt laeuft + Kuenstlerseite: scrim-det.png + gleichmaessige Abdunklung (F24: weisse Fotos hinter weissem Text)
  *                  Nur die Scrims neu erzeugen: node tools/make_assets.js --scrims
- * - scrim-saver*.png Bildschirmschoner-Einblendungen (siehe saverScrims); nur diese: node tools/make_assets.js --saver
+ * - scrim-saver*.png Bildschirmschoner-Einblendungen (siehe saverScrims; Eck-Schatten je Ecke fertig gespiegelt); nur diese: node tools/make_assets.js --saver
+ * - scrim-clock.png weicher Eckschatten hinter der Startseiten-Uhr ohne Kasten (entsteht mit den Schoner-Scrims)
  * Braucht: rsvg-convert (Homebrew librsvg) fuer den Sprite, npm-Paket qrcode.
  */
 'use strict';
 var fs = require('fs'), path = require('path'), zlib = require('zlib'), cp = require('child_process');
 var ROOT = path.join(__dirname, '..'), OUT = path.join(ROOT, 'src', 'assets');
+var T = require('./tokens.js'), BG_HEX = T.color('bg'), QR_LIGHT = T.color('white');   // Farben aus design/tokens.json
 fs.mkdirSync(OUT, { recursive: true });
 
 /* ---------- Zeiger (Smart Control): Pfeil in der Akzentfarbe, 2 px dunkle Kontur, Spitze bei (4,4) ----------
@@ -28,13 +33,13 @@ fs.mkdirSync(OUT, { recursive: true });
  * Nur die Zeiger neu erzeugen: node tools/make_assets.js --pointers */
 function arrowSvg(fill) {
   return '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><path d="M4 4 L4 26 L10 20.5 L14.2 29.5 L18.6 27.5 L14.4 18.6 L22 18.6 Z" ' +
-    'fill="' + fill + '" stroke="#0E0F11" stroke-width="2" stroke-linejoin="round"/></svg>';
+    'fill="' + fill + '" stroke="' + BG_HEX + '" stroke-width="2" stroke-linejoin="round"/></svg>';
 }
 function lighten(hex, f) {
   return '#' + [1, 3, 5].map(function (i) { var v = parseInt(hex.substr(i, 2), 16); return ('0' + Math.round(v + (255 - v) * f).toString(16)).slice(-2); }).join('').toUpperCase();
 }
 var ptrs = [];
-require('./build.js').loadPalette().forEach(function (p) { ptrs.push(['pointer-' + p.id, p.color, lighten(p.color, 0.3)]); });
+T.palette().forEach(function (p) { ptrs.push(['pointer-' + p.id, p.color, lighten(p.color, 0.3)]); });
 fs.readdirSync(path.join(ROOT, 'brand')).filter(function (f) { return /\.json$/.test(f); }).forEach(function (f) {
   var b = JSON.parse(fs.readFileSync(path.join(ROOT, 'brand', f), 'utf8'));
   ptrs.push([b.pointer, b.accent, b.accentPress]);
@@ -63,7 +68,7 @@ function png(w, h, pixel) {   // pixel(x,y) -> [r,g,b,a]
   var ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 6; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
 }
-var BG = [0x0E, 0x0F, 0x11];
+var BG = [1, 3, 5].map(function (i) { return parseInt(BG_HEX.substr(i, 2), 16); });   // Token c.bg
 
 if (process.argv.indexOf('--scrims') >= 0) { scrimDet(); scrimNp(); saverScrims(); process.exit(0); }
 if (process.argv.indexOf('--saver') >= 0) { saverScrims(); process.exit(0); }
@@ -74,83 +79,141 @@ if (process.argv.indexOf('--saver') >= 0) { saverScrims(); process.exit(0); }
  * - scrim-saver.png   1000x460 Ecke links unten (Ambient, Minimal; andere Ecken per scale(-1,1)/(1,-1) gespiegelt)
  * - scrim-saver-b.png 1280x340 Band unten (Filmplakat, Untertitel-Leiste)
  * - scrim-saver-c.png 1200x600 weiche Ellipse (Grosse Uhr) */
+/* TV-Befund 28.10. abends ("auf hellem Grund wirkt der Verlauf hinter der Uhr wenig anmutig"): die alten Formen – Ellipse um die
+ * Bildecke mit Plateau 0,8 bis r 0,55, dann smoothstep; Ellipse 0,66 um die grosse Uhr – zeichneten sich auf hellen Bildern als
+ * dunkles "Ei" mit sichtbarer Schulter ab (smoothstep: Kruemmung springt an beiden Enden -> Mach-Band), Minimal nahm das Eckbild
+ * 1000x460 gestaucht auf 420x200 (harter Fleck). Erster Versuch "Kern + Hof" (Abstand zum Textblock) wirkte wie ein weiches
+ * Rechteck/eine Stufe -> verworfen. Neu ("weicher Schatten"):
+ * - Feld = Summe weniger Gauss-Glocken, die auf dem Text liegen (Ecke: eine um die Uhr in der Ecke, eine laengliche entlang Titel
+ *   und Zeile; Grosse Uhr: eine laengliche ueber den Ziffern; Nur kleine Uhr: eine kleine um die Uhr). alpha = peak * (1 - e^(-k*Feld)):
+ *   ueber dem Text satt, nach aussen wie ein echter Schatten auslaufend – ueberall glatt (keine Schulter, keine Kante, keine Ecke).
+ * - Wo das Bild nicht am Bildschirmrand liegt, laeuft der Rest der Glocke in den letzten 'win' px per smootherstep sicher auf 0
+ *   (dort ist alpha schon < 0,06 -> unsichtbar), damit nie eine Bildkante sichtbar wird.
+ * - Alpha mit +-1/2 LSB Rauschen (ign) gegen Banding auf dem 8-Bit-Panel.
+ * - Deckkraft nur so viel wie noetig: weisses Bild nach saver-dim 0,35 = 166 -> Text text-1 braucht a >= 0,34, text-soft (Zeile,
+ *   Uhr im Filmplakat) a >= 0,45 fuer 4,5:1 (vorher bis 0,8 – wirkte als dunkle Wolke). tests/saver.test.js prueft die Deckkraft
+ *   der fertigen Bilder an den Textstellen. Glocken: [Mitte x, Mitte y, Halbachse x, Halbachse y] (Ecke: ab der Bildecke, y nach oben). */
+function scrimCfg() { return {   // als Funktion: --saver laeuft oben, bevor var-Zuweisungen hier ausgefuehrt sind
+  corner: { w: 1000, h: 460, peak: 0.7, k: 2.5, win: 90, g: [[0, 0, 420, 230], [420, 60, 300, 150]] },     // Ambient (Ecke unten links)
+  minimal: { w: 420, h: 200, peak: 0.66, k: 3, win: 60, g: [[110, 72, 170, 78]] },                        // Nur kleine Uhr
+  clock: { w: 1200, h: 600, peak: 0.62, k: 2, win: 90, g: [[480, 300, 230, 135], [720, 300, 230, 135]] },   // Grosse Uhr: zwei Glocken = flacher, kein Ei
+  band: { w: 1280, h: 340, peak: 0.74, y1: 215 }                                                              // Leisten unten
+}; }
+function smoother(t) { t = Math.max(0, Math.min(1, t)); return t * t * t * (t * (t * 6 - 15) + 10); }
+/* Deckkraft an (x, y) aus den Glocken; edges: Raender, an denen das Bild NICHT am Bildschirmrand liegt ({l,r,t,b}: true) */
+function scrimSoft(c, x, y, edges) {
+  var f = 0, i;
+  for (i = 0; i < c.g.length; i++) { var g = c.g[i], u = (x - g[0]) / g[2], v = (y - g[1]) / g[3]; f += Math.exp(-(u * u + v * v)); }
+  var w = 1;
+  if (edges.l) w *= smoother(x / c.win); if (edges.r) w *= smoother((c.w - x) / c.win);
+  if (edges.t) w *= smoother(y / c.win); if (edges.b) w *= smoother((c.h - y) / c.win);
+  return c.peak * (1 - Math.exp(-c.k * f)) * w;
+}
+/* Ecke unten links: x ab der Ecke nach rechts, yb ab der Unterkante nach oben; aussen liegen rechts (x = w) und oben (yb = h) */
+function scrimCorner(c, x, yb) { return scrimSoft(c, x, yb, { r: 1, b: 1 }); }
+function scrimClock(c, x, y) { return scrimSoft(c, x, y, { l: 1, r: 1, t: 1, b: 1 }); }
+function scrimBand(c, y) { return c.peak * smoother(y / c.y1); }
 function saverScrims() {
-  function S(v, a, b) { var t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); }
-  function out(name, w, h, alpha) { fs.writeFileSync(path.join(OUT, name), png(w, h, function (x, y) { return [0, 0, 0, Math.round(255 * alpha(x, y))]; })); }
-  out('scrim-saver.png', 1000, 460, function (x, y) {        // Ellipse um die Ecke: wirkt wie ein Schatten, kein Rechteck
-    var dx = x / 1000, dy = (460 - y) / 460;
-    return 0.8 * (1 - S(Math.sqrt(dx * dx + dy * dy), 0.55, 1));
+  var SAVER_SCRIM = scrimCfg();
+  function out(name, w, h, alpha) {
+    fs.writeFileSync(path.join(OUT, name), png(w, h, function (x, y) {
+      var a = 255 * alpha(x + 0.5, y + 0.5);
+      return [0, 0, 0, a <= 0 ? 0 : Math.max(0, Math.min(255, Math.floor(a + ign(x, y))))];
+    }));
+  }
+  /* Je Ecke ein fertig gespiegeltes Bild (unten links = ohne Zusatz, -br/-tr/-tl): keine CSS-Spiegelung (TV-Befund 28.10.: Luecke
+   * zwischen Schatten und Rand in manchen Ecken). Minimal: eigene, kleine Bilder (-m…) in Anzeigegroesse 420x200 */
+  [['corner', 'scrim-saver'], ['minimal', 'scrim-saver-m']].forEach(function (k) {
+    var c = SAVER_SCRIM[k[0]], W = c.w, H = c.h;
+    out(k[1] + '.png', W, H, function (x, y) { return scrimCorner(c, x, H - y); });
+    out(k[1] + '-br.png', W, H, function (x, y) { return scrimCorner(c, W - x, H - y); });
+    out(k[1] + '-tr.png', W, H, function (x, y) { return scrimCorner(c, W - x, y); });
+    out(k[1] + '-tl.png', W, H, function (x, y) { return scrimCorner(c, x, y); });
   });
-  out('scrim-saver-b.png', 1280, 340, function (x, y) { return 0.78 * S(y, 0, 210); });
-  out('scrim-saver-c.png', 1200, 600, function (x, y) {        // sehr weich auslaufend: kein sichtbares "Ei" auf hellen Bildern
-    var dx = (x - 600) / 600, dy = (y - 300) / 300;
-    return 0.66 * (1 - S(Math.sqrt(dx * dx + dy * dy), 0.15, 1));
+  out('scrim-saver-b.png', 1280, 340, function (x, y) { return scrimBand(SAVER_SCRIM.band, y); });
+  clockScrims();
+  out('scrim-saver-c.png', 1200, 600, function (x, y) { return scrimClock(SAVER_SCRIM.clock, x, y); });
+}
+
+/* ---------- Startseiten-Uhr ohne Kasten (settings.clockStyle free/date/small): je Stil ein eigener Eckschatten ----------
+ * TV-Test 28.10.: "Mit Datum" sah gut aus, mit demselben Schatten wirkte "Gross und frei" zu hart (dunkle Wolke unter den
+ * Ziffern, nichts darin) und "Klein und dezent" wie ein Fleck. Deshalb je Stil ein Bild, in den Massen von "Mit Datum"
+ * (Referenz, unveraendert): Ellipse um die Uhr, waagerecht gestreckt, bis in die Ecke oben rechts; Hoehe/Breite folgen dem
+ * Textblock des Stils. Verlauf a = peak * (1 - smoothstep(r))^2: laeuft mit ~(1-r)^4 aus, Steigung 0 am Ende, kein sichtbarer Rand.
+ * Alpha mit +-1/2 LSB Rauschen (interleaved gradient noise) gegen Stufen auf dem 8-Bit-Panel.
+ * Bild in Anzeigegroesse (keine CSS-Skalierung), rechts und oben buendig mit der Bildschirmecke (CSS .hc-scr right/top).
+ * Deckkraft: kleinste, bei der die Schrift auf rein weissem Bild (mit scrim.png 0,25 oben rechts) Kontrast >= 3:1 behaelt
+ * (Ziffern text-1, Datum/kleine Uhr text-soft); "Mit Datum" bleibt bei 0,6 (Datumszeile damit genau 3:1).
+ * Werte je Bild: Mitte cx/cy und Halbachsen rx/ry in Bildschirm-Koordinaten
+ * (ryt: Halbachse nach oben, falls anders – reicht dann weich bis an die Oberkante), peak */
+function clockScrims() {
+  var CLOCK_SCRIMS = {
+    'scrim-clock-date.png': { cx: 1190, cy: 60, rx: 390, ry: 160, peak: 0.6 },    // Mit Datum: Ziffern + Datum y 41..96 (Referenz)
+    'scrim-clock.png': { cx: 1190, cy: 54, rx: 360, ry: 112, peak: 0.42 },        // Gross und frei: Ziffern y 41..72
+    'scrim-clock-small.png': { cx: 1205, cy: 50, rx: 220, ry: 60, ryt: 110, peak: 0.56 }      // Klein und dezent: y 45..60
+  };
+  function SS(t) { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); }   // smoothstep wie bisher (Referenz "Mit Datum")
+  function ign(x, y) { var v = 52.9829189 * ((0.06711056 * x + 0.00583715 * y) % 1); return v - Math.floor(v); }   // [0,1)
+  Object.keys(CLOCK_SCRIMS).forEach(function (name) {
+    var c = CLOCK_SCRIMS[name], ox = Math.max(0, c.cx - c.rx), w = 1280 - ox, h = c.cy + c.ry;
+    fs.writeFileSync(path.join(OUT, name), png(w, h, function (px, py) {
+      var dx = (ox + px + 0.5 - c.cx) / c.rx, dy = (py + 0.5 - c.cy) / (py + 0.5 < c.cy && c.ryt || c.ry), g = 1 - SS(Math.sqrt(dx * dx + dy * dy));
+      return [0, 0, 0, Math.max(0, Math.min(255, Math.floor(255 * c.peak * g * g + ign(px, py))))];
+    }));
   });
 }
 
+/* ---------- Rahmen links + unten (TV-Befund 28.10.: auf buntem Mediathek-Hintergrund waren Seitenleiste und Band unten
+ * verschieden kraeftig, die Ecke unten links wirkte hart) ----------
+ * rail.png und fade-frame.png (Band unten der Mediathek, library.js) teilen EINE Kurve: deckend c.bg, dann auf FRAME_L px
+ * per smoothstep (Steigung 0 an beiden Enden -> keine Kante/Machsche Linie) auf 0. Beide Ebenen liegen uebereinander (gleiche Farbe), die Ecke ergibt sich damit
+ * von selbst als 1-(1-a)(1-b): runde Hoehenlinien, kein Knick – kein eigenes Eckbild noetig, keine zusaetzliche Ebene.
+ * Alpha mit +-1/2 LSB Rauschen gegen Stufen auf dem 8-Bit-Panel. */
+var FRAME_L = 40;
+function frameA(d, x, y) {   // d = Abstand von der Innenkante (0 = transparent) in px
+  var t = Math.max(0, Math.min(1, (d + 0.5) / FRAME_L)), a = t * t * (3 - 2 * t);
+  return Math.max(0, Math.min(255, Math.floor(255 * a + (t > 0 && t < 1 ? ign(x, y) : 0.5))));
+}
+function ign(x, y) { var v = 52.9829189 * ((0.06711056 * x + 0.00583715 * y) % 1); return v - Math.floor(v); }   // [0,1)
+/* fade-frame: 1280x108, Bild beginnt bei y=612; transparent oben -> deckend ab y 652 (Hinweisleiste, Reihen laufen darunter aus).
+ * Nur in der Mediathek: dort reicht der (bunte) Hintergrund bis unten. Start/Details/Suche behalten fade-bottom (kurz, ab y 632):
+ * deren unterste Reihe/Fortschrittsbalken reichen bis y ~650, und unten links dunkelt dort scrim.png ohnehin ab. */
+fs.writeFileSync(path.join(OUT, 'fade-frame.png'), png(1280, 108, function (x, y) {
+  return [BG[0], BG[1], BG[2], frameA(y, x, y)];
+}));
+/* rail: 120x720, deckend bis x 80 (Symbole x 58..86 auf vollem c.bg), dann auf 40 px wie fade-frame auf 0 bei x 120 */
+fs.writeFileSync(path.join(OUT, 'rail.png'), png(120, 720, function (x, y) {
+  return [BG[0], BG[1], BG[2], frameA(119 - x, x, y)];
+}));
 /* fade-bottom: Bild beginnt bei y=632; transparent bei 0, deckend ab 20 (y=652) */
 fs.writeFileSync(path.join(OUT, 'fade-bottom.png'), png(1280, 88, function (x, y) {
   var a = y >= 20 ? 255 : Math.round(255 * (y / 20) * (y / 20) * 0.6 + 255 * (y / 20) * 0.4);
   return [BG[0], BG[1], BG[2], Math.min(255, a)];
 }));
 
-/* rail: deckend links, 0.9 bei 60 %, 0 bei 100 % */
-fs.writeFileSync(path.join(OUT, 'rail.png'), png(120, 720, function (x) {
-  var f = x / 119, a = f <= 0.6 ? 1 - (f / 0.6) * 0.1 : 0.9 * (1 - (f - 0.6) / 0.4);
-  return [BG[0], BG[1], BG[2], Math.round(255 * a)];
+/* scrim-hdr: Kopfband der Film-/Serien-Detailseite in den Abschnitten (DetHero o.hdr, wie fade-bottom um 180° gedreht: y=0 hier = unten, x=0 = rechts).
+ * Kraeftig hinter dem Text (links bis x 780), nach rechts weich auf 30 % – rechts steht kein Text (TV-Befund 28.10.: Bild sonst
+ * zu dunkel). Weggescrollte Abschnitte blendet die Seite aus, das Band muss sie nicht mehr verdecken. */
+fs.writeFileSync(path.join(OUT, 'scrim-hdr.png'), png(1280, 88, function (x, y) {
+  var v = y >= 20 ? 1 : (y / 20) * (y / 20) * 0.6 + (y / 20) * 0.4;
+  var t = Math.max(0, Math.min(1, (1279 - x - 780) / 460)), h = 1 - 0.7 * t * t * (3 - 2 * t);
+  return [BG[0], BG[1], BG[2], Math.round(255 * v * h)];
 }));
 
-/* ---------- Icon-Sprite ---------- */
-// Formen = abgenommene Rail-/Button-Icons aus den Mockups (USER). Reihenfolge = Spalten-Index (src/ui/icons.js).
-var ICONS = [
-  ['search', '<circle cx="12" cy="12" r="7.5"/><path d="M17.5 17.5L24 24"/>', 's'],
-  ['home', '<path d="M4 13L14 4.5 24 13v11h-7v-7h-6v7H4z"/>', 'sj'],
-  ['film', '<rect x="4" y="6" width="20" height="16" rx="2"/><path d="M9 6v16M19 6v16M4 14h5M19 14h5"/>', 's'],
-  ['tv', '<rect x="3" y="8" width="22" height="15" rx="2"/><path d="M10 3.5l4 4 4-4"/>', 'sj'],
-  ['star', '<path d="M14 3l2.6 8.4L25 14l-8.4 2.6L14 25l-2.6-8.4L3 14l8.4-2.6z"/>', 'sj'],
-  ['globe', '<circle cx="14" cy="14" r="10"/><ellipse cx="14" cy="14" rx="4.5" ry="10"/><path d="M4 14h20"/>', 's'],
-  ['gear', '<circle cx="14" cy="14" r="4"/><path d="M14 3v4M14 21v4M3 14h4M21 14h4M6.2 6.2l2.8 2.8M19 19l2.8 2.8M6.2 21.8L9 19M19 9l2.8-2.8"/>', 's'],
-  ['lock', '<g transform="translate(4 3)"><rect x="2" y="9" width="16" height="12" rx="2" fill="C" stroke="none"/><path d="M5.5 9V6.5a4.5 4.5 0 0 1 9 0V9"/></g>', 's'],
-  ['confirm', '<path d="M6 14.5l5 5L22 8" stroke-width="2.6"/>', 'sj'],
-  ['return', '<g transform="translate(6 6) scale(0.6667)"><path d="M20 5v7a4 4 0 0 1-4 4H5" stroke-width="2.6"/><path d="M9 11l-5 5 5 5" stroke-width="2.6"/></g>', 'sj'],
-  ['backspace', '<path d="M10 6h14v16H10l-7-8z" stroke-width="2"/><path d="M14 11l6 6M20 11l-6 6" stroke-width="2"/>', 'sj'],
-  ['info', '<circle cx="14" cy="14" r="10"/><path d="M14 13v6M14 9v0.5"/>', 's'],
-  ['person', '<circle cx="14" cy="10" r="4.5"/><path d="M5 24c1.5-5 5-7 9-7s7.5 2 9 7"/>', 's'],
-  ['tick', '<g transform="translate(6 6) scale(0.5714)"><path d="M6 14.5l5 5L22 8" stroke-width="4"/></g>', 'sj'],
-  // Player-Knopfreihe (Mockup player-osd.html)
-  ['play', '<path d="M9 5.5v17l14-8.5z" fill="C" stroke-width="1.6"/>', 'sj'],
-  ['pause', '<rect x="7.5" y="5.5" width="4.5" height="17" rx="1" fill="C" stroke="none"/><rect x="16" y="5.5" width="4.5" height="17" rx="1" fill="C" stroke="none"/>', 's'],
-  ['next', '<path d="M6 7v14l11-7z" fill="C" stroke-width="1.6"/><rect x="19" y="7" width="3.2" height="14" rx="1" fill="C" stroke="none"/>', 'sj'],
-  ['chapters', '<path d="M6 8h16M6 14h16M6 20h10"/>', 's'],
-  ['audio', '<path d="M5 11v6h4.5l5.5 4.5v-15L9.5 11z" stroke-width="2"/><path d="M18.5 10.5a5 5 0 0 1 0 7M21.5 7.5a9 9 0 0 1 0 13" stroke-width="2"/>', 'sj'],
-  ['more', '<circle cx="7" cy="14" r="2.2" fill="C" stroke="none"/><circle cx="14" cy="14" r="2.2" fill="C" stroke="none"/><circle cx="21" cy="14" r="2.2" fill="C" stroke="none"/>', 's'],
-  ['moon', '<path d="M20.5 17.5A8.5 8.5 0 0 1 10.5 6a8.5 8.5 0 1 0 10 11.5z" stroke-width="2"/>', 'sj'],
-  // M4 Musik & Hoerbuecher (Jetzt laeuft)
-  ['prev', '<path d="M22 7v14l-11-7z" fill="C" stroke-width="1.6"/><rect x="5.8" y="7" width="3.2" height="14" rx="1" fill="C" stroke="none"/>', 'sj'],
-  ['shuffle', '<path d="M4 9h4.5c4 0 6.5 10 11 10H24M4 19h4.5c1.8 0 3.2-2 4.4-4.2M15.2 13.2C16.4 11 17.8 9 19.5 9H24" stroke-width="2"/><path d="M21 6l3 3-3 3M21 16l3 3-3 3" stroke-width="2"/>', 'sj'],
-  ['repeat', '<path d="M5 15v-3a4 4 0 0 1 4-4h14M23 13v3a4 4 0 0 1-4 4H5" stroke-width="2"/><path d="M20 5l3 3-3 3M8 17l-3 3 3 3" stroke-width="2"/>', 'sj'],
-  ['repeat1', '<path d="M5 15v-3a4 4 0 0 1 4-4h14M23 13v3a4 4 0 0 1-4 4H5" stroke-width="2"/><path d="M20 5l3 3-3 3M8 17l-3 3 3 3" stroke-width="2"/><path d="M13 12.5l1.6-1.2V17" stroke-width="1.8"/>', 'sj'],
-  ['note', '<path d="M11 20V6.5l12-2.5v13" stroke-width="2"/><circle cx="8" cy="20" r="3" fill="C" stroke="none"/><circle cx="20" cy="17" r="3" fill="C" stroke="none"/>', 'sj'],
-  ['book', '<path d="M14 7.5c-2.5-2-6-2.5-9-2v15c3-0.5 6.5 0 9 2 2.5-2 6-2.5 9-2v-15c-3-0.5-6.5 0-9 2zM14 7.5v15" stroke-width="2"/>', 'sj'],
-  // P4 Entdecken (Seitenleiste)
-  ['compass', '<circle cx="14" cy="14" r="10"/><path d="M18.6 9.4l-2.7 6.5-6.5 2.7 2.7-6.5z" stroke-width="2"/>', 'sj']
-];
-var COLORS = ['#858B92', '#B7BBC0', '#F2F2F2', '#141414'];   // Zeilen: text-3, text-2, text-1, on-accent
-var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + (ICONS.length * 32) + '" height="' + (COLORS.length * 32) + '">';
-COLORS.forEach(function (col, r) {
-  ICONS.forEach(function (ic, i) {
-    var body = ic[1].replace(/fill="C"/g, 'fill="' + col + '"');
-    svg += '<g transform="translate(' + (i * 32 + 2) + ' ' + (r * 32 + 2) + ')" fill="none" stroke="' + col + '" stroke-width="2.2" stroke-linecap="round"' +
-      (ic[2].indexOf('j') >= 0 ? ' stroke-linejoin="round"' : '') + '>' + body + '</g>';
-  });
-});
-svg += '</svg>';
+/* ---------- Icon-Sprite ----------
+ * Quelle: design/icons/<name>.svg (je Symbol eine Datei, 28er viewBox, Farbe currentColor), Spalten-Reihenfolge
+ * design/icons/order.json (nur anhaengen), Zeilen-Farben = design/tokens.json icons.rows (Farb-Tokens). Formen = abgenommene
+ * Rail-/Button-Icons aus den Mockups (USER). Neues Symbol: SVG anlegen, Namen in order.json anhaengen, dieses Skript und
+ * node tools/design_doc.js --write ausfuehren (src/ui/icons.js COLS und design/README.md werden erzeugt).
+ * src/assets/icons.svg ist der erzeugte Vektor-Sprite (Eingabe fuer rsvg-convert; Test prueft, dass er aktuell ist). */
+var svg = T.spriteSvg();
+fs.writeFileSync(path.join(OUT, 'icons.svg'), svg + '\n');
 var tmp = path.join(require('os').tmpdir(), 'plexneo-icons.svg');
 fs.writeFileSync(tmp, svg);
 try {
   cp.execFileSync('rsvg-convert', ['-o', path.join(OUT, 'icons.png'), tmp]);
 } catch (e) { console.error('rsvg-convert fehlt – icons.png nicht neu erzeugt'); }
-fs.writeFileSync(path.join(OUT, 'icons.json'), JSON.stringify(ICONS.map(function (i) { return i[0]; })) + '\n');
+fs.writeFileSync(path.join(OUT, 'icons.json'), JSON.stringify(T.order()) + '\n');
 
 /* ---------- scrim-det: Text-Bereich der Detailseiten zusaetzlich abdunkeln ----------
  * Zusatz e(x,y) = 0.65 im Textbereich (x <= 860, y 210..560), weich auslaufend bis x 1240 bzw. y 40 und 700;
@@ -181,7 +244,7 @@ function scrimNp() {
 
 /* ---------- QR ---------- */
 var QR = require('qrcode');
-QR.toFile(path.join(OUT, 'qr.png'), 'https://plex.tv/link', { errorCorrectionLevel: 'M', margin: 0, width: 264, color: { dark: '#0E0F11', light: '#FFFFFF' } }, function (err) {
+QR.toFile(path.join(OUT, 'qr.png'), 'https://plex.tv/link', { errorCorrectionLevel: 'M', margin: 0, width: 264, color: { dark: BG_HEX, light: QR_LIGHT } }, function (err) {
   if (err) console.error('QR-Fehler', err);
   var scrimSrc = path.join(ROOT, 'app', 'scrim.png');
   if (!fs.existsSync(path.join(OUT, 'scrim.png')) && fs.existsSync(scrimSrc)) fs.copyFileSync(scrimSrc, path.join(OUT, 'scrim.png'));

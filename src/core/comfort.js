@@ -18,18 +18,18 @@
       return rest >= m * MIN;
     },
     /* Bilder fuer den Schoner aus dem Home-Cache (0 Anfragen): erst Weiterschauen + "Neu", sonst alle Reihen; je Bild einmal */
-    saverItems: function (cache, max) {
-      var rows = cache && cache.rows || [], out = [], seen = {}, pass, i, j;
+    saverItems: function (cache, max, need) {
+      var rows = cache && cache.rows || [], out = [], seen = {}, pass, i, j, k = need || 'art';   // need 'thumb': "Poster und Cover"
       max = max || 24;
       for (pass = 0; pass < 2 && !out.length; pass++) {
         for (i = 0; i < rows.length; i++) {
           var r = rows[i], pri = r.id === 'cw' || /^new-/.test(String(r.id));
           if (pass === 0 && !pri) continue;
           for (j = 0; r.items && j < r.items.length && out.length < max; j++) {
-            var it = r.items[j], art = it.art || '';   // nur echte Hintergrundbilder (TV 27.10.: Poster als Ersatz = Farbbrei)
-            if (!art || seen[art]) continue;
-            seen[art] = 1;
-            out.push({ art: art, title: it.title || '', sub: N.saverLogic.meta(it) });
+            var it = r.items[j], pic = it[k] || '';   // Hintergrundbild (TV 27.10.: Poster als Ersatz im Vollbild = Farbbrei)
+            if (!pic || seen[pic]) continue;
+            seen[pic] = 1;
+            out.push({ art: it.art || '', thumb: it.thumb || '', sq: N.saverLogic.square(it), title: it.title || '', sub: N.saverLogic.meta(it) });
           }
         }
       }
@@ -98,13 +98,19 @@
   C.DEFAULTS = { screensaver: 5, saverBlur: true, clock: true, backgrounds: true, spoiler: false, resumeRewind: 0, passthrough: true, audioBoost: 100,
     stillTime: 2, sleepDefault: 'off', lowerOffer: true, subColor: 'white', subDelay: 0,
     animeDetect: 'normal', animeShow: true, animeAudio: 'ja', animeSubs: 'deen', animeSigns: false,
-    saverFx: 'fade', saverInterval: 30, saverSrc: 'libs', saverLibs: null, saverUnwatched: false, saverInfo: 'ambient',   // Schoner (N.saverLogic)
-    accent: N.brand.accent };   // Akzentfarbe (N.accent): Standard = Farbe der Marke
+    saverFx: 'fade', saverInterval: 30, saverSrc: 'libs', saverLibs: null, saverUnwatched: false, saverInfo: 'ambient', saverPics: 'art',   // Schoner (N.saverLogic)
+    clockStyle: 'box', hints: 'always',   // Uhr auf der Startseite (C.CLOCK_STYLES), Tastenhinweise (N.ui.hints.MODES)
+    accent: N.brand.accent,   // Akzentfarbe (N.accent): Standard = Farbe der Marke
+    libBg: 'mood', libBgStrength: 'soft' };   // Hintergrund in Bibliotheken (N.amb): Farbstimmung, dezent
   C.applyDefaults = function (st, kid) {
     if (!st) return st;
     for (var k in C.DEFAULTS) if (Object.prototype.hasOwnProperty.call(C.DEFAULTS, k) && st[k] === undefined) st[k] = k === 'stillTime' && kid ? 1 : C.DEFAULTS[k];
     return st;
   };
+  /* Uhr auf der Startseite: box = Kasten (bisher, Standard), free = grosse duenne Ziffern frei auf weichem Eckschatten,
+   * date = wie free plus Datumszeile, small = kleine ruhige Ziffern. Fehlend/unbekannt -> box. */
+  C.CLOCK_STYLES = ['box', 'free', 'date', 'small'];
+  C.clockStyle = function (st) { var v = st && st.clockStyle; return C.CLOCK_STYLES.indexOf(v) >= 0 ? v : 'box'; };
   N.evt.on('profile:changed', function () { if (N.session) C.applyDefaults(N.session.settings, N.session.isKid()); });
   N.comfort = C;
 })(N);

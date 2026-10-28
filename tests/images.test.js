@@ -121,3 +121,24 @@ test('Profilwechsel leert Warteschlange und LRU', function () {
   assert.strictEqual(N.img._stats().cached, 0);
   assert.strictEqual(N.img._stats().queued, 0);
 });
+
+test('Vorab-Dekodieren (Runde 5): nur geladene Bilder, eines je Frame, nur in Ruhe, nicht doppelt', function () {
+  var s = setup(), N = s.N, T = s.T, dec = new Img(), seen = [];
+  N.img._dec(dec);
+  var a = new Img(), b = new Img();
+  N.img.want(a, 'http://pms/a', 1); N.img.want(b, 'http://pms/b', 1);
+  T.tick(50); a.onload(); b.onload();                                  // beide geladen (LRU)
+  T.tick(200);
+  N.idle.touch();
+  N.img.warm(['http://pms/a', 'http://pms/nicht-geladen', 'http://pms/b', 'http://pms/a']);
+  T.tick(100);
+  assert.strictEqual(dec.src, '', 'nicht direkt nach einer Taste');
+  var last = '';
+  for (var i = 0; i < 40; i++) { T.tick(10); if (dec.src !== last) { seen.push(dec.src); last = dec.src; } }
+  H.eq(seen, ['http://pms/a', 'http://pms/b']);                       // Reihenfolge der Liste, Ungeladenes ausgelassen, keine Doppel
+  assert.strictEqual(N.img._stats().warms, 2);
+  N.img.warm(['http://pms/a']); T.tick(400);
+  assert.strictEqual(N.img._stats().warms, 2);                         // kuerzlich dekodiert -> kein zweites Mal
+  N.img.reset();
+  assert.strictEqual(dec.src, N.img.BLANK);
+});

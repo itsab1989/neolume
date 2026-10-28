@@ -106,6 +106,14 @@ var EPSUM = ['Old secrets surface when a storm cuts the town off for a night.', 
 function slug(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
 var ITEMS = {}, CHILDREN = {}, ART = {}, LIB = { 1: [], 2: [], 3: [], 4: [] }, ALBUMS = { 3: [], 4: [] };
 function art(path, kind, info) { ART[path] = { kind: kind, info: info }; return path; }
+/* Farbstimmung ("Hintergrund in Bibliotheken"): der PMS liefert je Titel UltraBlurColors (4 Ecken, Hex ohne #) – hier aus der
+ * Palette des Themas, damit die Stimmung zum generierten Bild passt */
+var ARTMOD = require('./art');
+function ub(theme) {
+  var t = ARTMOD.THEMES[theme] || ARTMOD.THEMES.sea, p = ARTMOD.PALETTES[t[1]];
+  function h(c) { return c.slice(1); }
+  return { topLeft: h(p[1]), topRight: h(p[2]), bottomRight: h(p[1]), bottomLeft: h(p[0]) };
+}
 
 MOVIES.forEach(function (m, i) {
   var rk = String(100 + i), roles = [];
@@ -115,7 +123,7 @@ MOVIES.forEach(function (m, i) {
     art: art('/sc/art/m' + rk, 'backdrop', { theme: m[2], seed: rk }), duration: m[6] * 60000, audienceRating: m[4], contentRating: m[5], summary: m[7],
     tagline: '', studio: STUDIOS[i % STUDIOS.length], addedAt: T0 + (30 - i) * 86400, originallyAvailableAt: m[1] + '-0' + (1 + i % 9) + '-1' + (i % 9),
     viewCount: i % 4 === 3 ? 1 : 0, Genre: [{ id: 100 + i % 7, tag: m[3] }], Director: [{ id: 70 + i % DIRECTORS.length, tag: DIRECTORS[i % DIRECTORS.length] }], Role: roles,
-    _theme: m[2] };
+    UltraBlurColors: ub(m[2]), _theme: m[2] };
   ITEMS[rk] = it; LIB[1].push(it);
 });
 
@@ -124,7 +132,7 @@ SHOWS.forEach(function (s, i) {
   var show = { ratingKey: rk, key: '/library/metadata/' + rk + '/children', type: 'show', title: s[0], titleSort: s[0].replace(/^(The) /, ''), year: s[1], librarySectionID: 2, librarySectionTitle: 'TV Shows',
     thumb: art('/sc/poster/s' + rk, 'poster', { title: s[0], theme: s[2], seed: rk, sub: 'A new series', credit: 'NEW EPISODES EVERY FRIDAY' }), art: art('/sc/art/s' + rk, 'backdrop', { theme: s[2], seed: rk }),
     contentRating: s[4], audienceRating: (7 + (i * 37 % 20) / 10), summary: s[7], childCount: s[5], studio: STUDIOS[(i + 1) % STUDIOS.length], addedAt: T0 + (20 - i) * 86400,
-    Genre: [{ id: 200 + i % 5, tag: s[3] }], Role: [], _theme: s[2] };
+    Genre: [{ id: 200 + i % 5, tag: s[3] }], Role: [], UltraBlurColors: ub(s[2]), _theme: s[2] };
   for (var k = 0; k < 8; k++) show.Role.push({ id: 900 + (i * 5 + k) % PEOPLE.length, tag: PEOPLE[(i * 5 + k) % PEOPLE.length], role: ['Chief Nora Vale', 'Ben Harlow', 'Edie', 'Captain Moss', 'Rosa', 'Kit', 'Father Abel', 'Narrator'][k], thumb: '/sc/person/' + ((i * 5 + k) % PEOPLE.length) });
   for (var sn = 1; sn <= s[5]; sn++) {
     var srk = String(Number(rk) + sn), eps = [];
@@ -156,15 +164,16 @@ function audioLib(sec, list, isBook) {
       thumb: art('/sc/' + (isBook ? 'author' : 'artist') + '/' + rk, 'person', { seed: name + 'x' }), art: art('/sc/art/ar' + rk, 'backdrop', { theme: isBook ? a[1][0][1] : ['sea', 'night', 'city', 'forest', 'moon', 'motel', 'desert', 'space', 'sun', 'snow', 'fog', 'garden'][i % 12], seed: rk }),
       addedAt: T0 + i * 100, summary: isBook ? name + ' writes quiet, luminous novels about places and the people who refuse to leave them.' : name + ' is a ' + a[1].toLowerCase() + ' act known for warm arrangements and late-night melodies.',
       Genre: [{ tag: isBook ? 'Fiction' : a[1] }] };
+    artist.UltraBlurColors = ub(ART[artist.art].info.theme);
     ITEMS[rk] = artist; LIB[sec].push(artist);
     var albums = [];
     (isBook ? a[1] : a[2]).forEach(function (al, j) {
-      var title = isBook ? al[0] : al, theme = isBook ? al[1] : Object.keys(require('./art').THEMES)[(i * 2 + j) % 25];
+      var title = isBook ? al[0] : al, theme = isBook ? al[1] : Object.keys(ARTMOD.THEMES)[(i * 2 + j) % 25];
       var ark = String((isBook ? 750 : 700) + aIdx), n = isBook ? 12 + (aIdx % 3) : 9 + (aIdx % 3), tracks = [];
       var album = { ratingKey: ark, key: '/library/metadata/' + ark + '/children', type: 'album', title: title, titleSort: title.replace(/^(The|A) /, ''), parentTitle: name, parentRatingKey: rk,
         year: 2015 + (aIdx * 3) % 10, librarySectionID: sec, thumb: art('/sc/' + (isBook ? 'book' : 'album') + '/' + ark, isBook ? 'book' : 'album', { title: title, sub: name, theme: theme, seed: ark }),
         art: artist.art, parentThumb: artist.thumb, addedAt: T0 + aIdx * 500, summary: isBook ? 'Unabridged. Read by ' + PEOPLE[(aIdx + 4) % PEOPLE.length] + '.' : 'The ' + (j ? 'second' : 'debut') + ' album by ' + name + '.',
-        Genre: [{ tag: isBook ? 'Fiction' : a[1] }], leafCount: n };
+        Genre: [{ tag: isBook ? 'Fiction' : a[1] }], leafCount: n, UltraBlurColors: ub(theme) };
       for (var t = 1; t <= n; t++) {
         var trk = String((isBook ? 90000 : 80000) + aIdx * 40 + t), dur = isBook ? 1500000 + (t * 97 % 13) * 60000 : 170000 + (t * 53 % 9) * 17000;
         var tr = { ratingKey: trk, key: '/library/metadata/' + trk, type: 'track', title: isBook ? CHAPTERS[(t - 1) % CHAPTERS.length] : SONGS[(t * 3 + aIdx) % SONGS.length], index: t, parentIndex: 1,
@@ -184,6 +193,33 @@ function audioLib(sec, list, isBook) {
 }
 audioLib(3, ARTISTS, false);
 audioLib(4, AUTHORS.map(function (a) { return [a[0], a[1]]; }), true);
+
+/* Weitere Veroeffentlichungen einer Kuenstlerin (Kuenstlerseite mit Gruppen wie in den offiziellen Plex-Apps): der PMS liefert sie
+ * NICHT in /children, sondern in /library/metadata/<id>/related als Hubs artist.albums.<gruppe>. Nicht in der Alben-Liste. */
+var RELATED = {};
+(function () {
+  var artist = LIB[3].filter(function (a) { return a.title === 'Juno Halloway'; })[0], rk = artist.ratingKey;
+  var EXTRA = [['singles', 'Blue Hour EP', 'night', 2023, 4], ['singles', 'Paper Lanterns (Single)', 'city', 2024, 2],
+    ['live', 'Live at the Lamp Room', 'motel', 2022, 10], ['soundtrack', 'Moons of Paper Street (Original Score)', 'moon', 2022, 12],
+    ['compilation', 'The Very Best of Juno Halloway', 'sun', 2025, 14]];
+  RELATED[rk] = {};
+  EXTRA.forEach(function (x, k) {
+    var ark = String(790 + k), tracks = [];
+    var album = { ratingKey: ark, key: '/library/metadata/' + ark + '/children', type: 'album', title: x[1], titleSort: x[1].replace(/^(The|A) /, ''), parentTitle: artist.title,
+      parentRatingKey: rk, year: x[3], librarySectionID: 3, thumb: art('/sc/album/' + ark, 'album', { title: x[1].replace(/ \(.*\)$/, ''), sub: artist.title, theme: x[2], seed: ark }),
+      art: artist.art, parentThumb: artist.thumb, addedAt: T0 + 20000 + k * 500, summary: 'A ' + (x[0] === 'singles' ? 'short release' : x[0] + ' album') + ' by ' + artist.title + '.',
+      Genre: [{ tag: 'Jazz' }], leafCount: x[4], UltraBlurColors: ub(x[2]) };
+    for (var t = 1; t <= x[4]; t++) {
+      var trk = String(85000 + k * 40 + t), dur = 170000 + (t * 53 % 9) * 17000;
+      var tr = { ratingKey: trk, key: '/library/metadata/' + trk, type: 'track', title: SONGS[(t * 5 + k) % SONGS.length], index: t, parentIndex: 1, parentTitle: x[1], parentRatingKey: ark,
+        grandparentTitle: artist.title, grandparentRatingKey: rk, parentThumb: album.thumb, thumb: album.thumb, grandparentThumb: artist.thumb, librarySectionID: 3, duration: dur,
+        addedAt: album.addedAt, Media: [{ audioCodec: 'mp3', container: 'mp3', Part: [{ id: Number(trk), key: '/library/parts/' + trk + '/1/file.mp3', duration: dur }] }] };
+      ITEMS[trk] = tr; tracks.push(tr);
+    }
+    ITEMS[ark] = album; CHILDREN[ark] = tracks;
+    (RELATED[rk][x[0]] = RELATED[rk][x[0]] || []).push(album);
+  });
+})();
 
 var SECTIONS = { MediaContainer: { size: 4, Directory: [
   { key: '1', type: 'movie', title: 'Movies', agent: 'tv.plex.agents.movie', language: 'en-US', hidden: 0 },
@@ -211,6 +247,12 @@ var INSP = {
     hub('tv.rediscover.2', 'tv.rediscover', 'show', 'Rediscover', pickRk([330, 320, 410])),
     hub('tv.toprated.2', 'tv.toprated', 'show', 'Top Rated', pickRk([310, 300, 340, 320, 390, 350, 370]))]
 };
+/* "Weitere Server": Bibliotheken auf dem freigegebenen Server eines Freundes (eigener Mock-Port in tools/showcase.js) */
+var FRIEND = { name: 'Lakeside', machineId: 'showcase-friend-0001',
+  sections: { MediaContainer: { size: 2, Directory: [{ key: '1', type: 'movie', title: 'Film Classics', agent: 'tv.plex.agents.movie', hidden: 0 },
+    { key: '2', type: 'show', title: 'Nature & Travel', agent: 'tv.plex.agents.series', hidden: 0 }] } },
+  sectionsDe: { MediaContainer: { size: 2, Directory: [{ key: '1', type: 'movie', title: 'Filmklassiker', agent: 'tv.plex.agents.movie', hidden: 0 },
+    { key: '2', type: 'show', title: 'Natur & Reisen', agent: 'tv.plex.agents.series', hidden: 0 }] } } };
 /* Entdecken: Titel, die NICHT auf dem Server liegen (ebenfalls erfunden) */
 var EXTERNAL = [
   ['The Paper Navigator', 2025, 'map'], ['Harvest Lamplight', 2024, 'garden'], ['The Lamplighter\'s Code', 2023, 'night'], ['Tidecaller', 2025, 'sea'],
@@ -219,4 +261,4 @@ var EXTERNAL = [
 EXTERNAL.forEach(function (x, i) { art('/sc/ext/' + i, 'poster', { title: x[0], theme: x[2], seed: 'ext' + i, credit: 'COMING SOON' }); });
 
 module.exports = { ITEMS: ITEMS, CHILDREN: CHILDREN, ART: ART, LIB: LIB, ALBUMS: ALBUMS, SECTIONS: SECTIONS, SECTIONS_DE: SECTIONS_DE, CONTINUE: CONTINUE, ONDECK: ONDECK,
-  RECENT: RECENT, INSP: INSP, EXTERNAL: EXTERNAL, PEOPLE: PEOPLE, art: art, slug: slug };
+  RECENT: RECENT, INSP: INSP, RELATED: RELATED, FRIEND: FRIEND, EXTERNAL: EXTERNAL, PEOPLE: PEOPLE, art: art, slug: slug };

@@ -124,3 +124,39 @@ test('Genre-Tags in der App-Sprache (F22): bekannte uebersetzt, unbekannte unver
   assert.strictEqual(N.fmt.genre('Komödie'), 'Comedy'); assert.strictEqual(N.fmt.genre('Adventure'), 'Adventure');
   N.i18n.set('de');
 });
+
+test('Staffel-Reiter: angeschnittene Reiter ausgeblendet, Pfeil zeigt weitere Staffeln an (TV-Befund 28.10.)', function () {
+  var D = require('./helpers/load').load().N.det;
+  var X = [[0, 112], [120, 112], [240, 112], [360, 112], [480, 112]];   // 5 Staffeln, Fenster 464, "Staffel 5" ragt hinein
+  var v = D.tabView(X, 0, 0, 464, 28);
+  assert.deepStrictEqual([v.o, v.shift, v.first, v.last, v.left, v.right], [0, 0, 0, 2, false, true]);   // Reiter 4 haette nur 16 px + Pfeil
+  v = D.tabView(X, 4, v.o, 464, 28);
+  assert.ok(v.left && !v.right && v.last === 4 && v.first > 0);
+  X.forEach(function (t, i) { if (i >= v.first && i <= v.last) assert.ok(t[0] - v.o + v.shift >= 28 && t[0] + t[1] - v.o + v.shift <= 464); });
+  v = D.tabView(X.slice(0, 3), 2, 0, 464, 28);                     // passt alles: keine Pfeile
+  assert.deepStrictEqual([v.o, v.shift, v.last, v.left, v.right], [0, 0, 2, false, false]);
+  for (var f = 0; f < 5; f++) { v = D.tabView(X, f, 0, 464, 28); assert.ok(f >= v.first && f <= v.last, 'Fokus sichtbar ' + f); }
+});
+
+test('Reiter-Pfeile 44 px Platz (Zeiger-Flaeche 40 px): ganze Reiter bleiben zwischen den Pfeilen', function () {
+  var X = [[0, 110], [118, 110], [236, 110], [354, 110], [472, 110]];
+  var v = D.tabView(X, 4, 0, 464, 44);
+  assert.ok(v.left && v.shift === 44);
+  X.forEach(function (t, i) { if (i >= v.first && i <= v.last) assert.ok(t[0] - v.o + v.shift >= 44 && t[0] + t[1] - v.o + v.shift <= 464 - (v.right ? 44 : 0)); });
+  v = D.tabView(X, 0, 0, 464, 44);
+  assert.ok(v.right && !v.left);
+  assert.ok(X[v.last][0] + X[v.last][1] + 44 <= 464, 'rechter Pfeil (4 px Abstand + 40 px) passt in den Clip');
+});
+
+test('Staffelstreifen-Eingabe: Karten fehlender Folgen (miss) zaehlen nicht -> 12 Server-Folgen bleiben Felder', function () {
+  var eps = [];
+  for (var i = 1; i <= 12; i++) eps.push({ e: i, vc: i < 3 ? 1 : 0, off: 0, dur: 100 });
+  eps.splice(5, 0, { e: 13, ph: true, miss: { st: 'none' } });                  // fehlende Folge an ihrer Stelle (Erweiterung)
+  eps.push({ e: 14, ph: true, miss: { st: 'unaired' } });
+  var src = D.stripSource(eps);
+  assert.strictEqual(src.n, 12); assert.strictEqual(src.eps.length, 12); assert.strictEqual(src.full, true);
+  assert.strictEqual(N.SeasonStrip.layout({ enabled: true, size: 'M', episodes: src.eps, total: 12 }).mode, 'cells');
+  eps[0] = { e: 1, ph: true };                                                   // Seite noch nicht geladen
+  assert.strictEqual(D.stripSource(eps).full, false);
+  assert.strictEqual(D.stripSource([]).full, false);
+});

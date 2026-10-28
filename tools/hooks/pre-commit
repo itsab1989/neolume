@@ -1,0 +1,11 @@
+#!/bin/sh
+# Optional git hook (install once with: npm run hooks). Before each commit: product spec, test plan, porting playbook,
+# ports list and design files in sync with the code (well under a second). Same check as CI; the full test suite runs
+# before a push (pre-push). Skip once with: git commit --no-verify
+# Note: checks the files in your working folder, not only what is staged.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+if ! node tools/spec_gen.js --check; then
+  echo "" >&2
+  echo "Commit stopped: fix the points above (usually: npm run spec, then git add the updated files)." >&2
+  exit 1
+fi

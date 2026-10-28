@@ -3,8 +3,10 @@
  * drueckt die Tasten selbst (N.router.key im festen Takt) und misst per rAF.
  * Start: Ziffernfolge 9,8,7 auf der Fernbedienung (je < 4 s Abstand) | window.PN_BENCH = 'all' | 'home,lib,leak' (tools/dev.py serve
  * --bench …, Vorschau &bench=…). RETURN/EXIT bricht ab. Ergebnis: je Szenario eine Zeile "bench <name>: …" im Protokoll (ctx.log).
- * Szenarien: home, home-hero, lib-L/M/S/list, details-movie, details-show, search, player-osd (readOnly erzwungen, keine
- * Fortschritts-/Spur-Schreibzugriffe), leak (Details Film/Serie, Bibliothek, Suche, Einstellungen, Musik, Player je Runde
+ * Szenarien: home, home-hero, lib-L/M/S/list, details-movie, details-show, search, discover, player-osd (readOnly erzwungen, keine
+ * Fortschritts-/Spur-Schreibzugriffe), loupe (Feinauswahl am Balken: Zeiger ruht -> oeffnet, Hin-und-her im 40-ms-Takt, nach oben weg;
+ * nur mit Zeiger-Steuerung, Einstellung waehrend des Laufs an; Darstellung A Lasche = Standard, frueher 'loupe-panel'),
+ * loupe-stretch / loupe-film (dasselbe in den anderen Darstellungen, SPEC PLAY-31; film misst nur mit Vorschaubildern des ersten Films den Filmstreifen, sonst das Panel), leak (Details Film/Serie, Bibliothek, Suche, Einstellungen, Musik, Player je Runde
  * oeffnen/schliessen, Standard 10 Runden, 'leak:20'; nur auf Wunsch: 'leak' bzw. 'all,leak'), saver-<uebergang> (nur auf Wunsch:
  * 'saver' bzw. Ziffern 9,8,4 = alle Uebergaenge mit Frame-Protokoll). */
 (function (N) {
@@ -12,10 +14,13 @@
   var run = null, seq = 0, seqT = 0, tm = null;
 
   function R() { return N.router; }
+  /* Schritt eines Laufs: Tastenname oder Funktion (Zeiger-Szenarien, z. B. 'loupe': N.pointer.move wie die echte Smart Control) */
+  function press(k) { if (typeof k === 'function') k(); else R().key(k); }
   function log(m) { N.log(m); }
   function heap() { try { var p = window.performance; return p && p.memory ? p.memory.usedJSHeapSize : 0; } catch (e) { return 0; } }
   function domCount() { return document.getElementsByTagName('*').length; }
   function imgN() { var s = N.img._stats(); return (s.sets || 0) + (s.loads || 0); }
+  function decN() { return N.img._stats().warms || 0; }   // Runde 5: Vorab-Dekodierungen (N.img.warm) – im Frame-Protokoll 'dec'
 
   /* Timer-Buchhaltung fuer den Leck-Test (erst ab Start des Laufs, Wrapper bleiben danach aktiv) */
   function trackTimers() {
@@ -86,7 +91,7 @@
   Work.prototype.key = function (k) {
     var s = this.s;
     this.take(false);
-    var t = pnow(); R().key(k); var d = pnow() - t, l = flushT();
+    var t = pnow(); press(k); var d = pnow() - t, l = flushT();
     this.take(true);
     s.js += d; s.sl += l; s.key += d + l;
     if (d + l > s.maxTask) s.maxTask = d + l;
@@ -104,7 +109,8 @@
    * Bildzuweisungen. Rest = Intervall - JS ~ Stil/Layout/Malen/Compositing des Browsers. Ausgabe: Mittel + die 5 laengsten Frames. */
   function Frames() {
     var F = this, MO = window.MutationObserver || window.WebKitMutationObserver, W = window;
-    F.cur = {}; F.js = 0; F.mut = 0; F.top = []; F.topJs = []; F.n = 0; F.sum = 0; F.sumJs = 0; F.sumMut = 0; F.last = 0; F.img = imgN(); F.undo = [];
+    F.cur = {}; F.js = 0; F.mut = 0; F.top = []; F.topJs = []; F.n = 0; F.sum = 0; F.sumJs = 0; F.sumMut = 0; F.last = 0; F.img = imgN(); F.dec = decN(); F.dec0 = F.dec; F.undo = [];
+    F.kn = 0; F.kl = ''; F.since = 0;                   // TV 28.10.: letzte Taste (#Nummer) + Frames seither -> lange Frames einem Schritt zuordnen
     F.mo = MO ? new MO(function (l) { F.mut += l.length; }) : null;
     if (F.mo) F.mo.observe(document.body, { subtree: true, attributes: true, characterData: true, childList: true });
     F.depth = 0;
@@ -121,9 +127,20 @@
     wrap('Row.render', N.ui.Row && N.ui.Row.prototype, 'render');
     wrap('Row.setModel', N.ui.Row && N.ui.Row.prototype, 'setModel');
     wrap('Hero.set', N.ui.Hero && N.ui.Hero.prototype, 'set');
+    wrap('Hero.swap', N.ui.Hero && N.ui.Hero.prototype, '_swap');      // Hero-Bild sichtbar (1280x720 dekodieren + malen)
+    wrap('Row.vis', N.ui.Row && N.ui.Row.prototype, 'setVisible');
     wrap('hints', N.router, 'refreshHints');
     wrap('ring', N.ui.Ring && N.ui.Ring.prototype, 'to');
     wrap('img.want', N.img, 'want');
+    wrap('amb.apply', N.ui.Ambient && N.ui.Ambient.prototype, '_apply');   // Hintergrund in Bibliotheken: Ziel + PNG/URL + src
+    wrap('amb.show', N.ui.Ambient && N.ui.Ambient.prototype, '_show');
+    wrap('amb.png', N.amb, 'moodUrl');   // Anteil des Verlaufsbilds an amb.apply (Rest = img.src/Bild-URL)
+    wrap('amb.src', N.ui.Ambient && N.ui.Ambient.prototype, '_src');   // Runde 5: davon die src-Zuweisung allein
+    // Runde 5: Feinauswahl (Ziffern 9,8,1) und Schreiben (Dev-Protokoll ruht waehrend des Laufs; taucht es auf, ist es ein Fehler)
+    var LV = N.ui.LoupeView && N.ui.LoupeView.prototype;
+    wrap('Loupe.show', LV, 'show'); wrap('Loupe.point', LV, 'point'); wrap('Loupe.hide', LV, 'hide');
+    wrap('Loupe.frames', LV, 'loadFrames'); wrap('Loupe.exact', LV, 'exact'); wrap('Loupe.played', LV, 'played');
+    wrap('diag.flush', N.diag, 'flush'); wrap('store.flush', N.store, 'flush');
     var sT = W.setTimeout, raf = U.raf;
     F.sT = sT; F.raf = raf;
     /* perf3: teure Timer/rAF (>= 4 ms) zusaetzlich mit Code-Anfang benennen, damit man sie im Quelltext findet */
@@ -138,13 +155,17 @@
     U.raf = function (f) { return raf.call(U, named('raf', f)); };
     F.undo.push(function () { W.setTimeout = sT; U.raf = raf; });
   }
-  Frames.prototype.key = function (k) { this.wrapFn('key ' + k, function () { R().key(k); })(); };
+  Frames.prototype.key = function (k) {
+    this.kn++; this.kl = typeof k === 'function' ? 'ptr' : String(k).charAt(0); this.since = 0;
+    this.wrapFn(typeof k === 'function' ? 'ptr' : 'key ' + k, function () { press(k); })();
+  };
   Frames.prototype.tick = function (t) {
     var F = this;
     if (F.mo && F.mo.takeRecords) F.mut += F.mo.takeRecords().length;
     if (F.last) {
-      var d = t - F.last, im = imgN(), fr = { d: d, js: F.js, mut: F.mut, img: im - F.img, w: F.cur };
-      F.n++; F.sum += d; F.sumJs += F.js; F.sumMut += F.mut; F.img = im;
+      var d = t - F.last, im = imgN(), dc = decN(), fr = { d: d, js: F.js, mut: F.mut, img: im - F.img, dec: dc - F.dec, w: F.cur, k: F.kn ? F.kl + F.kn + '+' + F.since : '' };
+      F.since++;
+      F.n++; F.sum += d; F.sumJs += F.js; F.sumMut += F.mut; F.img = im; F.dec = dc;
       F.top.push(fr); F.top.sort(function (a, b) { return b.d - a.d; }); if (F.top.length > 5) F.top.pop();
       F.topJs.push(fr); F.topJs.sort(function (a, b) { return b.js - a.js; }); if (F.topJs.length > 3) F.topJs.pop();
     }
@@ -161,11 +182,11 @@
         for (var k in fr.w) ks.push(k);
         ks.sort(function (a, b) { return fr.w[b] - fr.w[a]; });
         for (var j = 0; j < ks.length && j < 5; j++) if (fr.w[ks[j]] >= 0.05) parts.push(ks[j] + ' ' + r(fr.w[ks[j]]));
-        o += ' [' + r(fr.d) + 'ms js ' + r(fr.js) + ' mut ' + fr.mut + (fr.img ? ' img ' + fr.img : '') + (parts.length ? ': ' + parts.join(', ') : '') + ']';
+        o += ' [' + r(fr.d) + 'ms' + (fr.k ? ' @' + fr.k : '') + ' js ' + r(fr.js) + ' mut ' + fr.mut + (fr.img ? ' img ' + fr.img : '') + (fr.dec ? ' dec ' + fr.dec : '') + (parts.length ? ': ' + parts.join(', ') : '') + ']';
       }
       return o;
     }
-    var out = 'frames ' + name + ': n ' + F.n + ', avg ' + r(F.sum / n) + 'ms (js ' + r(F.sumJs / n) + ', rest ' + r((F.sum - F.sumJs) / n) + '), mut/frame ' + r(F.sumMut / n) + ' | longest:';
+    var out = 'frames ' + name + ': n ' + F.n + ', avg ' + r(F.sum / n) + 'ms (js ' + r(F.sumJs / n) + ', rest ' + r((F.sum - F.sumJs) / n) + '), mut/frame ' + r(F.sumMut / n) + ', dec ' + (F.dec - F.dec0) + ' | longest:';
     out += fmt(F.top) + ' | most js:' + fmt(F.topJs);
     return out;
   };
@@ -191,7 +212,7 @@
         }, 600);
         return;
       }
-      if (wk) wk.key(keys[i++]); else if (fs) fs.key(keys[i++]); else R().key(keys[i++]);
+      if (wk) wk.key(keys[i++]); else if (fs) fs.key(keys[i++]); else press(keys[i++]);
       sT.call(window, step, gap);
     })();
   }
@@ -216,8 +237,33 @@
 
   /* name -> function(done) */
   var S = {};
-  S.home = function (done, label) { home(); later(2500, function () { measure(label || 'home', BM.keys('R12 D R8 D R8 U U D'), GAP, done); }); };
-  S['home-hero'] = function (done) { home(); later(1500, function () { measure('home-hero', BM.keys('R8'), 450, done); }); };
+  /* Runde 5 (TV 28.10.): Startseite bisher ab der zuletzt fokussierten Reihe – aus der letzten Reihe waren die ▼ wirkungslos (1 statt
+   * 4 lange Frames), home-hero lief je nach Reihe ganz ohne Hero-Wechsel (66 fps) oder mit 8 (52,9 fps). Jetzt fester Ausgangspunkt. */
+  function homeBench() { var t = R().top(); return R().topName() === 'home' && t && t.bench ? t.bench : null; }
+  S.home = function (done, label) {
+    home();
+    later(300, function () {
+      var hb = homeBench();
+      if (hb) { hb.top(); log('bench ' + (label || 'home') + ' start: Reihe 0, Karten je Reihe ' + hb.counts().join('/')); }
+      later(2500, function () { measure(label || 'home', BM.keys('R12 D R8 D R8 U U D'), GAP, done); });
+    });
+  };
+  /* home-hero: erste Reihe mit >= 9 Karten (sonst die laengste), damit jeder der 8 Schritte den Hero wirklich wechselt */
+  S['home-hero'] = function (done) {
+    home();
+    later(300, function () {
+      var hb = homeBench(), c = hb ? hb.counts() : [], r = -1, i;
+      for (i = 0; i < c.length && r < 0; i++) if (c[i] >= 9) r = i;
+      if (r < 0) for (i = 0; i < c.length; i++) if (r < 0 || c[i] > c[r]) r = i;
+      if (hb) hb.top();
+      var n = Math.max(0, r);
+      (function down() {
+        if (n-- > 0) { later(400, function () { R().key('DOWN'); down(); }); return; }
+        if (hb) log('bench home-hero start: Reihe ' + hb.row() + ' (' + (c[hb.row()] || 0) + ' Karten)');
+        later(2500, function () { measure('home-hero', BM.keys('R8'), 450, done); });
+      })();
+    });
+  };
   ['L', 'M', 'S', 'list'].forEach(function (v) {
     S['lib-' + v] = function (done, label) {
       var lb = lib('movie') || lib('show');
@@ -244,6 +290,24 @@
   ['lib-S', 'lib-M', 'lib-L', 'home'].forEach(function (b) {
     variant('nocapl-' + b.replace('lib-', ''), b, function () { U.cls(document.body, 'nocapl', true); }, function () { U.cls(document.body, 'nocapl', false); });
   });
+  /* Hintergrund in Bibliotheken (ui/ambient.js): Raster mit Hintergrund Aus/Farbstimmung/Titelbild (Kosten der Ebenen beim Scrollen,
+   * Wechsel erst nach 600 ms Ruhe -> im 160-ms-Takt nie) und amb-fade-* mit 900 ms Takt (jeder Schritt loest nach 600 ms Ruhe einen
+   * Wechsel samt 400-ms-Ueberblendung aus; die naechste Taste faellt in die Blende). Einstellung nur im Speicher, danach zurueck. */
+  function ambVariant(nm, base, mode, str) {
+    var old;
+    variant(nm, base, function () { var st = N.session.settings || {}; old = [st.libBg, st.libBgStrength]; st.libBg = mode; st.libBgStrength = str || 'soft'; },
+      function () { var st = N.session.settings || {}; st.libBg = old[0]; st.libBgStrength = old[1]; });
+  }
+  ['M', 'S', 'list'].forEach(function (v) { ['off', 'mood', 'art'].forEach(function (m) { ambVariant('amb-' + m + '-' + v, 'lib-' + v, m); }); });
+  ['mood', 'art'].forEach(function (m) {
+    S['ambfade-' + m] = function (done, label) {
+      var lb = lib('movie') || lib('show');
+      if (!lb) { skip(label, 'keine Bibliothek', done); return; }
+      home(); R().push('library', { lib: lb, view: 'M' });
+      later(3000, function () { measure(label, BM.keys('R4 D R4 D L4'), 900, function () { R().back(); later(800, done); }); });
+    };
+    ambVariant('amb-fade-' + m, 'ambfade-' + m, m);
+  });
   ['movie', 'show'].forEach(function (t) {
     S['details-' + t] = function (done) {
       first(t, function (it) {
@@ -260,6 +324,12 @@
       later(3000, function () { measure('search', BM.keys('R10 D3 R6 U3 D3'), GAP, function () { R().back(); later(800, done); }); });
     });
   };
+  /* TV-Test 28.10.: Entdecken leer (Merkliste + Inspirations-Reihen), Tastatur -> Reihen, dann ▼/▲ ueber die Reihen */
+  S.discover = function (done) {
+    if (!N.disc || !N.disc.enabled()) { skip('discover', 'Entdecken aus', done); return; }
+    home(); R().push('discover');
+    later(5000, function () { measure('discover', BM.keys('R10 D6 U3 D3'), GAP, function () { R().back(); later(800, done); }); });
+  };
   S['player-osd'] = function (done) {
     first('movie', function (it) {
       if (!it) { skip('player-osd', 'kein Film', done); return; }
@@ -274,6 +344,43 @@
       });
     });
   };
+  /* Feinauswahl (SPEC PLAY-30): Smart-Control-Zeiger nachgestellt (N.pointer.move im 40-ms-Takt = Drossel des Zeigers): auf den Balken,
+   * 1 s ruhig mit kleinsten Bewegungen (Finger auf dem Touchpad) -> oeffnet nach 700 ms, dann 2x quer durch das Fenster (10 px je Schritt),
+   * nach oben weg (y 250: ueber jeder Lasche); zweimal. Misst fps/lange Frames und (work/frames) die Arbeit je Zeigerschritt. */
+  function loupeSteps() {
+    var out = [], i, x;
+    function mv(px, py) { out.push(function () { N.pointer.move(px, py); }); }
+    for (var round = 0; round < 2; round++) {
+      mv(640, 300); mv(700, 486);
+      for (i = 0; i < 25; i++) mv(700 + (i % 2), 486);
+      for (x = 700; x <= 880; x += 10) mv(x, 486 + (x % 20 ? 0 : 8));
+      for (x = 880; x >= 420; x -= 10) mv(x, 494);
+      for (x = 420; x <= 700; x += 10) mv(x, 486);
+      mv(700, 250);
+    }
+    return out;
+  }
+  function loupeRun(name, style) {
+    return function (done) {
+      if (!N.pointer.enabled()) { skip(name, 'Zeiger-Steuerung aus', done); return; }
+      first('movie', function (it) {
+        if (!it) { skip(name, 'kein Film', done); return; }
+        var ro = N.config.readOnly, st = N.session.settings || {}, old = st.ptrLoupe, oldS = st.loupeStyle;
+        N.config.readOnly = true; st.ptrLoupe = true; st.loupeStyle = style;   // nur im Speicher, danach zurueck
+        home(); N.player.open(it, 0);
+        later(6000, function () {
+          measure(name, loupeSteps(), 40, function () {
+            st.ptrLoupe = old; st.loupeStyle = oldS;
+            if (R().topName() === 'player') R().key('STOP');
+            later(1500, function () { N.config.readOnly = ro; done(); });
+          });
+        });
+      });
+    };
+  }
+  S.loupe = loupeRun('loupe', 'panel');
+  S['loupe-stretch'] = loupeRun('loupe-stretch', 'stretch');
+  S['loupe-film'] = loupeRun('loupe-film', 'film');
   /* Langzeit: Ansichten wiederholt oeffnen/schliessen; Schnappschuss nach einer Aufwaermrunde und am Ende */
   S.leak = function (done) {
     var CYC = run.cycles || 10, c = 0, before = null, mv = null, sh = null;
@@ -327,6 +434,35 @@
       done();
     }, ms);
   }
+  /* Schoner-Uebergang: Wertung von go() (Vorbereitung: Teile anlegen, Info-Block ausblenden + umsetzen) bis 900 ms nach dem Uebergang
+   * (Tausch, Aufraeumen) und getrennt '| transition only' = nur der sichtbare Uebergang (Beginn bis Ende, Schnitt: 1 Frame danach) */
+  function measureSaver(name, go, done) {
+    var my = run, m = new BM.Meter(), m2 = null, r2 = null, on = true, fs = my.frames ? new Frames() : null, raf = fs ? fs.raf : U.raf, sT = fs ? fs.sT : setTimeout;
+    (function tick() {
+      if (!on || run !== my) return;
+      var t = U.now(), im = imgN();
+      m.frame(t, im); if (m2) m2.frame(t, im);
+      if (fs) fs.tick(pnow !== U.now ? pnow() : t);
+      raf.call(U, tick);
+    })();
+    var guard = sT.call(window, function () { finish(); }, 8000);   // Uebergang begann nie (Schoner beendet) -> trotzdem weiter
+    function finish() {
+      if (!on) return;
+      on = false;
+      if (run !== my || my.stop) { if (fs) fs.end(name); return; }
+      var t = r2 || (m2 ? m2.result() : null);
+      log(BM.line(name, m.result(), { steps: 0, heap: heap(), dom: domCount() }) +
+        (t ? ' | transition only: ' + t.fps + ' fps, >50ms ' + t.long + ', worst ' + t.worst + 'ms' : ' | transition only: n/a'));
+      if (fs) log(fs.end(name));
+      done();
+    }
+    go(function (d) {
+      clearTimeout(guard);
+      m2 = new BM.Meter();
+      sT.call(window, function () { r2 = m2.result(); m2 = null; }, Math.max(d, 50));
+      sT.call(window, finish, d + 900);
+    });
+  }
   var SAVERS = [];
   N.saverLogic.FX.forEach(function (fx) {
     if (fx === 'random') return;
@@ -338,20 +474,19 @@
       later(1500, function () {
         Sv.bench(fx, function (go) {
           if (!go) { log('bench saver-' + fx + ': uebersprungen (kein Bild)'); end(); return; }
-          var d = go();
-          measureFor('saver-' + fx, d + 900, function () {
+          measureSaver('saver-' + fx, go, function () {
             if (fx === 'zoom' || fx === 'drift') measureFor('saver-' + fx + '-hold', 3000, end); else end();
           });
         });
       });
     };
   });
-  var NAMES = ['home', 'home-hero', 'lib-L', 'lib-M', 'lib-S', 'lib-list', 'details-movie', 'details-show', 'search', 'player-osd', 'leak'].concat(CHUNKS, SAVERS);
+  var NAMES = ['home', 'home-hero', 'lib-L', 'lib-M', 'lib-S', 'lib-list', 'details-movie', 'details-show', 'search', 'discover', 'player-osd', 'loupe', 'loupe-stretch', 'loupe-film', 'leak'].concat(CHUNKS, SAVERS);
 
   function waitHome(my, tries, fn) {
     if (run !== my || my.stop) return;
     if (R().topName() === 'home' && (N.ui.rail.libs || []).length) { fn(); return; }
-    if (tries <= 0) { log('bench: Startseite nicht bereit – Abbruch'); run = null; return; }
+    if (tries <= 0) { log('bench: Startseite nicht bereit – Abbruch'); run = null; N.diag.hold = false; return; }
     setTimeout(function () { waitHome(my, tries - 1, fn); }, 500);
   }
   var B = {
@@ -365,22 +500,26 @@
         frames: /(^|,)\s*frames\s*(,|$)/.test(String(spec || '')) };
       var my = run;
       log('bench start: ' + list.join(','));
+      N.diag.hold = true;                              // Dev-Protokoll erst nach dem Lauf in die Datei (core/log.js)
       if (N.ui.toast) N.ui.toast.show('Messlauf: ' + list.length + ' Szenarien');
       waitHome(my, 60, function () {
         (function next() {
           if (run !== my || my.stop) return;
-          if (my.i >= my.list.length) { log('bench done in ' + Math.round((U.now() - my.t0) / 1000) + 's'); run = null; home(); return; }
+          if (my.i >= my.list.length) { log('bench done in ' + Math.round((U.now() - my.t0) / 1000) + 's'); run = null; N.diag.hold = false; home(); return; }
           var name = my.list[my.i++];
           try { S[name](next); } catch (e) { log('bench ' + name + ' Fehler ' + e.message); next(); }
         })();
       });
     },
-    stop: function () { if (!run) return; run.stop = true; run = null; log('bench abgebrochen'); },
+    stop: function () { if (!run) return; run.stop = true; run = null; N.diag.hold = false; log('bench abgebrochen'); },
     /* echte Tasten: waehrend des Laufs nur RETURN/EXIT (Abbruch); sonst Ziffernfolge 9,8,7 erkennen. true = verbraucht */
     key: function (k) {
       if (run) { if (k === 'RETURN') B.stop(); return true; }
-      // perf2: dritte Ziffer waehlt den Lauf: 7 = alles (wie bisher), 6 = home,lib mit Frame-Protokoll, 5 = Varianten chunk (1/2/3) und nocapl mit Frame-Protokoll
-      var LAST = { '7': 'all', '6': 'home,lib,frames', '5': 'chunk,nocapl,frames', '4': 'saver,frames' };   // 4: Bildschirmschoner-Uebergaenge
+      // perf2: dritte Ziffer waehlt den Lauf: 7 = alles (wie bisher), 6 = home,lib mit Frame-Protokoll, 5 = Varianten chunk (1/2/3) und nocapl mit Frame-Protokoll,
+      // 4 = Bildschirmschoner, 3 = Hintergrund in Bibliotheken (amb-off/mood/art je Ansicht M/S/Liste, amb-fade-mood/art) mit Frame-Protokoll
+      // 2 = Entdecken (▼ ueber Merkliste/Inspirations-Reihen) mit Frame-Protokoll
+      // 1 = Feinauswahl (loupe, loupe-stretch, loupe-film; Video mit Ton) mit Frame-Protokoll
+      var LAST = { '7': 'all', '6': 'home,lib,frames', '5': 'chunk,nocapl,frames', '4': 'saver,frames', '3': 'amb,frames', '2': 'discover,frames', '1': 'loupe,frames' };   // 4: Bildschirmschoner-Uebergaenge, 3: Hintergrund in Bibliotheken
       if (seq === SEQ.length - 1 && LAST[k] && U.now() - seqT < SEQ_MS) { seq = 0; B.start(LAST[k]); return true; }
       if (k === SEQ[seq] && (seq === 0 || U.now() - seqT < SEQ_MS)) { seq++; seqT = U.now(); if (seq === SEQ.length) { seq = 0; B.start('all'); return true; } }
       else seq = k === SEQ[0] ? 1 : 0;

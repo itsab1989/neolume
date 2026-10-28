@@ -15,3 +15,31 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Spec, test plan, porting playbook, ports list and design files in sync with the code
+        run: npm run spec:check
+      # Nur im privaten Repository (dort liegt public/): der exportierte oeffentliche Baum muss dieselben Pruefungen
+      # bestehen – faellt auf, wenn eine Pruefung eine Datei braucht, die nicht exportiert wird.
+      - name: Public edition (export) passes the same checks
+        if: hashFiles('public/docs/SPEC.md') != ''
+        run: |
+          sh tools/export_public.sh "$RUNNER_TEMP/public"
+          cd "$RUNNER_TEMP/public"
+          npm ci
+          npm test
+          npm run spec:check
+  # Generierte Bloecke muessen auf jedem Betriebssystem gleich herauskommen (Zeilenenden, Pfade, Sortierung).
+  spec-os:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Spec check gives the same result on ${{ matrix.os }}
+        run: npm run spec:check

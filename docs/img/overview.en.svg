@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="516" viewBox="0 0 800 516" role="img" aria-labelledby="t d">
+<title id="t">How the installation works</title>
+<desc id="d">Diagram: computer with the setup program, plex.tv, Plex Media Server and TV. 1: the computer signs in to plex.tv. 2: the TV fetches the app package from the computer. 3: every day the TV only talks to the server. Dashed: optional helper for watchlist and trends.</desc>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff7a1a"/></marker><linearGradient id="scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2747"/><stop offset="1" stop-color="#0c1127"/></linearGradient><linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3c8fe8"/><stop offset="1" stop-color="#1f62c8"/></linearGradient><linearGradient id="neo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16181b"/><stop offset="1" stop-color="#0e0f11"/></linearGradient></defs>
+<rect x="8" y="8" width="784" height="360" rx="12" fill="#f3f4f6" stroke="#d0d4da" stroke-width="1.5"/>
+<rect x="40" y="40" width="220" height="96" rx="12" fill="#ffffff" stroke="#9da3ab" stroke-width="2"/>
+<text x="150" y="70" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="bold" fill="#1d1d1f" text-anchor="middle">Computer</text>
+<text x="150" y="92" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#4b5563" text-anchor="middle">setup program</text>
+<text x="150" y="110" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#4b5563" text-anchor="middle">(only for the setup)</text>
+<rect x="290" y="230" width="220" height="110" rx="12" fill="#20232a" stroke="#d5d9e0" stroke-width="2"/>
+<text x="400" y="260" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="bold" fill="#1d1d1f" text-anchor="middle">TV</text>
+<text x="400" y="282" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#4b5563" text-anchor="middle">Neolume</text>
+<text x="400" y="300" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#4b5563" text-anchor="middle">Samsung 2014</text>
+<text x="400" y="260" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="bold" fill="#ffffff" text-anchor="middle">TV</text>
+<rect x="540" y="40" width="220" height="96" rx="12" fill="#ffffff" stroke="#9da3ab" stroke-width="2"/>
+<text x="650" y="70" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="bold" fill="#1d1d1f" text-anchor="middle">Plex Media Server</text>
+<text x="650" y="92" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#4b5563" text-anchor="middle">your server</text>
+<text x="650" y="110" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#4b5563" text-anchor="middle">on your home network</text>
+<rect x="290" y="40" width="220" height="96" rx="12" fill="#ffffff" stroke="#c7cad0" stroke-width="2"/>
+<text x="400" y="70" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="bold" fill="#1d1d1f" text-anchor="middle">plex.tv</text>
+<text x="400" y="92" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#4b5563" text-anchor="middle">sign-in (once)</text>
+<text x="400" y="110" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#4b5563" text-anchor="middle">watchlist, trends</text>
+<rect x="292" y="232" width="216" height="106" rx="11" fill="#20232a"/>
+<text x="400" y="262" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="bold" fill="#ffffff" text-anchor="middle">TV</text>
+<text x="400" y="284" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#e6e8eb" text-anchor="middle">Neolume</text>
+<text x="400" y="302" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#aab0b8" text-anchor="middle">Samsung 2014</text>
+<line x1="260" y1="88" x2="286" y2="88" stroke="#ff7a1a" stroke-width="3" marker-end="url(#ah)"/>
+<circle cx="273" cy="112" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="273" y="116.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<line x1="150" y1="140" x2="300" y2="238" stroke="#ff7a1a" stroke-width="3" marker-end="url(#ah)"/>
+<text x="196" y="214" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#ff7a1a" text-anchor="end">2  app package</text>
+<line x1="510" y1="270" x2="640" y2="140" stroke="#2EC4B6" stroke-width="3" marker-end="url(#ah)"/>
+<line x1="640" y1="140" x2="510" y2="270" stroke="#2EC4B6" stroke-width="3" marker-end="url(#ah)"/>
+<text x="590" y="230" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#1f7a72" text-anchor="start">3  every day: only</text>
+<text x="590" y="248" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#1f7a72" text-anchor="start">TV ↔ server</text>
+<line x1="400" y1="140" x2="400" y2="226" stroke="#8a8f98" stroke-width="2" stroke-dasharray="6 5"/>
+<text x="410" y="190" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#4b5563" text-anchor="start">optional: helper</text>
+<rect x="8" y="374" width="784" height="136" rx="10" fill="#f3f4f6" stroke="#d0d4da" stroke-width="1.5"/>
+<circle cx="32" cy="397" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="401.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<text x="52" y="403" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">The setup program signs you in to plex.tv once and fetches access for your profiles</text>
+<circle cx="32" cy="427" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="431.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<text x="52" y="433" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">The TV fetches the finished app package from the computer (“Start User App Sync”)</text>
+<circle cx="32" cy="457" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="461.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+<text x="52" y="463" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">Afterwards Neolume only talks to your server – the computer can be off</text>
+<text x="24" y="493" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#4b5563" text-anchor="start">Dashed: only the watchlist and trends need plex.tv – through the optional helper (section 13).</text>
+</svg>

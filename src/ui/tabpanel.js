@@ -7,12 +7,13 @@
   function open(o) {
     var ov = { el: U.el('div', 'layer'), closed: false, tab: o.tab || 0, f: 0, items: [], data: [], off: 0 };
     U.el('div', 'dim', ov.el);                       // Hintergrund leicht abdunkeln: zeigt, was gerade im Fokus ist
-    var p = U.el('div', 'panel', ov.el), tabs = [], tx = 32;
+    var p = U.el('div', 'panel', ov.el), tabs = [];
     U.txt('div', 'pt t-h2', p, o.title);
+    var tabRow = U.el('div', 'tp-tabs', p);            // Reiter nebeneinander nach Textbreite (fester Abstand schob "Ansicht" in den Sicherheitsrand)
     for (var t = 0; t < o.tabs.length; t++) {
-      var te = U.el('div', 'tp-tab', p, 'left:' + tx + 'px');
+      var te = U.el('div', 'tp-tab', tabRow);
       te.appendChild(document.createTextNode(o.tabs[t].t));
-      tabs.push(te); tx += 152;
+      tabs.push(te);
     }
     var clip = U.el('div', 'tp-clip', p), list = U.el('div', 'tp-list', clip);
     function render(keepF) {

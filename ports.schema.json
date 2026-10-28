@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ports.schema.json",
+  "title": "Community ports of Neolume",
+  "description": "Registry of apps built from docs/SPEC.md for other TVs. PORTS.md and the website section are generated from ports.json by tools/spec_gen.js (npm run spec). Only links – no binaries are hosted here.",
+  "type": "object",
+  "required": ["ports"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "ports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "brand", "models", "os", "url", "maintainer", "licence", "lastVerified", "features"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 2, "maxLength": 60, "description": "Name of the port. Must not contain 'Plex' and must not imitate the official app." },
+          "reference": { "type": "boolean", "description": "Only for the reference implementation in this repository (always counts as built against the current spec)." },
+          "brand": { "type": "string", "minLength": 2, "maxLength": 40, "description": "TV brand, e.g. 'LG', 'Sony', 'Samsung'." },
+          "models": { "type": "string", "minLength": 2, "maxLength": 120, "description": "Tested models or model years, e.g. 'OLED C1 (2021)'." },
+          "os": { "type": "string", "minLength": 2, "maxLength": 60, "description": "TV operating system and version, e.g. 'webOS 6.0', 'Google TV (Android 12)'." },
+          "url": { "type": "string", "pattern": "^https://[^\\s]+$", "description": "Link to the port's repository or releases page (https)." },
+          "specVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "description": "App/spec version of docs/SPEC.md the port was built against (shown at the top of SPEC.md)." },
+          "maintainer": { "type": "string", "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$", "description": "GitHub handle of the maintainer, without @." },
+          "licence": { "type": "string", "minLength": 2, "maxLength": 40, "description": "Licence of the port, e.g. 'MIT'." },
+          "lastVerified": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "Date (YYYY-MM-DD) the port was last checked to work." },
+          "features": {
+            "type": "object",
+            "description": "Status per Part A section of SPEC.md (A1 … A19).",
+            "additionalProperties": false,
+            "patternProperties": {
+              "^A\\d{1,2}$": { "enum": ["done", "partial", "planned", "n/a"] }
+            }
+          },
+          "notes": { "type": "string", "maxLength": 300, "description": "Optional short note (not shown in the table)." }
+        }
+      }
+    }
+  }
+}

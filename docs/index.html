@@ -34,7 +34,7 @@
   "applicationCategory": "MultimediaApplication",
   "applicationSubCategory": "Media player / Plex client",
   "operatingSystem": "Samsung Smart TV (Orsay, 2014); setup program: Windows, macOS, Linux",
-  "softwareVersion": "1.0.0",
+  "softwareVersion": "1.0.5",
   "license": "https://opensource.org/licenses/MIT",
   "isAccessibleForFree": true,
   "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"},
@@ -60,67 +60,13 @@
     {"@type": "Question", "name": "Do I need Plex Pass?",
      "acceptedAnswer": {"@type": "Answer", "text": "No. Only extras like skip-intro markers and seek thumbnails depend on data your server creates with Plex Pass."}},
     {"@type": "Question", "name": "Why can my 2014 Samsung TV no longer sign in to Plex?",
-     "acceptedAnswer": {"@type": "Answer", "text": "The TV only supports old encryption (TLS 1.1 and older), which plex.tv no longer accepts. Neolume signs in once from your computer; afterwards the TV only talks to your own Plex Media Server on the home network."}}
+     "acceptedAnswer": {"@type": "Answer", "text": "The TV only supports old encryption (TLS 1.1 and older), which plex.tv no longer accepts. Neolume signs in once from your computer; afterwards the TV only talks to your own Plex Media Server on the home network."}},
+    {"@type": "Question", "name": "Is there a Neolume for newer TVs (Tizen, webOS, Android TV)?",
+     "acceptedAnswer": {"@type": "Answer", "text": "No ready-made one. Neolume runs only on 2014 Samsung TVs with the Orsay Smart Hub; most newer TVs have the official Plex app in their app store. If you want Neolume's look and features on a newer TV, an AI coding agent can build it for you from Neolume's product specification and porting playbook: https://itsab1989.github.io/neolume/port.html"}}
   ]
 }
 </script>
-<style>
-:root {
-  --bg: #0E0F11; --bg2: #17191C; --card: #1F2226; --line: #2E3237;
-  --text: #F2F2F2; --text2: #B7BBC0; --text3: #858B92; --accent: #2EC4B6; --accent-ink: #141414;
-  --radius: 14px; --max: 1080px;
-}
-* { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 Inter, "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; }
-a { color: var(--accent); }
-a:focus-visible, .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
-.wrap { max-width: var(--max); margin: 0 auto; padding: 0 16px; }
-header.top { border-bottom: 1px solid var(--line); }
-header.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 14px; padding-bottom: 14px; }
-.brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 700; font-size: 20px; }
-.brand img { width: 36px; height: auto; }
-.brand span { color: var(--accent); }
-nav.links { display: flex; gap: 18px; flex-wrap: wrap; font-size: 15px; }
-nav.links a { color: var(--text2); text-decoration: none; }
-nav.links a:hover { color: var(--text); }
-.hero { padding: 56px 0 40px; background: radial-gradient(60% 80% at 80% 30%, rgba(46,196,182,.12), transparent 70%); }
-.hero h1 { font-size: clamp(32px, 6vw, 54px); line-height: 1.08; margin: 0 0 16px; letter-spacing: -0.02em; }
-.hero p.lead { font-size: clamp(18px, 2.4vw, 21px); color: var(--text2); max-width: 680px; margin: 0 0 26px; }
-.cta { display: flex; gap: 12px; flex-wrap: wrap; }
-.btn { display: inline-block; padding: 12px 20px; border-radius: 10px; font-weight: 600; text-decoration: none; border: 1px solid var(--line); color: var(--text); background: var(--card); }
-.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.note { margin-top: 22px; font-size: 14px; color: var(--text3); }
-.shot { margin-top: 36px; border-radius: var(--radius); border: 1px solid var(--line); overflow: hidden; background: var(--bg2); }
-.shot img { display: block; width: 100%; height: auto; }
-section { padding: 44px 0; border-top: 1px solid var(--line); }
-h2 { font-size: clamp(24px, 3.6vw, 32px); margin: 0 0 18px; letter-spacing: -0.01em; }
-h3 { font-size: 19px; margin: 0 0 6px; }
-.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; }
-.card p, .card ul { margin: 0; color: var(--text2); font-size: 16px; }
-.card ul { padding-left: 18px; }
-.gallery { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
-.gallery figure { margin: 0; background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-.gallery img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--card); }
-.gallery figcaption { padding: 10px 14px; font-size: 14px; color: var(--text2); }
-.table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 16px; }
-th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
-th { color: var(--text2); font-weight: 600; }
-code { background: var(--bg2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: .92em; word-break: break-word; }
-ol.steps { padding-left: 22px; color: var(--text2); }
-ol.steps li { margin-bottom: 10px; }
-ol.steps b { color: var(--text); }
-details { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; }
-summary { cursor: pointer; font-weight: 600; }
-details p { color: var(--text2); margin: 10px 0 0; }
-.kofi { text-align: center; }
-.kofi p { color: var(--text2); max-width: 620px; margin: 10px auto 0; font-size: 15px; }
-footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--text3); font-size: 14px; }
-footer a { color: var(--text2); }
-@media (max-width: 560px) { nav.links { display: none; } .hero { padding-top: 36px; } }
-</style>
+<link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
 <header class="top">
@@ -131,6 +77,8 @@ footer a { color: var(--text2); }
       <a href="#tvs">Supported TVs</a>
       <a href="#install">Install</a>
       <a href="#faq">FAQ</a>
+      <a href="port.html">Other TVs</a>
+      <a href="https://github.com/itsab1989/neolume/blob/main/docs/README.md">Docs</a>
       <a href="https://github.com/itsab1989/neolume">GitHub</a>
     </nav>
   </div>
@@ -180,18 +128,21 @@ footer a { color: var(--text2); }
   <div class="wrap">
     <h2>Screenshots</h2>
     <div class="gallery">
-      <figure><img src="screenshots/profiles.png" alt="Profile picker" loading="lazy" width="1280" height="720"><figcaption>Profiles – Plex Home, PINs, kids profiles</figcaption></figure>
-      <figure><img src="screenshots/library.png" alt="Movie library grid with sort and filter" loading="lazy" width="1280" height="720"><figcaption>Library – grid, sort, filter, A–Z</figcaption></figure>
-      <figure><img src="screenshots/details.png" alt="Movie details page" loading="lazy" width="1280" height="720"><figcaption>Details – everything about a movie</figcaption></figure>
-      <figure><img src="screenshots/series.png" alt="Show with seasons and episodes" loading="lazy" width="1280" height="720"><figcaption>Shows – seasons, episodes, progress</figcaption></figure>
-      <figure><img src="screenshots/player.png" alt="Player with chapters and control bar" loading="lazy" width="1280" height="720"><figcaption>Player – chapters, skip, sleep timer</figcaption></figure>
-      <figure><img src="screenshots/tracks.png" alt="Audio and subtitle panel" loading="lazy" width="1280" height="720"><figcaption>Audio & subtitles – readable track names</figcaption></figure>
-      <figure><img src="screenshots/search.png" alt="Search with on-screen keyboard" loading="lazy" width="1280" height="720"><figcaption>Search – keyboard or number keys</figcaption></figure>
-      <figure><img src="screenshots/discover.png" alt="Discover screen" loading="lazy" width="1280" height="720"><figcaption>Discover – rediscover your library</figcaption></figure>
-      <figure><img src="screenshots/music.png" alt="Music albums" loading="lazy" width="1280" height="720"><figcaption>Music – artists and albums</figcaption></figure>
-      <figure><img src="screenshots/audiobooks.png" alt="Audiobook with chapters" loading="lazy" width="1280" height="720"><figcaption>Audiobooks – chapters and progress</figcaption></figure>
-      <figure><img src="screenshots/sidebar.png" alt="Side menu" loading="lazy" width="1280" height="720"><figcaption>Side menu – libraries at a glance</figcaption></figure>
-      <figure><img src="screenshots/settings.png" alt="Settings" loading="lazy" width="1280" height="720"><figcaption>Settings in plain language</figcaption></figure>
+      <figure><img src="screenshots/profiles.png" alt="Profile picker with four profiles, two of them locked with a PIN" loading="lazy" width="1280" height="720"><figcaption>Profiles – Plex Home, PINs, kids profiles</figcaption></figure>
+      <figure><img src="screenshots/sidebar.png" alt="Open sidebar with your own libraries plus two libraries from a friend's server, labelled “from Lakeside”" loading="lazy" width="1280" height="720"><figcaption>Sidebar – plus libraries shared from other servers</figcaption></figure>
+      <figure><img src="screenshots/library.png" alt="Movie library grid whose background takes on the colours of the selected poster" loading="lazy" width="1280" height="720"><figcaption>Library – grid, sort, filter, A–Z, colour mood</figcaption></figure>
+      <figure><img src="screenshots/details.png" alt="Movie details page with poster, summary and buttons" loading="lazy" width="1280" height="720"><figcaption>Details – everything about a movie</figcaption></figure>
+      <figure><img src="screenshots/series.png" alt="Show with season tabs, episode pictures and progress" loading="lazy" width="1280" height="720"><figcaption>Shows – seasons, episodes, progress</figcaption></figure>
+      <figure><img src="screenshots/search.png" alt="Search with on-screen keyboard and results" loading="lazy" width="1280" height="720"><figcaption>Search – keyboard or number keys</figcaption></figure>
+      <figure><img src="screenshots/player.png" alt="Player with chapter marks on the progress bar and the new control bar" loading="lazy" width="1280" height="720"><figcaption>Player – new control bar, chapters, sleep timer</figcaption></figure>
+      <figure><img src="screenshots/tracks.png" alt="Audio track picker with readable track names" loading="lazy" width="1280" height="720"><figcaption>Audio &amp; subtitles – readable track names</figcaption></figure>
+      <figure><img src="screenshots/music.png" alt="Music library with album covers" loading="lazy" width="1280" height="720"><figcaption>Music – artists and albums</figcaption></figure>
+      <figure><img src="screenshots/artist.png" alt="Artist page with releases grouped into singles &amp; EPs and live albums" loading="lazy" width="1280" height="720"><figcaption>Artist pages – albums, singles &amp; EPs, live, soundtracks</figcaption></figure>
+      <figure><img src="screenshots/audiobooks.png" alt="Audiobook with chapter list and progress" loading="lazy" width="1280" height="720"><figcaption>Audiobooks – chapters and progress</figcaption></figure>
+      <figure><img src="screenshots/discover.png" alt="Discover screen with keyboard and suggestions" loading="lazy" width="1280" height="720"><figcaption>Discover – rediscover your library</figcaption></figure>
+      <figure><img src="screenshots/screensaver.png" alt="Screensaver with a movie's background picture, the clock and the title in the Ambient style" loading="lazy" width="1280" height="720"><figcaption>Screensaver – pictures from your libraries</figcaption></figure>
+      <figure><img src="screenshots/accent.png" alt="Accent colour picker with seven colours, set to Coral" loading="lazy" width="1280" height="720"><figcaption>Accent colour – seven colours, per profile</figcaption></figure>
+      <figure><img src="screenshots/settings.png" alt="Settings, Display section, with a short explanation of the selected option" loading="lazy" width="1280" height="720"><figcaption>Settings in plain language</figcaption></figure>
     </div>
     <p class="note">All titles, people and artwork in the screenshots are invented demo content.</p>
   </div>
@@ -221,13 +172,42 @@ footer a { color: var(--text2); }
   <div class="wrap">
     <h2>How to install</h2>
     <ol class="steps">
-      <li><b>On the TV:</b> sign in to Smart Hub once with the user <code>develop</code> (<code>MENU</code> → Smart Hub → Samsung Account → Log In).</li>
+      <li><b>On the TV:</b> sign in to Smart Hub once with the user <code>develop</code> (<code>MENU</code> → Smart Hub → Samsung Account → Log In – no password needed).</li>
       <li><b>On your computer:</b> download the setup program from the <a href="https://github.com/itsab1989/neolume/releases/latest">latest release</a> and start it – Windows (<code>neolume-setup-windows-x64.exe</code>), macOS (<code>neolume-setup-macos-arm64.zip</code> or <code>-macos-x64.zip</code>), Linux (<code>neolume-setup-linux-x64</code>) or any system with Python (<code>neolume-setup.pyz</code>).</li>
       <li><b>In the browser:</b> sign in with Plex, pick your server and profiles, click <i>Create app package</i>.</li>
       <li><b>On the TV:</b> in SAMSUNG APPS hold <code>OK</code> for 5 seconds on any app → <i>IP Setting</i> → your computer's address → <i>Start User App Sync</i>.</li>
       <li><b>Done:</b> Neolume appears under MY APPS. Your computer is no longer needed.</li>
+      <li><b>Optional:</b> for your Plex watchlist, the Discover rows from plex.tv and details of titles that are not on your server, tick the helper in the setup program and let it run on a computer or NAS in your home network.</li>
     </ol>
-    <p>Every button and menu, plus troubleshooting, is in the <a href="https://github.com/itsab1989/neolume/blob/main/docs/INSTALL.md">installation guide for beginners</a>.</p>
+    <p>Every button and menu – with drawings of the TV screens – plus troubleshooting is in the <a href="https://github.com/itsab1989/neolume/blob/main/docs/INSTALL.md">installation guide for beginners</a> (<a href="https://github.com/itsab1989/neolume/blob/main/docs/INSTALL.de.md">auf Deutsch</a>).</p>
+  </div>
+</section>
+
+<section id="ports">
+  <div class="wrap">
+    <h2>Build it for your TV with an AI agent</h2>
+    <p>Neolume runs only on 2014 Samsung TVs. Have a newer TV? Most of them (Samsung Tizen, LG webOS, Android TV / Google TV …)
+      have the official Plex app in their store – try that first. If you would like Neolume's look and features there, an
+      AI coding agent can build the app for your TV from Neolume's
+      <a href="https://github.com/itsab1989/neolume/blob/main/docs/SPEC.md">product specification</a>. Paste this prompt into
+      your agent and replace the part in angle brackets:</p>
+<!-- gen:prompt-html -->
+<!-- generated by tools/spec_gen.js – do not edit; run `npm run spec` -->
+<pre class="prompt" id="prompt"><code>Read https://raw.githubusercontent.com/itsab1989/neolume/main/docs/PORTING-WITH-AI.md and follow it exactly to build the app for my TV: &lt;brand and model, e.g. &quot;LG OLED C1&quot;&gt;. Work in a new folder; ask me only for things you cannot do yourself.</code></pre>
+<!-- /gen:prompt-html -->
+    <button class="btn copy" type="button" data-copy="prompt" hidden>Copy prompt</button>
+    <div class="cta" style="margin-top:18px"><a class="btn primary" href="port.html">How porting with an AI agent works</a></div>
+    <p>Community ports (links only – each port is the responsibility of its author, see the
+      <a href="https://github.com/itsab1989/neolume/blob/main/PORTS.md">policy</a>):</p>
+<!-- gen:ports-html -->
+<!-- generated by tools/spec_gen.js – do not edit; run `npm run spec` -->
+    <div class="table-wrap"><table>
+      <thead><tr><th>Port</th><th>TV</th><th>OS</th><th>Spec version</th><th>Maintainer</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://github.com/itsab1989/neolume">Neolume (reference implementation)</a></td><td>Samsung – 2014 H/HU series with Smart Hub (Orsay), tested on UE48H8000</td><td>Orsay Smart Hub (2014)</td><td>1.0.5</td><td><a href="https://github.com/itsab1989">@itsab1989</a></td></tr>
+      </tbody>
+    </table></div>
+<!-- /gen:ports-html -->
   </div>
 </section>
 
@@ -238,6 +218,7 @@ footer a { color: var(--text2); }
     <details><summary>Do I need Plex Pass?</summary><p>No. Only extras like skip-intro markers and seek thumbnails depend on data your server creates with Plex Pass.</p></details>
     <details><summary>Will it delete my other apps?</summary><p>Apps from the Samsung store are not touched. The TV's developer sync removes other <em>self-installed</em> apps that are not on the sync list – the setup program lets you add them so they stay.</p></details>
     <details><summary>Does it work outside my home?</summary><p>No, by design. Neolume only connects to your server on your home network.</p></details>
+    <details><summary>Is there a Neolume for newer TVs (Tizen, webOS, Android TV)?</summary><p>No ready-made one. Neolume runs only on 2014 Samsung TVs with the Orsay Smart Hub; most newer TVs have the official Plex app in their app store. If you want Neolume's look and features on a newer TV, an AI coding agent can build it for you from Neolume's specification – see <a href="port.html">Build it for your TV with an AI agent</a>.</p></details>
     <details><summary>Is my data safe?</summary><p>There is no telemetry or tracking. Your Plex password is only entered on plex.tv. Each profile gets access that only works with your server and can be revoked on plex.tv at any time.</p></details>
     <p><a href="https://github.com/itsab1989/neolume/blob/main/docs/FAQ.md">All questions and answers →</a></p>
   </div>
@@ -253,10 +234,11 @@ footer a { color: var(--text2); }
 
 <footer>
   <div class="wrap">
-    <p><a href="https://github.com/itsab1989/neolume">Source code on GitHub</a> · <a href="https://github.com/itsab1989/neolume/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/itsab1989/neolume/blob/main/LICENSE">MIT License</a> · <a href="https://github.com/itsab1989/neolume/issues">Report a problem</a></p>
+    <p><a href="https://github.com/itsab1989/neolume">Source code on GitHub</a> · <a href="https://github.com/itsab1989/neolume/blob/main/docs/README.md">Documentation</a> · <a href="port.html">Build it for your TV</a> · <a href="https://github.com/itsab1989/neolume/blob/main/CONTRIBUTING.md">Contributing</a> · <a href="https://github.com/itsab1989/neolume/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/itsab1989/neolume/blob/main/LICENSE">MIT License</a> · <a href="https://github.com/itsab1989/neolume/issues">Report a problem</a></p>
     <p>Neolume is an independent project, not affiliated with, endorsed or sponsored by Plex, Inc. or Samsung Electronics Co., Ltd.
       "Plex", "Plex Media Server" and "Plex Pass" are trademarks of Plex, Inc.; "Samsung" and "Smart Hub" are trademarks of Samsung Electronics Co., Ltd.</p>
   </div>
 </footer>
+<script src="assets/copy.js" defer></script>
 </body>
 </html>

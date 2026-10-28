@@ -12,19 +12,38 @@ var errors = [];
 function fail(msg) { errors.push(msg); }
 
 /* ---------- CSS ---------- */
-/* Marken-Tokens: @accent@ (Akzentfarbe) und @pointer@ (Zeiger-Bilder) aus brand/<id>.json (Standard: oeffentliche Marke).
+/* Design-Tokens (design/tokens.json, tools/tokens.js): @<gruppe>.<name>@ (z. B. @c.bg@, @sp.4@, @mo.base@) wird vor allen Gates
+ * durch den Wert ersetzt (WebKit 537 kennt kein var()); unbekannte Platzhalter sind ein Build-Fehler. In src/css/*.css sind
+ * Farb-Literale (#hex, rgb()/rgba(), hsl(), Farbnamen) in Deklarationen verboten – jede Farbe ist ein Token (Ausnahme nur ueber
+ * RAW_COLOR_ALLOW, derzeit leer). Werkzeug zum Umstellen neuer Literale: node tools/tokenize_css.js --write.
+ * Marken-Tokens: @accent@ (Akzentfarbe) und @pointer@ (Zeiger-Bilder) aus brand/<id>.json (Standard: oeffentliche Marke).
  * Akzentfarbe waehlbar (src/core/accent.js): Die Grundregeln tragen die Standardfarbe der Marke; fuer jede andere
  * Palettenfarbe entsteht aus jeder Regel mit Token eine Variante ".ac-<id> <selektor>{nur die Token-Deklarationen}".
  * Die App schaltet nur die Klasse am <html> um. Weil die Varianten eine Klasse spezifischer sind, werden Regeln ohne Token,
  * die eine Token-Deklaration in der Grundfassung ueberstimmen koennten (gleiche Eigenschaft, gleiche Klasse im letzten
  * Selektor-Glied, mindestens gleich spezifisch), mit allen Farbklassen in Quellreihenfolge mitkopiert. */
-var BRAND_CSS = { accent: '#2EC4B6', pointer: 'pointer-teal', accentId: 'teal' };
-/* Palette aus src/core/accent.js (eine Quelle fuer App, Build, make_assets.js und Tests) */
-function loadPalette() {
-  var ctx = { N: undefined };
-  vm.createContext(ctx);
-  ['core/ns.js', 'core/accent.js'].forEach(function (f) { vm.runInContext(fs.readFileSync(path.join(SRC, f), 'utf8'), ctx, { filename: f }); });
-  return ctx.N.accent.PALETTE.map(function (p) { return { id: p[0], color: p[1] }; });
+var TOKENS = require('./tokens.js');
+var RAW_COLOR_ALLOW = [];   // ausdrueklich erlaubte Farb-Literale in src/css (exakter Text, z. B. 'rgba(0,0,0,0.5)'); bitte Token bevorzugen
+/* Palette aus design/tokens.json (Gruppe accent; daraus erzeugt: src/core/accent.js PALETTE, Test prueft Gleichstand) */
+function loadPalette() { return TOKENS.palette(); }
+/* ohne Markenprofil (Tests, Werkzeuge): Teal der Palette mit den Teal-Zeigern */
+var BRAND_CSS = { accent: loadPalette().filter(function (p) { return p.id === 'teal'; })[0].color, pointer: 'pointer-teal', accentId: 'teal' };
+/* Quell-CSS pruefen: keine rohen Farbwerte in Deklarationen (Kommentare zaehlen nicht), alle Token-Platzhalter aufloesbar */
+var COLOR_NAMES = /(^|[^-\w.#@])(white|black|red|green|blue|yellow|orange|purple|gray|grey|silver|maroon|navy|teal|olive|lime|aqua|fuchsia|pink|brown|gold)(?![-\w])/i;
+function cssSourceErrors(text, file) {
+  var out = [], code = text.replace(/\/\*[\s\S]*?\*\//g, ''), f = file || 'CSS';
+  var r = TOKENS.resolve(code);
+  r.unknown.forEach(function (u) { out.push(f + ': unbekannter Design-Token ' + u + ' (design/tokens.json)'); });
+  var re = /\{([^{}]*)\}/g, m;
+  while ((m = re.exec(code))) {
+    m[1].split(';').forEach(function (d) {
+      var k = d.indexOf(':'); if (k < 0) return;
+      var prop = d.slice(0, k).trim(), v = d.slice(k + 1).trim(), lit = v.match(/#[0-9a-fA-F]{3,8}\b|\b(rgba?|hsla?)\([^)]*\)/g) || [], n = COLOR_NAMES.exec(v);
+      if (n && !/^(font-family|content|-webkit-animation|animation)$/.test(prop)) lit.push(n[2]);
+      lit.forEach(function (l) { if (RAW_COLOR_ALLOW.indexOf(l) < 0) out.push(f + ': Farb-Literal ' + l + ' in "' + prop + ': ' + v + '" – Farb-Token verwenden (@c.<name>@, design/tokens.json)'); });
+    });
+  }
+  return out;
 }
 /* Palette fuer eine Marke: ihre Standardfarbe (accentId) mit dem Markenwert und ihren Zeiger-Bildern, die anderen mit pointer-<id> */
 function brandPalette(brand) {
@@ -145,6 +164,9 @@ function buildCss(cssText, brand) {
   var css = cssText !== undefined ? cssText : fs.readFileSync(path.join(SRC, 'css', 'app.css'), 'utf8');
   var b = brand || BRAND_CSS;
   var code = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  var tk = TOKENS.resolve(code);           // Design-Tokens vor den Gates einsetzen (die Gates sehen die echten Werte)
+  tk.unknown.forEach(function (u) { fail('CSS: unbekannter Design-Token ' + u + ' (design/tokens.json)'); });
+  code = tk.text;
   if (/@[a-z]+@/.test(code.replace(/@(accent|pointer)@/g, ''))) fail('CSS: unbekannter Marken-Token ' + code.replace(/@(accent|pointer)@/g, '').match(/@[a-z]+@/)[0]);
   var bad = [[/gradient/i, 'gradient'], [/box-shadow/i, 'box-shadow'], [/text-shadow/i, 'text-shadow'], [/(^|[^-\w])filter\s*:/i, 'filter'],
     [/display\s*:\s*(-webkit-)?flex/i, 'flex'], [/calc\(/i, 'calc()'], [/\d(vw|vh)\b/i, 'vw/vh'], [/var\(/i, 'var()']];
@@ -160,10 +182,10 @@ function buildCss(cssText, brand) {
 }
 
 /* ---------- i18n ---------- */
-function checkI18n() {
+function checkI18n(extra) {
   var ctx = { N: undefined };
   vm.createContext(ctx);
-  ['core/ns.js', 'i18n/strings.de.js', 'i18n/strings.en.js', 'i18n/strings.music.js'].forEach(function (f) { vm.runInContext(fs.readFileSync(path.join(SRC, f), 'utf8'), ctx, { filename: f }); });
+  ['core/ns.js', 'i18n/strings.de.js', 'i18n/strings.en.js', 'i18n/strings.music.js'].concat(extra || []).forEach(function (f) { vm.runInContext(fs.readFileSync(path.join(SRC, f), 'utf8'), ctx, { filename: f }); });
   var errs = require('./i18n_rules').check(ctx.N.strings.de, ctx.N.strings.en);
   errs.forEach(function (e) { fail('i18n: ' + e); });
   return Object.keys(ctx.N.strings.de).length;
@@ -201,7 +223,32 @@ function brandConfig() {
   if (!/^#[0-9A-Fa-f]{6}$/.test(b.accent || '') || !/^[a-z0-9-]+$/.test(b.pointer || '')) { fail('brand/' + id + '.json: accent/pointer fehlen'); return null; }
   var ids = loadPalette().map(function (p) { return p.id; });
   if (ids.indexOf(b.accentId) < 0) { fail('brand/' + id + '.json: accentId muss eine Palettenfarbe sein (' + ids.join(', ') + ')'); return null; }
-  return { id: id, name: b.name, wordmark: [String(b.wordmark[0]), String(b.wordmark[1])], accent: b.accent, pointer: b.pointer, accentId: b.accentId };
+  var feats = b.features === undefined ? [] : b.features;
+  if (!Array.isArray(feats) || feats.some(function (f) { return typeof f !== 'string' || !/^[a-z0-9-]+$/.test(f); })) { fail('brand/' + id + '.json: features muss eine Liste von Namen sein'); return null; }
+  return { id: id, name: b.name, wordmark: [String(b.wordmark[0]), String(b.wordmark[1])], accent: b.accent, pointer: b.pointer, accentId: b.accentId, features: feats };
+}
+
+/* ---------- optionale Erweiterungen (brand/<id>.json "features") ----------
+ * Gibt es src/<EXT_DIR>/manifest.json (nur in Baeumen, die Erweiterungen enthalten), haengt der Build die Module jeder im
+ * Marken-Profil eingeschalteten Erweiterung NACH dem Haupt-Manifest an, ihr CSS hinter app.css (gleiche Gates, gleiche Tokens)
+ * und prueft ihre Texte (Dateien "strings*.js") mit dem i18n-Gate. Ohne Ordner oder ohne "features": nichts davon.
+ * Format: {"<feature>": {"js": ["pfad.js", …], "css": ["pfad.css", …]}} – Pfade relativ zu src/<EXT_DIR>/. */
+var EXT_DIR = 'private';
+function extensions(brand) {
+  var base = path.join(SRC, EXT_DIR), mp = path.join(base, 'manifest.json'), out = { js: [], css: [], strings: [], listed: [], on: [] };
+  if (!fs.existsSync(mp)) return out;
+  var m;
+  try { m = JSON.parse(fs.readFileSync(mp, 'utf8')); } catch (e) { fail('src/' + EXT_DIR + '/manifest.json ist kein gueltiges JSON: ' + e.message); return out; }
+  Object.keys(m).forEach(function (f) {
+    var e = m[f] || {}, js = (e.js || []).map(function (x) { return EXT_DIR + '/' + x; }), css = (e.css || []).map(function (x) { return EXT_DIR + '/' + x; });
+    out.listed = out.listed.concat(js, css);
+    if (!brand || brand.features.indexOf(f) < 0) return;
+    out.on.push(f);
+    out.js = out.js.concat(js); out.css = out.css.concat(css);
+    js.forEach(function (x) { if (/(^|\/)strings[^\/]*\.js$/.test(x)) out.strings.push(x); });
+  });
+  (brand ? brand.features : []).forEach(function (f) { if (!m[f]) fail('brand: Erweiterung "' + f + '" fehlt in src/' + EXT_DIR + '/manifest.json'); });
+  return out;
 }
 
 /* ---------- JS ---------- */
@@ -262,11 +309,24 @@ function build() {
   var t0 = Date.now();
   var manifest = JSON.parse(fs.readFileSync(path.join(SRC, 'manifest.json'), 'utf8'));
   var brand = brandConfig();
-  var css = buildCss(undefined, brand);
+  var ext = extensions(brand);
+  if (ext.on.length) console.log('Erweiterungen: ' + ext.on.join(', ') + ' (' + ext.js.length + ' Module)');
+  fs.readdirSync(path.join(SRC, 'css')).filter(function (f) { return /\.css$/.test(f); }).forEach(function (f) {
+    cssSourceErrors(fs.readFileSync(path.join(SRC, 'css', f), 'utf8'), 'src/css/' + f).forEach(fail);
+  });
+  ext.listed.forEach(function (f) { if (!fs.existsSync(path.join(SRC, f))) fail('Erweiterungs-Datei fehlt: src/' + f); });
+  var extCss = ext.css.filter(function (f) { return fs.existsSync(path.join(SRC, f)); }).map(function (f) {
+    var t = fs.readFileSync(path.join(SRC, f), 'utf8');
+    cssSourceErrors(t, 'src/' + f).forEach(fail);
+    return t;
+  }).join('\n');
+  var css = buildCss(extCss ? fs.readFileSync(path.join(SRC, 'css', 'app.css'), 'utf8') + '\n' + extCss : undefined, brand);
   var cssStats = accentCss.stats;
-  var keys = checkI18n();
+  var keys = checkI18n(ext.strings);
   var local = localConfig();
   var parts = ['/* gebaut aus src/ (tools/build.js). Nicht von Hand bearbeiten. */'], rel = [];
+  var main = manifest.slice();
+  manifest = manifest.concat(ext.js);                      // Erweiterungen hinter dem Haupt-Manifest (melden sich per N.ext an)
   manifest.forEach(function (f, i) {
     var p = path.join(SRC, f);
     if (!fs.existsSync(p)) { fail('Manifest-Datei fehlt: ' + f); return; }
@@ -274,7 +334,8 @@ function build() {
     parts.push(chunk);
     if (!/^dev\//.test(f)) rel.push(chunk);                // Release (minifiziert): ohne Entwicklungs-Module
     var extra = i === 0 ? 'N.CSS = ' + JSON.stringify(css) + ';' : f === 'core/config.js' && Object.keys(local).length ? 'N.config.apply(' + JSON.stringify(local) + ');   /* aus local.json */' :
-      f === 'core/brand.js' && brand ? 'N.brand = ' + JSON.stringify({ id: brand.id, name: brand.name, wordmark: brand.wordmark, accent: brand.accentId }) + ';   /* brand/' + brand.id + '.json */' : '';
+      f === 'core/brand.js' && brand ? 'N.brand = ' + JSON.stringify({ id: brand.id, name: brand.name, wordmark: brand.wordmark, accent: brand.accentId }) + ';   /* brand/' + brand.id + '.json */' +
+        (ext.on.length ? '\nN.features = ' + JSON.stringify(ext.on) + ';' : '') : '';
     if (extra) { parts.push(extra); rel.push(extra); }
   });
   // nicht im Manifest gelistete Quelldateien melden
@@ -282,7 +343,7 @@ function build() {
     fs.readdirSync(dir).forEach(function (f) {
       var p = path.join(dir, f), rel = path.relative(SRC, p);
       if (fs.statSync(p).isDirectory()) { if (f !== 'assets' && f !== 'css') scan(p); }
-      else if (/\.js$/.test(f) && manifest.indexOf(rel) < 0) fail('Quelldatei nicht im Manifest: ' + rel);
+      else if (/\.js$/.test(f) && main.indexOf(rel) < 0 && ext.listed.indexOf(rel) < 0) fail('Quelldatei nicht im Manifest: ' + rel + (rel.indexOf(EXT_DIR + '/') === 0 ? ' (src/' + EXT_DIR + '/manifest.json)' : ''));
     });
   })(SRC);
   var code = stripComments(escapeNonAscii(parts.join('\n')));
@@ -323,7 +384,8 @@ function build() {
     } else console.log('HINWEIS: --no-min – app/app.min.js nicht neu gebaut.');
     // Regressionsschutz: alle Unit-Tests laufen im Build; bei Fehlern bleiben die vorherigen Dateien stehen
     if (process.argv.indexOf('--no-test') < 0) {
-      var r = require('child_process').spawnSync(process.execPath, ['--test', 'tests/*.test.js'], { cwd: ROOT, stdio: 'inherit' });
+      var globs = ['tests/*.test.js'].concat(fs.existsSync(path.join(ROOT, 'tests', EXT_DIR)) ? ['tests/' + EXT_DIR + '/*.test.js'] : []);
+      var r = require('child_process').spawnSync(process.execPath, ['--test'].concat(globs), { cwd: ROOT, stdio: 'inherit' });
       if (r.status !== 0) {
         if (previous) fs.writeFileSync(appPath, previous);
         if (min !== null && prevMin) fs.writeFileSync(minPath, prevMin);
@@ -339,9 +401,13 @@ if (require.main === module) build();
 module.exports = {
   es5Errors: function (code) { errors = []; es5Gate(code); return errors.slice(); },
   cssErrors: function (css) { errors = []; buildCss(css); return errors.slice(); },
+  /* Quell-Gate fuer src/css/*.css (Farb-Literale, Token-Platzhalter) -> Liste der Fehler */
+  cssSourceErrors: cssSourceErrors,
   /* Akzent-Varianten (tests/accent.test.js): CSS (Rohtext) + Marke -> {css, errors, stats} */
   css: function (css, brand) { errors = []; var out = buildCss(css, brand); return { css: out, errors: errors.slice(), stats: accentCss.stats }; },
   brandPalette: brandPalette, loadPalette: loadPalette, specificity: specificity,
+  /* Erweiterungen eines Marken-Profils (tests/helpers/load.js, Werkzeuge): {js, css, strings, listed, on} */
+  extensions: function (brand) { errors = []; return extensions(brand); },
   escapeNonAscii: escapeNonAscii,
   minify: minify
 };

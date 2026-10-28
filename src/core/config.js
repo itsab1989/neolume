@@ -2,7 +2,7 @@
  * Netz-Standards sind im Repo leer: tools/build.js setzt die lokalen Werte aus local.json (git-ignoriert) ins gebaute app.js. */
 (function (N) {
   var C = {
-    version: '1.0.4',
+    version: '1.0.5',
     product: N.brand.name,
     platform: 'Samsung',
     platformVersion: 'Orsay 2014',
@@ -35,6 +35,8 @@
       if (o.sefFake === 'still') C.sefFake = 'still';                 // Vorschau/visuelle Tests: stehendes Bild
       if (Number(o.seekDelay) > 0) C.seekDelay = Number(o.seekDelay);  // nur Tests: Sammel-Sprung haelt an
       if (Number(o.ptrEdgeDwell) > 0) C.ptrEdgeDwell = Number(o.ptrEdgeDwell);   // nur Tests: Zeiger-Randzone zeigt nur die Pille
+      if (/^#[0-9A-Fa-f]{6}$/.test(o.fakeBg || '')) C.fakeBg = o.fakeBg;   // nur Bildtests: Farbe des Video-Platzhalters (helles Bild, Feinauswahl)
+      if (typeof o.fakeSub === 'string' && o.fakeSub.length < 120) C.fakeSub = o.fakeSub;   // nur Bildtests (stehendes Bild): feste Untertitel-Zeile
       if (o.hlsFast === true) C.hls = { wait: 0, startBitrate: 5000000, offset: true, eac3: true, incomplete: true, buf: null };
       var H = C.hls;
       if (o.hlsWait !== undefined && Number(o.hlsWait) >= 0) H.wait = Number(o.hlsWait);
@@ -44,8 +46,10 @@
       if (typeof o.hlsIncomplete === 'boolean') H.incomplete = o.hlsIncomplete;
       if (o.hlsBuf && typeof o.hlsBuf === 'object') H.buf = { init: Number(o.hlsBuf.init) || 0, pending: Number(o.hlsBuf.pending) || 0, total: Number(o.hlsBuf.total) || 0 };
       if (typeof o.fixedClock === 'string' && /^\d\d:\d\d$/.test(o.fixedClock)) C.fixedClock = o.fixedClock;   // nur visuelle Tests: feste Uhr
+      if (Number(o.hintMs) > 0) C.hintMs = Number(o.hintMs);         // nur Tests: Tastenhinweise "Nur kurz" blenden nach ms aus
       if (o.welcome === false) C.welcome = false;                     // nur Tests: keine Willkommenskarte
-      if (Number(o.saverMs) > 0) C.saverMs = Number(o.saverMs);       // nur visuelle Tests: Schoner nach ms statt Minuten
+      if (Number(o.saverMs) > 0) C.saverMs = Number(o.saverMs);
+      if (o.saverPos >= 0 && o.saverPos <= 3) C.saverPos = Math.floor(o.saverPos);   // nur Bildtests: Lage der Schoner-Einblendung (0..3)       // nur visuelle Tests: Schoner nach ms statt Minuten
       if (o.cropBase === 'video' || o.cropBase === 'app') C.cropBase = o.cropBase;   // Zoom: Koordinaten fuer SetCropArea (A/B)
       if (typeof o.helperUrl === 'string' && /^http:\/\/[0-9.]+(:\d{1,5})?\/?$/.test(o.helperUrl)) C.helperUrl = o.helperUrl;   // P4: Merkliste-Helfer (Entwicklung; sonst setup.json)
       if (typeof o.helperKey === 'string' && /^[A-Za-z0-9_\-]{16,128}$/.test(o.helperKey)) C.helperKey = o.helperKey;

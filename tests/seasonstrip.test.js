@@ -50,22 +50,60 @@ test('Einstellung aus -> kein Streifen (Layout der anderen Elemente bleibt)', fu
   assert.strictEqual(SS.layout({ enabled: true, episodes: [], total: 0 }).mode, 'none');
 });
 
-test('Serien-Balken: Segmente proportional, >= 4 px, Luecke 2 px, Specials ausgeschlossen, gewaehlte Staffel', function () {
+test('Serien-Balken: Segmente proportional, >= 4 px, Luecke 3 px, Specials ausgeschlossen, gewaehlte Staffel', function () {
   var seasons = [{ index: 0, leaf: 5, vleaf: 0 }, { index: 1, leaf: 100, vleaf: 100 }, { index: 2, leaf: 1, vleaf: 0 }, { index: 3, leaf: 50, vleaf: 25 }];
   var b = SS.seriesBar(seasons, 3);
   assert.strictEqual(b.mode, 'segments');
   assert.strictEqual(b.segments.length, 3);
   var total = 0; b.segments.forEach(function (s) { total += s.w; assert.ok(s.w >= 4); });
-  assert.strictEqual(total + 2 * 2, 416);
+  assert.strictEqual(total + 2 * 3, 336);                                    // so breit wie der Staffel-Balken M
+  assert.strictEqual(SS.SIZES.M.barW, 336);
   assert.strictEqual(b.segments[1].w, 4);                                    // winzige Staffel auf 4 px
   assert.strictEqual(b.segments[0].fill, b.segments[0].w);                  // ganz gesehen
   assert.ok(b.segments[2].sel && !b.segments[0].sel);
-  assert.strictEqual(b.segments[1].x, b.segments[0].w + 2);
+  assert.strictEqual(b.segments[1].x, b.segments[0].w + 3);
+  assert.strictEqual(b.watched, 125); assert.strictEqual(b.total, 151);    // fuer die Beschriftung, ohne Specials
+});
+
+test('Serien-Balken: nur eine regulaere Staffel (Specials zaehlen nicht) -> keiner', function () {
+  assert.strictEqual(SS.seriesBar([{ index: 1, leaf: 10, vleaf: 2 }], 1).mode, 'none');
+  assert.strictEqual(SS.seriesBar([{ index: 0, leaf: 3, vleaf: 0 }, { index: 1, leaf: 10, vleaf: 2 }], 1).mode, 'none');
+  assert.strictEqual(SS.seriesBar([], 1).mode, 'none');
+});
+
+test('Serien-Beschriftung: ungesehene Folgen der ganzen Serie, alles gesehen, DE/EN', function () {
+  N.i18n.set('de');
+  var b = SS.seriesBar([{ index: 1, leaf: 10, vleaf: 10 }, { index: 2, leaf: 12, vleaf: 2 }], 2);
+  assert.strictEqual(SS.seriesText(b), 'Serie: 10 von 22 ungesehen');
+  assert.strictEqual(SS.seriesText(SS.seriesBar([{ index: 1, leaf: 10, vleaf: 10 }, { index: 2, leaf: 12, vleaf: 12 }], 2)), 'Serie: alle 22 gesehen');
+  assert.strictEqual(SS.seriesText({ mode: 'none' }), '');
+  N.i18n.set('en');
+  assert.strictEqual(SS.seriesText(b), 'Series: 10 of 22 unwatched');
+  N.i18n.set('de');
 });
 
 test('Serien-Balken: > 40 Staffeln -> einfacher Balken', function () {
   var many = []; for (var i = 1; i <= 41; i++) many.push({ index: i, leaf: 10, vleaf: i <= 20 ? 10 : 0 });
   var b = SS.seriesBar(many, 1);
   assert.strictEqual(b.mode, 'single');
-  assert.strictEqual(b.fill, Math.round(416 * 200 / 410));
+  assert.strictEqual(b.fill, Math.round(336 * 200 / 410));
+  assert.strictEqual(b.watched, 200); assert.strictEqual(b.total, 410);
+});
+
+test('Einstellung "Serien-Fortschritt": Standard an, unabhaengig; wer "Folgen-Fortschritt" aus hatte, behaelt den Balken aus', function () {
+  var files = {}, g = N.store.get, st = N.store.set;
+  N.store.get = function (f) { return files[f] || null; }; N.store.set = function (f, v) { files[f] = v; };
+  N.session.state = { profiles: {}, server: { uri: 'http://192.0.2.1:32400' } };
+  N.session.activate({ uuid: 'a', kind: 'main' }, 'T');
+  assert.strictEqual(N.session.settings.seriesProgress, true);
+  assert.strictEqual(N.session.settings.episodeProgress, true);
+  files['settings-b.json'] = { episodeProgress: false };                       // alt: ein Schalter fuer beides
+  N.session.activate({ uuid: 'b', kind: 'main' }, 'T');
+  assert.strictEqual(N.session.settings.seriesProgress, false);
+  assert.ok(!('seriesProgress' in files['settings-b.json']), 'nur abgeleitet, nichts geschrieben');
+  N.session.setSetting('seriesProgress', true);                                // danach gilt die eigene Wahl
+  N.session.activate({ uuid: 'b', kind: 'main' }, 'T');
+  assert.strictEqual(N.session.settings.seriesProgress, true);
+  assert.strictEqual(N.session.settings.episodeProgress, false);
+  N.store.get = g; N.store.set = st;
 });

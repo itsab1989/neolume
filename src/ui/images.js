@@ -4,7 +4,13 @@
  * P7 27.10. (TV: lange Frames in den ersten Schritten nach dem Laden = Dekodieren beim Scrollen):
  * - Dekodier-Sperre: Downloads laufen in ein losgeloestes Image(); das sichtbare <img> bekommt die (dann im Cache liegende) URL
  *   erst in einer Ruhephase, hoechstens SHOW_PER_FRAME (1) je Frame. WebKit dekodiert beim ersten Zeichnen -> nie mitten in einer Tastenfolge.
- * - Nach Tastenwiederholung (N.fx.isFast) gilt REST_FAST statt REST: bei 160-ms-Wiederholung kein Zuweisen zwischen zwei Tasten. */
+ * - Nach Tastenwiederholung (N.fx.isFast) gilt REST_FAST statt REST: bei 160-ms-Wiederholung kein Zuweisen zwischen zwei Tasten.
+ * - Vorab-Dekodieren (Runde 5, 28.10.): Der TV-WebKit malt GPU-Ebenen ausserhalb des Bildschirms nicht (Kacheln nur im sichtbaren
+ *   Bereich) -> Karten einer Reihe unter dem Bildschirmrand bzw. rechts ausserhalb des Clips werden erst beim ▼/▶ gemalt UND ihre
+ *   Bilder erst dann dekodiert (home ▼: 56–75-ms-Frames ohne DOM-Aenderung). warm(urls) legt solche (schon geladenen) Bilder in
+ *   Ruhe nacheinander in einen 1x1-px-Dekodierer (eigene kleine Ebene, Deckkraft 0,01): WebKit dekodiert das ganze Bild, die
+ *   dekodierten Daten haengen am gemeinsamen Bild-Cache-Eintrag -> beim Aufdecken malt die Karte ohne Dekodieren.
+ *   Zaehlt ins selbe Budget wie das Zuweisen (hoechstens 1 Dekodierung je Frame, nur in Ruhe). */
 (function (N) {
   var U = N.util;
   var BLANK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -12,10 +18,12 @@
     poster: [176, 264], posterS: [144, 216], posterXS: [96, 144], posterQ: [120, 180], listThumb: [48, 72], land: [288, 162],
     hero: [1280, 720],            // am TV gemessen: 1280x720 schaerfer UND weniger Haenger als skaliert (PHASE1)
     square: [176, 176], squareS: [144, 144], squareXS: [96, 96], listSq: [48, 48], cover: [192, 192], coverL: [400, 400],   // M4 Musik (quadratisch)
-    backdrop: [640, 360], upnext: [176, 99], chapter: [96, 54], avatar: [160, 160], avatarM: [96, 96], avatarS: [32, 32], cast: [120, 120]
+    saverPoster: [360, 540], saverSq: [460, 460],   // Schoner "Poster und Cover" (scharf, 1:1 gezeigt)
+    backdrop: [640, 360], amb: [320, 180], upnext: [176, 99], chapter: [96, 54], avatar: [160, 160], avatarM: [96, 96], avatarS: [32, 32], cast: [120, 120]
   };
   var MAX_ACTIVE = 4, PER_FRAME = 2, SHOW_PER_FRAME = 1, REST = 150, REST_FAST = 250;   // perf3: 1 Dekodierung je Frame (TV: 2 Poster = 82-ms-Frame)
   var jobs = [], ready = [], active = 0, lru = new N.LRU(400), frameT = 0, paused = false, sets = 0, loads = 0;   // sets/loads: Zaehler fuer den Messlauf (P7)
+  var dec = null, warmQ = [], warmed = new N.LRU(80), warms = 0, WARM_TTL = 30000;   // Vorab-Dekodieren (s. Kopf); warmed: URL -> Zeit
   /* losgeloestes Bild fuer den Download (Tests ohne DOM: null -> direkt ins <img> wie frueher) */
   function mkPre() { return typeof Image !== 'undefined' ? new Image() : null; }
   function rest() { return N.idle ? N.idle.restFor() : 1e9; }
@@ -25,6 +33,7 @@
     if (!path) return '';
     var sz = TIERS[tier] || TIERS.poster, q = { width: sz[0], height: sz[1], minSize: 1, upscale: 1, format: (opts && opts.format) || 'jpeg' };
     if (opts && opts.blur) q.blur = opts.blur;
+    if (opts && opts.opacity) { q.opacity = opts.opacity; q.background = opts.background || '000000'; }   // PMS dunkelt ab (Deckkraft % ueber Farbe), geprueft 27.10.
     if (opts && opts.quality) q.quality = opts.quality;   // PMS: JPEG-Qualitaet 1..100 (Standard ~75; s. SOFT_Q)
     else if (N.comfort && N.comfort.isSpoiler(path)) q.blur = 30;   // Spoilerschutz (SPEC 5.3): ungesehene Folgen unscharf
     // Weitere Server: Pfad mit Marke '@<machineId>|<pfad>' -> Bild ueber DIESEN Server (nicht erreichbar -> kein Bild)
@@ -122,7 +131,7 @@
   function pump() {
     frameT = 0;
     var r = rest(), need = restNeed();
-    if (paused || r < need) { if (jobs.length || ready.length) frameT = setTimeout(pump, paused ? REST : need - r + 10); return; }
+    if (paused || r < need) { if (jobs.length || ready.length || warmNext() >= 0) frameT = setTimeout(pump, paused ? REST : need - r + 10); return; }
     var n = 0, d = 0, i;
     if (ready.length > 1) ready.sort(byPrio);
     while (ready.length && n < SHOW_PER_FRAME) { show(ready.shift()); n++; }   // fertige Downloads zuerst sichtbar machen
@@ -132,7 +141,27 @@
       else if (active < MAX_ACTIVE) { assign(jobs.splice(i, 1)[0]); d++; }
       else i++;
     }
-    if ((jobs.length || ready.length) && !frameT) frameT = setTimeout(function () { frameT = 0; U.raf(pump); }, ready.length || active < MAX_ACTIVE ? 16 : 60);
+    if (n < SHOW_PER_FRAME && warmOne()) n++;                                     // Ruhe uebrig: ein Bild vorab dekodieren
+    if ((jobs.length || ready.length || warmNext() >= 0) && !frameT) frameT = setTimeout(function () { frameT = 0; U.raf(pump); }, ready.length || active < MAX_ACTIVE || !jobs.length ? 16 : 60);
+  }
+  /* naechster Kandidat zum Vorab-Dekodieren: geladen (LRU) und nicht kuerzlich dekodiert; nicht geladene bleiben in der Liste */
+  function warmNext() {
+    if (!dec) return -1;
+    var now = U.now();
+    for (var i = 0; i < warmQ.length; i++) {
+      var u = warmQ[i], t = warmed.has(u) ? warmed.get(u) : 0;
+      if (t && now - t < WARM_TTL) { warmQ.splice(i--, 1); continue; }
+      if (lru.has(u)) return i;
+    }
+    return -1;
+  }
+  function warmOne() {
+    var i = warmNext();
+    if (i < 0) return false;
+    var u = warmQ.splice(i, 1)[0];
+    warmed.set(u, U.now()); warms++;
+    dec.src = u;                                       // naechstes Malen der 1x1-Ebene dekodiert das ganze Bild
+    return true;
   }
   function kick() { if (!frameT) frameT = setTimeout(function () { frameT = 0; U.raf(pump); }, 0); }
   var seq = 0;
@@ -171,13 +200,27 @@
       if (img._pnUrl && !keep) { img.src = BLANK; img._pnUrl = null; }
     },
     pause: function (on) { paused = !!on; if (!paused) kick(); },
+    /* Vorab-Dekodieren (s. Kopf): Dekodierer einmal anlegen (App-Start, Chrome-Ebene); warm(urls) ersetzt die Liste (wichtigste zuerst) */
+    decoder: function (parent) {
+      if (dec || !parent || typeof document === 'undefined') return;
+      var box = U.el('div', '', parent, 'position:absolute;left:0;top:0;width:1px;height:1px;overflow:hidden;opacity:0.01;-webkit-transform:translate3d(0,0,0)');
+      dec = U.el('img', '', box, 'position:absolute;left:0;top:0;width:1px;height:1px');
+      dec.src = BLANK;
+    },
+    warm: function (urls) {
+      warmQ = [];
+      for (var i = 0; urls && i < urls.length; i++) if (urls[i] && warmQ.indexOf(urls[i]) < 0) warmQ.push(urls[i]);
+      if (dec && warmQ.length) kick();
+    },
     /* Profilwechsel: Warteschlange und LRU leeren (SPEC 7.15.5) */
     reset: function () {
       for (var i = 0; i < jobs.length; i++) jobs[i].img._pnJob = null;
       for (i = 0; i < ready.length; i++) ready[i].img._pnJob = null;
-      jobs = []; ready = []; lru.clear();
+      jobs = []; ready = []; lru.clear(); warmQ = []; warmed.clear();
+      if (dec) dec.src = BLANK;
     },
-    _stats: function () { return { queued: jobs.length, ready: ready.length, active: active, cached: lru.size, sets: sets, loads: loads }; },
-    _mkPre: function (f) { mkPre = f; }               // Tests: losgeloestes Bild nachbilden
+    _stats: function () { return { queued: jobs.length, ready: ready.length, active: active, cached: lru.size, sets: sets, loads: loads, warms: warms }; },
+    _mkPre: function (f) { mkPre = f; },              // Tests: losgeloestes Bild nachbilden
+    _dec: function (img) { dec = img; }                // Tests: Dekodierer ohne DOM
   };
 })(N);

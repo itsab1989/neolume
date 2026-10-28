@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="616" viewBox="0 0 800 616" role="img" aria-labelledby="t d">
+<title id="t">Öko-Lösung: automatisches Ausschalten</title>
+<desc id="d">Skizze: Menü System → Öko-Lösung mit Energiesparmod. (Aus), Öko-Sensor (Aus), Kein Sig. Standby (Aus) und Autom. Aussch. (markiert). Eine Auswahl zeigt Aus, 4 Std., 6 Stunden, 8 Std.; „Aus“ ist markiert.</desc>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff7a1a"/></marker><linearGradient id="scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2747"/><stop offset="1" stop-color="#0c1127"/></linearGradient><linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3c8fe8"/><stop offset="1" stop-color="#1f62c8"/></linearGradient><linearGradient id="neo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16181b"/><stop offset="1" stop-color="#0e0f11"/></linearGradient></defs>
+<rect x="8" y="8" width="784" height="455" rx="18" fill="#20232a" stroke="#d5d9e0" stroke-width="4"/>
+<rect x="24" y="24" width="752" height="423" rx="4" fill="url(#scr)"/>
+<rect x="106" y="74" width="560" height="330" rx="2" fill="none" stroke="#c9d3e6" stroke-width="1.5" stroke-opacity="0.7"/>
+<circle cx="133" cy="94" r="10" fill="#e66f8f"/>
+<circle cx="133" cy="136" r="10" fill="#9aa3ad"/>
+<circle cx="133" cy="178" r="10" fill="#b7c0ca"/>
+<circle cx="133" cy="220" r="10" fill="#3e8de0"/>
+<circle cx="133" cy="262" r="10" fill="#7fcf9a"/>
+<rect x="116" y="288" width="34" height="32" rx="6" fill="none" stroke="#ffffff" stroke-width="2"/>
+<circle cx="133" cy="304" r="10" fill="#c9ced6"/>
+<circle cx="133" cy="346" r="10" fill="#5cc27a"/>
+<rect x="160" y="66" width="380" height="350" rx="3" fill="url(#blue)" stroke="#9cc7ff" stroke-width="1"/>
+<text x="182" y="102" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="21" font-weight="normal" fill="#ffffff" text-anchor="start">Öko-Lösung</text>
+<text x="184" y="146" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#ffffff" text-anchor="start">Energiesparmod.</text>
+<text x="514" y="146" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#ffffff" text-anchor="end">Aus</text>
+<text x="184" y="192" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#ffffff" text-anchor="start">Öko-Sensor</text>
+<text x="514" y="192" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#ffffff" text-anchor="end">Aus</text>
+<text x="184" y="238" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#ffffff" text-anchor="start">Kein Sig. Standby</text>
+<text x="514" y="238" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#ffffff" text-anchor="end">Aus</text>
+<rect x="174" y="260" width="350" height="38" rx="8" fill="none" stroke="#bff4ff" stroke-width="2" stroke-opacity="0.55"/>
+<rect x="176" y="262" width="346" height="34" rx="6" fill="#123d86" stroke="#ffffff" stroke-width="2.5"/>
+<text x="184" y="284" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#f4ea6a" text-anchor="start">Autom. Aussch.</text>
+<circle cx="160" cy="276" r="13" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="160" y="280.94" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.95" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<rect x="400" y="250" width="200" height="174" rx="4" fill="#4a4f58" stroke="#d0d4da" stroke-width="1.5"/>
+<rect x="406" y="258" width="188" height="38" rx="8" fill="none" stroke="#bff4ff" stroke-width="2" stroke-opacity="0.55"/>
+<rect x="408" y="260" width="184" height="34" rx="6" fill="#123d86" stroke="#ffffff" stroke-width="2.5"/>
+<text x="430" y="284" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="bold" fill="#f4ea6a" text-anchor="start">Aus</text>
+<text x="430" y="324" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#ffffff" text-anchor="start">4 Std.</text>
+<text x="430" y="364" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#ffffff" text-anchor="start">6 Stunden</text>
+<text x="430" y="404" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#ffffff" text-anchor="start">8 Std.</text>
+<circle cx="600" cy="274" r="13" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="600" y="278.94" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.95" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+<text x="560" y="112" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#c9d3e6" text-anchor="start">MENU → System →</text>
+<text x="560" y="134" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="bold" fill="#c9d3e6" text-anchor="start">Öko-Lösung</text>
+<circle cx="538" cy="106" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="538" y="110.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<rect x="8" y="474" width="784" height="136" rx="10" fill="#f3f4f6" stroke="#d0d4da" stroke-width="1.5"/>
+<circle cx="32" cy="497" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="501.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<text x="52" y="503" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">MENU → System → Öko-Lösung</text>
+<circle cx="32" cy="527" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="531.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<text x="52" y="533" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">„Autom. Aussch.“ wählen (steht meist auf 4 Std.)</text>
+<circle cx="32" cy="557" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="561.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+<text x="52" y="563" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">„Aus“ – oder eine längere Zeit – wählen</text>
+<text x="24" y="593" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#4b5563" text-anchor="start">Optional. Der Fernseher schaltet sich sonst nach 4 Stunden ohne Tastendruck ab – auch mitten im Film.</text>
+</svg>

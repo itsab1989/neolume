@@ -1,7 +1,8 @@
 /* Ansicht 'player' – Video-Wiedergabe mit OSD (SPEC 7.10–7.12; docs/research/player.md). Video liegt im SEF-Plugin HINTER der
  * transparenten HTML-Ebene; darueber nur kleine Inseln, ohne Ein-/Ausblend-Animation.
  * - OSD: Titel-Insel oben links, Uhrzeit/Ende oben rechts, Bedien-Insel unten (Balken, Zeiten, Kapitelname, Knopfreihe
- *   −10 · Play/Pause · +10 · Naechste Folge | Kapitel · Ton & UT · Mehr; Label ueber dem fokussierten Knopf, SPEC 5.22).
+ *   [⏮] · −x · Play/Pause · +x · [⏭] | Kapitel · Ton & UT · Mehr; Label unter dem fokussierten Knopf, SPEC 5.22). −x/+x folgen
+ *   "Sprungweite Pfeiltasten & Knoepfe"; ⏮/⏭ wechseln Folge, Video der Warteschlange oder Kapitel (N.osd.pnMode), auch CH▲/CH▼.
  *   Erscheint bei jeder Taste, weg nach 5 s (Start 3 s, Pause: bleibt + Mini-Hinweisleiste). Zeit/Balken max. 1x/s, nur sichtbar.
  * - Fokus-Zonen bei sichtbarem OSD: Knoepfe (◀▶) -> ▲ Balken (◀▶ = Vorschau-Spulen, Sprung bei OK oder nach 1 s) -> ▲ Skip-Button.
  * - Spulen bei verborgenem OSD: ◀▶ / ◀◀▶▶ sammeln ein Ziel ("+2:30 → 41:12"), EIN Sprung 600 ms nach dem letzten Druck.
@@ -10,13 +11,15 @@
  * - Gelb Kapitel, Blau Sleep-Timer, INFO Technik, Gruen/SUBTITLE Ton & UT. Zeiger: Bewegung zeigt das OSD, alles anklickbar.
  * N.player.play(item, how) ist der Einstieg (Fortsetzen-Frage nach Einstellung). */
 (function (N) {
-  var U = N.util, F = N.fmt, O = N.osd, BAR_X = 96, BAR_W = 1088, BAR_Y = O.BAR_Y, OSD_MS = 5000, START_MS = 3000, MH_Y = 650, MH_H = 40, SKIP_Y = 398;
+  var U = N.util, F = N.fmt, O = N.osd, BAR_X = 96, BAR_W = 1088, BAR_Y = O.BAR_Y, OSD_MS = 5000, START_MS = 3000, MH_Y = 648, MH_H = 36, SKIP_Y = 398;
   function hms(ms) {
     var s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60;
     return (h ? h + ':' + U.pad2(m) : m) + ':' + U.pad2(s % 60);
   }
   N.fmt.hms = hms;
   function cfg() { return N.session.settings || {}; }
+  function arrows() { return O.steps(cfg().seekArrows, 10); }   // Pfeile + Knoepfe −x/+x (Sekunden {b, f})
+  function ffrw() { return O.steps(cfg().seekFf, 30); }          // Spultasten
   var status = null;                                     // P5: Zustand fuer den Bildschirmschoner (N.player.status)
 
   N.router.define('player', function (params) {
@@ -26,7 +29,8 @@
     var pb = null, sef = null, mk = null, acc = null, item = null, osd = false, osdT = 0, lastSec = -1, queue = null, qTask = null, upF = 0, cdOn = false, skipM = null, btnKind = null;
     var closed = false, cues = null, cueI = -1, subClr = 0, thumbOn = false, thLast = -1, thT0 = 0, thFail = 0, bif = null, bifRaw = null, info = null, onFlush = null, trackMem = null, errOn = false, slow = 0;
     // Fokus im OSD: zone 'btn' | 'bar' | 'skip'; quick = Balken per ◀▶ bei verborgenem OSD (Sammelfenster 600 ms, sonst 1 s)
-    var zone = 'btn', fb = 'pp', ids = ['back', 'pp', 'fwd', 'tracks', 'more'], quick = false, chs = [], chI = -2;
+    // ids = bedienbare Knoepfe (Fokus/Zeiger), vis = sichtbare (gesperrte ⏮/⏭ gedimmt), pn = Modus von ⏮/⏭ ('ep'|'chap'|'item'|'')
+    var zone = 'btn', fb = 'pp', ids = ['back', 'pp', 'fwd', 'tracks', 'more'], vis = ids, pn = '', pnSt = { prev: false, next: false }, quick = false, chs = [], chI = -2, hov = false;
     // Wiedergabe-Sitzung (Mehr-Menue, gilt bis zum Schliessen des Players, auch fuer folgende Folgen); pcfg = Einstellungen + sess
     var sess = {}, pcfg = null, sleep = { mode: 'off', at: 0, t: 0, w: 0 };
     // Karte "Das war die letzte Folge" (lastOn, Knopf-Fokus lastF), "Schaust du noch?" (still, stillOn)
@@ -34,6 +38,38 @@
     // P5: "Geringere Qualitaet?" beim Puffern (bw, lowT, offerT), Zurueckspulen nach langer Pause (pausedAt),
     // "Verbindung unterbrochen" (lost = {at}, Insel lostEl mit 2 Knoepfen, lostT = Wiederholungs-Takt)
     var bw = null, lowT = 0, offerT = 0, pausedAt = 0, prevSt = '', lost = null, lostEl, lostBtns = [], lostF = 0, lostT = 0, onOff = null, onOn = null;
+    // Feinauswahl am Balken (N.Loupe + N.ui.LoupeView, SPEC PLAY-30/31): lp Logik, lpv Darstellung, lpPend/lpRaf Zeichnen je Frame,
+    // lpS wirksame Darstellung (panel|stretch|film), lpTab Lasche (A/D) als Rechteck, lpBand Band in dem sie offen bleibt
+    var lp = null, lpv = null, lpPend = null, lpRaf = false, lpS = 'panel', lpTab = null, lpBand = null;
+    var xt = null, upOv = null, lastTi = null, lastTx = null, lastB0 = null, offerTm = 0;   // optionale Erweiterung (N.ext 'player:open')
+    /* Schnittstelle fuer eine Erweiterung: Hinweis-Insel (wie "Intro ueberspringen", nur wenn keine andere da ist), Karte
+     * "letzte Folge" umbeschriften, Ueberzeile der Naechste-Folge-Karte, Folge hinter die aktuelle in die Play-Queue setzen */
+    var PX = {
+      item: function () { return item; }, queue: function () { return queue; }, hasNext: function () { return hasNext(); }, dur: function () { return dur(); },
+      offer: function (text, ms) {
+        if (btnKind || closed) return false;
+        btnKind = 'ext'; skipM = null; U.setText(skipT, text); U.show(skip, true);
+        if (offerTm) clearTimeout(offerTm);
+        offerTm = setTimeout(function () { offerTm = 0; if (btnKind === 'ext') hideSkip(); }, ms || 15000);
+        return true;
+      },
+      hideOffer: function () { if (btnKind === 'ext') hideSkip(); },
+      setLast: function (title, text, b0) { U.setText(lastTi, title || N.t('pl.last.title')); U.setText(lastTx, text || N.t('pl.last.text')); U.setText(lastB0, b0 || N.t('pl.last.toShow')); },
+      setUpOver: function (text) { if (upOv) U.setText(upOv, text || N.t('pl.next.over')); },
+      /* rk ans Ende der aktuellen Folge der Play-Queue (PMS PUT /playQueues/<id>?uri=…&next=1); cb(ok) */
+      addNext: function (rk, cb) {
+        var mid = isrv() || N.session.state.server && N.session.state.server.machineId;
+        if (!queue || !mid || closed) { cb(false); return; }
+        N.plex.pms('PUT', '/playQueues/' + queue.id, { uri: 'server://' + mid + '/com.plexapp.plugins.library/library/metadata/' + rk, next: 1 }, N.srv.o(isrv(), { retries: 0, dedupe: false }), function (err, d) {
+          var mc = !err && d && d.MediaContainer;
+          if (!mc || !mc.Metadata || closed) { cb(false); return; }
+          var items = [], cur = queue.idx;
+          for (var i = 0; i < mc.Metadata.length; i++) { var x = mc.Metadata[i], it = N.model.norm(x); it.pqi = x.playQueueItemID; if (item && it.rk === item.rk) cur = i; items.push(it); }
+          queue = { id: mc.playQueueID || queue.id, items: items, idx: cur };
+          updBtns(); cb(true);
+        });
+      }
+    };
 
     /* ---------- Aufbau ---------- */
     s.create = function (el) {
@@ -63,13 +99,22 @@
       for (i = 0; i < O.BTNS.length; i++) {
         var b = O.BTNS[i], be = U.el('div', 'pl-b' + (b.w > 48 ? ' lg' : ''), bot, 'left:' + b.x + 'px;top:' + b.y + 'px');   // Groesse per CSS (.pl-b / .pl-b.lg)
         if (b.id === 'back' || b.id === 'fwd') { var nm = U.txt('div', 'num', be, ''); if (b.id === 'back') numB = nm; else numF = nm; }
-        else { var ic = N.ui.icon(be, { pp: 'pause', next: 'next', chap: 'chapters', tracks: 'audio', more: 'more' }[b.id]); if (b.id === 'pp') ppIc = ic; }
+        else { var ic = N.ui.icon(be, { pp: 'pause', prev: 'prev', next: 'next', chap: 'chapters', tracks: 'audio', more: 'more' }[b.id]); if (b.id === 'pp') ppIc = ic; }
         btnEl[b.id] = be;
       }
       lbl = U.el('div', 'pl-lbl', root, 'display:none'); lblT = U.txt('span', '', lbl, '');
       thumb = U.el('div', 'pl-th', root, 'display:none');
       thImg = U.el('img', '', thumb); thImg.src = N.img.BLANK;
       thT = U.txt('div', 'pl-tht', thumb, '');
+      lpv = new N.ui.LoupeView({ parent: root, ox: 0, oy: 0, barTop: BAR_Y - 5, barH: 10, barX: BAR_X, barW: BAR_W,
+        islY: O.ISL_Y, islX: O.ISL_X, islW: 1152 });
+      // Runde 5: Feinauswahl-Behaelter in Ruhe vorab anlegen (nur mit Zeiger + Einstellung; Darstellung wie beim Oeffnen gewaehlt)
+      N.idle.add(function () {
+        if (closed || !lpv || eff('ptrLoupe') !== true || !N.pointer.enabled()) return;
+        var st = N.Loupe.style(eff('loupeStyle'), { thumbs: true });
+        lpv.prep(st);
+        if (st === 'film') lpv.prep('panel');                 // ohne Vorschaubilder wird es die Lasche A
+      }, 'lp-prep');
       spin = U.el('div', 'pl-spin', root, 'display:none');
       U.el('div', 'spinner', spin, 'left:180px;top:16px');
       spinT = U.txt('div', 'pl-spt', spin, '');
@@ -78,13 +123,14 @@
       up = U.el('div', 'pl-up', root, 'display:none');
       upImg = U.el('img', '', up); upImg.src = N.img.BLANK;
       upBar = U.el('i', '', U.el('div', 'pl-upbar', up));
-      U.txt('div', 'pl-upov', up, N.t('pl.next.over'));
+      upOv = U.txt('div', 'pl-upov', up, N.t('pl.next.over'));
       upTi = U.txt('div', 'pl-upti', up, ''); upIn = U.txt('div', 'pl-upin', up, '');
       for (i = 0; i < 2; i++) { var ub = U.el('div', 'btn pl-upb', up, 'left:' + (16 + i * 192) + 'px'); ub.appendChild(document.createTextNode(N.t(i ? 'pl.next.watchCredits' : 'pl.next.now'))); upBtns.push(ub); }
       last = U.el('div', 'pl-up pl-last', root, 'display:none');
-      U.txt('div', 'pl-lastti', last, N.t('pl.last.title'));
-      U.txt('div', 'pl-lastx', last, N.t('pl.last.text'));
-      for (i = 0; i < 2; i++) { var lb = U.el('div', 'btn pl-upb', last, 'left:' + (16 + i * 192) + 'px'); lb.appendChild(document.createTextNode(N.t(i ? 'pl.next.watchCredits' : 'pl.last.toShow'))); lastBtns.push(lb); }
+      lastTi = U.txt('div', 'pl-lastti', last, N.t('pl.last.title'));
+      lastTx = U.txt('div', 'pl-lastx', last, N.t('pl.last.text'));
+      for (i = 0; i < 2; i++) { var lb = U.el('div', 'btn pl-upb', last, 'left:' + (16 + i * 192) + 'px'), lt = document.createTextNode(N.t(i ? 'pl.next.watchCredits' : 'pl.last.toShow')); lb.appendChild(lt); lastBtns.push(lb); if (!i) lastB0 = lt; }
+      if (N.ext.has('player:open')) xt = N.ext.call('player:open', PX) || null;
       lostEl = U.el('div', 'pl-isl pl-lost', root, 'display:none');
       U.txt('div', 'pl-lostti', lostEl, N.t('err.connLost.title'));
       U.txt('div', 'pl-lostx', lostEl, N.t('err.connLost.text'));
@@ -92,6 +138,8 @@
       sbBg = U.el('div', 'pl-errbg', root, 'display:none');
       sb = new N.ui.StateBlock(root);
       acc = new N.SeekAcc(commitSeek, { now: U.now, set: function (f, ms) { return setTimeout(f, ms); }, clear: function (t) { clearTimeout(t); } }, N.config.seekDelay || 600);
+      lp = new N.Loupe({ timers: { now: U.now, set: function (f, ms) { return setTimeout(f, ms); }, clear: function (t) { clearTimeout(t); } },
+        ok: lpOk, live: ptrLive, pos: function () { return { x: N.pointer.x, y: N.pointer.y }; }, open: lpOpen });
       onFlush = exitSync;
       N.evt.on('app:flush', onFlush);
       onOff = function () { if (pb && !closed && !isrv() && !errOn && (pb.state === 'playing' || pb.state === 'paused' || pb.state === 'buffering')) connLost(); };
@@ -104,7 +152,7 @@
     s.enter = function (p, restore) {
       if (pb || closed) return;                      // Rueckkehr aus einem Overlay o. ae.
       sef = N.sef.create(function (type, data) { if (pb) pb.onEvent(type, data); });
-      if (sef.fake) U.show(vbg, true); else transparent(true);
+      if (sef.fake) { U.show(vbg, true); if (N.config.fakeBg) vbg.style.background = N.config.fakeBg; } else transparent(true);   // Bildtest: heller Film
       U.cls(document.body, 'in-player', true);
       N.tv.saver(false);
       trackMem = N.store.get(memFile()) || {};
@@ -127,8 +175,12 @@
     };
     function shutdown() {
       closed = true;
-      acc.cancel();
+      if (offerTm) { clearTimeout(offerTm); offerTm = 0; }
+      if (xt && xt.close) xt.close();
+      acc.cancel(); lp.leave(); lpEnd();
       setSleep('off', true);
+      // Startseite: bis zur Schwelle gesehen/zu Ende -> Titel verlaesst Weiterschauen zu Recht (kein Warten auf ihn, home.js)
+      var fin = !!pb && (pb.state === 'ended' || (pb.dur() > 0 && pb.t / pb.dur() >= (N.config.watchedThreshold || 0.9)));
       if (pb) { pb.stop('user'); pb = null; }
       if (qTask) { qTask.abort(); qTask = null; }
       if (osdT) clearTimeout(osdT);
@@ -137,7 +189,7 @@
       transparent(false);
       U.cls(document.body, 'in-player', false);
       N.tv.saver(true);
-      N.evt.emit('playback:stopped', { rk: item ? item.rk : '' });
+      N.evt.emit('playback:stopped', { rk: item ? item.rk : '', video: true, done: fin, srv: item && item.srv || '' });
     }
     function close() { if (closed) return; shutdown(); N.router.back(); }
     /* EXIT/onunload: Abschluss-Anfragen synchron (async XHR wuerde mit der App sterben) */
@@ -159,7 +211,9 @@
 
     /* ---------- Wiedergabe ---------- */
     function play(it, off, q) {
-      item = it; cues = null; cueI = -1; showSub(''); hideSkip(); hideUp(); hideLast(); bif = null; thFail = 0; errOn = false; slow = 0; chs = []; chI = -2;
+      lpEnd();
+      item = it; cues = null; cueI = -1; showSub(''); hideSkip(); hideUp(); hideLast();
+      if (xt && xt.item) xt.item(it); bif = null; thFail = 0; errOn = false; slow = 0; chs = []; chI = -2;
       clearLow(); bw = new N.comfort.BufWatch(U.now()); pausedAt = 0; prevSt = ''; hideLost();
       sb.hide(); U.show(sbBg, false);
       U.setText(t1, it.type === 'episode' ? it.title : ''); U.setText(t2, it.type === 'episode' ? N.t('pl.epTitle', { s: it.s, e: it.e, t: it.epTitle || '' }) : it.title);
@@ -214,7 +268,7 @@
       chs = m.chapters || [];
       buildSegs(m);
       thumbOn = eff('thumbs') !== false && N.thumbs.has(m.part);
-      if (m.type === 'episode' && eff('autoNext') && !queue) makeQueue(m);
+      if (m.type === 'episode' && !queue) makeQueue(m);       // auch ohne Autoplay: ⏮/⏭ brauchen die Folgen davor und danach
       if (queue) for (var i = 0; i < queue.items.length; i++) if (queue.items[i].rk === m.rk) queue.idx = i;
       updBtns();
     }
@@ -284,6 +338,7 @@
     function onTime(ms) {
       var sec = Math.floor(ms / 1000);
       if (sec !== lastSec) { lastSec = sec; if (osd && !acc.active()) paint(ms); }
+      if (!cues && sef.fake && N.config.fakeSub) cues = [{ a: 0, b: 1e10, x: N.config.fakeSub }];   // nur Bildtest: Untertitel-Zeile
       if (cues) cue(ms);
       if (mk && pb) markerTick(ms);
     }
@@ -296,7 +351,8 @@
       var now = N.clock.date(), ends = d ? N.t('pl.endsAt', { time: F.clock(new Date(now.getTime() + d - pos)) }) : '';
       U.setText(clk, cfg().clock === false ? ends : N.comfort.clock(now, N.config.fixedClock) + (ends ? ' · ' + ends : ''));   // P5 set.clock
       var k = O.chapterAt(chs, pos);
-      if (k !== chI) { chI = k; U.setText(chn, k < 0 ? '' : O.chapterNamed(chs[k]) ? N.t('pl.chapter', { n: k + 1, t: chs[k].t }) : N.t('pl.chapterN', { n: k + 1 })); }
+      if (lpv.on) lpv.played(pos);
+      if (k !== chI) { chI = k; U.setText(chn, k < 0 ? '' : O.chapterNamed(chs[k]) ? N.t('pl.chapter', { n: k + 1, t: chs[k].t }) : N.t('pl.chapterN', { n: k + 1 })); if (pn === 'chap') pnPaint(pos); }
     }
     function markerTick(ms) {
       var o = mk.tick(ms, { dur: dur(), playing: pb.state === 'playing', hasNext: hasNext() && sleep.mode !== 'end', last: isLast() && sleep.mode !== 'end', resume: pb.resume });
@@ -307,7 +363,8 @@
       if (o.next) { autoNext(); return; }
       if (o.cd > 0) { showUp(o.cd); } else if (cdOn) hideUp();
       if (o.last) showLast(); else if (lastOn) hideLast();
-      if (o.btn) showSkip(o.btn, o.marker); else if (btnKind && btnKind !== 'lower') hideSkip();
+      if (o.btn) showSkip(o.btn, o.marker); else if (btnKind && btnKind !== 'lower' && btnKind !== 'ext') hideSkip();
+      if (xt && xt.tick) xt.tick(ms, dur(), o);
     }
     function showSkip(kind, m) {
       skipM = m;
@@ -315,10 +372,12 @@
       btnKind = kind;
       U.setText(skipT, N.t('pl.skip.' + kind));
       U.show(skip, true);
+      lpCover();
     }
     function hideSkip() { btnKind = null; skipM = null; U.show(skip, false); if (zone === 'skip') setZone('bar'); }
     function doSkip() {
       if (!btnKind || !pb) return;
+      if (btnKind === 'ext') { hideSkip(); if (xt && xt.offerOk) xt.offerOk(); return; }
       if (btnKind === 'lower') { hideSkip(); lowerQuality(); return; }
       if (btnKind === 'watch') { var t = mk.watchStart(); hideSkip(); if (t >= 0) seekPb(t); return; }
       if (btnKind === 'next') { hideSkip(); playNext(); return; }
@@ -328,13 +387,13 @@
     /* ---------- Untertitel: SEF-intern (Ereignis 19) / externe SRT (eigene Box); Darstellung aus Einstellung/Mehr ---------- */
     function showSub(t) {
       if (subClr) { clearTimeout(subClr); subClr = 0; }
-      if (t && (!pb || (pb.subMode !== 'sef' && pb.subMode !== 'sidecar'))) t = '';   // UT aus: nichts zeichnen
+      if (t && (!pb || (pb.subMode !== 'sef' && pb.subMode !== 'sidecar')) && !(sef && sef.fake && N.config.fakeSub)) t = '';   // UT aus: nichts zeichnen
       U.setText(subT, t || ''); U.show(sub, !!t);
       U.cls(sub, 'up', osd);
       if (t && !cues) subClr = setTimeout(function () { subClr = 0; showSub(''); }, 2500 + 1500 * t.split('\n').length);
     }
     function subLook() {
-      sub.className = 'pl-sub sz-' + (eff('subSize') || 'medium') + ' bg-' + (eff('subBg') || 'dim') + (eff('subColor') === 'yellow' ? ' yel' : '') + (eff('subPos') === 'high' ? ' hi' : '') + (osd ? ' up' : '');
+      sub.className = 'pl-sub sz-' + (eff('subSize') || 'medium') + ' bg-' + (eff('subBg') || 'dim') + (eff('subColor') === 'yellow' ? ' yel' : '') + (eff('subPos') === 'high' ? ' hi' : '') + (osd ? ' up' : '') + (lpTab ? ' lp-' + lpS : '');
     }
     function loadSidecar(mode) {
       cues = null; cueI = -1; showSub('');
@@ -367,21 +426,44 @@
     }
     function hideOsd(force) {
       if (osdT) clearTimeout(osdT); osdT = 0;
+      // Feinauswahl offen und Finger auf dem Touchpad: OSD bleibt (ruhiges Zielen dauert); sonst zu
+      if (lp.isOpen() && force !== true && ptrLive()) { osdT = setTimeout(hideOsd, OSD_MS); return; }
+      if (lp.isOpen() || lpv.on) lpEnd();
+      lp.leave();
       // waehrend Spulen oder offenem Panel (Ton & UT, Mehr, Kapitel …) bleibt das OSD stehen
       if (!osd || (force !== true && (acc.active() || N.router.hasOverlay()))) { if (osd) osdT = setTimeout(hideOsd, OSD_MS); return; }
+      hov = false; hovMs = -1; U.cls(thumb, 'tonly', false);
       osd = false; U.show(top, false); U.show(bot, false); U.show(thumb, false); U.show(lbl, false); U.cls(sub, 'up', false); U.cls(root, 'pl-osd', false);
       U.cls(skip, 'is-focus', false); U.cls(btnEl[fb], 'is-focus', false); U.cls(bot, 'foc', false);
       zone = 'btn'; fb = 'pp'; quick = false;                   // naechstes Einblenden: Fokus Play/Pause
       N.router.refreshHints();
     }
-    /* sichtbare Knoepfe: Naechste Folge nur mit naechstem Eintrag, Kapitel nur mit Kapiteln */
+    /* sichtbare Knoepfe: ⏮/⏭ nach Modus (Folgen/Warteschlange/Kapitel), Kapitel-Liste nur mit Kapiteln; Sprungweiten aus der Einstellung */
     function updBtns() {
-      ids = O.visible({ next: !!(item && item.type === 'episode' && hasNext()), chap: chs.length > 0 });
-      for (var k in btnEl) U.show(btnEl[k], ids.indexOf(k) >= 0);
-      var n = Number(cfg().seekArrows) || 10;
-      U.setText(numB, '-' + n); U.setText(numF, '+' + n);
-      if (ids.indexOf(fb) < 0) fb = O.nav(ids, fb, '');
+      pn = O.pnMode({ type: item && item.type, qLen: queue ? queue.items.length : 0, chapters: chs.length });
+      vis = O.visible({ pn: pn, chap: chs.length > 0 });
+      for (var k in btnEl) U.show(btnEl[k], vis.indexOf(k) >= 0);
+      var nm = O.stepNums(arrows());
+      U.setText(numB, nm[0]); U.setText(numF, nm[1]);
+      pnPaint(pb ? pb.t : 0);
+    }
+    /* ⏮/⏭ bedienbar? Gesperrte bleiben gedimmt stehen (Reihe springt nicht), bekommen aber weder Fokus noch Klick */
+    function pnPaint(ms) {
+      pnSt = O.pnState({ mode: pn, qIdx: queue ? queue.idx : 0, qLen: queue ? queue.items.length : 0, chs: chs, ms: ms });
+      U.cls(btnEl.prev, 'off', !pnSt.prev); U.cls(btnEl.next, 'off', !pnSt.next);
+      ids = O.usable(vis, pnSt);
+      if (ids.indexOf(fb) < 0) { U.cls(btnEl[fb], 'is-focus', false); fb = O.nav(ids, fb, ''); }
       if (osd) setZone(zone, true);
+    }
+    /* ⏮ / ⏭ (Knopf, Zeiger, CH▲/CH▼) */
+    function stepItem(dir) {
+      if (!pn || !pb || !(dir < 0 ? pnSt.prev : pnSt.next)) return;
+      if (pn === 'chap') {
+        var tg = dir < 0 ? O.prevChapter(chs, pb.t) : O.nextChapter(chs, pb.t);
+        if (tg >= 0) { showOsd(); seekTo(tg > 0 ? tg + 1000 : 0, true); }   // +1 s: Sprung landet sonst knapp vor dem Anfang (TV-Test 28.10.)
+        return;
+      }
+      if (dir < 0) playPrev(); else playNext(true);
     }
     /* Fokus setzen: nur alter + neuer Knopf umklassen, Label per left + nodeValue (SPEC 5.22) */
     function setZone(z, force, id) {
@@ -396,30 +478,34 @@
       setLabel();
     }
     function setLabel() {
+      if (lp && lp.isOpen()) return;                         // Feinauswahl: das Label-Feld zeigt deren Hinweis
       if (!osd || zone !== 'btn') { U.show(lbl, false); return; }
-      var t = fb === 'pp' ? (pb && pb.state === 'paused' ? 'pl.btn.play' : 'pl.btn.pause') : 'pl.btn.' + { back: 'back', fwd: 'fwd', next: 'next', chap: 'chapters', tracks: 'tracks', more: 'more' }[fb];
-      U.setText(lblT, N.t(t, { n: Number(cfg().seekArrows) || 10 }));
+      var t = fb === 'pp' ? (pb && pb.state === 'paused' ? 'pl.btn.play' : 'pl.btn.pause') : fb === 'prev' || fb === 'next' ? O.pnLabel(pn, fb)
+        : 'pl.btn.' + { back: 'back', fwd: 'fwd', chap: 'chapters', tracks: 'tracks', more: 'more' }[fb], st = arrows();
+      U.setText(lblT, N.t(t, { n: fb === 'back' ? st.b : st.f }));
       U.show(lbl, true);
       // Label mittig UNTER dem Knopf, aber nie ueber den Innenrand der Insel hinaus (rechte Knoepfe, lange Texte)
       var c = O.center(fb), w = lblT.parentNode.offsetWidth || 0, x = U.clamp(c - w / 2, O.ISL_X + 32, O.ISL_X + 1152 - 32 - w);
       lbl.style.left = Math.round(x + w / 2 - 150) + 'px';
     }
     function activate(id) {
-      var n = (Number(cfg().seekArrows) || 10) * 1000;
+      var st = arrows();                                     // wiederholte Klicks sammeln wie die Tasten (ein Sprung nach 600 ms Ruhe)
       switch (id) {
-        case 'back': seekBy(-n, false); break;
-        case 'fwd': seekBy(n, false); break;
+        case 'back': seekBy(-st.b * 1000, false); break;
+        case 'fwd': seekBy(st.f * 1000, false); break;
         case 'pp': if (pb) pb.toggle(); showOsd(); break;
-        case 'next': playNext(); break;
+        case 'prev': stepItem(-1); break;
+        case 'next': stepItem(1); break;
         case 'chap': chapters(); break;
         case 'tracks': tracks('a'); break;
         case 'more': more(); break;
       }
     }
-    /* Mini-Hinweisleiste (Pause): B Ton & UT · C Kapitel · D Sleep-Timer · INFO Hilfe; anklickbar */
+    /* Mini-Hinweisleiste (Pause): B Ton & UT · C Kapitel · D Sleep-Timer · INFO Hilfe; anklickbar. Tastenhinweise "Aus" -> nie;
+     * "Nur kurz" -> wie "Immer" (erscheint ohnehin nur mit der Bedienleiste in der Pause) */
     var MH_KEYS = { green: 'GREEN', yellow: 'YELLOW', blue: 'BLUE', INFO: 'INFO' };
     function miniHints(on) {
-      if (!on || acc.active()) { U.show(mh, false); mhRects = null; return; }
+      if (!on || acc.active() || N.ui.hints.mode() === 'off') { U.show(mh, false); mhRects = null; return; }   // Tastenhinweise "Aus": auch hier nicht
       var list = [{ k: 'green', t: 'hint.tracks' }];
       if (chs.length) list.push({ k: 'yellow', t: 'hint.chapters' });
       list.push({ k: 'blue', t: 'hint.sleep' }, { k: 'INFO', t: 'hint.help' });
@@ -447,7 +533,7 @@
     /* ---------- Spulen (Sammelfenster) + Vorschaubild ---------- */
     function seekBy(step, accel) {
       if (!pb || !dur() || pb.state === 'resolving' || pb.state === 'error') return;
-      showOsd();
+      showOsd(); hoverOff();
       acc.delay = N.config.seekDelay || (zone === 'bar' && !quick ? 1000 : 600);   // Balken: Sprung nach 1 s Ruhe oder OK
       U.show(mh, false);
       showSeek(acc.press(step, pb.t, dur(), accel));
@@ -460,6 +546,24 @@
       U.setText(skl, (st.delta < 0 ? '-' : '+') + hms(Math.abs(st.delta)) + ' (' + hms(st.target) + ')');
       if (thumbOn) showThumb(st.target, w);
     }
+    /* Zeiger ueber dem Balken: Zeit (+ Vorschaubild, falls vorhanden) an der Zeigerstelle, gesprungen wird erst beim Klick */
+    var hovMs = -1;
+    function hover(x) {
+      if (acc.active() || !dur()) return;               // laufendes Spulen hat Vorrang
+      var w = Math.round(U.clamp(x - BAR_X, 0, BAR_W)), ms = Math.round(dur() * w / BAR_W);
+      hov = true; hovMs = ms;
+      if (thumbOn) { U.cls(thumb, 'tonly', false); showThumb(ms, w); return; }
+      U.cls(thumb, 'tonly', true);                        // ohne Vorschaubilder: nur die Zeit in einer kleinen Blase
+      thumb.style.left = U.clamp(BAR_X + w - 48, BAR_X, BAR_X + BAR_W - 96) + 'px';
+      U.setText(thT, hms(ms));
+      U.show(thumb, true);
+    }
+    function hoverOff() {
+      if (!hov) return;
+      hov = false; hovMs = -1;
+      if (!acc.active()) U.show(thumb, false);
+      U.cls(thumb, 'tonly', false);
+    }
     function showThumb(ms, w) {
       var x = U.clamp(BAR_X + w - 120, 64, 1216 - 240);
       thumb.style.left = x + 'px';
@@ -467,7 +571,7 @@
       U.show(thumb, true);
       var snap = N.thumbs.snap(ms), now = U.now();
       if (snap === thLast) return;
-      if (now - thT0 < 250) { setTimeout(function () { if (acc.active() && acc.target === ms) showThumb(ms, w); }, 260); return; }
+      if (now - thT0 < 250) { setTimeout(function () { if ((acc.active() && acc.target === ms) || (hov && hovMs === ms)) showThumb(ms, w); }, 260); return; }
       thLast = snap; thT0 = now;
       if (bif) { thImg.src = N.thumbs.dataUri(bifRaw, bif, N.thumbs.frameAt(bif, ms)) || N.img.BLANK; return; }
       thImg.onerror = function () { if (++thFail === 2) loadBif(); };
@@ -500,6 +604,91 @@
       showOsd();
       paused();
     }
+    /* Klick auf den Balken: Ziel wie beim Spulen sofort zeigen (Zeit, Vorschaubild, "+12:30"), EIN Sprung nach 1 s Ruhe – in der
+     * Zeit korrigiert Wischen auf dem Touchpad (= ◀▶ auf dem Balken) um die Sprungweite, ohne einen zweiten teuren Sprung */
+    function clickSeek(ms) {
+      if (!pb || !dur() || pb.state === 'resolving' || pb.state === 'error') return;
+      acc.delay = N.config.seekDelay || 1000;
+      U.show(mh, false);
+      showSeek(acc.set(ms, pb.t, dur(), false));
+    }
+    /* ---------- Feinauswahl am Balken (docs/research/player-controls.md "Feinauswahl"): ruhiger Zeiger -> Fenster um die Stelle in der
+     * gewaehlten Darstellung (Einstellung loupeStyle: A Lasche (Standard), B Balken dehnt sich, D Filmstreifen – ohne
+     * Vorschaubilder A); Klick setzt das Ziel ueber das Sammelfenster (ein Sprung), Taste/Wegbewegen nach oben/seitlich schliesst.
+     * Schutzzone: das Band reicht bis zur Unterkante der Bedien-Insel (y 638) – solange die Feinauswahl offen ist, reagiert die
+     * Knopfreihe (Treffer 530–594) weder auf Zeigen noch auf Klick; ein Klick dort setzt das feine Ziel (TV-Befund 28.10.) ---------- */
+    var LP_BOT = O.ISL_Y + O.ISL_H;                               // oben: Laschen-Oberkante (A/D) bzw. 32 px ueber der Balkenmitte (B)
+    function ptrLive() { var P = N.pointer; return !!(P && P.rawT && U.now() - P.rawT < P.LIVE); }
+    function lpHalf() { return N.Loupe.half(dur(), BAR_W); }
+    function lpOk() { return eff('ptrLoupe') === true && N.pointer.enabled() && osd && hov && !!pb && !acc.active() && !N.router.hasOverlay() && !errOn && !lost && lpHalf() > 0; }
+    function lpOpen(x) {
+      var h = lpHalf(), Lp = N.Loupe;
+      if (!h || closed) return;
+      lpS = Lp.style(eff('loupeStyle'), { thumbs: thumbOn && !!(pb && pb.meta && pb.meta.partId) });
+      var g = lp.open(Lp.geom({ x: x, barX: BAR_X, barW: BAR_W, dur: dur(), w: Lp.width(lpS, 480, BAR_W), h: h }), chs, 0);
+      lpTab = Lp.tab(lpS, g, O.ISL_Y);
+      lpBand = Lp.band(lpS, g, { barY: BAR_Y, islY: O.ISL_Y, bottom: LP_BOT, side: BAR_Y + 16 });   // seitlich raus nur bis zur Balken-Trefferzone
+      U.cls(bot, 'lp', true); U.cls(bot, 'lp-' + lpS, true);
+      if (lpS === 'film' || (!thumbOn && lpS !== 'stretch')) U.show(thumb, false);   // Zielzeit steht an der Feinleiste bzw. im Bild
+      U.cls(thumb, 'lp-panel', lpS === 'panel');                 // A: Vorschaubild ueber der Lasche
+      var txt = lpText(h);
+      lpv.show(g, { style: lpS, fmt: hms, chs: chs, coff: 0, markers: pb && pb.meta && pb.meta.parts < 2 ? pb.meta.markers : null, pos: pb ? pb.t : 0,
+        title: txt, img: lpImg, fail: function () { if (!bif && ++thFail === 2) loadBif(); } });
+      if (lpTab) { U.show(lbl, false); U.cls(sub, 'lp-' + lpS, true); lpCover(); } else lpLabel(txt);
+      var p = lp.move(N.pointer.x, N.pointer.y, lpBand);
+      if (p && !p.exit) lpMove(p);
+    }
+    /* Hinweis/Titel: die ersten 3 Male (Zaehler je TV) der Hinweis zum Verlassen, danach "Feinauswahl · ±4:48 Min." */
+    function lpText(h) {
+      var S = N.session, n = Number(S.state && S.state.loupeHints) || 0;
+      if (n < N.Loupe.K.HINTS && S.state) { S.state.loupeHints = n + 1; S.save(); return N.t('pl.loupe.hint'); }
+      return N.t('pl.loupe.title', { t: hms(h) });
+    }
+    /* B: im Label-Feld unter der Knopfreihe (A/D: in der Kopfzeile der Lasche) */
+    function lpLabel(txt) {
+      U.setText(lblT, txt); U.show(lbl, true);
+      var w = lblT.parentNode.offsetWidth || 0;                // einmal je Oeffnen gemessen, nie je Bewegung
+      lbl.style.left = Math.round(640 - Math.max(w, 300) / 2) + 'px';
+    }
+    /* A/D: nur weichen, was die Lasche wirklich verdeckt (Skip-Knopf, Countdown-/Letzte-Folge-Karte); einmal je Oeffnen bzw. wenn eins
+     * davon waehrend der Feinauswahl erscheint. Untertitel ruecken per Klasse hoch (subLook). */
+    function lpCover() {
+      if (!lpTab) return;
+      [skip, up, last].forEach(function (e) {
+        var on = e.style.display !== 'none' && N.Loupe.hit(lpTab, { x: e.offsetLeft, y: e.offsetTop, w: e.offsetWidth, h: e.offsetHeight });
+        U.cls(e, 'lp-off', on);
+      });
+    }
+    /* D: Bild-URL fuer eine Stelle (Einzelbild-Endpunkt oder BIF-Rueckfall wie die Zeiger-Vorschau); '' = keins */
+    function lpImg(ms) {
+      if (!thumbOn || !pb || !pb.meta) return '';
+      if (bif) return N.thumbs.dataUri(bifRaw, bif, N.thumbs.frameAt(bif, ms)) || '';
+      var cn = conn();
+      return cn.base ? N.thumbs.url(cn.base, pb.meta.partId, ms, cn.token) : '';
+    }
+    function lpMove(p) { hovMs = p.ms; lpPend = p; if (!lpRaf) { lpRaf = true; U.raf(lpFrame); } }
+    function lpFrame() {
+      lpRaf = false;
+      var p = lpPend;
+      if (!p || !lp.isOpen()) return;
+      lpv.point(p);
+      if (lpS === 'film') return;                               // D: das Bild unter dem Zeiger ist die Vorschau
+      if (thumbOn) { showThumb(p.ms, p.x - BAR_X); return; }
+      if (lpS === 'stretch') {                                  // B ohne Bilder: Zeit-Blase am Zeiger wie die grobe Vorschau
+        thumb.style.left = U.clamp(p.x - 48, BAR_X, BAR_X + BAR_W - 96) + 'px';
+        U.setText(thT, hms(p.ms));
+      }
+    }
+    function lpEnd() {
+      if (!lpv) return;
+      if (lp.isOpen()) lp.close();
+      lpPend = null;
+      if (!lpv.on) return;
+      lpv.hide(); U.cls(bot, 'lp', false); U.cls(bot, 'lp-' + lpS, false);
+      if (lpTab) { lpTab = null; U.cls(sub, 'lp-' + lpS, false); U.cls(skip, 'lp-off', false); U.cls(up, 'lp-off', false); U.cls(last, 'lp-off', false); }
+      U.cls(thumb, 'lp-panel', false);
+      if (zone === 'btn' && osd) setLabel(); else U.show(lbl, false);
+    }
     function seekTo(ms, now) { if (!pb || !dur()) return; acc.set(ms, pb.t, dur(), now !== false); }
     function cancelSeek() { acc.cancel(); U.setText(skl, ''); U.show(thumb, false); if (pb) paint(pb.t); paused(); }
 
@@ -507,8 +696,11 @@
     function makeQueue(m) {
       var mid = isrv() || N.session.state.server && N.session.state.server.machineId;   // Weitere Server: Queue auf DEM Server
       if (!mid) return;
-      qTask = N.plex.pms('POST', '/playQueues', { type: 'video', continuous: 1, includeChapters: 0,
-        uri: 'server://' + mid + '/com.plexapp.plugins.library/library/metadata/' + m.rk }, N.srv.o(isrv(), { retries: 0, dedupe: false }), function (err, d) {
+      // Serie als Quelle + key = diese Folge: die Queue enthaelt auch die Folgen DAVOR (nur mit der Folge als uri beginnt sie bei ihr;
+      // am PMS 1.43 geprueft 28.10.: offset 1 statt 0). Ohne Serien-Schluessel wie bisher.
+      var lib = 'server://' + mid + '/com.plexapp.plugins.library/library/metadata/';
+      qTask = N.plex.pms('POST', '/playQueues', m.showRk ? { type: 'video', continuous: 1, includeChapters: 0, key: '/library/metadata/' + m.rk, uri: lib + m.showRk }
+        : { type: 'video', continuous: 1, includeChapters: 0, uri: lib + m.rk }, N.srv.o(isrv(), { retries: 0, dedupe: false }), function (err, d) {
         qTask = null;
         var mc = !err && d && d.MediaContainer;
         if (!mc || !mc.Metadata) { N.log('playQueue ' + (err ? err.status || err.type : 'leer')); return; }
@@ -533,7 +725,7 @@
         var nx = queue.items[queue.idx + 1];
         U.setText(upTi, N.t('pl.epTitle', { s: nx.s, e: nx.e, t: nx.epTitle }));
         upImg.src = nx.still ? N.img.url(nx.still, 'upnext') : N.img.BLANK;
-        U.show(up, true);
+        U.show(up, true); lpCover();
         upBar.style.webkitTransition = 'none'; upBar.style.webkitTransform = 'scaleX(1)';
         var n = left;
         setTimeout(function () { upBar.style.webkitTransition = '-webkit-transform ' + n + 's linear'; upBar.style.webkitTransform = 'scaleX(0)'; }, 30);
@@ -544,13 +736,23 @@
     function hideUp() { if (!cdOn && up.style.display === 'none') return; cdOn = false; U.show(up, false); upBar.style.webkitTransition = 'none'; }
     function setUpF(i) { U.cls(upBtns[upF], 'is-focus', false); upF = i; U.cls(upBtns[i], 'is-focus', true); }
     function upAct(i) { if (i === 0) playNext(); else { mk.cancelCountdown(); hideUp(); } }
-    function playNext() {
+    /* skip: von Hand mitten in der Folge (⏭/CH▼) -> nicht als gesehen markieren (wie Plex), nur die Stelle bleibt gemerkt */
+    function playNext(skip) {
       if (!hasNext() || !pb) { if (pb && pb.state === 'ended') close(); return; }
       var nx = queue.items[queue.idx + 1];
-      hideUp(); hideSkip();
-      pb.stop('next');
+      hideUp(); hideSkip(); hideLast();
+      pb.stop(skip === true ? 'skip' : 'next');
       queue.idx++;
       play(nx, 0, nx);
+    }
+    /* ⏮ bei Folgen/Warteschlange: vorige Folge von vorn (wie Plex: ohne Rueckfrage; die Stelle der laufenden Folge ist gemerkt) */
+    function playPrev() {
+      if (!queue || queue.idx < 1 || !pb) return;
+      var pv = queue.items[queue.idx - 1];
+      hideUp(); hideSkip(); hideLast();
+      pb.stop('prev');
+      queue.idx--;
+      play(pv, 0, pv);
     }
     function onEnded() {
       hideSkip(); hideUp();
@@ -574,11 +776,13 @@
     /* Karte "Das war die letzte Folge": Zur Serie (bis es Details gibt: zurueck zur Startseite) · Abspann ansehen */
     function showLast() {
       if (lastOn) return;
-      lastOn = true; U.show(lastBtns[1], true); setLastF(0); U.show(last, true);
+      lastOn = true; U.show(lastBtns[1], true); setLastF(0); U.show(last, true); lpCover();
+      if (xt && xt.last) xt.last();
     }
     function hideLast() { if (!lastOn) return; lastOn = false; U.show(last, false); }
     function setLastF(i) { U.cls(lastBtns[lastF], 'is-focus', false); lastF = i; U.cls(lastBtns[i], 'is-focus', true); }
     function lastAct(i) {
+      if (i === 0 && xt && xt.lastAct && xt.lastAct()) return;
       if (i === 0 || (pb && pb.state === 'ended')) { close(); return; }
       if (mk) mk.cancelCountdown();
       hideLast();
@@ -858,6 +1062,8 @@
 
     /* ---------- Tasten ---------- */
     s.onKey = function (k) {
+      if (lp.isOpen()) { lp.cancel(); lpEnd(); if (k === 'RETURN') { showOsd(); return true; } }   // jede Taste schliesst, RETURN nur die Feinauswahl
+      else lp.cancel();
       if (lost) {
         if (k === 'LEFT' || k === 'RIGHT') setLostF(k === 'LEFT' ? 0 : 1);
         else if (k === 'ENTER') lostAct(lostF);
@@ -881,13 +1087,15 @@
         if (k === 'ENTER') { lastAct(lastF); return true; }
         if (k === 'RETURN') { lastAct(two ? 1 : 0); return true; }
       }
-      var C = cfg(), ar = (Number(C.seekArrows) || 10) * 1000, ff = (Number(C.seekFf) || 30) * 1000, was = osd;
+      var A = arrows(), FR = ffrw(), was = osd;
       switch (k) {
         case 'PLAY': if (pb) pb.play(); showOsd(); return true;
         case 'PAUSE': if (pb) pb.pause(); showOsd(); return true;
         case 'STOP': close(); return true;
-        case 'RW': seekBy(-ff, false); return true;
-        case 'FF': seekBy(ff, false); return true;
+        case 'RW': seekBy(-FR.b * 1000, false); return true;
+        case 'FF': seekBy(FR.f * 1000, false); return true;
+        case 'CH_UP': if (pn) { showOsd(); stepItem(-1); } return true;   // wie Jetzt laeuft: CH▲ = vorige, CH▼ = naechste
+        case 'CH_DOWN': if (pn) { showOsd(); stepItem(1); } return true;
         case 'GREEN': showOsd(); tracks('a'); return true;
         case 'SUBTITLE': showOsd(); tracks('s'); return true;
         case 'YELLOW': showOsd(); chapters(); return true;
@@ -905,7 +1113,7 @@
       }
       if (!was) {                                          // OSD verborgen (SPEC 7.10 Tastenkarte)
         if (k === 'ENTER') { if (btnKind) doSkip(); else { showOsd(); setZone('btn', false, 'pp'); } return true; }
-        if (k === 'LEFT' || k === 'RIGHT') { showOsd(); setZone('bar'); quick = true; seekBy(k === 'LEFT' ? -ar : ar, true); return true; }
+        if (k === 'LEFT' || k === 'RIGHT') { showOsd(); setZone('bar'); quick = true; seekBy(k === 'LEFT' ? -A.b * 1000 : A.f * 1000, true); return true; }
         if (k === 'UP') { showOsd(); setZone('btn', false, 'pp'); return true; }
         if (k === 'DOWN') { showOsd(); setZone('bar'); return true; }
         if (k === 'RETURN') { close(); return true; }
@@ -918,7 +1126,7 @@
           hideOsd(); return true;
         case 'LEFT': case 'RIGHT':
           if (zone === 'btn') { var n = O.nav(ids, fb, k); if (n !== fb) setZone('btn', false, n); }
-          else if (zone === 'bar') seekBy(k === 'LEFT' ? -ar : ar, true);
+          else if (zone === 'bar') seekBy(k === 'LEFT' ? -A.b * 1000 : A.f * 1000, true);
           return true;
         case 'UP':
           if (zone === 'btn') setZone('bar'); else if (zone === 'bar' && btnKind) setZone('skip');
@@ -940,6 +1148,18 @@
         return true;
       }
       if (errOn) return sb.pointer(x, y, kind);
+      if (lp.isOpen()) {                                      // Feinauswahl hat Vorrang (ihr Band deckt die Knopfreihe mit ab)
+        if (kind === 'click') {                               // Klick: setzt das Ziel oder schliesst nur – loest nie einen Knopf aus
+          var lms = lp.click(x, y, lpBand);
+          lpEnd(); hoverOff();
+          if (lms >= 0) clickSeek(lms); else showOsd();
+          return true;
+        } else {
+          var r = lp.move(x, y, lpBand);
+          if (r && !r.exit) { showOsd(); if (!r.same) lpMove(r); return true; }
+          lpEnd();                                            // verlassen: unten wie gewohnt weiter (grobe Vorschau, Knoepfe)
+        }
+      }
       var cy = osd ? 382 : 588;                              // Countdown-/Letzte-Folge-Karte: bei sichtbarem OSD ueber der Bedien-Insel
       if (cdOn && x >= 816 && y >= cy && y < cy + 48) {
         var i = x < 1016 ? 0 : 1;
@@ -958,11 +1178,15 @@
       showOsd();
       if (btnKind && x >= 856 && x < 1216 && y >= SKIP_Y && y < SKIP_Y + 48) { if (zone !== 'skip') setZone('skip'); if (kind === 'click') doSkip(); return true; }
       if (!was && kind === 'click') return true;           // erster Klick blendet nur ein
+      // Balken: 32 px hohe Trefferzone (Kopf 24 px + Rand), endet ueber den Zeiten (y 500); Bewegung = Vorschau, Klick = Sprung
+      var onBar = x >= BAR_X - 8 && x < BAR_X + BAR_W + 8 && y >= BAR_Y - 16 && y < BAR_Y + 16 && dur() > 0;
+      if (!onBar) { hoverOff(); lp.leave(); }
       var b = O.hit(ids, x, y);
       if (b) { if (zone !== 'btn' || b !== fb) setZone('btn', false, b); if (kind === 'click') activate(b); return true; }
-      if (x >= BAR_X - 8 && x < BAR_X + BAR_W + 8 && y >= BAR_Y - 16 && y < BAR_Y + 16 && dur()) {
+      if (onBar) {
         if (zone !== 'bar') setZone('bar');
-        if (kind === 'click') seekTo(dur() * U.clamp((x - BAR_X) / BAR_W, 0, 1), true);
+        if (kind === 'click') { lp.cancel(x, y); hoverOff(); clickSeek(dur() * U.clamp((x - BAR_X) / BAR_W, 0, 1)); }
+        else { hover(x); if (eff('ptrLoupe') === true) lp.track(x, y); }   // ruhig halten -> Feinauswahl (Einstellung)
         return true;
       }
       if (mhRects && mh.style.display !== 'none' && y >= MH_Y && y < MH_Y + MH_H) {

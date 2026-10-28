@@ -7,7 +7,7 @@ import secrets
 import socketserver
 import threading
 
-from . import brand
+from . import brand, ext
 from .package import PackageError
 from .plextv import PlexError
 from .wizard import StepError
@@ -36,6 +36,12 @@ class UIServer(http.server.ThreadingHTTPServer):
 
 
 def actions(w):
+    a = ext.actions(w)                      # optional extensions of the edition (ext.py); never replace a built-in action
+    a.update(_actions(w))
+    return a
+
+
+def _actions(w):
     return {
         'state': lambda a: None,
         'login_start': lambda a: w.login_start(a.get('kind')),
@@ -56,6 +62,10 @@ def actions(w):
         'helper': lambda a: w.set_helper(_bool(a.get('on', False)), _bool(a.get('remember', True)), _str(a.get('address', ''))),
         'helper_start': lambda a: w.helper_start(),
         'helper_stop': lambda a: w.helper_stop(),
+        'helper_install': lambda a: w.helper_install(_bool(a.get('tray', True)), _opt_str(a.get('lang'))),
+        'helper_uninstall': lambda a: w.helper_uninstall(_bool(a.get('keep', False))),
+        'helper_tray': lambda a: w.helper_tray(_bool(a.get('on', True))),
+        'helper_bg': lambda a: w.helper_bg(_bool(a.get('run', True))),
         'finish': lambda a: w.finish(),
         'logout': lambda a: w.reset(),
         'prefs': lambda a: w.set_prefs(_opt_str(a.get('lang')), None if a.get('remember') is None else _bool(a.get('remember'))),
@@ -106,6 +116,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not self._host_ok(): return self._send(403, b'forbidden', 'text/plain')
         if self.path.split('?')[0] != '/': return self._send(404, b'not found', 'text/plain')
         html = pkgutil.get_data('neosetup', 'ui.html').decode('utf-8')
+        html = html.replace('/*__EXT__*/', ext.ui().replace('</script', '<\\/script'))
         html = html.replace('__CSRF__', self.server.csrf).replace('__NONCE__', self.server.nonce).replace('__APP__', brand.name()).replace('__PKG__', brand.package_name())
         html = html.replace('__ACCENT__', brand.CURRENT['accent'].lower()).replace('__SOFT_LIGHT__', brand.CURRENT['softLight']).replace('__SOFT_DARK__', brand.CURRENT['softDark'])
         self._send(200, html.encode('utf-8'), 'text/html; charset=utf-8')

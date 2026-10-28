@@ -21,7 +21,7 @@ test('Gate erkennt Fehler (fehlender Schluessel, Platzhalter, Laenge, Zeichen)',
 
 test('jeder im Code benutzte Schluessel existiert in beiden Sprachen', function () {
   var used = {}, files = [];
-  (function scan(d) { fs.readdirSync(d).forEach(function (f) { var p = path.join(d, f); if (fs.statSync(p).isDirectory()) scan(p); else if (/\.js$/.test(f) && !/strings\./.test(f)) files.push(p); }); })(SRC);
+  (function scan(d) { fs.readdirSync(d).forEach(function (f) { var p = path.join(d, f); if (fs.statSync(p).isDirectory()) { if (f !== 'private') scan(p); } else if (/\.js$/.test(f) && !/strings\./.test(f)) files.push(p); }); })(SRC);
   files.forEach(function (p) {
     var s = fs.readFileSync(p, 'utf8'), m, re = /N\.tn?\('([a-zA-Z0-9_.]+)'(?!\s*\+)|\b(?:t|label|desc|ddesc|tk): '([a-z]+\.[a-zA-Z0-9_.]+)'/g;
     while ((m = re.exec(s))) used[m[1] || m[2]] = p;

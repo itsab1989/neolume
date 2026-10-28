@@ -8,7 +8,8 @@
  *   hints() -> [...], rail -> 'home'|'settings'|null, railClosed(), relabel()   (alles ausser create/onKey optional) */
 (function (N) {
   var U = N.util, KEEP = 2, THROTTLE = 120, FAST = 200;
-  var factories = {}, stack = [], overlays = [], layer = null, overLayer = null, lastNav = 0, nowFn = U.now;
+  var factories = {}, stack = [], overlays = [], layer = null, overLayer = null, lastNav = 0, nowFn = U.now, hintCtx = null;
+  var WAKE_KEYS = { RED: 1, GREEN: 1, YELLOW: 1, BLUE: 1, INFO: 1, TOOLS: 1 };
 
   function mkEl() { var e = document.createElement('div'); e.className = 'scr'; return e; }
   function build(entry) {
@@ -113,7 +114,8 @@
     topOverlay: function () { return overlays.length ? overlays[overlays.length - 1] : null; },
     refreshHints: function () {
       if (!N.ui.hints || !N.ui.hints.el) return;
-      var o = overlays.length ? overlays[overlays.length - 1] : null;
+      var o = overlays.length ? overlays[overlays.length - 1] : null, cx = o || top();
+      if (cx !== hintCtx) { hintCtx = cx; N.ui.hints.wake(); }   // neuer Bildschirm/neues Overlay: "Nur kurz" blendet ein (Rail zaehlt nicht)
       if (o) { N.ui.hints.set(o.hints ? o.hints() : [{ k: 'ret', t: 'hint.cancel' }]); return; }
       if (N.ui.rail && N.ui.rail.isOpen()) { N.ui.hints.set([{ k: 'ret', t: 'hint.back' }]); return; }
       var t = top();
@@ -131,6 +133,7 @@
       }
       if (N.idle) N.idle.touch();
       if (N.pointer && N.pointer.keyUsed) N.pointer.keyUsed();
+      if (WAKE_KEYS[k] && N.ui.hints && N.ui.hints.el) N.ui.hints.wake();   // Tastenhinweise "Nur kurz": nach Farbtaste/INFO/TOOLS zeigen
       N.fx.step(fast);
       R.dispatch(k, fast);
       return true;

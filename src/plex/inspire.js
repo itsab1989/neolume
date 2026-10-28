@@ -5,10 +5,15 @@
  * Stufe 2 (vorbereitet, nur mit Helfer + "discover":true): "Gerade beliebt / Neu erschienen / Bald verfuegbar" je Filme/Serien aus
  * plex.tv Discover ueber den Helfer, danach EIN GUID-Abgleich /library/all?guid= -> Kennzeichnung "Auf/Nicht auf deinem Server".
  * Auswahl/Reihenfolge je Profil in settings.inspRows (gleiche Logik wie homeRows: N.homeRows.merge/view/store/enabled).
- * Reihen laden unabhaengig (jede Reihe meldet sich, sobald ihre Quellen da sind), Ergebnis 5 min im Speicher (je Profil/Tag/Sprache). */
+ * Reihen laden unabhaengig (jede Reihe meldet sich, sobald ihre Quellen da sind), Ergebnis 5 min im Speicher (je Profil/Tag/Sprache).
+ * "Nur Titel, die du noch nicht hast" (Nutzerwunsch 27.10., settings.inspHideOwn, Standard AN; inspHideShared: auch Weitere Server,
+ * Standard AN): die plex.tv-Reihen zeigen dann nur Titel, die der GUID-Abgleich NICHT gefunden hat – reine Inspiration; eigene
+ * Titel stehen ohnehin in den Server-Reihen. Zum Auffuellen holt der Helfer dann FETCH statt MAX Titel (seine Grenze, EIN Abgleich
+ * prueft hoechstens N.disc.MAX_EXT); bleibt nichts uebrig, zeigt die Reihe einen Hinweis statt Karten (kind 'note'). */
 (function (N) {
   var U = N.util, M = N.model, HR = N.homeRows;
   var TTL = 300000, MAX = 20, GENRE_MIN = 4, GENRE_TRIES = 3, HUB_COUNT = 20;
+  var FETCH = 30, SHARED_WAIT = 6000;               // FETCH: Helfer erlaubt size <= 30; SHARED_WAIT: Weitere Server nicht laenger abwarten
   var ROWS = [
     { id: 'top', tk: 'insp.row.top', fams: ['movie.topunwatched'], types: ['movie'] },
     { id: 'trend-movie', tk: 'insp.row.trend.movie', list: 'trending', type: 'movie' },
@@ -30,10 +35,23 @@
   var genreMem = { key: '', pools: null };          // Genre-Listen je Tag/Profil (aendern sich kaum)
 
   var I = {
-    TTL: TTL, ROWS: ROWS,
+    TTL: TTL, ROWS: ROWS, MAX: MAX, FETCH: FETCH, SHARED_WAIT: SHARED_WAIT,
     def: function (id) { return BY[id] || null; },
     /* Stufe 2 sichtbar? Nur mit Helfer, der "discover":true meldet (N.disc.probeHelper), nie ohne Helfer-Adresse */
     helperOn: function () { return !!(N.disc && N.disc.discoverOn && N.disc.discoverOn()); },
+    /* "Nur Titel, die du noch nicht hast": '' = aus (alle zeigen, mit Marke), 'own' = eigener Server, 'all' = auch Weitere Server
+     * (nur wenn das Profil welche hat). Fehlende Einstellung = an (Nutzerwunsch: Entdecken soll reine Inspiration sein). */
+    hide: function () {
+      var s = N.session && N.session.settings || {};
+      if (s.inspHideOwn === false) return '';
+      return s.inspHideShared !== false && N.srv && N.srv.has() ? 'all' : 'own';
+    },
+    /* Weitere Server, die gerade verbunden sind (Adresse geprueft): nur diese werden gefragt, nie eine Adresspruefung abgewartet */
+    sharedSrv: function () {
+      var out = [], l = N.srv ? N.srv.list() : [];
+      for (var i = 0; i < l.length; i++) if (l[i].base && l[i].state === 'ok') out.push(l[i].id);
+      return out;
+    },
     /* ---------- Auswahl (settings.inspRows) ---------- */
     /* verfuegbare Reihen in Standard-Reihenfolge (alle Standard an). libs: Film-/Serien-Bibliotheken des Profils;
      * cat: Hub-Katalog ("Startseite anpassen", optional) -> Hub-Reihen nur, wenn der Server eine passende Familie liefert */
@@ -145,10 +163,31 @@
       }
       return out;
     },
-    /* Helfer-Antwort {items:[{guid,title,year,summary,thumb}]} -> fremde Eintraege des Typs (nur gueltige Plex-GUID) */
-    parseHelper: function (d, type) {
+    /* nur Titel, die weder auf dem eigenen Server (Marke aus markServer) noch auf einem Weiteren Server (other: {guid: 1}) liegen */
+    onlyNew: function (items, other) {
+      var out = [];
+      for (var i = 0; i < items.length; i++) if (items[i].ext && !(other && other[items[i].guid])) out.push(items[i]);
+      return out;
+    },
+    /* plex.tv-Reihe bauen: hide null = alle Titel mit Marke (bisher); sonst nur neue (hide = GUIDs der Weiteren Server, {} = keine).
+     * Leer, obwohl plex.tv Titel geliefert hat (alles schon vorhanden) -> Hinweis-Reihe statt einer leeren bzw. fehlenden Reihe
+     * (srv: Weitere Server wurden mitgeprueft -> Hinweis nennt sie). */
+    helperRow: function (id, exts, local, hide, srv) {
+      var r = BY[id], items = I.markServer(exts, local);
+      if (hide) items = I.onlyNew(items, hide);
+      if (items.length) return { id: id, kind: 'posterQ', tk: r.tk, tp: null, items: items.slice(0, MAX) };
+      return hide && exts.length ? { id: id, kind: 'note', tk: r.tk, tp: null, items: [], note: srv ? 'insp.note.allOwnedSrv' : 'insp.note.allOwned' } : null;
+    },
+    /* /library/all?guid= eines Weiteren Servers -> {guid: 1} */
+    guidSet: function (json) {
+      var l = json && json.MediaContainer && json.MediaContainer.Metadata || [], out = {};
+      for (var i = 0; i < l.length; i++) if (l[i] && l[i].guid) out[String(l[i].guid)] = 1;
+      return out;
+    },
+    /* Helfer-Antwort {items:[{guid,title,year,summary,thumb}]} -> fremde Eintraege des Typs (nur gueltige Plex-GUID), max. max (Standard MAX) */
+    parseHelper: function (d, type, max) {
       var l = d && d.items || [], out = [], seen = {};
-      for (var i = 0; i < l.length && out.length < MAX; i++) {
+      for (var i = 0; i < l.length && out.length < (max || MAX); i++) {
         var x = l[i];
         if (!x || !N.disc.guidOk(x.guid) || x.guid.indexOf('plex://' + type + '/') !== 0 || seen[x.guid] || !x.title) continue;
         seen[x.guid] = 1;
@@ -160,7 +199,7 @@
     key: function (libs) {
       var S = N.session, ids = [];
       for (var i = 0; libs && i < libs.length; i++) ids.push(libs[i].id);
-      return (S && S.profile ? S.profile.uuid : 'x') + '|' + I.day(U.now()) + '|' + N.i18n.lang() + '|' + ids.join(',');
+      return (S && S.profile ? S.profile.uuid : 'x') + '|' + I.day(U.now()) + '|' + N.i18n.lang() + '|' + ids.join(',') + '|' + I.hide();   // Filter umgeschaltet -> neu laden
     },
     /* gemerkte Reihen fuer libs: {id: {row, fresh}} (fresh = juenger als TTL) */
     cached: function (libs) {
@@ -269,18 +308,37 @@
           });
         });
       }
-      /* Stufe 2: Liste vom Helfer, danach EIN GUID-Abgleich; schlaegt der fehl, faellt die Reihe weg (strikte Trennung) */
+      /* Stufe 2: Liste vom Helfer, danach EIN GUID-Abgleich; schlaegt der fehl, faellt die Reihe weg (strikte Trennung).
+       * Filter an: FETCH Titel holen (Auffuellen), mit 'all' parallel derselbe Abgleich an jedem verbundenen Weiteren Server –
+       * dort hoechstens SHARED_WAIT abwarten; fehlt eine Antwort, bleiben dessen Titel stehen und die Reihe wird nicht gemerkt. */
       function loadHelper(id) {
-        var r = BY[id];
-        tasks.push(N.disc.helperGet('/discover/' + r.list + '?type=' + r.type + '&size=' + MAX, function (e, d) {
+        var r = BY[id], mode = I.hide(), n = mode ? FETCH : MAX;
+        tasks.push(N.disc.helperGet('/discover/' + r.list + '?type=' + r.type + '&size=' + n, function (e, d) {
           if (dead || (e && e.type === 'aborted')) return;
           if (e) { emit(id, null, e); return; }
-          var exts = I.parseHelper(d, r.type), gp = N.disc.guidParam(exts);
+          var exts = I.parseHelper(d, r.type, n), gp = N.disc.guidParam(exts);
           if (!gp) { emit(id, null); return; }
+          var srvs = mode === 'all' ? I.sharedSrv() : [], sLeft = srvs.length, other = {}, part = false, own = null, ownErr = null, fin = false, timer = 0;
+          function done() {
+            if (fin || dead || (!ownErr && (own === null || sLeft > 0))) return;   // eigener Abgleich fehlgeschlagen: sofort Ende
+            fin = true;
+            if (timer) clearTimeout(timer);
+            if (ownErr) { emit(id, null, ownErr); return; }
+            var row = I.helperRow(id, exts, own, mode ? other : null, mode === 'all');
+            emit(id, row, part && row ? { type: 'partial' } : null);
+          }
           get('/library/all', { guid: gp, excludeElements: N.hubs.EXCL }, { timeout: 10000 }, function (e2, d2) {
-            if (e2) { emit(id, null, e2); return; }
-            var items = I.markServer(exts, N.disc.localList(d2, kinds));
-            emit(id, items.length ? { id: id, kind: 'posterQ', tk: r.tk, tp: null, items: items } : null);
+            if (e2) ownErr = e2; else own = N.disc.localList(d2, kinds);
+            done();
+          });
+          if (!sLeft) return;
+          timer = setTimeout(function () { timer = 0; if (sLeft > 0) { part = true; sLeft = 0; done(); } }, I.SHARED_WAIT);
+          U.each(srvs, function (sid) {
+            get('/library/all', { guid: gp, excludeElements: N.hubs.EXCL }, N.srv.o(sid, { timeout: 10000, retries: 0 }), function (e3, d3) {
+              if (fin || sLeft <= 0) return;
+              if (e3) part = true; else U.extend(other, I.guidSet(d3));
+              sLeft--; done();
+            });
           });
         }));
       }

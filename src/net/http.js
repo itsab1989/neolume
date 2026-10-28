@@ -1,6 +1,7 @@
 /* N.http – XHR mit eigenem Timeout (setTimeout + abort), JSON, Retries fuer GET (Netzfehler/Timeout/5xx: nach 500 und 1500 ms),
  * Dedupe gleicher laufender GETs (URL + Token), max. 3 parallel, 401 -> Ereignis auth:expired (SPEC 14.8).
  * Liefert nebenbei Proben fuer die Uhr-Korrektur (Date-Kopf -> N.clock.sample).
+ * o.cred: XHR mit withCredentials (Cookie eines fremden Hosts, z. B. Anmeldung bei einem Dienst im Heimnetz).
  * cb(err, data, meta) ; err = {type:'timeout'|'network'|'http'|'parse', status} ; Rueckgabe task {abort()} */
 (function (N) {
   var U = N.util, active = 0, MAX = 3, queue = [], inflight = {};
@@ -46,6 +47,7 @@
     };
     try {
       x.open(o.method || 'GET', o.url, true);
+      if (o.cred) { try { x.withCredentials = true; } catch (ec) {} }   // Sitzungs-Cookie eines anderen Hosts behalten/mitschicken
       var h = o.headers || {};
       for (var k in h) if (Object.prototype.hasOwnProperty.call(h, k)) x.setRequestHeader(k, h[k]);
       sent = U.now();
@@ -105,6 +107,8 @@
     },
     /* Tests: XHR-Fabrik und Timer austauschen */
     _setFactory: function (f) { factory = f; },
+    /* eigene XHR-Laeufe (z. B. Suche im Heimnetz mit eigener Parallelitaet) nutzen dieselbe Fabrik wie Tests/Vorschau */
+    factory: function () { return factory(); },
     _setTimers: function (t) { timers = t; },
     _reset: function () { active = 0; queue = []; inflight = {}; },
     _stats: function () { return { active: active, queued: queue.length }; }

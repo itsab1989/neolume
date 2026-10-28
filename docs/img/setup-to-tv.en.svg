@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="706" viewBox="0 0 800 706" role="img" aria-labelledby="t d">
+<title id="t">Setup program: To the TV</title>
+<desc id="d">Sketch of the “To the TV” page: six steps, at step 4 the computer’s address in large digits (example 192.168.1.20). Below, the log: “TV … fetched widgetlist.xml” and “TV … fetched Neolume.zip”. Buttons “Back”, “Stop sync server” and “The app is on the TV”.</desc>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff7a1a"/></marker><linearGradient id="scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2747"/><stop offset="1" stop-color="#0c1127"/></linearGradient><linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3c8fe8"/><stop offset="1" stop-color="#1f62c8"/></linearGradient><linearGradient id="neo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16181b"/><stop offset="1" stop-color="#0e0f11"/></linearGradient></defs>
+<rect x="8" y="8" width="784" height="544" rx="12" fill="#f6f5f2" stroke="#b9bec6" stroke-width="2"/>
+<rect x="8" y="8" width="784" height="40" rx="12" fill="#e8eaed"/>
+<rect x="8" y="36" width="784" height="12" rx="0" fill="#e8eaed"/>
+<circle cx="32" cy="28" r="6" fill="#ff5f57"/>
+<circle cx="52" cy="28" r="6" fill="#febc2e"/>
+<circle cx="72" cy="28" r="6" fill="#28c840"/>
+<rect x="110" y="16" width="300" height="24" rx="12" fill="#ffffff" stroke="#d0d4da" stroke-width="1"/>
+<text x="126" y="33" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" font-weight="normal" fill="#4b5563" text-anchor="start">127.0.0.1:32480</text>
+<text x="40" y="84" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="20" font-weight="bold" fill="#1d1d1f" text-anchor="start">Neolume Setup</text>
+<rect x="40" y="104" width="71.36" height="22" rx="11" fill="none" stroke="#2f8a4a" stroke-width="1"/>
+<text x="50" y="119" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#2f8a4a" text-anchor="start">1. Sign in</text>
+<rect x="117.36" y="104" width="69.92" height="22" rx="11" fill="none" stroke="#2f8a4a" stroke-width="1"/>
+<text x="127.36" y="119" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#2f8a4a" text-anchor="start">2. Server</text>
+<rect x="193.28" y="104" width="76.64" height="22" rx="11" fill="none" stroke="#2f8a4a" stroke-width="1"/>
+<text x="203.28" y="119" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#2f8a4a" text-anchor="start">3. Profiles</text>
+<rect x="275.92" y="104" width="82.4" height="22" rx="11" fill="none" stroke="#2f8a4a" stroke-width="1"/>
+<text x="285.92" y="119" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#2f8a4a" text-anchor="start">4. Summary</text>
+<rect x="364.32" y="104" width="89.12" height="22" rx="11" fill="#2EC4B6"/>
+<text x="374.32" y="119" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#1d1d1f" text-anchor="start">5. To the TV</text>
+<rect x="459.44" y="104" width="61.28" height="22" rx="11" fill="none" stroke="#6b6b70" stroke-width="1"/>
+<text x="469.44" y="119" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#6b6b70" text-anchor="start">6. Done</text>
+<rect x="40" y="140" width="720" height="400" rx="12" fill="#ffffff" stroke="#e3e1dc" stroke-width="1"/>
+<text x="60" y="174" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="19" font-weight="bold" fill="#1d1d1f" text-anchor="start">Install the app on the TV</text>
+<text x="60" y="200" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#1d1d1f" text-anchor="start">Keep this window open and do this on the TV (Samsung 2014, H series):</text>
+<text x="64" y="226" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#6b6b70" text-anchor="start">1.</text>
+<rect x="84" y="217" width="380" height="8" rx="4" fill="#6b6b70" fill-opacity="0.3"/>
+<text x="64" y="246" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#6b6b70" text-anchor="start">2.</text>
+<rect x="84" y="237" width="220" height="8" rx="4" fill="#6b6b70" fill-opacity="0.3"/>
+<text x="64" y="266" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#6b6b70" text-anchor="start">3.</text>
+<rect x="84" y="257" width="330" height="8" rx="4" fill="#6b6b70" fill-opacity="0.3"/>
+<text x="64" y="286" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#6b6b70" text-anchor="start">4.</text>
+<text x="84" y="286" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#1d1d1f" text-anchor="start">IP Setting → enter this address:</text>
+<text x="84" y="324" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="30" font-weight="bold" fill="#1d1d1f" text-anchor="start">192.168.1.20</text>
+<rect x="76" y="294" width="290" height="42" rx="8" fill="none" stroke="#ff7a1a" stroke-width="2.5"/>
+<circle cx="76" cy="294" r="13" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="76" y="298.94" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.95" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<text x="64" y="360" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#6b6b70" text-anchor="start">5.</text>
+<rect x="84" y="351" width="400" height="8" rx="4" fill="#6b6b70" fill-opacity="0.3"/>
+<text x="64" y="380" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#6b6b70" text-anchor="start">6.</text>
+<rect x="84" y="371" width="300" height="8" rx="4" fill="#6b6b70" fill-opacity="0.3"/>
+<text x="60" y="408" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#1d1d1f" text-anchor="start">Ready – the TV can fetch the app now.</text>
+<rect x="60" y="418" width="680" height="58" rx="8" fill="#f6f5f2"/>
+<text x="72" y="440" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" font-weight="normal" fill="#2f8a4a" text-anchor="start">20:15:02  TV 192.168.1.30 fetched widgetlist.xml</text>
+<text x="72" y="462" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" font-weight="normal" fill="#2f8a4a" text-anchor="start">20:15:09  TV 192.168.1.30 fetched Neolume.zip</text>
+<circle cx="60" cy="418" r="13" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="60" y="422.94" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.95" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<rect x="60" y="490" width="64.48" height="34" rx="8" fill="#ffffff" stroke="#e3e1dc" stroke-width="1"/>
+<text x="92.24" y="512" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#1d1d1f" text-anchor="middle">Back</text>
+<rect x="132.48" y="490" width="140.36" height="34" rx="8" fill="#ffffff" stroke="#e3e1dc" stroke-width="1"/>
+<text x="202.66" y="512" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#1d1d1f" text-anchor="middle">Stop sync server</text>
+<rect x="280.84" y="490" width="173.574" height="34" rx="8" fill="#2EC4B6"/>
+<text x="367.627" y="512" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#1d1d1f" text-anchor="middle">The app is on the TV</text>
+<circle cx="280.84" cy="490" r="13" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="280.84" y="494.94" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.95" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+<rect x="8" y="564" width="784" height="136" rx="10" fill="#f3f4f6" stroke="#d0d4da" stroke-width="1.5"/>
+<circle cx="32" cy="587" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="591.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<text x="52" y="593" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">Enter this address on the TV under “IP Setting”</text>
+<circle cx="32" cy="617" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="621.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<text x="52" y="623" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">After “Start User App Sync” these two lines appear = success</text>
+<circle cx="32" cy="647" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="651.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+<text x="52" y="653" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">Then go on to “Done”</text>
+<text x="24" y="683" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#4b5563" text-anchor="start">Addresses and times are examples.</text>
+</svg>
