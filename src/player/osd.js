@@ -121,6 +121,8 @@
     },
     DELAYS: [-3000, -2000, -1000, -500, -250, 0, 250, 500, 1000, 2000, 3000],
     SLEEP: ['off', 'end', 15, 30, 60, 90],
+    /* Pause: Wartezeit bis kurz nach der naechsten Minutengrenze (Uhr + "Ende um" einmal je Minute neu, TV-Test 29.10.) */
+    minuteWait: function (d) { return 60000 - (d.getSeconds() * 1000 + d.getMilliseconds()) + 50; },
     sleepLeft: function (at, now) { return Math.max(1, Math.ceil((at - now) / 60000)); },
     /* eine Stufe geringer; direkt abgespielt -> 8 Mbit/s (Umwandlung) */
     lower: function (q, direct) {

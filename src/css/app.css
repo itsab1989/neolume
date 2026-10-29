@@ -41,6 +41,8 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .fr-poster { width: 192px; height: 280px; }
 .fr-land { width: 304px; height: 178px; }
 .fr-prof { width: 176px; height: 176px; border-radius: 88px; }
+/* Runde 7: ruhende Form (ui/ring.js, ein Element je Form) – unsichtbar, Ebene + Inhalt bleiben, folgt ohne Uebergang */
+.focus-ring.fr-off { opacity: 0; -webkit-transition: none; }
 
 .pg { position: absolute; left: 0; top: 0; width: @l.screen-w@; height: @l.screen-h@;
   -webkit-transform: translate3d(0,0,0); -webkit-transition: -webkit-transform @mo.base@ @mo.ease@; }
@@ -49,6 +51,13 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .row-head .cnt { font-size: 16px; font-weight: 400; color: @c.text-3@; padding-left: 10px; }
 /* HOME-11: "darunter geht es weiter" – derselbe › wie .d-tmore (Staffel-Reiter), um 90 Grad gedreht, hinter dem Kopf der naechsten Reihe */
 .row-head .more-dn { display: inline-block; width: 28px; height: 32px; margin-left: @sp.2@; vertical-align: top; text-align: center; font-size: 28px; line-height: 30px; font-weight: 600; color: @c.text-2@;
+  -webkit-transform: rotate(90deg); }
+/* HOME-11, fester Hinweis: hohe Posterreihe schiebt den Kopf der naechsten Reihe aus dem Bild -> derselbe gedrehte › mit ihrem
+ * Titel unten links auf Hoehe der Hinweisleiste (die steht rechtsbuendig), ueber dem Verlauf */
+.hmore { position: absolute; left: @l.content-x@; top: 656px; height: 28px; max-width: 400px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: @ty.small.size@; line-height: 28px; color: @c.text-2@; -webkit-transform: translate3d(0,0,0); }   /* Runde 6: dauerhafte Ebene, Wechsel per visibility (home.js markMore) */
+.hcue0 .hmore { -webkit-transform: none; }   /* Gegenprobe nur im Messlauf (hvar-cue0) */
+.hmore .more-dn { display: inline-block; width: 28px; height: 28px; margin-right: @sp.2@; vertical-align: top; text-align: center; font-size: 28px; line-height: 26px; font-weight: 600;
   -webkit-transform: rotate(90deg); }
 .rclip { position: absolute; left: 128px; top: 0; width: 1152px; height: 340px; overflow: hidden; -webkit-transform: translate3d(0,0,0); }   /* feste Ebene ohne Inhalt: Reihe verbergen = Deckkraft (Row.setVisible) */
 .strip { position: absolute; left: 16px; top: 52px; width: 10px; height: 10px;
@@ -161,6 +170,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
   z-index: @z.toast@; opacity: 0; visibility: hidden; -webkit-transform: translate3d(0,16px,0);
   -webkit-transition: -webkit-transform @mo.base@ @mo.ease@, opacity @mo.base@ @mo.ease@; }
 #pn-toast.low { top: 628px; }
+#pn-toast.high { left: @l.safe-x@; top: 124px; }   /* Player: unter der Titel-Insel (y 36–108), weg von Bedien-Insel und Untertiteln */
 #pn-toast.on { opacity: 1; visibility: visible; -webkit-transform: translate3d(0,0,0); }
 #pn-toast .ic { left: 14px; top: 12px; }
 #pn-over { z-index: @z.over@; visibility: hidden; }
@@ -370,7 +380,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .scs-tile { position: absolute; overflow: hidden; background-color: @c.black@; background-repeat: no-repeat; -webkit-background-size: @l.screen-w@ @l.screen-h@; background-size: @l.screen-w@ @l.screen-h@; -webkit-transform: translate3d(0,0,0); }
 .scs-tile i { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: @c.saver-dim@; }
 /* "Poster und Cover" (SAV-5): Plakat scharf auf dem vom PMS abgedunkelten, unscharfen Grund – ohne eigene Abdunklungs-Ebene */
-.scs-pst { position: absolute; }
+.scs-psh, .scs-pst { position: absolute; }
 .scs-in.pm .scs-dim, .scs-tiles.pm i { display: none; }
 .scs-ov { position: absolute; left: 0; top: 0; z-index: 5; -webkit-transform: translate3d(0,0,0); }
 .scs-scr { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
@@ -449,6 +459,12 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .pl-tm0 { position: absolute; left: 32px; top: 42px; width: 200px; font-size: 20px; line-height: 26px; color: @c.text-1@; }
 .pl-tm1 { position: absolute; right: 32px; top: 42px; width: 200px; text-align: right; font-size: 20px; line-height: 26px; color: @c.text-2@; }
 .pl-skl { position: absolute; left: 326px; top: 41px; width: 500px; text-align: center; font-size: 22px; line-height: 28px; font-weight: 600; color: @accent@; white-space: nowrap; }
+/* Schnellspulen (SPEC PLAY-32): Pille "▶▶ 8×" mittig in der Zeitzeile (Platz des Sprungziels, beide nie zugleich), hell wie der
+ * Abspielkopf, Schrift/Icon on-accent (auf text-1 lesbar, tokens.json); ohne Markenfarbe -> keine Akzent-Varianten. Hoehe 28 = Zeitzeile y 42–70 */
+.pl-trk { position: absolute; left: 326px; top: 42px; width: 500px; height: 28px; text-align: center; }
+.pl-trk span { position: relative; display: inline-block; height: 28px; padding: 0 @sp.4@ 0 38px; border-radius: 14px; background: @c.text-1@; }
+.pl-trk .ic { left: 6px; top: -2px; }
+.pl-trk b { font-size: @ty.title.size@; line-height: @ty.title.lh@; font-weight: @ty.title.weight@; color: @c.on-accent@; white-space: nowrap; }
 .pl-chn { position: absolute; left: 32px; top: 90px; width: 368px; height: 28px; font-size: @ty.title.size@; line-height: @ty.title.lh@; color: @c.text-2@; }
 .pl-mh { right: @l.safe-x@; top: 648px; height: 36px; padding: 0 @sp.5@ 0 0; white-space: nowrap; }   /* endet auf dem Sicherheitsrand (y 684) */
 .pl-mh .hint { margin: @sp.1@ 0 0 @sp.5@; font-size: 18px; }
@@ -498,6 +514,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
 /* Ton & Untertitel: Reiter + scrollende Liste */
 .tp-tab { position: absolute; top: 112px; height: 40px; padding: 0 @sp.3@; font-size: 20px; line-height: 40px; font-weight: 600; color: @c.text-3@; border-bottom: 3px solid transparent; }
 .tp-tab.is-cur { color: @c.text-1@; border-bottom-color: @c.text-1@; }
+.tp-tab.is-focus { background: @accent@; color: @c.on-accent@; border-bottom-color: @accent@; border-radius: @r.md@; }   /* Reiterzeile fokussiert (▲ vom ersten Eintrag, Zeiger): wie die Staffel-Reiter */
 .tp-tabs { position: absolute; left: 32px; top: 112px; height: 43px; white-space: nowrap; }   /* Reiter nebeneinander nach Textbreite: "Ansicht" lag mit festem Abstand im Sicherheitsrand */
 .tp-tabs .tp-tab { position: relative; display: inline-block; top: 0; vertical-align: top; margin-right: @sp.4@; }
 .tp-clip { position: absolute; left: 0; top: 160px; width: @l.panel-w@; height: 504px; overflow: hidden; }
@@ -521,6 +538,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .chip { display: inline-block; position: relative; height: 32px; padding: 0 @sp.3@; margin-right: @sp.3@; border-radius: @r.sm@; background: @c.surface-2@;
   color: @c.text-2@; font-size: 16px; line-height: 32px; font-weight: 600; vertical-align: top; border: 1px solid @c.surface-2@;
   -webkit-transform: translate3d(0,0,0); }
+.sclr { background: transparent; border-color: @c.line@; }   /* Zuletzt gesucht: "Verlauf löschen" nur umrandet; Fokus (.chip.is-focus) gewinnt per Spezifitaet */
 .chip.act { border-color: @c.text-2@; color: @c.text-1@; }
 .chip.is-focus { background: @accent@; border-color: @accent@; color: @c.on-accent@; }
 /* Raster: Clip unter der Chip-Zeile, EIN Seiten-Container per translate3d */
@@ -528,6 +546,8 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .gpg { position: absolute; left: 0; top: 0; width: @l.screen-w@; height: 10px;
   -webkit-transform: translate3d(0,0,0); -webkit-transition: -webkit-transform @mo.base@ @mo.ease@; }
 .gpg .cap { top: 0; }
+/* Hinweis unter der letzten Rasterzeile (Erweiterungs-Reiter mit Hoechstzahl), wandert mit dem Seiten-Container */
+.gend { position: absolute; padding-top: @sp.2@; white-space: normal; }
 /* Buchstaben-Register (SPEC 7.5): 5 Positionen bei x 1160, aktueller Buchstabe 40 px im 56er-Kasten */
 .reg { position: absolute; text-align: center; }
 /* Sprung-Blase (SPEC 5.23) */
@@ -565,6 +585,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
   font-size: 20px; line-height: 40px; font-weight: 600; color: @c.text-2@; border-bottom: 3px solid transparent; }
 .tab.is-cur { color: @c.text-1@; border-bottom-color: @c.text-1@; }
 .tab.is-focus { background: @accent@; color: @c.on-accent@; border-bottom-color: @accent@; }
+.tab.is-wait { color: @c.text-3@; }   /* Reiter kommen gleich (Katalog der Erweiterung, DET-3): dezent, ohne Rahmen */
 .d-sst { position: absolute; left: 600px; top: 334px; width: 200px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Serien-Balken (DET-3, TV-Befund 28.10.): zweite Zeile unter dem Staffelstreifen, rechtsbuendig wie er, mit Beschriftung links;
  * duenn und gedaempft, Staffeln als getrennte Segmente, die gewaehlte Staffel voll deckend (sonst 55 %) – kein heller "Schieber" */
@@ -601,7 +622,8 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .cap-poster-s { width: 144px; }
 .fr-poster-s { width: 160px; height: 232px; }
 .srecent { position: absolute; left: 560px; top: 48px; width: 656px; }
-.srecent .chip { margin-bottom: @sp.3@; }
+/* Zuletzt gesucht: Chips nebeneinander (Positionen aus N.srch.pack), lange Begriffe mit "…"; "Verlauf löschen" nur umrandet */
+.srchip { position: absolute; max-width: 300px; margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 /* Hinweis statt Karten (Entdecken: plex.tv-Reihe, deren Titel alle schon da sind) */
 .rnote { position: absolute; left: @l.content-x@; top: 52px; width: 584px; padding: 14px 20px; background: @c.surface-1@; border-radius: @r.sm@;
   font-size: @ty.body.size@; line-height: @ty.body.lh@; color: @c.text-2@; white-space: normal; }
@@ -715,10 +737,13 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .mini-bar i { position: absolute; left: 0; top: 0; width: 0; height: 3px; background: @accent@; }
 /* Gegenprobe (nur per Messlauf 'nocapl' aktiv): Beschriftungen ohne eigene Ebene wie bis perf2 */
 .nocapl .cap { -webkit-transform: none; }
+/* Gegenprobe Runde 6 (nur Messlauf 'hvar-herol'): Hero-Bilder + Scrim als eigene Ebenen statt in der Wurzel-Ebene */
+.herol .hero-img, .herol .full { -webkit-transform: translate3d(0,0,0); }
 /* Feinauswahl am Fortschrittsbalken (N.ui.LoupeView, SPEC PLAY-30/31). Bewegung nur opacity/transform, @mo.fast@ ease-out,
  * reduzierte Bewegung (.rm): sofort; Ausblenden sofort. Ausschnitt + Keil (.lpv-l, A/D) blenden ein. */
-.lpv-l { position: absolute; left: 0; top: 0; opacity: 0; -webkit-transition: opacity @mo.fast@ @mo.ease@; }
+.lpv-l { position: absolute; left: 0; top: 0; opacity: 0; -webkit-transition: opacity @mo.fast@ @mo.ease@; -webkit-transform: translate3d(0,0,0); }   /* Runde 6: dauerhafte Ebene (sonst legt die Blende eine an und verwirft sie danach) */
 .lpv-l.on { opacity: 1; }
+.lpv-l.off, .lpv-x.off { opacity: 0; -webkit-transition: none; }   /* Runde 7: Schliessen sofort, ohne visibility (Ebene + Inhalt bleiben) */
 .lpv-r { position: absolute; border-radius: 3px; background: @c.text-1@; opacity: 0.85; }
 .lpv-w { position: absolute; left: 0; top: 0; color: @c.wedge@; }   /* Canvas der Keil-Linien; color = Linienfarbe (JS liest sie einmal) */
 /* Feinleiste in der Lasche (A, D): Ursprung linkes Fensterende, y = Mitte der Leiste */
@@ -744,7 +769,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .lpv-im { position: absolute; border-radius: @r.xs@; background: @c.surface-2@; }
 .lpv-sel { position: absolute; border: 3px solid @accent@; border-radius: @r.sm@; -webkit-transform: translate3d(0,0,0); }
 /* B: Ueberzug auf dem Balken in 3 Gruppen; Start = grobe Lage (Transform), .on laesst sie auf gedehnt laufen */
-.lpv-x { position: absolute; }
+.lpv-x { position: absolute; -webkit-transform: translate3d(0,0,0); }   /* Runde 7: dauerhafte Ebene – Schliessen = Deckkraft 0 (.off) */
 .lpv-z { position: absolute; top: 0; }
 .lpv-zb, .lpv-zf { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: @c.line@; }
 .lpv-zf { background: @accent@; -webkit-transform-origin: 0 0; }

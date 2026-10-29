@@ -51,6 +51,14 @@ test('Abdunkeln: Helligkeit nie ueber der Grenze der Staerke (Text lesbar), dunk
     assert.ok(A.lum(A.shade(A.hex(h), 'strong')) <= A.LOOK.strong.lmax + 0.002, h + ' strong');
     assert.ok(A.lum(A.shade(A.hex(h), 'strong')) > A.lum(A.shade(A.hex(h), 'soft')), h + ' kraeftiger = heller');
   });
+  /* TV-Test 29.10. ("Dezent" bei kraeftigen Postern sehr bunt, ganz magenta): Buntheit (groesster minus kleinster Kanal)
+   * dezent hoechstens 30 Stufen (vorher bis 66), kraeftiger deutlich mehr */
+  ['ff00c8', 'ff2d6e', '00e5ff', '7cff00', 'ff0000'].forEach(function (h) {
+    var sc = A.shade(A.hex(h), 'soft'), st = A.shade(A.hex(h), 'strong');
+    var cs = Math.max.apply(null, sc) - Math.min.apply(null, sc), ct = Math.max.apply(null, st) - Math.min.apply(null, st);
+    assert.ok(cs <= 30, h + ' dezent: Buntheit ' + cs + ' ' + sc);
+    assert.ok(ct > cs, h + ' kraeftiger bunter');
+  });
   var red = A.shade(A.hex('ff0000'), 'soft');
   assert.ok(red[0] > red[1] && red[0] > red[2], 'rot bleibt rot');
   var dark = A.shade(A.hex('101010'), 'soft');

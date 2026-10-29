@@ -7,7 +7,7 @@ var BANNED = '→←▲▼◀▶−★✓⌫↩☆✔✕⏎';
 function allowedChar(ch) { var c = ch.charCodeAt(0); return (c >= 0x20 && c <= 0x7e) || (c >= 0xa0 && c <= 0xff) || EXTRA.indexOf(ch) >= 0; }
 var RULES = [
   [/^hint\./, 14], [/^toast\./, 40], [/^nav\./, 15],
-  [/^dlg\..*\.title$/, 32], [/^dlg\..*\.text$/, 160], [/^dlg\..*\.(confirm|cancel)$/, 18], [/^kids\.protect\.(ok|later)$/, 18],
+  [/^dlg\..*\.title$/, 32], [/^dlg\..*\.text$/, 160], [/^dlg\..*\.(confirm|cancel)$/, 18], [/^dlg\.hrResetOwn\.(keep|all)$/, 44], [/^kids\.protect\.(ok|later)$/, 18],
   [/^kids\.protect\.title$/, 32], [/^kids\.protect\.text$/, 160],
   [/^err\.btn\./, 18], [/^login\.btn/, 18], [/^err\..*\.title$/, 40], [/^err\..*\.text$/, 200],
   [/^empty\..*\.title$/, 40], [/^empty\..*\.text$/, 200],

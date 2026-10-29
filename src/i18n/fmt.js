@@ -41,12 +41,16 @@
       if (r === undefined || r === null || r === '') return '';
       return N.t('fmt.rating', { n: (Math.round(Number(r) * 10) / 10).toFixed(1).replace('.', N.t('fmt.decimal')) });
     },
-    /* Altersfreigabe: "de/12" -> "FSK 12", sonst Rohwert ("TV-14") */
+    /* Altersfreigabe: "de/12" -> "FSK 12"; Freigabe eines anderen Landes mit Land davor ("us/R" -> "US: R"), damit eine US-Angabe nie
+     * wie eine FSK aussieht (TV-Test 29.10.: "R" stand da, wo eine Quelle keine deutsche hat); in Englisch ist US das eigene Land (ohne Vorsatz).
+     * Ohne Land (alte Plex-Daten) unveraendert. */
     rated: function (cr) {
       if (!cr) return '';
       var m = /^de\/(\d+)$/.exec(cr);
       if (m) return N.t('meta.fsk', { n: m[1] });
-      return cr.replace(/^[a-z]{2}\//, '');
+      m = /^([a-z]{2})\/(.+)$/.exec(cr);
+      if (!m) return cr;
+      return m[1] === (N.i18n && N.i18n.lang() === 'en' ? 'us' : 'de') ? m[2] : m[1].toUpperCase() + ': ' + m[2];
     },
     /* Teile mit " · " verbinden, leere weglassen */
     join: function (parts) {

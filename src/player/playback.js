@@ -3,8 +3,9 @@
  *   deps.sef      {exec(name, a, b, …) -> Rueckgabe}         (N.sef.create)
  *   deps.get      (path, query, opts, cb)  PMS-GET           deps.write (method, path, query, cb)  schreibend (readOnly beachtet)
  *   deps.timers   {now, set, clear}         deps.base / token / clientId   deps.cfg (Einstellungen)   deps.mem(showRk) -> gemerkte Spuren
- * Zustaende: resolving -> buffering <-> playing <-> paused -> ended | stopped | error.
- * Ereignisse (on(fn(ev, data))): meta, state, time, buffer, sub, ended, error, tracks. */
+ * Zustaende: resolving -> buffering <-> playing <-> paused -> ended | stopped | error. Schnellspulen (PLAY-32): speed != 1 bei
+ * Zustand 'playing' (Trick-Modus des SEF, nur Direct Play), siehe trick()/normal().
+ * Ereignisse (on(fn(ev, data))): meta, state, time, buffer, sub, ended, error, tracks, speed, trickEdge. */
 (function (N) {
   var U = N.util, D = N.decision, TR = N.tracks, TL_MS = 10000;
   function Playback(deps, item) {
@@ -13,6 +14,7 @@
     this.fns = []; this.loop = 0; this.session = ''; this.sub = null; this.subMode = 'none'; this.firstTick = false; this.dead = false;
     this.aspect = deps.cfg.aspect || 'auto'; this.base = 0; this.rel = false; this.t0 = 0; this.cropped = null;
     this.queueItem = item.pqi || null; this.queueId = item.pqId || null;
+    this.speed = 1; this.cap = null; this.refused = null; this.revAt = 0;   // Schnellspulen: aktuelle Geschwindigkeit, Kappung abgelehnter Stufen {f, b}
   }
   var P = Playback.prototype;
   P.on = function (fn) { this.fns.push(fn); };
@@ -142,6 +144,7 @@
     var self = this, H = this.hlsCfg(), sec = Math.floor(this.resume / 1000);
     if (this.hls && this.base) sec = 0;
     this.rel = false;
+    this.slow();                                     // neuer Datenstrom (Rueckfall, Neustart): das SEF beginnt mit 1x
     this.exec('Stop');
     this.firstTick = false; this.buffered = false;
     this.setState('buffering');
@@ -214,14 +217,20 @@
       case 2: case 3: this.fail(type === 2 ? 'notAllowed' : type === 3 ? 'fileMissing' : 'server', 'SEF ' + type); break;
       case 4: this.fail('server', 'Netz weg'); break;
       case 6: this.renderError(data); break;
-      case 8: this.ended(); break;
+      /* Ende-Ereignis beim ZURUECKspulen (Anfang erreicht, manche Dateien melden dann "fertig"): wie der Anfang, nicht wie das Ende –
+       * kein Gesehen, keine naechste Folge (Audit 1.0.6). Die Datei laeuft ab 0:00 neu an. TV-Test 29.10.: das Ereignis kann auch
+       * erst ~1 s NACH dem Ruecksetzen auf 1x kommen (aus -16x bis 0:00) – deshalb gilt eine Schonfrist (revEnd). */
+      case 8: if (this.revEnd()) { this.log('Ende-Ereignis beim/kurz nach dem Zurueckspulen = Anfang ' + this.t); this.slow(); this.revAt = 0; this.restart(0); this.emit('trickEdge', 'start'); break; } this.ended(); break;
       case 9: this.streamReady(); break;
-      case 11: if (this.state !== 'paused') this.setState('buffering'); break;
+      case 11:
+        if (this.speed !== 1) { this.log('Puffern beim Schnellspulen'); break; }   // Trick-Modus laeuft weiter: kein Zustandswechsel, keine Puffer-Timeline
+        if (this.state !== 'paused') this.setState('buffering');
+        break;
       case 12: if (this.state === 'buffering') this.setState('playing'); break;
       case 13: this.emit('buffer', Number(data) || 0); break;
       case 7: break;
       case 14: this.tick(Number(data) || 0); break;
-      case 19: if (this.subMode === 'sef' && this.sub) this.emit('sub', N.subs.clean(data)); break;   // UT aus: SEF-Text verwerfen
+      case 19: if (this.subMode === 'sef' && this.sub && this.speed === 1) this.emit('sub', N.subs.clean(data)); break;   // UT aus / Schnellspulen: SEF-Text verwerfen
       default: this.log('SEF-Ereignis ' + type + ' ' + data);
     }
   };
@@ -239,7 +248,8 @@
       // Sicherheitsnetz (Orca delayedJump): 550 ms nach dem ersten Tick, falls der Start-Sprung nicht gegriffen hat
       if (want > 10000) this.d.timers.set(function () { if (!self.dead && self.t < want - 10000) self.exec('JumpForward', Math.floor((want - self.t) / 1000)); }, 550);
     }
-    this.emit('time', ms);
+    if (this.speed !== 1) this.trickEdge(ms);
+    this.emit('time', this.t);
   };
   P.streamReady = function () {
     var T = this.meta.tracks, a = TR.selected(T.audio);
@@ -267,20 +277,87 @@
   };
 
   /* ---------- Steuerung ---------- */
-  P.pause = function () { if (this.state !== 'playing' && this.state !== 'buffering') return; this.exec('Pause'); this.setState('paused'); };
+  P.pause = function () { if (this.state !== 'playing' && this.state !== 'buffering') return; this.normal(true); this.exec('Pause'); this.setState('paused'); };
   P.play = function () { if (this.state !== 'paused') return; this.exec('Resume'); this.setState('playing'); };
   P.toggle = function () { if (this.state === 'paused') this.play(); else this.pause(); };
   /* Sprung auf ms: primaer Jump (auch HLS, K3); Rueckgabe != 1 bei HLS -> Sitzung an der Stelle neu starten */
   P.seek = function (ms) {
     var dur = this.dur(); if (dur > 0) ms = Math.min(ms, dur - 3000);
     ms = Math.max(0, ms);
+    this.normal(true);                               // ein Sprung beendet das Schnellspulen
     var delta = ms - this.t, sec = Math.round(Math.abs(delta) / 1000);
-    if (sec < 1) return;
+    // rueckwaerts nie weiter als bis 0:00 springen (aufgerundet: aus 5,6 s wurde JumpBackward 6 – vor den Anfang, TV-Test 29.10.)
+    if (delta < 0) sec = Math.min(sec, Math.floor(this.t / 1000));
+    if (sec < 1) { if (ms === 0 && this.t > 0) { this.t = 0; this.emit('time', 0); } return; }
     var r = this.exec(delta > 0 ? 'JumpForward' : 'JumpBackward', sec), paused = this.state === 'paused';
     if (r !== 1 && r !== true && this.hls) { this.restart(ms); return; }
     this.t = ms;
     if (paused) this.exec('Pause');                  // Orca: nach Sprung in der Pause erneut pausieren
     this.emit('time', ms);
+  };
+
+  /* ---------- Schnellspulen (PLAY-32, N.trick): SetPlaybackSpeed im Trick-Modus, nur Direct Play, ohne Ton ----------
+   * dir +1 (FF) / -1 (RW) -> {ok, speed, why}: why 'hls' (umgewandelt/HLS: das SEF kann es dort nicht), 'state' (laedt noch o. ae.),
+   * 'max' (Anschlag), 'retry' (SEF lehnt diese Stufe zum ersten Mal ab: nichts gekappt), 'refused' (lehnt sie zum zweiten Mal ab:
+   * Skala gekappt, die bisherige bleibt), 'off' (Richtung geht gar nicht).
+   * Aus der Pause heraus: erst weiter (Resume), dann spulen. Die Timeline meldet waehrend des Spulens 'playing' mit der Position. */
+  P.trick = function (dir) {
+    if (this.hls) return { ok: false, speed: this.speed, why: 'hls' };
+    if (this.state !== 'playing' && this.state !== 'paused') return { ok: false, speed: this.speed, why: 'state' };
+    var TK = N.trick, sp = TK.speeds(N.config && N.config.trickSpeeds);
+    if (!this.cap) this.cap = { f: sp[sp.length - 1], b: sp[sp.length - 1] };
+    if (this.speed === 1 && (dir > 0 ? this.cap.f : this.cap.b) === 0) return { ok: false, speed: 1, why: 'off' };
+    var nx = TK.next(this.speed, dir, sp, this.cap);
+    if (nx === this.speed) return { ok: true, speed: nx, why: 'max' };
+    if (this.state === 'paused') { this.exec('Resume'); this.setState('playing'); }
+    if (nx === 1) { this.normal(); return { ok: true, speed: 1, why: '' }; }
+    var r = this.exec('SetPlaybackSpeed', nx);
+    if (r !== 1 && r !== true) {
+      /* Audit 1.0.6: eine einzelne Ablehnung (z. B. gerade am Puffern) kappte die Skala fuer das ganze Video. Erst die zweite
+       * Ablehnung derselben Stufe kappt; die erste meldet 'retry' (die Ansicht springt dann einmal, wenn noch nichts laeuft) */
+      this.refused = this.refused || {};
+      if (!this.refused[nx]) { this.refused[nx] = 1; this.log('Schnellspulen ' + nx + ' abgelehnt (1. Mal)'); return { ok: false, speed: this.speed, why: 'retry' }; }
+      var lim = TK.below(sp, nx);
+      if (nx > 0) this.cap.f = lim; else this.cap.b = lim;
+      this.log('Schnellspulen ' + nx + ' abgelehnt, Grenze ' + (nx > 0 ? '+' : '-') + lim);
+      if (this.speed === 1) return { ok: false, speed: 1, why: lim ? 'refused' : 'off' };
+      return { ok: false, speed: this.speed, why: 'refused' };
+    }
+    this.speed = nx;
+    this.emit('speed', nx);
+    return { ok: true, speed: nx, why: '' };
+  };
+  /* zurueck auf 1x an der aktuellen Stelle (PLAY/OK, Pause, Sprung, Rand). quiet: keine eigene Timeline (Pause/Sprung melden selbst) */
+  P.normal = function (quiet) {
+    if (this.speed === 1) return false;
+    this.revMark();
+    this.exec('SetPlaybackSpeed', 1);
+    this.speed = 1;
+    this.emit('speed', 1);
+    if (!quiet && this.state === 'playing') this.timeline();
+    return true;
+  };
+  /* ohne SEF-Aufruf zuruecksetzen (Stop, neuer Datenstrom, Fehler): das SEF beginnt danach ohnehin mit 1x */
+  P.slow = function () { if (this.speed === 1) return; this.revMark(); this.speed = 1; this.emit('speed', 1); };
+  /* Schonfrist nach dem Zurueckspulen (TV-Test 29.10.: aus -16x bis 0:00 kam das SEF-Ende-Ereignis 1,1 s nach SetPlaybackSpeed 1
+   * und beendete das Video als gesehen). Waehrend REV_MS nach dem Ende des Rueckwaerts-Spulens zaehlt ein Ende-Ereignis nur dann
+   * als echtes Ende, wenn die Position wirklich am Ende steht (dur - END_MS); sonst ist es der Anfang. */
+  var REV_MS = 4000, END_MS = 10000;
+  P.revMark = function () { if (this.speed < 0) this.revAt = this.d.timers.now(); };
+  P.revEnd = function () {
+    if (this.speed < 0) return true;
+    if (!this.revAt || this.d.timers.now() - this.revAt > REV_MS) return false;
+    var d = this.dur();
+    return !(d > 0 && this.t >= d - END_MS);
+  };
+  /* Rand: zurueck am Anfang -> 1x ab 0:00; vor kurz vor dem Ende -> 1x, das Ende laeuft wie gewohnt (Countdown, naechste Folge) */
+  P.trickEdge = function (ms) {
+    var e = N.trick.edge(this.speed, ms, this.dur());
+    if (!e) return;
+    this.log('Schnellspulen am ' + (e === 'start' ? 'Anfang' : 'Ende') + ' ' + ms);
+    if (e === 'start') { this.normal(true); if (ms >= 1000) this.seek(0); this.timeline(); }
+    else this.normal();
+    this.emit('trickEdge', e);
   };
 
   /* ---------- Timeline / Ping (alle 10 s, bei Zustandswechsel) ---------- */
@@ -322,6 +399,7 @@
   };
   P.halt = function (st, time) {
     if (this.loop) { this.d.timers.clear(this.loop); this.loop = 0; }
+    this.slow();
     this.timeline(st === 'ended' ? 'stopped' : 'stopped');
     this.stopTranscode();
     this.exec('Stop');
@@ -345,6 +423,7 @@
   P.fail = function (kind, detail) {
     this.log('Fehler ' + kind + ' ' + detail);
     if (this.loop) { this.d.timers.clear(this.loop); this.loop = 0; }
+    this.slow();
     if (this.state !== 'resolving') { this.timeline('stopped'); this.stopTranscode(); this.exec('Stop'); }
     this.setState('error');
     this.emit('error', { kind: kind, detail: String(detail || ''), r: this.r });

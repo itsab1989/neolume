@@ -47,7 +47,7 @@
  "player/versions.js",
  "player/tracks.js",
  "player/markers.js",
- "player/seek.js", "player/loupe.js",
+ "player/seek.js", "player/loupe.js", "player/trick.js",
  "player/thumbs.js",
  "player/subs.js",
  "player/playback.js",

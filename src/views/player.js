@@ -6,6 +6,9 @@
  *   Erscheint bei jeder Taste, weg nach 5 s (Start 3 s, Pause: bleibt + Mini-Hinweisleiste). Zeit/Balken max. 1x/s, nur sichtbar.
  * - Fokus-Zonen bei sichtbarem OSD: Knoepfe (◀▶) -> ▲ Balken (◀▶ = Vorschau-Spulen, Sprung bei OK oder nach 1 s) -> ▲ Skip-Button.
  * - Spulen bei verborgenem OSD: ◀▶ / ◀◀▶▶ sammeln ein Ziel ("+2:30 → 41:12"), EIN Sprung 600 ms nach dem letzten Druck.
+ * - Schnellspulen (PLAY-32, Einstellung "Vor-/Rueckspultasten im Video" = Schnell spulen): ◀◀▶▶ schalten den SEF-Trick-Modus
+ *   (N.trick-Skala -16…-2 · 1 · 2…16, nur direkte Wiedergabe, ohne Ton); Pille "▶▶ 8x" in der Zeitzeile, OSD bleibt stehen, UT aus.
+ *   PLAY/OK/RETURN = normal weiter; Pause, Sprung, Ziffern, Farbtasten, Stop beenden es zuerst. Umgewandelt -> Spruenge + Hinweis.
  * - Mehr (TOOLS): Qualitaet, Bildformat, Untertitel-Darstellung, Skip-Modus, Autoplay, Sleep-Timer, "Problem mit der Wiedergabe?"
  *   – gilt fuer diese Wiedergabe (auch die folgenden Folgen), Standards in Einstellungen › Wiedergabe.
  * - Gelb Kapitel, Blau Sleep-Timer, INFO Technik, Gruen/SUBTITLE Ton & UT. Zeiger: Bewegung zeigt das OSD, alles anklickbar.
@@ -17,13 +20,16 @@
     return (h ? h + ':' + U.pad2(m) : m) + ':' + U.pad2(s % 60);
   }
   N.fmt.hms = hms;
+  /* Restzeit passend zur abgelaufenen: beide auf ganze Sekunden abgerundet, zusammen = Laenge (sonst z. B. 0:01 + -0:01 bei 0:01,5 von 0:02,4) */
+  function left(pos, d) { return hms((Math.floor(d / 1000) - Math.floor(Math.max(0, pos) / 1000)) * 1000); }
+  N.fmt.left = left;
   function cfg() { return N.session.settings || {}; }
   function arrows() { return O.steps(cfg().seekArrows, 10); }   // Pfeile + Knoepfe −x/+x (Sekunden {b, f})
   function ffrw() { return O.steps(cfg().seekFf, 30); }          // Spultasten
   var status = null;                                     // P5: Zustand fuer den Bildschirmschoner (N.player.status)
 
   N.router.define('player', function (params) {
-    var s = { rail: null, wheelKeys: ['LEFT', 'RIGHT'] };
+    var s = { rail: null, wheelKeys: ['LEFT', 'RIGHT'], toastHigh: true };   // Toasts oben links (NAV-10), nie ueber der Bedien-Insel
     var root, vbg, top, t1, t2, clk, bot, played, head, segs, cgs, tm0, tm1, skl, chn, spin, spinT, thumb, thImg, thT, skip, skipT, up, upImg, upTi, upIn, upBar, upBtns = [], sub, subT, sb, sbBg;
     var btnEl = {}, ppIc = null, numB = null, numF = null, lbl, lblT, mh, mhItems = [], mhRects = null;
     var pb = null, sef = null, mk = null, acc = null, item = null, osd = false, osdT = 0, lastSec = -1, queue = null, qTask = null, upF = 0, cdOn = false, skipM = null, btnKind = null;
@@ -41,6 +47,8 @@
     // Feinauswahl am Balken (N.Loupe + N.ui.LoupeView, SPEC PLAY-30/31): lp Logik, lpv Darstellung, lpPend/lpRaf Zeichnen je Frame,
     // lpS wirksame Darstellung (panel|stretch|film), lpTab Lasche (A/D) als Rechteck, lpBand Band in dem sie offen bleibt
     var lp = null, lpv = null, lpPend = null, lpRaf = false, lpS = 'panel', lpTab = null, lpBand = null;
+    var clkT = 0, trk, trkIc, trkT, hintT = 0, trickHinted = false, lastPaint = 0, ffrwAt = 0, FFRW_GAP = 250;   // Schnellspulen: Pille, Hinweis im Label-Feld (einmal je Video)
+    var lblW = {}, lblM = null, lblMT = null;            // Runde 6: Label-Breite je Text (lblWidth), Mess-Zwilling (lblWarm)
     var xt = null, upOv = null, lastTi = null, lastTx = null, lastB0 = null, offerTm = 0;   // optionale Erweiterung (N.ext 'player:open')
     /* Schnittstelle fuer eine Erweiterung: Hinweis-Insel (wie "Intro ueberspringen", nur wenn keine andere da ist), Karte
      * "letzte Folge" umbeschriften, Ueberzeile der Naechste-Folge-Karte, Folge hinter die aktuelle in die Play-Queue setzen */
@@ -89,6 +97,8 @@
       tm0 = U.txt('div', 'pl-tm0', bot, ''); tm1 = U.txt('div', 'pl-tm1', bot, '');
       skl = U.txt('div', 'pl-skl', bot, '');
       chn = U.txt('div', 'pl-chn ell', bot, '');
+      trk = U.el('div', 'pl-trk', bot, 'visibility:hidden');                // Schnellspulen: Pille mittig in der Zeitzeile (Platz des Sprungziels)
+      var tp = U.el('span', '', trk); trkIc = N.ui.icon(tp, 'ff', 's3'); trkT = U.txt('b', '', tp, '');
       mh = U.el('div', 'pl-isl pl-mh', root, 'display:none');           // Mini-Hinweisleiste in der Pause (SPEC 7.10): eigene Insel unter der Bedien-Insel
       for (var i = 0; i < 4; i++) {
         var e = { root: U.el('span', 'hint', mh) };
@@ -103,6 +113,7 @@
         btnEl[b.id] = be;
       }
       lbl = U.el('div', 'pl-lbl', root, 'display:none'); lblT = U.txt('span', '', lbl, '');
+      lblM = U.el('div', 'pl-lbl', root, 'visibility:hidden'); lblMT = U.txt('span', '', lblM, '');   // Runde 6: misst Label-Breiten in Ruhe
       thumb = U.el('div', 'pl-th', root, 'display:none');
       thImg = U.el('img', '', thumb); thImg.src = N.img.BLANK;
       thT = U.txt('div', 'pl-tht', thumb, '');
@@ -176,6 +187,7 @@
     function shutdown() {
       closed = true;
       if (offerTm) { clearTimeout(offerTm); offerTm = 0; }
+      if (hintT) { clearTimeout(hintT); hintT = 0; }
       if (xt && xt.close) xt.close();
       acc.cancel(); lp.leave(); lpEnd();
       setSleep('off', true);
@@ -184,6 +196,7 @@
       if (pb) { pb.stop('user'); pb = null; }
       if (qTask) { qTask.abort(); qTask = null; }
       if (osdT) clearTimeout(osdT);
+      if (clkT) { clearTimeout(clkT); clkT = 0; }
       clearLow(); if (lostT) { clearTimeout(lostT); lostT = 0; } lost = null;
       N.sef.close();
       transparent(false);
@@ -213,7 +226,7 @@
     function play(it, off, q) {
       lpEnd();
       item = it; cues = null; cueI = -1; showSub(''); hideSkip(); hideUp(); hideLast();
-      if (xt && xt.item) xt.item(it); bif = null; thFail = 0; errOn = false; slow = 0; chs = []; chI = -2;
+      if (xt && xt.item) xt.item(it); bif = null; thFail = 0; errOn = false; slow = 0; chs = []; chI = -2; trickHinted = false; U.vis(trk, false);
       clearLow(); bw = new N.comfort.BufWatch(U.now()); pausedAt = 0; prevSt = ''; hideLost();
       sb.hide(); U.show(sbBg, false);
       U.setText(t1, it.type === 'episode' ? it.title : ''); U.setText(t2, it.type === 'episode' ? N.t('pl.epTitle', { s: it.s, e: it.e, t: it.epTitle || '' }) : it.title);
@@ -257,7 +270,8 @@
         case 'ended': onEnded(); break;
         case 'error': onError(d); break;
         case 'fallback': N.diag.log('warn', 'Player Rueckfall von ' + d); break;
-        case 'terminated': N.ui.toast.show(N.t('pl.terminated')); close(); break;
+        case 'terminated': close(); N.ui.toast.show(N.t('pl.terminated')); break;   // erst schliessen: Toast an der Stelle des Bildschirms dahinter
+        case 'speed': trickUi(d); break;
       }
     }
     function onMeta(m) {
@@ -286,6 +300,7 @@
     function seekPb(ms) { if (bw) bw.mark(U.now()); pb.seek(ms); }
     function onState(st) {
       var was = prevSt; prevSt = st;
+      pauseClock(st === 'paused');
       if (st === 'playing') {
         hideSpin(); N.tv.saver(false);
         if (was !== 'playing' && was !== 'buffering' && bw) bw.mark(U.now());   // Start, Fortsetzen nach Pause
@@ -303,10 +318,17 @@
       paused();
       N.router.refreshHints();
     }
+    /* Pause: Uhr und "Ende um" laufen weiter (TV-Test 29.10.: standen still). Ohne Zeit-Ereignisse des SEF einmal je Minute
+     * (auf die Minutengrenze ausgerichtet) neu zeichnen – "Ende um" = jetzt + Restzeit. Billig: ein Timer, zwei Texte. */
+    function pauseClock(on) {
+      if (clkT) { clearTimeout(clkT); clkT = 0; }
+      if (!on || closed) return;
+      clkT = setTimeout(function () { clkT = 0; if (!closed && pb && pb.state === 'paused') { paintClk(pb.t, dur()); pauseClock(true); } }, O.minuteWait(N.clock.date()));
+    }
     /* Pause: Play-Symbol, OSD bleibt, Mini-Hinweisleiste; sonst Pause-Symbol */
     function paused() {
       var p = !!(pb && pb.state === 'paused');
-      N.ui.setIcon(ppIc, p ? 'play' : 'pause');
+      N.ui.setIcon(ppIc, p || trickOn() ? 'play' : 'pause');          // Schnellspulen: Play = normal weiter
       if (osd && zone === 'btn' && fb === 'pp') setLabel();
       if (p && osd) { showOsd(0); }
       miniHints(p && osd);
@@ -336,8 +358,10 @@
 
     /* ---------- Zeit: OSD (1x/s), Marker, Untertitel ---------- */
     function onTime(ms) {
-      var sec = Math.floor(ms / 1000);
-      if (sec !== lastSec) { lastSec = sec; if (osd && !acc.active()) paint(ms); }
+      var sec = Math.floor(ms / 1000), tr = trickOn();
+      // Zeit/Balken max. 1x/s (SPEC PLAY-23); beim Schnellspulen aendert sich die Sekunde bei jedem Takt -> nach Uhrzeit drosseln
+      if (sec !== lastSec && (!tr || U.now() - lastPaint >= 1000)) { lastSec = sec; lastPaint = U.now(); if (osd && !acc.active()) paint(ms); }
+      if (tr) return;                                     // Schnellspulen: keine Untertitel, keine Marker-Automatik (Ende = trickEdge)
       if (!cues && sef.fake && N.config.fakeSub) cues = [{ a: 0, b: 1e10, x: N.config.fakeSub }];   // nur Bildtest: Untertitel-Zeile
       if (cues) cue(ms);
       if (mk && pb) markerTick(ms);
@@ -347,12 +371,15 @@
       var d = dur(), w = d > 0 ? Math.round(BAR_W * Math.min(1, pos / d)) : 0;
       played.style.width = w + 'px';
       U.tf(head, BAR_X - 64 + w - 12, 0);
-      U.setText(tm0, hms(pos)); U.setText(tm1, d ? '-' + hms(d - pos) : '');   // ASCII-Minus: U+2212 fehlt in der TV-Schrift (Regel 10)
-      var now = N.clock.date(), ends = d ? N.t('pl.endsAt', { time: F.clock(new Date(now.getTime() + d - pos)) }) : '';
-      U.setText(clk, cfg().clock === false ? ends : N.comfort.clock(now, N.config.fixedClock) + (ends ? ' · ' + ends : ''));   // P5 set.clock
+      U.setText(tm0, hms(pos)); U.setText(tm1, d ? '-' + left(pos, d) : '');   // ASCII-Minus: U+2212 fehlt in der TV-Schrift (Regel 10)
+      paintClk(pos, d);
       var k = O.chapterAt(chs, pos);
       if (lpv.on) lpv.played(pos);
       if (k !== chI) { chI = k; U.setText(chn, k < 0 ? '' : O.chapterNamed(chs[k]) ? N.t('pl.chapter', { n: k + 1, t: chs[k].t }) : N.t('pl.chapterN', { n: k + 1 })); if (pn === 'chap') pnPaint(pos); }
+    }
+    function paintClk(pos, d) {
+      var now = N.clock.date(), ends = d ? N.t('pl.endsAt', { time: F.clock(new Date(now.getTime() + d - pos)) }) : '';
+      U.setText(clk, cfg().clock === false ? ends : N.comfort.clock(now, N.config.fixedClock) + (ends ? ' · ' + ends : ''));   // P5 set.clock
     }
     function markerTick(ms) {
       var o = mk.tick(ms, { dur: dur(), playing: pb.state === 'playing', hasNext: hasNext() && sleep.mode !== 'end', last: isLast() && sleep.mode !== 'end', resume: pb.resume });
@@ -387,6 +414,7 @@
     /* ---------- Untertitel: SEF-intern (Ereignis 19) / externe SRT (eigene Box); Darstellung aus Einstellung/Mehr ---------- */
     function showSub(t) {
       if (subClr) { clearTimeout(subClr); subClr = 0; }
+      if (trickOn()) t = '';
       if (t && (!pb || (pb.subMode !== 'sef' && pb.subMode !== 'sidecar')) && !(sef && sef.fake && N.config.fakeSub)) t = '';   // UT aus: nichts zeichnen
       U.setText(subT, t || ''); U.show(sub, !!t);
       U.cls(sub, 'up', osd);
@@ -421,7 +449,7 @@
       }
       if (osdT) clearTimeout(osdT);
       osdT = 0;
-      var hold = pb && pb.state === 'paused';
+      var hold = pb && (pb.state === 'paused' || pb.speed !== 1);   // Pause und Schnellspulen: OSD bleibt stehen
       if (!hold) osdT = setTimeout(hideOsd, ms || OSD_MS);
     }
     function hideOsd(force) {
@@ -431,7 +459,7 @@
       if (lp.isOpen() || lpv.on) lpEnd();
       lp.leave();
       // waehrend Spulen oder offenem Panel (Ton & UT, Mehr, Kapitel …) bleibt das OSD stehen
-      if (!osd || (force !== true && (acc.active() || N.router.hasOverlay()))) { if (osd) osdT = setTimeout(hideOsd, OSD_MS); return; }
+      if (!osd || (force !== true && (acc.active() || trickOn() || N.router.hasOverlay()))) { if (osd) osdT = setTimeout(hideOsd, OSD_MS); return; }
       hov = false; hovMs = -1; U.cls(thumb, 'tonly', false);
       osd = false; U.show(top, false); U.show(bot, false); U.show(thumb, false); U.show(lbl, false); U.cls(sub, 'up', false); U.cls(root, 'pl-osd', false);
       U.cls(skip, 'is-focus', false); U.cls(btnEl[fb], 'is-focus', false); U.cls(bot, 'foc', false);
@@ -446,6 +474,7 @@
       var nm = O.stepNums(arrows());
       U.setText(numB, nm[0]); U.setText(numF, nm[1]);
       pnPaint(pb ? pb.t : 0);
+      N.idle.add(lblWarm, 'pl-lblw');                         // Label-Breiten der Knoepfe in Ruhe messen
     }
     /* ⏮/⏭ bedienbar? Gesperrte bleiben gedimmt stehen (Reihe springt nicht), bekommen aber weder Fokus noch Klick */
     function pnPaint(ms) {
@@ -479,14 +508,34 @@
     }
     function setLabel() {
       if (lp && lp.isOpen()) return;                         // Feinauswahl: das Label-Feld zeigt deren Hinweis
+      if (hintT) return;                                     // Schnellspulen-Hinweis steht noch
       if (!osd || zone !== 'btn') { U.show(lbl, false); return; }
-      var t = fb === 'pp' ? (pb && pb.state === 'paused' ? 'pl.btn.play' : 'pl.btn.pause') : fb === 'prev' || fb === 'next' ? O.pnLabel(pn, fb)
-        : 'pl.btn.' + { back: 'back', fwd: 'fwd', chap: 'chapters', tracks: 'tracks', more: 'more' }[fb], st = arrows();
-      U.setText(lblT, N.t(t, { n: fb === 'back' ? st.b : st.f }));
+      var tx = btnText(fb, !!(pb && pb.state === 'paused'));
+      U.setText(lblT, tx);
       U.show(lbl, true);
       // Label mittig UNTER dem Knopf, aber nie ueber den Innenrand der Insel hinaus (rechte Knoepfe, lange Texte)
-      var c = O.center(fb), w = lblT.parentNode.offsetWidth || 0, x = U.clamp(c - w / 2, O.ISL_X + 32, O.ISL_X + 1152 - 32 - w);
+      var c = O.center(fb), w = lblWidth(tx), x = U.clamp(c - w / 2, O.ISL_X + 32, O.ISL_X + 1152 - 32 - w);
       lbl.style.left = Math.round(x + w / 2 - 150) + 'px';
+    }
+    function btnText(id, isPaused) {
+      var t = id === 'pp' ? (trickOn() ? 'pl.btn.normal' : isPaused ? 'pl.btn.play' : 'pl.btn.pause') : id === 'prev' || id === 'next' ? O.pnLabel(pn, id)
+        : 'pl.btn.' + { back: 'back', fwd: 'fwd', chap: 'chapters', tracks: 'tracks', more: 'more' }[id], st = arrows();
+      return N.t(t, { n: id === 'back' ? st.b : st.f });
+    }
+    /* Runde 6 (Regel: keine Geometrie-Abfragen im Tastenpfad): Breite je Label-Text einmal messen und merken; lblWarm misst die
+     * Knopf-Texte schon in Ruhe nach dem Start (verstecktes Zwillings-Label, gleiche Schrift). Ohne Treffer wie bisher: Label
+     * zeigen, dann messen (erzwingt Stil + Layout im Schritt). */
+    function lblWidth(tx) {
+      var w = lblW[tx];
+      if (w === undefined) { w = lblT.parentNode.offsetWidth || 0; if (w) lblW[tx] = w; }
+      return w;
+    }
+    function lblWarm() {
+      if (closed || !lblM) return;
+      var tx = [], k;
+      for (k in btnEl) { tx.push(btnText(k, false)); if (k === 'pp') tx.push(btnText(k, true)); }
+      if (eff('ffrw') === 'trick') tx.push(N.t('pl.btn.normal'), N.t('pl.trick.hls'), N.t('pl.trick.off'), N.t('pl.trick.hls.rw'), N.t('pl.trick.off.rw'));
+      for (k = 0; k < tx.length; k++) if (lblW[tx[k]] === undefined) { U.setText(lblMT, tx[k]); var w = lblMT.parentNode.offsetWidth || 0; if (w) lblW[tx[k]] = w; }
     }
     function activate(id) {
       var st = arrows();                                     // wiederholte Klicks sammeln wie die Tasten (ein Sprung nach 600 ms Ruhe)
@@ -533,6 +582,7 @@
     /* ---------- Spulen (Sammelfenster) + Vorschaubild ---------- */
     function seekBy(step, accel) {
       if (!pb || !dur() || pb.state === 'resolving' || pb.state === 'error') return;
+      pb.normal();                                    // Sprung ab der Stelle, an der das Schnellspulen steht
       showOsd(); hoverOff();
       acc.delay = N.config.seekDelay || (zone === 'bar' && !quick ? 1000 : 600);   // Balken: Sprung nach 1 s Ruhe oder OK
       U.show(mh, false);
@@ -542,7 +592,7 @@
       var d = dur(), w = Math.round(BAR_W * st.target / d);
       played.style.width = w + 'px';
       U.tf(head, BAR_X - 64 + w - 12, 0);
-      U.setText(tm0, hms(st.target)); U.setText(tm1, '-' + hms(d - st.target));
+      U.setText(tm0, hms(st.target)); U.setText(tm1, '-' + left(st.target, d));
       U.setText(skl, (st.delta < 0 ? '-' : '+') + hms(Math.abs(st.delta)) + ' (' + hms(st.target) + ')');
       if (thumbOn) showThumb(st.target, w);
     }
@@ -608,6 +658,7 @@
      * Zeit korrigiert Wischen auf dem Touchpad (= ◀▶ auf dem Balken) um die Sprungweite, ohne einen zweiten teuren Sprung */
     function clickSeek(ms) {
       if (!pb || !dur() || pb.state === 'resolving' || pb.state === 'error') return;
+      pb.normal();
       acc.delay = N.config.seekDelay || 1000;
       U.show(mh, false);
       showSeek(acc.set(ms, pb.t, dur(), false));
@@ -647,7 +698,7 @@
     /* B: im Label-Feld unter der Knopfreihe (A/D: in der Kopfzeile der Lasche) */
     function lpLabel(txt) {
       U.setText(lblT, txt); U.show(lbl, true);
-      var w = lblT.parentNode.offsetWidth || 0;                // einmal je Oeffnen gemessen, nie je Bewegung
+      var w = lblWidth(txt);                                    // je Text einmal gemessen, nie je Bewegung
       lbl.style.left = Math.round(640 - Math.max(w, 300) / 2) + 'px';
     }
     /* A/D: nur weichen, was die Lasche wirklich verdeckt (Skip-Knopf, Countdown-/Letzte-Folge-Karte); einmal je Oeffnen bzw. wenn eins
@@ -689,7 +740,51 @@
       U.cls(thumb, 'lp-panel', false);
       if (zone === 'btn' && osd) setLabel(); else U.show(lbl, false);
     }
-    function seekTo(ms, now) { if (!pb || !dur()) return; acc.set(ms, pb.t, dur(), now !== false); }
+    function seekTo(ms, now) { if (!pb || !dur()) return; pb.normal(); acc.set(ms, pb.t, dur(), now !== false); }
+    /* ---------- Schnellspulen (PLAY-32): Einstellung ffrw 'trick', sonst Spruenge (PLAY-22) ---------- */
+    function trickOn() { return !!(pb && pb.speed !== 1); }
+    /* ◀◀ (dir -1) / ▶▶ (+1): Trick-Modus, wenn eingestellt und moeglich; umgewandelt/abgelehnt -> Sprung + Hinweis (einmal je Video) */
+    function ffrwKey(dir) {
+      var FR = ffrw(), jump = function () { seekBy(dir < 0 ? -FR.b * 1000 : FR.f * 1000, false); };
+      if (!pb || eff('ffrw') !== 'trick') { jump(); return; }
+      /* gehaltene Taste (Wiederholung) schaltet sonst in Bruchteilen einer Sekunde durch alle Stufen: < 250 ms ignorieren */
+      var t = U.now();
+      if (t - ffrwAt < FFRW_GAP) return;
+      ffrwAt = t;
+      if (acc.active()) acc.commit();                     // offenes Sprungziel zuerst ausfuehren
+      var at = pausedAt, wasP = pb.state === 'paused';
+      if (wasP) pausedAt = 0;                             // aus der Pause spulen: kein "Zurueckspulen beim Fortsetzen" dazu (Sprung + Hinweis)
+      var r = pb.trick(dir);
+      if (wasP && pb.state === 'paused') pausedAt = at;   // nicht losgelaufen (umgewandelt o. ae.): bleibt pausiert wie vorher
+      if (r.why === 'hls' || r.why === 'off') { jump(); trickHint('pl.trick.' + r.why + (dir < 0 ? '.rw' : '')); return; }
+      if (r.why === 'state' || (r.why === 'retry' && r.speed === 1)) { jump(); return; }   // laedt gerade / erste Ablehnung: wie bisher springen
+      showOsd(); hoverOff();
+    }
+    function trickUi(sp) {
+      var on = sp !== 1;
+      if (on) {
+        N.ui.setIcon(trkIc, sp > 0 ? 'ff' : 'rw'); U.setText(trkT, N.trick.label(sp));
+        U.vis(trk, true); U.show(mh, false); showSub(''); lastPaint = 0;   // Pille: feste Ebene, nur visibility (Performance-Regel Runde 6)
+        if (btnKind && btnKind !== 'lower' && btnKind !== 'ext') hideSkip();   // Marker-Knoepfe/Countdown passen nicht mehr zur Stelle
+        if (cdOn) hideUp();
+        if (lastOn) hideLast();                           // Karte "Letzte Folge" passt ebenso wenig zur neuen Stelle
+      } else {
+        U.vis(trk, false); cueI = -1; if (mk) mk.seeked();
+      }
+      if (pb && (pb.state === 'playing' || pb.state === 'paused')) showOsd();
+      paused();
+    }
+    /* kurzer Hinweis im Label-Feld unter der Knopfreihe (wie die Feinauswahl), 4 s; einmal je Video */
+    function trickHint(key) {
+      if (trickHinted) return;
+      trickHinted = true;
+      var txt = N.t(key);
+      U.setText(lblT, txt); U.show(lbl, true);
+      lbl.style.left = Math.round(640 - Math.max(lblWidth(txt), 300) / 2) + 'px';
+      if (hintT) clearTimeout(hintT);
+      hintT = setTimeout(function () { hintT = 0; setLabel(); }, 4000);
+    }
+    function hintOff() { if (hintT) { clearTimeout(hintT); hintT = 0; setLabel(); } }
     function cancelSeek() { acc.cancel(); U.setText(skl, ''); U.show(thumb, false); if (pb) paint(pb.t); paused(); }
 
     /* ---------- Naechste Folge (Play-Queue, Countdown) ---------- */
@@ -801,7 +896,7 @@
       if (quiet) return;
       N.ui.toast.show(mode === 'off' ? N.t('pl.toast.sleepOff') : mode === 'end' ? N.t('pl.toast.sleepEnd') : N.t('pl.toast.sleep', { n: mode }), { icon: 'confirm' });
     }
-    function sleepDone() { sleep.t = 0; N.ui.toast.show(N.t('pl.toast.sleepDone'), { icon: 'info' }); close(); }
+    function sleepDone() { sleep.t = 0; close(); N.ui.toast.show(N.t('pl.toast.sleepDone'), { icon: 'info' }); }
     function sleepText() {
       if (sleep.mode === 'off') return N.t('set.v.off');
       if (sleep.mode === 'end') return N.t(item && item.type === 'episode' ? 'pl.sleep.end' : 'pl.sleep.endMovie');
@@ -1087,13 +1182,21 @@
         if (k === 'ENTER') { lastAct(lastF); return true; }
         if (k === 'RETURN') { lastAct(two ? 1 : 0); return true; }
       }
-      var A = arrows(), FR = ffrw(), was = osd;
+      if (k !== 'FF' && k !== 'RW') hintOff();
+      // Schnellspulen: PLAY/OK/RETURN = normal weiter an der Stelle; Navigation in der Knopfreihe laesst es laufen; alles andere beendet
+      // es zuerst und wirkt dann wie gewohnt (Pause, Sprung, Ziffern, Farbtasten, Stop, OK auf einem anderen Knopf)
+      if (trickOn() && k !== 'FF' && k !== 'RW' && k !== 'UP' && k !== 'DOWN' && !((k === 'LEFT' || k === 'RIGHT') && osd && zone === 'btn')) {
+        /* Stop, CH und ⏮/⏭ verlassen das Video gleich: ohne eigene "playing"-Meldung direkt vor "stopped" (quiet) */
+        pb.normal(k === 'STOP' || k === 'CH_UP' || k === 'CH_DOWN' || (k === 'ENTER' && osd && zone === 'btn' && (fb === 'prev' || fb === 'next')));
+        if (k === 'PLAY' || k === 'RETURN' || (k === 'ENTER' && !(osd && zone === 'btn' && fb !== 'pp'))) { showOsd(); return true; }
+      }
+      var A = arrows(), was = osd;
       switch (k) {
         case 'PLAY': if (pb) pb.play(); showOsd(); return true;
         case 'PAUSE': if (pb) pb.pause(); showOsd(); return true;
         case 'STOP': close(); return true;
-        case 'RW': seekBy(-FR.b * 1000, false); return true;
-        case 'FF': seekBy(FR.f * 1000, false); return true;
+        case 'RW': ffrwKey(-1); return true;
+        case 'FF': ffrwKey(1); return true;
         case 'CH_UP': if (pn) { showOsd(); stepItem(-1); } return true;   // wie Jetzt laeuft: CH▲ = vorige, CH▼ = naechste
         case 'CH_DOWN': if (pn) { showOsd(); stepItem(1); } return true;
         case 'GREEN': showOsd(); tracks('a'); return true;
@@ -1175,6 +1278,8 @@
         return true;
       }
       var was = osd;
+      // Schnellspulen: ein Klick beendet es; auf Play/Pause oder freier Flaeche nur das (normal weiter), sonst wirkt der Klick wie gewohnt
+      if (kind === 'click' && trickOn()) { var tb = O.hit(ids, x, y); pb.normal(tb === 'prev' || tb === 'next'); if (tb === 'pp' || (!tb && !(y >= BAR_Y - 16 && y < BAR_Y + 16))) { showOsd(); return true; } }
       showOsd();
       if (btnKind && x >= 856 && x < 1216 && y >= SKIP_Y && y < SKIP_Y + 48) { if (zone !== 'skip') setZone('skip'); if (kind === 'click') doSkip(); return true; }
       if (!was && kind === 'click') return true;           // erster Klick blendet nur ein

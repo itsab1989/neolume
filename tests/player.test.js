@@ -498,3 +498,10 @@ test('Untertitel-Verzoegerung: SEF-intern per SetSubtitleSync beim Start und bei
   p.setSubDelay(-1000);
   assert.ok(r.calls.indexOf('SetSubtitleSync:-1000') >= 0);
 });
+
+test('Pause: Uhr und "Ende um" einmal je Minute, kurz nach der Minutengrenze (TV-Test 29.10.: standen still)', function () {
+  var O = N.osd;
+  assert.strictEqual(O.minuteWait(new Date(2026, 9, 29, 8, 4, 0, 0)), 60050);
+  assert.strictEqual(O.minuteWait(new Date(2026, 9, 29, 8, 4, 59, 900)), 150);
+  assert.strictEqual(O.minuteWait(new Date(2026, 9, 29, 8, 4, 30, 0)), 30050);
+});

@@ -8,7 +8,7 @@
   /* Wiedergabe (M3): alles abschaltbar, Standardwerte nach SPEC 10.4 bzw. Nutzer (Fortsetzen fragen, Vorschaubilder an) */
   var DEFAULT_SETTINGS = { episodeProgress: true, seriesProgress: true, reduceMotion: false,
     resume: 'ask', quality: '12', directPlay: true, thumbs: true, skipIntro: 'button', skipCredits: 'button', autoNext: true, countdown: 10,
-    seekArrows: 10, seekFf: 30, ptrLoupe: false, loupeStyle: 'panel', rememberTracks: true, audioLang: 'de', subs: 'forced', subLang: 'de', ass: 'burn', anime: false,
+    seekArrows: 10, seekFf: 30, ffrw: 'jump', ptrLoupe: false, loupeStyle: 'panel', rememberTracks: true, audioLang: 'de', subs: 'forced', subLang: 'de', ass: 'burn', anime: false,
     aspect: 'auto', subSize: 'medium', subPos: 'low', subBg: 'dim', stillWatching: 3,
     themeMusic: false, themeVol: 50 };   // Titelmelodie (SPEC v2.2): Nutzerentscheidung M3b Standard AUS
   var S = {

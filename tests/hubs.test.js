@@ -174,3 +174,17 @@ test('Naechste Folgen: keine Filme aus onDeck, mit Weiterschauen keine angefange
   var rows = N.hubs.buildRows(d), deckRow = rows.filter(function (r) { return r.id === 'deck'; })[0];
   eq(deckRow.items.map(function (i) { return i.rk; }), ['8']);
 });
+
+test('Erweiterungs-Reihen: Platzhalter/Stand aus N.ext home:row an ihrer Stelle, nie im Startseiten-Cache, Hinweis zaehlt beim Vergleich', function () {
+  var c = H.load(), M = c.N, libs = M.hubs.libraries(S('sections.json'));
+  var d = { libs: libs, cw: list('continueWatching.json'), deck: list('onDeck.json'), recent: { 1: list('recent-1.json') } };
+  M.ext.on('home:row', function (id) { return id === 'x-a' ? { id: 'x-a', kind: 'poster', title: 'A', items: [], note: 'n.loading', want: true } : id === 'x-b' ? { id: 'x-c', items: [] } : undefined; });
+  d.order = ['cw', 'x-a', 'x-b', 'new-1'];
+  var rows = M.hubs.buildRows(d);
+  eq(rows.map(function (r) { return r.id; }), ['cw', 'x-a', 'new-1']);
+  assert.ok(rows[1].ext);
+  eq(M.hubs.pick([rows[0], rows[2]], ['x-a', 'cw']).map(function (r) { return r.id; }), ['x-a', 'cw']);
+  eq(M.hubs.forCache(rows).map(function (r) { return r.id; }), ['cw', 'new-1']);
+  var b2 = JSON.parse(JSON.stringify(rows[1])); b2.note = '';
+  assert.strictEqual(M.hubs.sameRow(rows[1], b2), false);
+});

@@ -4,11 +4,13 @@
  * translate3d (Fokus-Anker = 3. Zeile). Weitere Reihen (Server-Hubs, Playlists) kommen aus dem Hub-Katalog: sofort aus dem
  * Speicher, im Hintergrund frisch vom Server (Titel in der App-Sprache). Speichern sofort im Speicher, Datei entprellt.
  * N.rowsEditor(C) ist die gemeinsame Fabrik: "Inspiration anpassen" (views/insprows.js) nutzt dieselbe Liste mit eigener
- * Einstellung (C.setting), eigenen Reihen (C.avail) und Texten (C.label/val/desc, C.keys). */
+ * Einstellung (C.setting), eigenen Reihen (C.avail) und Texten (C.label/val/desc, C.keys).
+ * Optionale Erweiterungen (nur "Startseite anpassen", C.ext): zusaetzliche Eintraege unten ("Reihe hinzufuegen …", N.ext
+ * 'home:adders' / 'home:add') und entfernbare Reihen (Rot, N.ext 'home:removable', mit Rueckfrage). */
 (function (N) {
   var U = N.util, HR = N.homeRows, X = 144, W = 736, TOP = 112, STEP = 64, VIS = 6, ANCHOR = 2, STALE = 600000;
   function editor(C) { return function () {
-    var s = { rail: null, wheelKeys: ['UP', 'DOWN'] }, K = C.keys;
+    var s = { rail: null, wheelKeys: ['UP', 'DOWN'], toastLow: true }, K = C.keys;   // Toast unter der Beschreibung (.hr-desc bis y 608, NAV-10)
     var S = N.session, root, clip, list, desc, stat, els = [], items = [], f = 0, sc = 0, moving = false, cat = null, busy = null, dead = false;
     var MOD = C.model || HR;                            // Listen-Logik (view/store/move): Startseite/Inspiration N.homeRows, Seitenleiste N.railRows
     function locked(it) { return !it.reset && !!(C.locked && C.locked(it)); }   // immer an (z. B. Start in der Seitenleiste)
@@ -27,11 +29,14 @@
     function hubOf(id) { var h = cat && cat.hubs || []; for (var i = 0; i < h.length; i++) if (h[i].id === id) return h[i]; return null; }
 
     /* ---------- Texte je Reihe ---------- */
-    function label(it) { return it.reset ? N.t('set.hr.reset') : C.label(it, ctx()); }
-    function libName(it) { return it.reset ? '' : C.val(it, ctx()); }
+    function label(it) { return it.reset ? N.t('set.hr.reset') : it.add ? it.add.t : C.label(it, ctx()); }
+    function libName(it) { return it.reset || it.add ? '' : C.val(it, ctx()); }
+    function special(it) { return !!(it && (it.reset || it.add)); }
+    function removable(it) { return !!(C.ext && it && !special(it) && N.ext.has('home:removable') && N.ext.call('home:removable', it.id)); }
     function descText(it) {
       if (moving) return N.t('set.hr.moving');
       if (it.reset) return N.t(K.resetDesc);
+      if (it.add) return it.add.d;
       return C.desc(it, ctx());
     }
 
@@ -55,6 +60,8 @@
       var v = MOD.view(saved(), avail()), i;
       items = [];
       for (i = 0; i < v.length; i++) items.push({ id: v[i].id, on: v[i].on });
+      var adds = C.ext && N.ext.has('home:adders') ? N.ext.call('home:adders') || [] : [];
+      for (i = 0; i < adds.length; i++) if (adds[i] && adds[i].id) items.push({ id: '#add-' + adds[i].id, add: adds[i] });
       items.push({ id: '#reset', reset: true });
       while (els.length < items.length) els.push(mkRow(els.length));
       for (i = 0; i < els.length; i++) U.show(els[i].el, i < items.length);
@@ -64,6 +71,10 @@
       U.cls(els[f] ? els[f].el : list, 'is-focus', false);
       setFocus(nf, true);
     }
+    /* TV-Test 29.10.: nach Hinzufuegen/Entfernen/Zuruecksetzen blieb die Hinweisleiste der alten Zeile stehen (neue Reihe ohne
+     * "Entfernen/Verschieben", nach dem Entfernen "A Entfernen" auf einer eingebauten Reihe). Sofort und nach dem Schliessen
+     * eines Assistenten/Dialogs (der danach seine eigene Leiste abraeumt) neu */
+    function hintsNow() { N.router.refreshHints(); N.idle.add(function () { if (!dead) N.router.refreshHints(); }, 'hr-hints'); }
     function mkRow(i) {
       var e = { el: U.el('div', 'set-row hr-row', list, 'top:' + (i * STEP) + 'px') };
       e.lb = U.txt('div', 'lb', e.el, '');
@@ -76,10 +87,10 @@
     function paint(i) {
       var it = items[i], e = els[i];
       U.setText(e.lb, label(it));
-      U.setText(e.val, it.reset ? '' : locked(it) ? N.t(C.keys.always) : libName(it));
-      U.show(e.tg, !it.reset && !locked(it));
-      if (!it.reset) U.cls(e.tg, 'on', it.on);
-      U.cls(e.el, 'off', !it.reset && !it.on);
+      U.setText(e.val, special(it) ? '' : locked(it) ? N.t(C.keys.always) : libName(it));
+      U.show(e.tg, !special(it) && !locked(it));
+      if (!special(it)) U.cls(e.tg, 'on', it.on);
+      U.cls(e.el, 'off', !special(it) && !it.on);
     }
     function scrollFor(i) { return U.clamp(i - ANCHOR, 0, Math.max(0, items.length - VIS)); }
     function setFocus(i, jump) {
@@ -98,7 +109,7 @@
     /* ---------- Aenderungen ---------- */
     function save() {
       var vis = [];
-      for (var i = 0; i < items.length; i++) if (!items[i].reset) vis.push({ id: items[i].id, on: items[i].on });
+      for (var i = 0; i < items.length; i++) if (!special(items[i])) vis.push({ id: items[i].id, on: items[i].on });
       S.setSetting(C.setting, MOD.store(saved(), avail(), vis));
     }
     function toggle() {
@@ -107,7 +118,7 @@
       it.on = !it.on; paint(f); save();
     }
     function startMove() {
-      if (items[f].reset) return;
+      if (special(items[f])) return;
       moving = true; U.cls(els[f].el, 'is-move', true);
       U.setText(desc, descText(items[f]));
       N.router.refreshHints();
@@ -120,24 +131,71 @@
     }
     function step(dir) {
       var j = f + dir;
-      if (j < 0 || j >= items.length - 1) return;      // "Standard wiederherstellen" bleibt unten
+      if (j < 0 || j >= nRows()) return;               // "Reihe hinzufuegen …" und "Standard wiederherstellen" bleiben unten
       MOD.move(items, f, dir);
       U.cls(els[f].el, 'is-move', false);
       paint(f); paint(j);
       setFocus(j);
       U.cls(els[f].el, 'is-move', true);
     }
+    /* "Standard wiederherstellen": gibt es selbst hinzugefuegte (entfernbare) Reihen einer Erweiterung, fragt der Dialog, was mit
+     * ihnen geschieht – behalten (ausgeschaltet, am Ende) oder loeschen; Fokus auf "Abbrechen". Sonst die einfache Rueckfrage. */
     function reset() {
+      var own = false, i;
+      for (i = 0; i < items.length; i++) if (removable(items[i])) own = true;
+      if (own) {
+        N.ui.dialog.open({ title: N.t('dlg.hrReset.title'), text: N.t('dlg.hrResetOwn.text'), vertical: true, focus: 0,
+          buttons: [{ id: 'cancel', t: N.t('dlg.hrReset.cancel') }, { id: 'keep', t: N.t('dlg.hrResetOwn.keep') }, { id: 'all', t: N.t('dlg.hrResetOwn.all') }],
+          onSelect: function (id) {
+            if (dead || (id !== 'keep' && id !== 'all')) return;
+            if (id === 'all') S.setSetting(C.setting, null);
+            else { var av = avail(); S.setSetting(C.setting, MOD.store(null, av, MOD.view(null, av))); }   // Standard, eigene Reihen aus am Ende
+            rebuild(null); hintsNow();
+            N.ui.toast.show(N.t(id === 'all' ? 'toast.hrReset' : 'toast.hrResetKeep'), { icon: 'confirm' });
+          } });
+        return;
+      }
       N.ui.dialog.open({ title: N.t('dlg.hrReset.title'), text: N.t(K.resetText),
         buttons: [{ id: 'cancel', t: N.t('dlg.hrReset.cancel') }, { id: 'ok', t: N.t('dlg.hrReset.confirm') }], focus: 0,
         onSelect: function (id) {
           if (id !== 'ok') return;
           S.setSetting(C.setting, null);
-          rebuild(null);
+          rebuild(null); hintsNow();
           N.ui.toast.show(N.t('toast.hrReset'), { icon: 'confirm' });
         } });
     }
-    function activate() { if (items[f].reset) reset(); else toggle(); }
+    function activate() { if (items[f].reset) reset(); else if (items[f].add) addRow(items[f].add); else toggle(); }
+    function nRows() { var n = 0; for (var i = 0; i < items.length; i++) if (!special(items[i])) n++; return n; }
+    /* Erweiterung: Reihe hinzufuegen (Assistent der Erweiterung) -> eingeschaltet ans Ende der Reihen, Fokus darauf; gibt es sie
+     * schon, nur einschalten */
+    function addRow(a) {
+      N.ext.call('home:add', a.id, function (id) {
+        if (dead || !id || !/^x-/.test(id)) return;
+        var had = false, vis = [], i;
+        for (i = 0; i < items.length; i++) if (!special(items[i])) { if (items[i].id === id) { items[i].on = true; had = true; } vis.push({ id: items[i].id, on: items[i].on }); }
+        var sv = MOD.store(saved(), avail(), vis);       // Standard (null) erst ausschreiben, dann anhaengen
+        if (!had) sv.push({ id: id, on: true });
+        S.setSetting(C.setting, sv);
+        rebuild(id); hintsNow();
+        N.ui.toast.show(N.t(had ? 'toast.hrOn' : 'toast.hrAdded'), { icon: 'confirm' });
+      });
+    }
+    /* Erweiterung: hinzugefuegte Reihe entfernen (Rot, Rueckfrage mit Fokus auf "Behalten") */
+    function removeRow() {
+      var it = items[f];
+      if (!removable(it)) return;
+      N.ui.dialog.open({ title: N.t('dlg.hrRemove.title'), text: N.t('dlg.hrRemove.text', { row: label(it) }),
+        buttons: [{ id: 'keep', t: N.t('dlg.hrRemove.keep') }, { id: 'ok', t: N.t('dlg.hrRemove.confirm') }], focus: 0,
+        onSelect: function (id) {
+          if (id !== 'ok' || dead) return;
+          var out = [], l = saved() || MOD.view(null, avail()), i;
+          for (i = 0; i < l.length; i++) if (l[i] && l[i].id !== it.id) out.push({ id: l[i].id, on: !!l[i].on });
+          S.setSetting(C.setting, out);
+          var next = items[f + 1] && !special(items[f + 1]) ? items[f + 1].id : items[f - 1] ? items[f - 1].id : null;
+          rebuild(next); hintsNow();
+          N.ui.toast.show(N.t('toast.hrRemoved'), { icon: 'confirm' });
+        } });
+    }
 
     /* ---------- Hub-Katalog vom Server (Hintergrund) ---------- */
     function setStat(key) { U.setText(stat, key ? N.t(key) : ''); }
@@ -164,7 +222,8 @@
     s.hints = function () {
       if (moving) return [{ k: 'yellow', t: 'hint.drop' }];
       var list = [];
-      if (items[f] && !items[f].reset) list.push({ k: 'yellow', t: 'hint.move' });
+      if (removable(items[f])) list.push({ k: 'red', t: 'hint.removeRow' });
+      if (items[f] && !special(items[f])) list.push({ k: 'yellow', t: 'hint.move' });
       list.push({ k: 'ret', t: 'hint.back' }, { k: 'INFO', t: 'hint.learnMore' });
       return list;
     };
@@ -179,6 +238,7 @@
       if (k === 'UP' || k === 'DOWN') { n = N.nav.list(f, items.length, k, true); if (n >= 0) { setFocus(n); N.router.refreshHints(); } }
       else if (k === 'ENTER') activate();
       else if (k === 'YELLOW') startMove();
+      else if (k === 'RED') removeRow();
       else if (k === 'INFO') N.ui.panel.help(N.t(K.title), N.t(K.help));
       else if (k === 'RETURN') N.router.back();
       return true;
@@ -205,7 +265,7 @@
   }
   N.rowsEditor = editor;
   N.router.define('homerows', editor({
-    setting: 'homeRows',
+    setting: 'homeRows', ext: true,
     keys: { title: 'set.homeRows', how: 'set.hr.how', help: 'set.hr.help', resetDesc: 'set.hr.reset.desc', resetText: 'dlg.hrReset.text' },
     avail: function (c) { return HR.avail(c.libs, c.cat); },
     label: function (it, c) {
@@ -215,11 +275,17 @@
       if (it.id === 'ab') return N.t('mu.row.continue');   // M4
       if (p.group === 'new') { lib = c.libOf(p.lib); return N.t('home.row.newIn', { library: lib ? lib.title : '' }); }
       if (p.group === 'hub') return hubLabel(it.id, c);
+      if (p.group === 'ext') return N.ext.call('home:label', it.id) || it.id;   // Reihe einer Erweiterung
       return c.cat && c.cat.pl && c.cat.pl.title && c.cat.lang === N.i18n.lang() ? c.cat.pl.title : N.t('home.row.playlists');
     },
-    val: function (it, c) { var p = HR.parse(it.id), lib = p.group === 'hub' ? c.libOf(p.lib) : null; return lib ? lib.title : ''; },
+    val: function (it, c) {
+      var p = HR.parse(it.id), lib = p.group === 'hub' ? c.libOf(p.lib) : null;
+      if (p.group === 'ext') return N.ext.call('home:val', it.id) || '';
+      return lib ? lib.title : '';
+    },
     desc: function (it, c) {
       var p = HR.parse(it.id);
+      if (p.group === 'ext') return N.ext.call('home:desc', it.id) || '';
       if (it.id === 'ab') return N.t('mu.hr.ab.desc');   // M4
       if (it.id === 'cw' || it.id === 'deck' || it.id === 'pl') return N.t('set.hr.' + it.id + '.desc');
       var lib = c.libOf(p.lib), name = lib ? lib.title : '';

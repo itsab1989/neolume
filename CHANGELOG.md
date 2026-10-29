@@ -5,6 +5,92 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-10-29
+
+### Added
+- **New setting "Pointer scrolls at the edges"** (Settings → Display, on by default). With the Smart Control you can scroll
+  without clicking: rest the pointer at the top or bottom edge of a list and it scrolls on; on Home, resting it below the
+  cards takes you to the next row. If that feels too restless, switch it off – then lists only move when you click that
+  spot, press an arrow key or swipe on the touchpad. "Speed up pointer scrolling" now depends on it. INFO on the setting
+  explains everything.
+- **New setting "Recent searches"** (Settings → Display, also in kids profiles): choose how many of your last search terms
+  the app remembers per profile and shows before you type – **Off**, **4 terms** or **8 terms** (default; 8 terms of normal
+  length fill the two lines). Off stops remembering searches and deletes the current list. INFO on the setting explains
+  everything.
+- **Remove single search terms.** Move to a term under "Recent searches" and press the **red button** (the hint bar says
+  "Remove") – only that term disappears. The new **Clear history** chip at the end empties the whole list after asking
+  first. Works the same in Discover, which keeps its own list.
+- **Real fast-forward and rewind in videos (optional).** New setting **FF/rewind keys in videos** (Settings → Playback):
+  **Skip** (default, as before – each press jumps by the skip length) or **Fast-forward & rewind**. With the second choice
+  the fast-forward key makes the picture run 2×, 4×, 8× or 16× as fast, the rewind key slows down again and then runs
+  backwards; a small "8×" pill in the controls shows the speed, time and bar keep moving. PLAY or OK plays on normally
+  right there; pause, a jump or STOP end it cleanly, and rewinding to the very beginning simply plays on from 0:00. There
+  is no sound and no subtitles while scanning, and it only works when the TV plays the file directly – if the server has
+  to convert a video, the keys keep skipping and a short note under the buttons says why. Music and audiobooks are
+  unchanged. INFO on the setting explains everything.
+
+### Changed
+- **"Recent searches" takes much less room.** The terms now sit side by side like the genre chips on a details page and
+  wrap into at most two lines, instead of one below the other. The suggestions start right below and are fully visible
+  again. Very long terms end in "…"; if not all of them fit, the oldest are hidden (but still remembered). With the pointer you can point at and
+  click every term – nothing moves while you point.
+- **Screensaver: poster and big clock as one group.** With **Posters and covers** and the **Big clock** overlay, the poster
+  and the clock now sit together in the middle of the screen with an even gap, the poster level with the digits – before,
+  the poster hugged the left edge and the clock stood alone in the middle.
+- **Screensaver: a soft shadow under the poster.** In **Posters and covers** the poster or cover now has a gentle shadow, so
+  it seems to lie on the background instead of being pasted flat onto it.
+- **Screensaver: softer bottom darkening.** With the **Movie poster** and **Lower third** overlays the darkening behind the
+  text now starts much higher and far more gently, so on bright pictures you no longer see a line where it begins. The text
+  stays just as readable.
+- **Home always shows that more rows follow.** On a row with tall posters (for example *Recently added movies*) the next
+  heading used to slip off the bottom of the screen, so nothing hinted that more was below. Now the small down arrow and
+  the name of the next row appear at the bottom left in that case. Resting the pointer below the posters (or clicking
+  there) now also moves one row down – before, that only worked on rows whose next heading was visible. Passing over that
+  spot no longer jumps by accident: the pointer has to rest there for a moment.
+
+### Fixed
+- **The screensaver of a paused video now follows "Screensaver pictures".** With **Real backgrounds only** (default) it
+  shows the paused title's poster when its background is only a video still; with **Posters and covers** it always shows the
+  poster. A title without any background picture now shows its poster instead of a black screen with just the text.
+- **Search and Discover no longer jump around with the pointer.** Pointing at a result row used to scroll it to the top,
+  and moving the pointer onto the keyboard or onto *Recent searches* scrolled everything back – so the rows under the pointer
+  kept changing. Now pointing only highlights a row where it is; a row that is cut off comes in after a short rest, and the
+  top and bottom edges scroll one group at a time (with a small arrow, like in libraries).
+- **Detail pages no longer jump around with the pointer.** On movie, show, album and artist pages (and titles from
+  Discover), pointing at the season tabs, an episode or a row used to slide the whole page there at once – and the info text
+  at the top still reacted to sections that had already slid out of view, so the page could keep jumping while the pointer
+  rested. Now pointing only highlights things in the part of the page you are looking at. Something that only peeks in at
+  the bottom (like the season tabs under the buttons) comes up after a short rest or a click, and resting at the top or
+  bottom edge moves one section at a time, with the same small arrow as in libraries. With **Pointer scrolls at the edges**
+  switched off, only clicks, keys and the wheel move the page.
+- **The "View" tab in *Sort & filter* can be chosen reliably.** The tabs are laid out by the width of their names, but a
+  pointer click was checked against fixed slots, so clicking *View* usually opened *Filter*. Clicks now hit exactly the tab
+  under the pointer. With the arrow keys you can now also reach the tab row: press Up on the first entry, then Left/Right
+  to switch tabs and Down to go back to the list.
+- **Opening a show from an episode lands on that episode again.** Opening a show from *Continue watching* (or any episode)
+  sometimes left the info text on a grey "Season 2 · Episode 2" placeholder and stayed on the buttons instead of moving to
+  the episode. The page now waits for the episode list, focuses the episode you came from and shows its details. On the
+  season tabs the info text now follows the season you choose.
+- **Screensaver of a paused video: the poster moves with the text.** With **Posters and covers**, the clock and title
+  change place every few seconds – the poster used to stay put, so the text could end up on top of it. Now the poster
+  fades out and back in together with the text, always on the opposite side.
+- **Fast-forward & rewind polish.** The key overview (Settings → Help & info → Remote control keys) now describes FF/RW as set ("Skip by the skip
+  length" or "Fast-forward & rewind, direct play only") instead of "Skip further". Holding the key no longer races through
+  all speeds, a single refused speed no longer blocks it for the whole video, rewinding to the very start never counts as
+  "finished" (no watched mark, nothing autoplays), and scanning out of a long pause no longer jumps back a few seconds as
+  well. The "last episode" card hides while scanning, and the notes after the rewind key now say "Rewinding fast …". The
+  elapsed and remaining time under the bar now always add up to the length.
+- **Clearer texts.** In Search the red button is now called **Clear text** (it empties what you typed; *Clear history*
+  is the chip at the end of the list). A stored empty value for **Recent searches** no longer switches the list off. The
+  help for **Pointer scrolls at the edges** now names all places with the small arrow (libraries, albums, detail pages,
+  Search and Discover), and the help for **Screensaver pictures** is easier to follow.
+- **For porters:** a TV that reaches plex.tv over HTTPS is built without the helper and without the setup program and signs
+  in on the device (PROF-1); sign-out and account change for such ports (PROF-10) now have their own spec section, A4.5.
+  PLAY-33 describes the speed scale for TVs whose player can change the tempo, and PLAY-32 now says that an end event while
+  rewinding means the start, not the end.
+
+If fast-forwarding through the boring bits makes your evening, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.5] - 2026-10-28
 
 ### Added
@@ -296,7 +382,8 @@ that the TV talks only to your own server at home.
 
 If Neolume gives your TV a second life and you'd like to say thanks, a coffee on [Ko-fi](https://ko-fi.com/itsab1989) is always appreciated – entirely optional. ☕
 
-[Unreleased]: https://github.com/itsab1989/neolume/compare/v1.0.5...HEAD
+[Unreleased]: https://github.com/itsab1989/neolume/compare/v1.0.6...HEAD
+[1.0.6]: https://github.com/itsab1989/neolume/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/itsab1989/neolume/compare/v1.0.4...v1.0.5
 [1.0.1]: https://github.com/itsab1989/neolume/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/itsab1989/neolume/releases/tag/v1.0.0

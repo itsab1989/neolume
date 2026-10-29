@@ -4,7 +4,8 @@
  * - Raster: N.ui.Grid (Pool 25, Fokus-Anker y 176), Paging je 50 mit Platzhaltern, naechste Seiten 2 Zeilen vor dem Ende.
  * - Buchstaben-Register (nur Titelsortierung): 5 Positionen, ▶ aus der letzten Spalte, ▲▼ waehlt, OK springt; Ziffern = T9-Sprung.
  * - Sortierung, Filter und Reiter je Bibliothek + Profil gemerkt (N.lib). Person-Filter (aus der Besetzung) gilt nur fuer diesen Aufruf.
- * params: {lib:{id,title,type,kind}, coll:{rk,title} (Sammlung oeffnen), actor:{id,t} (Filter "mit <Person>"), view:'L'|'M'|'S'|'list' (nicht gemerkt)} */
+ * params: {lib:{id,title,type,kind}, coll:{rk,title} (Sammlung oeffnen), actor:{id,t} (Filter "mit <Person>"), view:'L'|'M'|'S'|'list' (nicht gemerkt),
+ *   xtab: Reiter einer Erweiterung gleich oeffnen (Kennung; '*' = erster mit Quelle – Messlauf lib-xtab)} */
 (function (N) {
   var U = N.util, M = N.model, G = N.GridMath, L = N.lib, REST = 300;
   var REG_X = 1160, REG_Y = 168, REG_STEP = 17, LETTERS = '#ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -20,8 +21,10 @@
     var prefs = null, items = [], n = -1, total = -1, chars = [], pages = {}, gen = 0, tasks = [], collN = -1;
     // M4 Musik/Hoerbuecher: Reiter 'lib' = Kuenstler (Musik) bzw. Buecher (Hoerbuecher), 'alt' = Alben bzw. Autoren; quadratische Karten
     var music = lib.type === 'artist', book = music && N.music.bookLib(lib);
-    // Erweiterung (N.ext 'lib:tabs'/'lib:items'/'lib:status'): eigener Reiter mit fertiger Titelliste (z. B. eine Merkliste der Erweiterung), nie gemerkt
-    var xtab = '';
+    // Erweiterung (N.ext 'lib:tabs'/'lib:items'/'lib:status'): eigener Reiter mit fertiger Titelliste (z. B. eine Merkliste der Erweiterung), nie gemerkt.
+    // Reiter mit Quelle (tab.src): Liste waechst seitenweise (src.load im Leerlauf, wenn der Fokus 2 Zeilen vor dem Ende ist), eigenes
+    // Sortieren & Filter (src.tabs/pick) + Ansicht, Hinweis unter der letzten Zeile (src.end), Statuszeile (src.status), Optionen (src.menu/act)
+    var xtab = '', xsrc = null;
     var restoreF = 0, zone = 'grid', cf = 0, regCh = '', regT = 0, t9 = { d: '', c: 0, t: 0 }, bubbleTm = 0, dead = false, away = false, railOpen = false, onScanned = null;
 
     /* ---------- Aufbau ---------- */
@@ -58,7 +61,8 @@
       if (dead || away) return;
       var has = false, l = xtabs();
       for (var i = 0; i < l.length; i++) if (l[i].id === xtab) has = true;
-      if (xtab && !has) { xtab = ''; reload(); return; }
+      if (xtab && !has) { xtab = ''; xsrc = null; reload(); return; }
+      if (xsrc) { if (xsrc.restamp && n > 0) { xsrc.restamp(); grid.refresh(Math.max(0, grid.f - 10), Math.min(n - 1, grid.f + 15)); } buildChips(); paintStatus(); return; }
       if (xtab) { var f = grid.f, x = N.ext.call('lib:items', lib, xtab) || []; if (x.length !== n || zone !== 'grid') { restoreF = Math.min(f, Math.max(0, x.length - 1)); reload(true); return; } items = x; grid.setModel(items, n, f); placeRing(grid.ringPos()); }
       buildChips();
     }
@@ -79,7 +83,7 @@
         if (collN > 0) d.push({ id: 'tab-coll', t: 'lib.tab.collections', act: !xtab && prefs.tab === 'coll' });
         for (var i = 0; i < xt.length; i++) d.push({ id: 'tab-x-' + xt[i].id, tx: xt[i].t, act: xtab === xt[i].id });
       }
-      if (mode() === 'lib') d.push({ id: 'sort', t: 'lib.chip' });
+      if (mode() === 'lib' || xPanel()) d.push({ id: 'sort', t: 'lib.chip' });
       if (mode() !== 'colls' && mode() !== 'x' && !book) { d.push({ id: 'all', t: 'lib.playAll' }); d.push({ id: 'shuffle', t: 'lib.shuffle' }); }
       return d;
     }
@@ -106,7 +110,7 @@
     function paintStatus() {
       if (n < 0) { U.setText(statT, N.t('common.loading')); return; }
       if (mode() === 'colls') { U.setText(statT, N.tn('lib.status.colls', n)); return; }
-      if (mode() === 'x') { U.setText(statT, N.ext.call('lib:status', lib, xtab, n) || ''); return; }
+      if (mode() === 'x') { U.setText(statT, (xsrc ? xsrc.status(n) : N.ext.call('lib:status', lib, xtab, n)) || ''); return; }
       if (coll) { U.setText(statT, N.tn('lib.status.items', n)); return; }
       U.setText(statT, L.status(n, total, prefs, qlib()));
     }
@@ -145,6 +149,7 @@
       if (G.size !== L.view(prefs) || !!G.square !== music) { G = N.GridMath.make(L.view(prefs), music); grid.setGeom(G); }   // Ansicht Gross/Mittel/Klein/Liste
       buildChips(); paintStatus();
       U.cls(grid.clip, 'is-ext', mode() === 'x');       // Erweiterungs-Reiter: Karten gedimmt (nicht abspielbar), per Klasse am Raster
+      if (xsrc) { items = xsrc.items(); if (!items.length && xsrc.more()) { xLoad(); return; } n = items.length; firstPaint(); return; }
       if (mode() === 'x') { items = N.ext.call('lib:items', lib, xtab) || []; n = items.length; firstPaint(); return; }
       if (srv && !N.srv.conn(srv)) U.setText(statT, N.t('srv.connecting', { server: lib.srvName || N.srv.name(srv) }));   // weiterer Server: Verbindung wird geprueft
       loadPage(0);
@@ -171,8 +176,38 @@
       paintReg(true);
       N.idle.add(updateHints, 'lib-hints');
       amb.focus(cur()); amb.data();
+      if (xsrc) grid.endNote(xEnd());
     }
-    function ensurePages() { var ps = G.pagesFor(n, grid.r); for (var i = 0; i < ps.length; i++) loadPage(ps[i]); }
+    function ensurePages() { if (xsrc) { xNear(); return; } var ps = G.pagesFor(n, grid.r); for (var i = 0; i < ps.length; i++) loadPage(ps[i]); }
+    /* ---------- Reiter mit Quelle (Erweiterung) ---------- */
+    function xPanel() { return !!(xsrc && xsrc.tabs); }
+    function xEnd() { return n > 0 && !xsrc.more() ? xsrc.end() || '' : ''; }
+    /* naechste Seite: erst wenn der Fokus hoechstens 2 Zeilen vor dem Ende steht, und dann aus dem Leerlauf (nie im Fokusschritt) */
+    function xNear() {
+      if (!xsrc || n <= 0 || !xsrc.more() || xsrc.busy() || G.row(n - 1) - G.row(grid.f) > 2) return;
+      var g = gen;
+      N.idle.add(function () { if (g === gen && !dead && xsrc && !xsrc.busy()) xLoad(); }, 'lib-xmore');
+    }
+    function xLoad() {
+      var g = gen, src = xsrc;
+      src.load(function (err) {
+        if (g !== gen || dead || src !== xsrc) return;
+        var l = src.items();
+        if (n < 0) {
+          if (!l.length && err) { xError(err); return; }
+          items = l; n = l.length; firstPaint(); return;
+        }
+        if (l.length > n) { items = l; n = l.length; grid.grow(items, n); }
+        grid.endNote(xEnd()); paintStatus();
+        if (!away) xNear();
+      });
+    }
+    function xError(err) {
+      var tx = xsrc.err(err);
+      U.show(skel, false); ring.hide(); U.setText(statT, '');
+      sb.show({ title: tx.title, text: tx.text, buttons: [{ id: 'retry', t: N.t('err.btn.retry') }], onSelect: function () { sb.hide(); reload(true); } });
+      zone = 'state';
+    }
     function onError(err) {
       U.show(skel, false); ring.hide();
       var kind = N.errs.kind(err, 'pms'), tx;
@@ -196,6 +231,13 @@
     }
     function showEmpty() {
       ring.hide(); grid.clear(); hideReg(); amb.focus(null);
+      if (xsrc) {
+        var em = xsrc.empty();
+        sb.show({ title: em.title, text: em.text, buttons: em.reset ? [{ id: 'reset', t: N.t('lib.filter.reset') }] : [], onSelect: function () { xsrc.reset(); restoreF = 0; reload(); } });
+        zone = sb.ids.length ? 'state' : chips.length ? 'chips' : 'state';
+        if (zone === 'chips') setChip(0, true);
+        return;
+      }
       var key = mode() === 'colls' ? 'empty.colls' : L.hasFilter(prefs) && !coll ? 'empty.filter' : 'empty.library';
       sb.show({ title: N.t(key + '.title'), text: N.t(key + '.text'), buttons: key === 'empty.filter' ? [{ id: 'reset', t: N.t('lib.filter.reset') }] : [],
         onSelect: function () { resetFilter(); } });
@@ -256,10 +298,17 @@
       cf = U.clamp(i, 0, chips.length - 1);
       U.cls(chips[cf].el, 'is-focus', true);
     }
+    /* ▲ aus der ersten Reihe: auf den aktiven Reiter (TV-Test 29.10.: landete auf "Sortieren & Filter", ▶ dann auf "Alle abspielen"
+     * und ein OK spielte sofort ab). Ohne Reiter: "Sortieren & Filter", sonst der erste Chip. Nie direkt "Alle abspielen". */
+    function upChip() {
+      for (var i = 0; i < chips.length; i++) if (chips[i].act) return i;
+      for (i = 0; i < chips.length; i++) if (chips[i].id === 'sort') return i;
+      return 0;
+    }
     function toChips() {
       if (!chips.length) return;
       zone = 'chips'; grid.setFocused(false); ring.hide();
-      setChip(chipIndex(mode() === 'lib' ? 'sort' : mode() === 'x' ? 'tab-x-' + xtab : 'all'), true);
+      setChip(upChip(), true);
       N.router.refreshHints();
     }
     function toGrid() {
@@ -281,7 +330,8 @@
     function cur() { return n > 0 ? grid.item(grid.f) : null; }
     function open(it) {
       if (!it) return;
-      if (it.ext) { N.router.push('extdetails', { it: it }); return; }   // Titel ausserhalb des Servers (Erweiterungs-Reiter)
+      if (it.ext && xsrc && xsrc.open && xsrc.open(it)) return;          // Reiter mit Quelle: z. B. schon vorhandener Titel -> echte Seite
+      if (it.ext) { N.router.push('extdetails', { it: it, rail: s.rail }); return; }   // Titel ausserhalb des Servers (Erweiterungs-Reiter); Marke bleibt auf der Bibliothek (TV-Test 29.10.)
       if (it.type === 'collection') { N.router.push('library', { lib: lib, coll: { rk: it.rk, title: it.title } }); return; }
       if (music && N.music.open(it)) return;
       N.details.open(it);
@@ -318,6 +368,7 @@
       return out;
     }
     function sortFilter(tab) {
+      if (xPanel()) { xSortFilter(tab); return; }
       if (mode() !== 'lib') return;
       N.ui.tabPanel.open({ title: N.t('lib.chip'), tab: tab || 0,
         tabs: [{ t: N.t('lib.panel.tabSort'), entries: sortEntries }, { t: N.t('lib.panel.tabFilter'), entries: filterEntries }, { t: N.t('lib.panel.tabView'), entries: viewEntries }],
@@ -331,6 +382,19 @@
           if (id === 'reset') { p.f = { status: '' }; params.actor = null; setPrefs(p); return false; }
           if (id.indexOf('ls:') === 0) { pickValue(id.slice(3)); return false; }
           return false;
+        } });
+    }
+    /* Sortieren & Filter eines Reiters mit Quelle: Reiter der Quelle + "Ansicht" (wie die Bibliothek). onPick der Quelle: true = offen
+     * lassen; ctx.reload() laedt neu (Fokus auf den Anfang), ctx.reopen(t) oeffnet das Panel wieder (z. B. nach einer Werteliste) */
+    function xSortFilter(tab) {
+      var src = xsrc, tabs = src.tabs(), vi = tabs.length;
+      var ctx = { reload: function () { if (src === xsrc && !dead) { restoreF = 0; reload(); } }, reopen: function (t) { if (src === xsrc && !dead && !away) xSortFilter(t); } };
+      N.ui.tabPanel.open({ title: N.t('lib.chip'), tab: Math.min(tab || 0, vi),
+        tabs: tabs.concat([{ t: N.t('lib.panel.tabView'), entries: viewEntries }]),
+        keys: { RED: function () {} },
+        onPick: function (t, id) {
+          if (t === vi) { var pv = U.extend({}, prefs); pv.view = id; restoreF = grid.f; prefs = pv; if (!coll && !params.actor) L.save(libKey, prefs); reload(true); return true; }
+          return src.pick(t, id, ctx);
         } });
     }
     /* Werte eines Zusatzfilters vom Server (lazy), Auswahl-Panel; RETURN -> zurueck ins Filter-Panel */
@@ -399,10 +463,11 @@
       if (pl && M.isLeaf(it) && M.progress(it) > 0) b.push({ id: 'start', t: N.t('menu.fromStart') });
       if (pl && M.isVideo(it)) b.push({ id: 'watched', t: N.t(M.watched(it) ? 'menu.markUnwatched' : 'menu.markWatched') });
       if (pl) b = b.concat(N.anime.menuButtons(it));
+      if (it && it.ext && xsrc && xsrc.menu) b = b.concat(xsrc.menu(it));   // Reiter mit Quelle: eigene Aktionen der Erweiterung
       if (it) b.push({ id: 'info', t: N.t('menu.info') });
       if (mode() !== 'colls' && mode() !== 'x' && n > 0) { b.push({ id: 'all', t: N.t('lib.playAll') }); b.push({ id: 'shuffle', t: N.t('lib.shuffle') }); }
-      if (mode() === 'lib') b.push({ id: 'sort', t: N.t('lib.chip') });
-      if (!coll && !srv && N.session.isAdmin()) b.push({ id: 'scan', t: N.t('menu.scanLib') });
+      if (mode() === 'lib' || xPanel()) b.push({ id: 'sort', t: N.t('lib.chip') });
+      if (!coll && !srv && N.session.isAdmin() && !xsrc) b.push({ id: 'scan', t: N.t('menu.scanLib') });
       if (!b.length) return;
       N.ui.dialog.open({ title: it ? it.title : (coll ? coll.title : lib.title), buttons: b, vertical: true, focus: 0, top: 120,
         onSelect: function (id) {
@@ -414,6 +479,7 @@
           else if (id === 'shuffle') playAll(true);
           else if (id === 'sort') sortFilter(0);
           else if (id === 'scan') N.scan.start(lib.id);
+          else if (xsrc && xsrc.act && xsrc.act(id, it, function () { var j = grid.items.indexOf(it); if (j >= 0 && !dead) grid.refresh(j, j); })) return;
           else N.anime.menuPick(id, it);
         } });
     }
@@ -423,18 +489,23 @@
       else if (id === 'shuffle') playAll(true);
       else if (id === 'tab-lib' || id === 'tab-coll' || id === 'tab-alt') {
         var t = id.slice(4), wasX = !!xtab;
-        xtab = '';
+        xtab = ''; xsrc = null;
         if (t !== prefs.tab) { var p = U.extend({}, prefs); p.tab = t; cf = chipIndex(id); setPrefs(p); }
         else if (wasX) { cf = chipIndex(id); restoreF = 0; reload(); }
       }
-      else if (id.indexOf('tab-x-') === 0 && id.slice(6) !== xtab) { xtab = id.slice(6); cf = chipIndex(id); restoreF = 0; reload(); }
+      else if (id.indexOf('tab-x-') === 0 && id.slice(6) !== xtab) {
+        xtab = id.slice(6); xsrc = null;
+        var xt = xtabs();
+        for (var i = 0; i < xt.length; i++) if (xt[i].id === xtab) xsrc = xt[i].src || null;
+        cf = chipIndex(id); restoreF = 0; reload();
+      }
     }
 
     /* ---------- Hinweisleiste ---------- */
     s.hints = function () {
       if (sb.on && zone === 'state') return [{ k: 'blue', t: 'hint.search' }, { k: 'ret', t: 'hint.back' }];
       var it = zone === 'grid' ? cur() : null, list = [];
-      if (mode() === 'lib') list.push({ k: 'red', t: 'hint.sort' });
+      if (mode() === 'lib' || xPanel()) list.push({ k: 'red', t: 'hint.sort' });
       if (it && !it.ext && M.isVideo(it)) list.push({ k: 'yellow', t: M.watched(it) ? 'hint.markUnwatched' : 'hint.markWatched' });
       list.push({ k: 'blue', t: 'hint.search' });
       if (it) list.push({ k: 'INFO', t: 'hint.details' });
@@ -453,6 +524,7 @@
         if (restore) { restoreF = restore.f || 0; if (restore.prefs) prefs = restore.prefs; }
         if (!coll && !params.actor) checkColls();
         if (music && !coll) N.music.probeLib(lib, function (b) { if (!dead && b !== book) { book = b; if (!restore) prefs = L.load(libKey); reload(true); } });
+        if (params.xtab && !restore) { var xl = xtabs(); for (var xi = 0; xi < xl.length && !xtab; xi++) if (xl[xi].id === params.xtab || (params.xtab === '*' && xl[xi].src)) { xtab = xl[xi].id; xsrc = xl[xi].src || null; } }
         reload(true);
         return;
       }

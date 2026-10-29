@@ -68,6 +68,20 @@ test('Staffeln: Specials zuletzt, Start-Staffel (Wunsch > naechste Folge > erste
   assert.strictEqual(D.pickSeason(s, null, { s: 1 }), 0);
   assert.strictEqual(D.pickSeason(s, null, null), 1);
 });
+test('Staffeln mit Katalog-Staffel (TV-Befund 1.0.5): Start-Staffel nie eine nur virtuelle, Position bleibt beim Ergaenzen, Reiter-Kennung', function () {
+  var s2 = { index: 2, leaf: 12, vleaf: 0, rk: '52' }, sp = { index: 0, leaf: 2, vleaf: 0, rk: '50' };
+  var v1 = { index: 1, leaf: 8, vleaf: 0, rk: '', virtual: true, miss: true };
+  var base = [s2, sp], mixed = [v1, s2, sp];
+  assert.strictEqual(D.pickSeason(base, null, null), 0);
+  assert.strictEqual(D.pickSeason(mixed, null, null), 1, 'gleiche Staffel wie ohne Katalog-Staffel (Staffel 2)');
+  assert.strictEqual(D.pickSeason(mixed, null, { s: 1 }), 1, 'naechste Folge in einer fehlenden Staffel -> trotzdem eine vorhandene');
+  assert.strictEqual(D.pickSeason(mixed, 1, null), 0, 'ausdruecklicher Wunsch (Staffel geoeffnet) gilt');
+  assert.strictEqual(D.pickSeason([v1, { index: 2, leaf: 12, vleaf: 12 }], null, null), 1, 'alles gesehen: erste vorhandene');
+  assert.strictEqual(D.seasonPos(mixed, base[0], 0), 1, 'Staffel 2 rutscht auf Platz 2, bleibt gewaehlt');
+  assert.strictEqual(D.seasonPos(base, v1, 5), 1, 'nicht mehr da -> geklemmt');
+  assert.strictEqual(D.tabSig(mixed), '1m,2,0');
+  assert.strictEqual(D.tabSig([v1, s2, sp].slice()), D.tabSig(mixed), 'gleiche Reiter -> nicht neu bauen');
+});
 test('Folgen: Fokus (angefangen > erste ungesehene), Beschriftung, Ziffernsprung auch bei Platzhaltern', function () {
   var M = N.model, eps = [];
   for (var i = 1; i <= 60; i++) eps.push(i <= 50 ? M.norm({ ratingKey: String(i), type: 'episode', index: i, title: 'T' + i, duration: 1440000, viewCount: i < 4 ? 1 : 0, viewOffset: i === 6 ? 600000 : 0 }) : D.placeholder(1, i));

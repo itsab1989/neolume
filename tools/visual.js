@@ -330,6 +330,18 @@ function colorFor(s) { if (s.indexOf('/hell') >= 0) return [244, 244, 242];   //
  * schwierigste Faelle vorn: erster Titel fast weiss (Farben + sehr helle Art /a/hell…), zweiter knallbunt */
 var UB_HARD = [['f4f1e8', 'fffef5', 'e8e4d8', 'f9f6ee'], ['ff2d6e', 'ffd400', '00e5ff', '7cff00']];
 function hex6(c) { return c.map(function (v) { return ('0' + Math.round(v * 0.6).toString(16)).slice(-2); }).join(''); }
+/* Pause-Schoner (Seeds svPicPause*): Bilder des pausierten Titels als PMS-Pfade (Standbild-Pruefung ueber /arts), Plakate als /t/… */
+function pauseData(o) {
+  if (!/^svPicPause/.test(curSeed) || !o || !o.MediaContainer || !o.MediaContainer.Metadata) return o;
+  var x = JSON.parse(JSON.stringify(o));
+  x.MediaContainer.Metadata.forEach(function (m) {
+    if (m.art) m.art = '/library/metadata/' + m.ratingKey + '/art/1';
+    if (m.grandparentArt) m.grandparentArt = '/library/metadata/' + (m.grandparentRatingKey || m.ratingKey) + '/art/1';
+    if (m.thumb) m.thumb = '/t/p' + m.ratingKey;
+    if (m.grandparentThumb) m.grandparentThumb = '/t/g' + (m.grandparentRatingKey || m.ratingKey);
+  });
+  return x;
+}
 function ambData(o, p) {
   if (!/^amb/.test(curSeed) || !/^\/library\/(sections|collections)\//.test(p) || !o || !o.MediaContainer || !o.MediaContainer.Metadata) return o;
   var x = JSON.parse(JSON.stringify(o)), off = Number(x.MediaContainer.offset) || 0;
@@ -367,7 +379,7 @@ function startServer(cb) {
   function handle(req, res) {
     var u = new URL(req.url, 'http://x'), p = u.pathname;
     function cors() { res.setHeader('Access-Control-Allow-Origin', '*'); res.setHeader('Access-Control-Allow-Headers', '*'); res.setHeader('Access-Control-Allow-Methods', '*'); }
-    function json(o, code) { o = ambData(o, p); cors(); res.writeHead(code || 200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); }
+    function json(o, code) { o = pauseData(ambData(o, p)); cors(); res.writeHead(code || 200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); }
     if (req.method === 'OPTIONS') { cors(); res.writeHead(200); return res.end(); }
     if (p === '/log' && req.method === 'POST') {
       var body = ''; req.on('data', function (c) { body += c; });
@@ -403,9 +415,11 @@ function startServer(cb) {
       if (/^svPic/.test(curSeed) && /^\/t\//.test(src)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(gradPng(w, Math.round(w * 1.5), function (c) { return darken(c, u.searchParams); })); }
       if (u.searchParams.get('blur') && w >= 640 && !/\/a\/|\/art\//.test(src)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(posterPng(w, darken(colorFor(src), u.searchParams))); }
       var pa0 = /^svPic/.test(curSeed) && /^\/library\/metadata\/(\d+)\/art\//.exec(src);
+      if (pa0 && /^svPicPause/.test(curSeed)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(/Still/.test(curSeed) ? busyPng(w, h) : gradPng(w, h, function (c) { return darken(c, u.searchParams); })); }
       if (pa0) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(Number(pa0[1]) % 2 ? busyPng(w, h) : gradPng(w, h, function (c) { return darken(c, u.searchParams); })); }
       var sv = /^sv[A-Z]/.test(curSeed) && /^\/a\//.test(src);   // Bildschirmschoner-Szenen: helles, dunkles, unruhiges Bild
       if (curSeed === 'ambCorner' && /^\/a\//.test(src)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(gradPng(w, h, function (c) { return darken(c, u.searchParams); })); }
+      if (sv && /Color/.test(curSeed)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(gradPng(w, h)); }   // knallbunt, hell
       if (sv && /Busy/.test(curSeed)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(busyPng(w, h)); }
       if (sv) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(solidPng(w, h, /Bright/.test(curSeed) ? [246, 246, 244] : [14, 14, 16])); }
       cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(solidPng(w, h, darken(colorFor(u.searchParams.get('url') || ''), u.searchParams)));
@@ -417,7 +431,7 @@ function startServer(cb) {
     if (p === '/hubs/sections/1') return json(syn('hubs-1.json'));          // Server-Hubs (Startseite anpassen)
     if (p === '/hubs') return json({ MediaContainer: { size: 1, Hub: [{ hubIdentifier: 'home.playlists', type: 'playlist', title: 'Zuletzt genutzte Playlists', size: 0 }] } });
     if (p === '/hubs/home/recentlyAdded') { var f = 'recent-' + u.searchParams.get('sectionID') + '.json'; return json(fs.existsSync(path.join(SYN, f)) ? syn(f) : { MediaContainer: { size: 0 } }); }
-    if (p === '/video/:/transcode/universal/decision') return json(syn('decision-direct.json'));
+    if (p === '/video/:/transcode/universal/decision') return json(syn(/^trickHls/.test(curSeed) ? 'decision-hevc.json' : 'decision-direct.json'));
     if (p === '/playQueues' && req.method === 'POST') return json(playQueue((u.searchParams.get('key') || new URL(u.searchParams.get('uri').replace('server://', 'http://')).pathname).split('/').pop()));   // wie der PMS: key = gewaehlte Folge (uri = Serie)
     var mr = musicRoute(p, u.searchParams);
     if (mr) return json(mr);
@@ -442,6 +456,7 @@ function startServer(cb) {
     }
     if (/^\/library\/collections\/\d+\/children$/.test(p)) return json(page(LIB[1].slice(0, 6), u.searchParams));
     var arm = /^\/library\/metadata\/(\d+)\/arts$/.exec(p);   // SAV-5: Bildauswahl wie am PMS – ungerade rk: Standbild (media://) ausgewaehlt
+    if (arm && /^svPicPause/.test(curSeed)) return json({ MediaContainer: { size: 1, Metadata: [{ ratingKey: /Still/.test(curSeed) ? 'media://1/ab.bundle/Contents/Art/art1.jpg' : 'metadata://art/tv.plex.agents.movie_ab', selected: true }] } });
     if (arm) return json({ MediaContainer: { size: 2, Metadata: [{ ratingKey: 'https://image.example.org/a.jpg', selected: false, provider: 'tmdb' },
       { ratingKey: Number(arm[1]) % 2 ? 'media://1/ab.bundle/Contents/Art/art1.jpg' : 'metadata://art/tv.plex.agents.movie_ab', selected: true }] } });
     if (p === '/hubs/search') return json(search(u.searchParams.get('query')));
@@ -553,10 +568,26 @@ function makeSeeds(port) {
   seeds.playEn = seed({ lang: 'en' }, null, cfgPlay);
   seeds.bookPlay = seed({}, null, cfgPlay); seeds.bookPlayEn = seed({ lang: 'en' }, null, cfgPlay);   // Jetzt laeuft als Hoerbuch (Kapitel = Titel)
   seeds.playAsym = seed({}, { 'settings-aaaa1111.json': { seekArrows: '10/30', seekFf: '15/30' } }, cfgPlay);   // -10/+30 auf den Knoepfen
+  // Schnellspulen (SPEC PLAY-32): Einstellung "Schnell spulen"; trickHls: der Server wandelt um (decision-hevc) -> Spruenge + Hinweis
+  seeds.playTrick = seed({}, { 'settings-aaaa1111.json': { ffrw: 'trick' } }, cfgPlay);
+  seeds.playTrickEn = seed({ lang: 'en', accent: 'violet' }, { 'settings-aaaa1111.json': { ffrw: 'trick', accent: 'violet' } }, cfgPlay);
+  seeds.trickHls = seed({}, { 'settings-aaaa1111.json': { ffrw: 'trick' } }, cfgPlay);
+  seeds.trickHlsEn = seed({ lang: 'en' }, { 'settings-aaaa1111.json': { ffrw: 'trick' } }, cfgPlay);
   // Zeiger-Randzone: Verweilen loest nie aus (ptrEdgeDwell) -> stehende Anzeige-Pille; Zeiger aus -> abhaengige Einstellung grau
   seeds.ptrHold = seed({}, null, JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, ptrEdgeDwell: 600000 }));
   seeds.ptrHoldPlay = seed({}, null, JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', sefFake: 'still', seekDelay: 600000, fixedClock: '21:34', welcome: false, ptrEdgeDwell: 600000 }));
   seeds.ptrOff = seed({ pointer: false });
+  // Nutzer-Feedback 28.10. "Zuletzt gesucht" (Chips in 2 Zeilen, Rot entfernt, Verlauf loeschen, Einstellung Aus/4/8, Standard 8); erfundene Begriffe.
+  // REC8: 8 normal lange Begriffe fuellen die 2 Zeilen (mit "Verlauf loeschen"); RECL: 8 Begriffe mit sehr langen -> aelteste ausgeblendet
+  var REC8 = ['Nordlicht', 'Bergklang', 'Krimi', 'Hafenlichter', 'Aurora Weiss', 'Sterne', 'Winterreise', 'Leuchtfeuer'];
+  var RECL = ['The Extraordinarily Long Journey Across the Silent Mountain', 'Frost & Fire', 'A very long documentary about whales and the deep blue sea', 'Echo', 'Glass beads', 'Harbour lights', 'Silver lake', 'Moonrise'];
+  var cfgHold = JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, ptrEdgeDwell: 600000 });
+  seeds.recent8 = seed({}, { 'search-aaaa1111.json': { q: REC8 }, 'disc-aaaa1111.json': { q: REC8.slice(0, 5) } });
+  seeds.recent8En = seed({ lang: 'en' }, { 'search-aaaa1111.json': { q: ['Northern lights', 'Mountain song', 'Crime', 'Harbour lights', 'Aurora', 'Stars', 'Winter trip', 'Beacon'] } });
+  seeds.recent4 = seed({}, { 'search-aaaa1111.json': { q: REC8 }, 'settings-aaaa1111.json': { recentSearches: 3 } });   // fruehere Stufe 3 -> 4 (Migration)
+  seeds.recentLongEn = seed({ lang: 'en' }, { 'search-aaaa1111.json': { q: RECL } });
+  seeds.recentPtr = seed({}, { 'search-aaaa1111.json': { q: REC8 } }, cfgHold);
+  seeds.ptrEdgeOff = seed({ ptrEdge: false }, null, JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, ptrEdgeDwell: 600000 }));   // "Zeiger blaettert am Rand weiter" aus
   // Feinauswahl am Balken (SPEC PLAY-30): Einstellung an, Zeiger-Verweilen echt (700 ms), heller "Film" (fakeBg) und Vorschaubilder aus
   // sub: feste Untertitel-Zeile (config.fakeSub, nur Bildtest) – Kollision Lasche/Untertitel sichtbar machen
   var cfgLp = function (bg, sub) { return JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', sefFake: 'still', seekDelay: 600000, fixedClock: '21:34', welcome: false, ptrEdgeDwell: 600000, fakeBg: bg || undefined, fakeSub: sub || undefined }); };
@@ -607,6 +638,7 @@ function makeSeeds(port) {
     helperUrl: 'http://127.0.0.1:' + port, helperKey: 'visual-helper-key-0001' });
   seeds.inspNew = seed({}, null, cfgHelper);
   seeds.inspNewEn = seed({ lang: 'en' }, null, cfgHelper);
+  seeds.inspNewPtr = seed({}, null, cfgHelper.replace('}', ', "ptrEdgeDwell": 600000}'));   // Zeiger-Szenen mit Helfer: Randzone zeigt nur die Pille
   seeds.inspNewOff = seed({}, { 'settings-aaaa1111.json': { inspHideOwn: false } }, cfgHelper);
   seeds.pkgSrvHelper = seed(pkgState, null, cfgHelper) + pkgWith(['http://127.0.0.1:' + friendPort]);
   seeds.noart = seed();                                                                               // Hero ohne Art: Poster unscharf
@@ -655,6 +687,29 @@ function makeSeeds(port) {
     seeds['svPicPoster' + cap + 'En1'] = seed({ lang: 'en' }, { 'settings-aaaa1111.json': { saverLibs: [1], saverFx: 'cut', saverPics: 'poster', saverInfo: st } },
       JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, saverMs: 1500, saverPos: 1 }));
   });
+  // Bunte, helle Bilder fuer die Leisten (Band unten weich, Text lesbar) und Grosse Uhr + Poster (Gruppe mittig) in weiteren Lagen
+  ['poster', 'lower'].forEach(function (st) {
+    var cap = st.charAt(0).toUpperCase() + st.slice(1);
+    seeds['svColor' + cap] = seed({}, { 'settings-aaaa1111.json': { saverInfo: st, saverLibs: [1], saverFx: 'cut' } }, svCfg);
+    seeds['svColor' + cap + 'Pos2'] = seed({}, { 'settings-aaaa1111.json': { saverInfo: st, saverLibs: [1], saverFx: 'cut' } },
+      JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, saverMs: 1500, saverPos: 2 }));
+  });
+  [2, 3].forEach(function (k) {
+    seeds['svPicPosterBigclockPos' + k] = seed({ lang: k === 3 ? 'en' : 'de' }, { 'settings-aaaa1111.json': { saverLibs: [1], saverFx: 'cut', saverPics: 'poster', saverInfo: 'bigclock' } },
+      JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, saverMs: 1500, saverPos: k }));
+  });
+  // Pause-Schoner (pausiertes Video) nach "Bilder im Bildschirmschoner": Standbild/echtes Bild je Modus
+  var svPauseCfg = JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', sefFake: 'still', seekDelay: 600000, fixedClock: '21:34', welcome: false, saverMs: 1500 });
+  seeds.svPicPauseStill = seed({}, null, svPauseCfg);                                                                       // Standard: Standbild -> Plakat
+  seeds.svPicPauseStillStills = seed({}, { 'settings-aaaa1111.json': { saverPics: 'stills' } }, svPauseCfg);                // Auch Standbilder: Standbild
+  seeds.svPicPauseReal = seed({}, null, svPauseCfg);                                                                        // echtes Hintergrundbild
+  seeds.keysTrick = seed({}, { 'settings-aaaa1111.json': { ffrw: 'trick' } });                      // Tastenbelegung: FF/REW folgt "Schnell spulen"
+  seeds.keysTrickEn = seed({ lang: 'en' }, { 'settings-aaaa1111.json': { ffrw: 'trick' } });
+  seeds.svPicPausePosterEn = seed({ lang: 'en' }, { 'settings-aaaa1111.json': { saverPics: 'poster', saverInfo: 'bigclock' } }, svPauseCfg);
+  // Pause-Schoner mit Plakat: Einblendung wandert (Lage 1 -> 2, Takt 5 s), Plakat und Schatten wandern mit (Audit 1.0.6)
+  var svPauseMoveCfg = JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', sefFake: 'still', seekDelay: 600000, fixedClock: '21:34', welcome: false, saverMs: 1500, saverPos: 0, saverIvMs: 5000 });
+  seeds.svPicPausePosterPos1 = seed({}, { 'settings-aaaa1111.json': { saverPics: 'poster' } }, svPauseMoveCfg);
+  seeds.svPicPausePosterMove = seed({}, { 'settings-aaaa1111.json': { saverPics: 'poster' } }, svPauseMoveCfg);
   // Anime je Titel: alle synthetischen Serien per eigener Markierung als Anime; Variante mit ausgeblendeter Kategorie
   var animeOv = { 900: 1, 910: 1 };
   for (var ai = 0; ai < 30; ai++) animeOv[5100 + ai * 10] = 1;
@@ -692,6 +747,11 @@ var SCENES = [
   { name: 'home-row2', seed: 'home', keys: 'DOWN,RIGHT' },
   { name: 'home-last', seed: 'home', keys: 'DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // HOME-11: letzte Reihe, kein "darunter"-Pfeil
   { name: 'home-poster', seed: 'home', keys: 'DOWN,DOWN,RIGHT,RIGHT', mask: [[320, 270, 600, 34]] },   // "Ende um HH:MM" haengt von der Uhr ab
+  { name: 'home-poster-en', seed: 'en', keys: 'DOWN,DOWN,RIGHT,RIGHT', mask: [[320, 270, 600, 34]] },   // HOME-11: fester Hinweis unten links (Kopf der naechsten Reihe nicht im Bild)
+  { name: 'home-ptr-next', seed: 'ptrHold', keys: 'DOWN,DOWN', mwait: 4200, moves: '600:300,600:320,600:664,601:665' },   // Zeiger ruht unter den Postern -> naechste Reihe
+  { name: 'home-ptr-next-land', seed: 'ptrHold', keys: 'DOWN', mwait: 3800, moves: '600:300,600:320,700:620,701:621' },   // Querformat: auf dem Kopf der naechsten Reihe
+  { name: 'home-ptr-next-off', seed: 'ptrEdgeOff', keys: 'DOWN,DOWN', mwait: 4200, moves: '600:300,600:320,600:664,601:665' },   // Einstellung aus: Verweilen bewegt nichts
+  { name: 'home-ptr-next-click', seed: 'ptrEdgeOff', keys: 'DOWN,DOWN', mwait: 4200, moves: '600:300,600:320,600:664,click@600:664' },   // aus: Klick geht eine Reihe tiefer
   { name: 'home-rail', seed: 'home', keys: 'LEFT,DOWN' },
   { name: 'home-tools', seed: 'home', keys: 'TOOLS' },
   { name: 'home-markshow', seed: 'home', keys: 'DOWN,DOWN,DOWN,RIGHT,YELLOW' },
@@ -708,15 +768,40 @@ var SCENES = [
   { name: 'search-123', seed: 'home', keys: 'BLUE,wait600,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
   { name: 'search-results', seed: 'home', keys: 'BLUE,wait600,ENTER,RIGHT,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN' },
   { name: 'search-empty', seed: 'home', keys: 'BLUE,wait600,9,wait1000,9,9,9,wait1500' },
+  // TV-Befund 1.0.5 ("Elemente springen wild umher"): Zeiger fokussiert ganz sichtbare Reihen ohne zu rollen, Tastatur rollt nicht zurueck
+  { name: 'search-ptr-row2', seed: 'ptrHold', keys: 'BLUE,wait600,ENTER,RIGHT,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT', mwait: 7800, moves: '700:300,700:320,700:500,701:502' },
+  { name: 'search-ptr-kbd', seed: 'ptrHold', keys: 'BLUE,wait600,ENTER,RIGHT,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN', mwait: 8200, moves: '700:300,700:320,300:300,302:301' },
+  { name: 'search-ptr-edge', seed: 'ptrHold', keys: 'BLUE,wait600,ENTER,RIGHT,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT', mwait: 7800, moves: '700:300,700:320,900:630,click@900:630' },   // Klick in die untere Randzone: eine Gruppe weiter
+  // Nutzer-Feedback 28.10.: "Zuletzt gesucht" als Chips in hoechstens 2 Zeilen, Rot = Begriff entfernen, "Verlauf loeschen" mit Rueckfrage
+  { name: 'search-recent8', seed: 'recent8', keys: 'BLUE,wait600' },
+  { name: 'search-recent8-en', seed: 'recent8En', keys: 'BLUE,wait600' },
+  { name: 'search-recent4', seed: 'recent4', keys: 'BLUE,wait600' },
+  { name: 'search-recent-focus', seed: 'recent8', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT' },
+  { name: 'search-recent-line2', seed: 'recent8', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN' },
+  { name: 'search-recent-removed', seed: 'recent8', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RED,wait300' },
+  { name: 'search-recent-clear', seed: 'recent8', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT' },
+  { name: 'search-recent-clear-dlg', seed: 'recent8', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,ENTER,wait300' },
+  { name: 'search-recent-cleared', seed: 'recent8', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,ENTER,wait300,RIGHT,ENTER,wait800' },
+  { name: 'search-recent-long-en', seed: 'recentLongEn', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT' },
+  { name: 'search-recent-sugg-up', seed: 'recent8', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,UP' },
+  { name: 'search-recent-ptr', seed: 'recentPtr', keys: 'BLUE,wait600', mwait: 3600, moves: '700:300,700:320,600:160,601:161' },   // Zeiger auf Zeile 2: Fokus ohne Rollen
+  { name: 'search-recent-ptr-click', seed: 'recentPtr', keys: 'BLUE,wait600', mwait: 4600, moves: '700:300,700:320,818:116,819:117,click@819:117' },   // Klick auf einen Begriff = OK
+  { name: 'settings-recent', seed: 'recent8', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-recent-panel-en', seed: 'recent8En', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-recent-info', seed: 'recent8', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'p4-discover-recent', seed: 'recent8', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT' },
   { name: 'p4-discover', seed: 'home', keys: 'LEFT,UP,ENTER,wait800' },
   { name: 'p4-discover-rail', seed: 'home', keys: 'LEFT,UP' },
+  { name: 'p4-discover-ptr', seed: 'ptrHold', keys: 'LEFT,UP,ENTER,wait1500', mwait: 5200, moves: '800:300,800:320,800:470,801:472' },   // Zeiger auf der zweiten Reihe: kein Rollen
   { name: 'p4-discover-results', seed: 'home', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT' },
   { name: 'p4-discover-ext', seed: 'home', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN' },
   { name: 'p4-ext-details', seed: 'home', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,ENTER,wait1200' },
   // DISC-5 Details fremder Titel: mit Helfer (Plex-Katalog) Film/Serie voll, Film minimal, Besetzung fokussiert, INFO; ohne Helfer ohne Beschreibung
   { name: 'p4-ext-details-full', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,ENTER,wait1500' },
   { name: 'p4-ext-details-full-info', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,ENTER,wait1500,INFO,wait400' },
-  { name: 'p4-ext-details-cast', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,ENTER,wait1500,DOWN,wait900' },
+  // DET-9: fremder Titel – Klick in die untere Randzone holt die Besetzung herein (Karten lugen unter den Knoepfen nur an)
+  { name: 'p4-ext-details-cast-ptr', seed: 'inspNewPtr', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,ENTER,wait1500', mwait: 12200, hold: 15500, moves: '600:300,600:320,700:630,click@700:630' },
+  { name: 'p4-ext-details-cast',seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,ENTER,wait1500,DOWN,wait900' },
   { name: 'p4-ext-details-show', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,ENTER,wait1500' },
   { name: 'p4-ext-details-show-en', seed: 'inspNewEn', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,ENTER,wait1500' },
   { name: 'p4-ext-details-min', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,RIGHT,ENTER,wait1500' },
@@ -724,13 +809,13 @@ var SCENES = [
   { name: 'p4-insp-rows', seed: 'home', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,DOWN,wait800' },   // Inspiration: Fokus in der 4. Reihe
   { name: 'p4-insp-back', seed: 'home', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,RIGHT,ENTER,wait1200,RETURN,wait900' },   // Detailseite und zurueck: Fokus bleibt in der Reihe
   { name: 'p4-insp-cleared', seed: 'home', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RED,wait1500' },   // Eingabe geloescht -> Reihen wieder da
-  { name: 'p4-insprows', seed: 'insp', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait600' },   // Einstellungen > Inspiration anpassen
-  { name: 'p4-settings-watchlist', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p4-insprows', seed: 'insp', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait600' },   // Einstellungen > Inspiration anpassen
+  { name: 'p4-settings-watchlist', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   // "Nur Titel, die du noch nicht hast" (Entdecken, plex.tv-Reihen ueber den Helfer): Einstellung de/en, mit Weiteren Servern, Reihen mit Filter
-  { name: 'p4-settings-insphide', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 19) + ',wait600' },
-  { name: 'p4-settings-insphide-info', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 19) + ',wait600,INFO' },   // INFO: alles erklaert
-  { name: 'p4-settings-insphide-en', seed: 'inspNewEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 19) + ',wait600' },
-  { name: 'p4-settings-insphide-srv', seed: 'pkgSrvHelper', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 20) + ',wait600' },   // zweite Zeile: auch Weitere Server
+  { name: 'p4-settings-insphide', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 20) + ',wait600' },
+  { name: 'p4-settings-insphide-info', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 20) + ',wait600,INFO' },   // INFO: alles erklaert
+  { name: 'p4-settings-insphide-en', seed: 'inspNewEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 20) + ',wait600' },
+  { name: 'p4-settings-insphide-srv', seed: 'pkgSrvHelper', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 21) + ',wait600' },   // zweite Zeile: auch Weitere Server
   { name: 'p4-insp-new', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,wait800' },          // Filter an: nur fremde Titel + Hinweis-Reihe
   { name: 'p4-insp-new-en', seed: 'inspNewEn', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,wait800' },
   { name: 'p4-insp-new-skip', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,wait800' },   // DOWN springt ueber den Hinweis
@@ -743,6 +828,7 @@ var SCENES = [
   { name: 'player-resume', seed: 'play', keys: 'ENTER' },
   { name: 'player-skip', seed: 'play', keys: 'ENTER,ENTER' },
   { name: 'player-osd', seed: 'play', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,PAUSE', mask: CLOCK },
+  { name: 'player-jump-toast', seed: 'play', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,PAUSE,5,wait900', mask: CLOCK },   // TV-Test 29.10.: "Sprung zu …" oben links, nie ueber der Knopf-Beschriftung
   { name: 'player-seek', seed: 'play', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,RETURN,RIGHT,RIGHT,RIGHT', mask: CLOCK },
   { name: 'player-btns', seed: 'play', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,RIGHT,RIGHT,RIGHT', mask: CLOCK },
   { name: 'player-osd-en', seed: 'playEn', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,PAUSE', mask: CLOCK },   // Pause: Hinweis-Insel (en)
@@ -764,16 +850,24 @@ var SCENES = [
   // P5 Einstellungen & Komfort
   { name: 'p5-settings-subs', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'p5-settings-anime', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,RIGHT,DOWN' },
-  { name: 'p5-settings-display', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-settings-display', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   // Zeiger-Scrollen beschleunigen (abhaengig von Zeiger-Steuerung): an, Zeiger-Steuerung selbst (Erklaerung mit "Aus: …"), Zeiger aus = grau, englisch
-  { name: 'settings-ptraccel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP' },
+  { name: 'settings-ptraccel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP' },
+  { name: 'settings-ptredge', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP' },   // Zeiger blaettert am Rand weiter (TV-Befund 1.0.5)
+  { name: 'settings-ptredge-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP,INFO' },
+  { name: 'settings-ptraccel-edgeoff', seed: 'ptrEdgeOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP' },   // ausgegraut: erst am Rand weiterblaettern einschalten
   { name: 'settings-pointer', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP,UP' },
-  { name: 'settings-ptraccel-off', seed: 'ptrOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP' },
-  { name: 'settings-ptraccel-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP' },
+  { name: 'settings-ptraccel-off', seed: 'ptrOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP' },
+  { name: 'settings-ptredge-off', seed: 'ptrOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP' },
+  { name: 'settings-ptraccel-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP' },
+  { name: 'settings-ptredge-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP' },
+  { name: 'settings-ptredge-info-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP,INFO' },
   { name: 'settings-pointer-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP,UP' },
   { name: 'p5-settings-help', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN' },
   { name: 'p5-settings-boost', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'p5-keys', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-keys-trick', seed: 'keysTrick', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-keys-trick-en', seed: 'keysTrickEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'p5-conntest', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER,wait1500', mask: [[872, 112, 376, 48]] },   // Antwortzeit (gemessen, 0/1 ms; bricht in die 2. Zeile um)
   // Anime je Titel (docs/TODO.md "Anime-Erkennung"): Ueberzeile, Grund im INFO-Panel, TOOLS-Eintraege, Kategorie ausgeblendet
   { name: 'p5-anime-details', seed: 'anime', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800' },
@@ -786,10 +880,10 @@ var SCENES = [
   { name: 'saver-off-busy', seed: 'svBusyOff', keys: 'wait6000' },
   { name: 'saver-fade-done', seed: 'svDarkFade', keys: 'wait7000' },                   // Standard (Ueberblenden) nach dem ersten Bild
   // Einstellungen: Schoner-Zeilen, Auswahl Uebergang/Einblendung, Mehrfachauswahl Bibliotheken
-  { name: 'saver-settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 21) },
-  { name: 'saver-fx-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 24) + ',ENTER' },
-  { name: 'saver-info-picker-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 25) + ',ENTER' },
-  { name: 'saver-libs-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 21) + ',ENTER,DOWN,DOWN,DOWN,ENTER' },   // Musik dazu
+  { name: 'saver-settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 22) },
+  { name: 'saver-fx-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 25) + ',ENTER' },
+  { name: 'saver-info-picker-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 26) + ',ENTER' },
+  { name: 'saver-libs-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 22) + ',ENTER,DOWN,DOWN,DOWN,ENTER' },   // Musik dazu
   { name: 'p5-spoiler', seed: 'spoiler', keys: 'DOWN' },
   // Uhr auf der Startseite: je Stil hell (de, Hero-Bild), dunkel (en, Hintergrundbilder aus), kraeftig gruen (de, Film-Reihe)
   { name: 'clock-box', seed: 'clock_box' }, { name: 'clock-free', seed: 'clock_free' }, { name: 'clock-date', seed: 'clock_date' }, { name: 'clock-small', seed: 'clock_small' },
@@ -801,10 +895,10 @@ var SCENES = [
   { name: 'hints-brief-faded', seed: 'hintsBrief', keys: 'wait3000' },
   { name: 'hints-brief-tools', seed: 'hintsBrief', keys: 'wait3000,TOOLS' },
   { name: 'hints-off', seed: 'hintsOff' },
-  { name: 'settings-clockstyle', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,' + rep('DOWN', 16) + ',ENTER' },
-  { name: 'settings-clockstyle-off', seed: 'spoiler', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,' + rep('DOWN', 16) },   // Uhr aus: Zeile gedimmt, Satz erklaert warum
-  { name: 'settings-hints-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,' + rep('DOWN', 17) + ',ENTER' },
-  { name: 'settings-hints-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,' + rep('DOWN', 17) + ',INFO' },
+  { name: 'settings-clockstyle', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,' + rep('DOWN', 16) + ',ENTER' },
+  { name: 'settings-clockstyle-off', seed: 'spoiler', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,' + rep('DOWN', 16) },   // Uhr aus: Zeile gedimmt, Satz erklaert warum
+  { name: 'settings-hints-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,' + rep('DOWN', 17) + ',ENTER' },
+  { name: 'settings-hints-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,' + rep('DOWN', 17) + ',INFO' },
   // Akzentfarbe: Einstellung (Farbfeld), Auswahl mit Farbfeldern, Wechsel wirkt sofort; Startseite/Seitenleiste in anderen Farben
   { name: 'accent-setting', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN' },
   { name: 'accent-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN' },
@@ -821,6 +915,12 @@ var SCENES = [
   { name: 'library-row2', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,DOWN,RIGHT' },
   { name: 'library-chips', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,UP' },
   { name: 'library-sort', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,RED' },
+  // TV-Befund 1.0.5: Reiter "Ansicht" per Taste (▲ auf die Reiterzeile) und per Zeiger (gemessene Reiter) erreichbar
+  { name: 'library-sort-tabs', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,RED,UP,RIGHT,RIGHT' },
+  { name: 'library-sort-tabs-en', seed: 'en', keys: 'LEFT,DOWN,ENTER,wait800,RED,UP,RIGHT,RIGHT' },
+  { name: 'library-sort-ptr-view', seed: 'ptrHold', keys: 'LEFT,DOWN,ENTER,wait800,RED', mwait: 5000, moves: '1000:300,1148:132,click@1148:132' },
+  { name: 'library-sort-ptr-list', seed: 'ptrHold', keys: 'LEFT,DOWN,ENTER,wait800,RED', mwait: 5000, moves: '1000:300,1148:132,click@1148:132,1000:400,click@1000:408' },   // Zeiger: Ansicht > Liste
+  { name: 'library-sort-ptr-view-back', seed: 'ptrHold', keys: 'LEFT,DOWN,ENTER,wait800,ENTER,wait1500,RETURN,wait1000,RED', mwait: 8600, moves: '1000:300,1148:132,click@1148:132' },   // nach Detailseite und zurueck
   { name: 'library-filter', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,RED,RIGHT,DOWN,ENTER' },
   { name: 'library-reg', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN' },
   { name: 'library-jump', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,7,wait1200' },
@@ -849,31 +949,57 @@ var SCENES = [
   // Nutzerbefund 28.10.: Zeiger ueber dem Staffel-Pfeil › bzw. ‹ -> hinterlegt wie ein Reiter
   { name: 'details-tabs-ptr-r', seed: 'ptrHold', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN', mwait: 6500, moves: '600:200,480:350,486:352' },
   { name: 'details-tabs-ptr-l', seed: 'ptrHold', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,RIGHT,RIGHT,RIGHT,wait800', mwait: 7500, moves: '600:200,150:350,148:352' },
+  // DET-9 (NAV-2): Zeiger auf Detailseiten rollt nie unter dem ruhenden Punkt. Reiter unter den Knoepfen = anderer Abschnitt:
+  // erst nach 250 ms Verweilen herein (Staffel unter dem Punkt gewaehlt), Einstellung aus = nichts
+  { name: 'details-ptr-tabs', seed: 'ptrHold', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800', mwait: 6500, moves: '600:200,300:598,301:599' },
+  { name: 'details-ptr-tabs-off', seed: 'ptrEdgeOff', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800', mwait: 6500, moves: '600:200,300:598,301:599' },
+  // Staffeln/Folgen eingerastet: vom Reiter auf eine Folge (Fokus ohne Rollen), dann Ruhe in der unteren Randzone (Pille, ptrHold rollt nicht)
+  { name: 'details-ptr-eps', seed: 'ptrHold', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN', mwait: 7000, moves: '600:200,600:220,300:350,700:470,701:471,700:640,701:641' },
+  // Besetzung eingerastet: Punkt ueber dem ausgeblendeten Folgen-Abschnitt (frueher Sprung dorthin) bleibt ohne Wirkung; obere Randzone mit Pille
+  { name: 'details-ptr-cast-hidden', seed: 'ptrHold', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,DOWN,DOWN', mwait: 7800, moves: '600:420,600:440,600:200,601:202,700:300,701:301' },
+  // Film: Klick in die untere Randzone unter den Knoepfen holt die Besetzung herein
+  { name: 'details-movie-ptr-cast', seed: 'ptrHold', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800', mwait: 6000, moves: '600:300,600:320,700:630,click@700:630' },
   { name: 'settings-play-end', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   // M4 Musik (Bibliothek 3 "Musik"): quadratische Karten, Alben-Reiter, Album-/Kuenstlerseite, Jetzt laeuft, Mini-Player
   { name: 'music-artists', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800' },
-  { name: 'music-albums', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800' },
-  { name: 'music-albums-list', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,RED,RIGHT,RIGHT,DOWN,DOWN,DOWN,ENTER,RETURN,wait800' },
-  { name: 'music-album', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800' },
-  { name: 'music-album-tracks', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,DOWN,DOWN,DOWN' },
-  { name: 'music-album-ptr', seed: 'ptrHoldPlay', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,DOWN,DOWN,DOWN', mwait: 11500, moves: '600:400,600:420,600:640,600:644' },   // angeschnittene 7. Zeile = Randzone
+  { name: 'music-albums', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800' },
+  { name: 'music-albums-list', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,RED,RIGHT,RIGHT,DOWN,DOWN,DOWN,ENTER,RETURN,wait800' },
+  { name: 'music-album', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800' },
+  { name: 'music-album-tracks', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,DOWN,DOWN,DOWN' },
+  { name: 'music-album-ptr', seed: 'ptrHoldPlay', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,DOWN,DOWN,DOWN', mwait: 11500, moves: '600:400,600:420,600:640,600:644' },   // angeschnittene 7. Zeile = Randzone
+  // DET-9: Albumseite unter den Knoepfen – Ruhe auf dem Rand der ersten Titelzeile rollt nicht mehr, Randzone mit Pille
+  { name: 'music-album-ptr-peek', seed: 'ptrHoldPlay', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800', mwait: 9200, moves: '600:400,600:420,600:626,601:627' },
   { name: 'music-artist', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,ENTER,wait800' },
+  // DET-9: Kuenstlerseite, Alben eingerastet – Punkt ueber dem Kopf (dort lag frueher eine ausgeblendete Reihe) und auf dem Kopf der
+  // naechsten Reihe bewegt nichts
+  { name: 'music-artist-ptr', seed: 'ptrHoldPlay', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,RIGHT,RIGHT,ENTER,wait800,DOWN,DOWN', mwait: 8500, moves: '600:400,600:420,600:120,601:121,600:590,601:591,600:620,601:621' },
   { name: 'music-artist-albums', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,ENTER,wait800,DOWN' },
-  { name: 'music-nowplaying', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800' },
-  { name: 'music-queue', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,YELLOW' },
-  { name: 'music-mini', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait1500' },
+  { name: 'music-nowplaying', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800' },
+  { name: 'music-queue', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,YELLOW' },
+  { name: 'music-mini', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait1500' },
   // TV-Test 27.10. nachmittags (F24–F30): heller Hintergrund, Titelkarten ohne Cover, Mini-Player (Pause, Platz, A–Z), lange Namen
-  { name: 'music-np-nocover', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,RIGHT,RIGHT,ENTER,wait800,ENTER,wait800' },
+  { name: 'music-np-nocover', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,RIGHT,RIGHT,ENTER,wait800,ENTER,wait800' },
   // Nutzerauftrag 28.10. (docs/research/player-controls.md): eine Knopf-Familie fuer Video, Musik, Hoerbuch; ⏮/⏭ nach Inhalt; Zeiger-Vorschau am Balken
-  { name: 'music-np-en', seed: 'playEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800' },
-  { name: 'music-np-prev', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,LEFT,LEFT' },
-  { name: 'music-np-asym', seed: 'playAsym', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,LEFT' },
-  { name: 'book-np', seed: 'bookPlay', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800' },
-  { name: 'book-np-en', seed: 'bookPlayEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RIGHT,RIGHT' },
-  { name: 'book-mini', seed: 'bookPlay', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait1500' },
-  { name: 'music-mini-en', seed: 'playEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait1500' },
+  { name: 'music-np-en', seed: 'playEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800' },
+  { name: 'music-np-prev', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,LEFT,LEFT' },
+  { name: 'music-np-asym', seed: 'playAsym', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,LEFT' },
+  { name: 'book-np', seed: 'bookPlay', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800' },
+  { name: 'book-np-en', seed: 'bookPlayEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RIGHT,RIGHT' },
+  { name: 'book-mini', seed: 'bookPlay', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait1500' },
+  { name: 'music-mini-en', seed: 'playEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait1500' },
   { name: 'player-pn-prev', seed: 'play', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,LEFT,LEFT', mask: CLOCK },                 // Film mit Kapiteln: ⏮ Voriges Kapitel
   { name: 'player-pn-next-en', seed: 'playEnLong', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,RIGHT,PAUSE', mask: CLOCK },      // lang + en + violett: ⏭ Next chapter, Pause-Hinweise
+  // Schnellspulen (SPEC PLAY-32): Pille in der Zeitzeile, Play-Knopf = "Normal weiter"; umgewandelt -> Sprung + Hinweis im Label-Feld
+  { name: 'player-trick-ff8', seed: 'playTrick', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,FF,FF,FF', mask: CLOCK },
+  { name: 'player-trick-rw4-en', seed: 'playTrickEn', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,RW,RW', mask: CLOCK },
+  { name: 'player-trick-normal', seed: 'playTrick', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,FF,FF,PLAY', mask: CLOCK },   // PLAY: Pille weg, Pause-Symbol
+  { name: 'player-trick-hls', seed: 'trickHls', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait1500,FF', mask: CLOCK },
+  { name: 'player-trick-hls-en', seed: 'trickHlsEn', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait1500,FF', mask: CLOCK },
+  { name: 'settings-ffrw', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ffrw-panel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-ffrw-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ffrw-panel-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-ffrw-help-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
   { name: 'player-asym', seed: 'playAsym', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,RIGHT', mask: CLOCK },                    // -10 / +30
   { name: 'player-ep-pn', seed: 'play', keys: 'ENTER,ENTER,wait800,UP,DOWN,LEFT,LEFT', mask: CLOCK },     // Folge: erste der Queue -> ⏮ gedimmt, Fokus bleibt auf -10; Skip-Knopf sichtbar
   { name: 'player-hover', seed: 'ptrHoldPlay', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,700:486', mask: CLOCK },   // Zeiger ueber dem Balken: Zeit + Vorschaubild
@@ -912,15 +1038,15 @@ var SCENES = [
   { name: 'player-lpD-up', seed: 'lpD', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6800, moves: '600:300,700:486,701:486,700:486,701:486,700:486,760:486,760:280', mask: CLOCK },   // ueber die Lasche hinaus: zu
   { name: 'settings-loupe-style', seed: 'lpStyleOn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,' + rep('DOWN', 18) + ',ENTER' },
   { name: 'settings-loupe-style-off-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,' + rep('DOWN', 18) },
-  { name: 'book-np-loupe', seed: 'bookLoupe', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,860:404,861:404,860:404,861:404,860:404,900:404' },
-  { name: 'book-np-loupe-en', seed: 'bookLoupeEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,640:404,641:404,640:404,641:404,640:404,620:420' },
-  { name: 'book-np-loupe-guard', seed: 'bookLoupe', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,860:404,861:404,860:404,861:404,860:404,870:440,880:480,890:510' },   // Jetzt laeuft (B): Zeiger auf der Knopfreihe, Knoepfe reagieren nicht
-  { name: 'music-np-hover', seed: 'musicLoupe', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,860:404,861:404,860:404,861:404,860:404' },   // Musiktitel 3 Min.: nur Zeit-Blase
+  { name: 'book-np-loupe', seed: 'bookLoupe', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,860:404,861:404,860:404,861:404,860:404,900:404' },
+  { name: 'book-np-loupe-en', seed: 'bookLoupeEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,640:404,641:404,640:404,641:404,640:404,620:420' },
+  { name: 'book-np-loupe-guard', seed: 'bookLoupe', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,860:404,861:404,860:404,861:404,860:404,870:440,880:480,890:510' },   // Jetzt laeuft (B): Zeiger auf der Knopfreihe, Knoepfe reagieren nicht
+  { name: 'music-np-hover', seed: 'musicLoupe', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,860:404,861:404,860:404,861:404,860:404' },   // Musiktitel 3 Min.: nur Zeit-Blase
   { name: 'settings-loupe-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,' + rep('DOWN', 17) + ',INFO' },
   { name: 'settings-loupe-off-en', seed: 'ptrOffEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,' + rep('DOWN', 17) },
-  { name: 'music-mini-nocover', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,RIGHT,RIGHT,ENTER,wait800,ENTER,wait800,PAUSE,RETURN,wait1500' },
-  { name: 'music-mini-list', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait1500,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait800' },
-  { name: 'music-mini-lib', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,LEFT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait800,RETURN,wait1500' },
+  { name: 'music-mini-nocover', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,RIGHT,RIGHT,ENTER,wait800,ENTER,wait800,PAUSE,RETURN,wait1500' },
+  { name: 'music-mini-list', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait1500,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait800' },
+  { name: 'music-mini-lib', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait800,RETURN,wait1500' },
   { name: 'music-artist-groups', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,RIGHT,RIGHT,ENTER,wait800,DOWN' },   // Alben + Live + Kompilation
   { name: 'music-artist-groups2', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,RIGHT,RIGHT,ENTER,wait800,DOWN,DOWN,DOWN' },
   { name: 'music-artist-bright', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800' },
@@ -944,12 +1070,12 @@ var SCENES = [
   { name: 'amb-off', seed: 'ambOff', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,wait1800' },
   { name: 'amb-rm', seed: 'ambRm', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,wait1000' },          // Reduzierte Bewegung: sofortiger Tausch
   { name: 'amb-music', seed: 'ambStrong', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,RIGHT,wait1800' },
-  { name: 'amb-settings', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'amb-settings-panel', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'amb-settings-strength', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'amb-settings-off', seed: 'ambOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'amb-settings-en', seed: 'ambEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'amb-settings-panel-en', seed: 'ambEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'amb-settings', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'amb-settings-panel', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'amb-settings-strength', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'amb-settings-off', seed: 'ambOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'amb-settings-en', seed: 'ambEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'amb-settings-panel-en', seed: 'ambEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
   { name: 'rail-long', seed: 'longLib', keys: 'LEFT' },
   // Weitere Server: Seitenleiste mit Bibliotheken eines freigegebenen Servers (Herkunft), Bibliothek/Details mit Herkunft,
   // Seitenleiste anpassen, Einstellungszeile, nicht erreichbarer Server (Meldung nur fuer ihn)
@@ -972,7 +1098,7 @@ SAVER_STYLES.forEach(function (st) {
     { name: 'saver-' + st + '-pos3', seed: 'svBusyPos' + cap + '3', keys: 'wait6000' });
 });
 /* SAV-5: Einstellung (Zeile, Auswahl en, INFO-Erklaerung), Standard ueberspringt Standbilder, Auch Standbilder, Poster je Einblendung */
-var SV_SET = 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,' + rep('DOWN', 27);
+var SV_SET = 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 28);
 SCENES.push({ name: 'saver-pics-setting', seed: 'home', keys: SV_SET }, { name: 'saver-pics-picker-en', seed: 'en', keys: SV_SET + ',ENTER' },
   { name: 'saver-pics-info', seed: 'home', keys: SV_SET + ',wait600,INFO' }, { name: 'saver-pics-art', seed: 'svPicArt', keys: 'wait6000' },
   { name: 'saver-pics-stills', seed: 'svPicStills', keys: 'wait6000' });
@@ -980,6 +1106,19 @@ SAVER_STYLES.concat(['off']).forEach(function (st) {
   var cap = st.charAt(0).toUpperCase() + st.slice(1);
   SCENES.push({ name: 'saver-pics-poster-' + st, seed: 'svPicPoster' + cap, keys: 'wait6000' }, { name: 'saver-pics-poster-' + st + '-en1', seed: 'svPicPoster' + cap + 'En1', keys: 'wait6000' });
 });
+
+['poster', 'lower'].forEach(function (st) {
+  var cap = st.charAt(0).toUpperCase() + st.slice(1);
+  SCENES.push({ name: 'saver-' + st + '-color', seed: 'svColor' + cap, keys: 'wait6000' }, { name: 'saver-' + st + '-color-pos2', seed: 'svColor' + cap + 'Pos2', keys: 'wait6000' });
+});
+SCENES.push({ name: 'saver-pics-poster-bigclock-pos2', seed: 'svPicPosterBigclockPos2', keys: 'wait6000' },
+  { name: 'saver-pics-poster-bigclock-pos3-en', seed: 'svPicPosterBigclockPos3', keys: 'wait6000' });
+var SV_PAUSE = 'RIGHT,RIGHT,ENTER,ENTER,wait800,PAUSE,wait6000';
+SCENES.push({ name: 'saver-pause-still', seed: 'svPicPauseStill', keys: SV_PAUSE }, { name: 'saver-pause-still-stills', seed: 'svPicPauseStillStills', keys: SV_PAUSE },
+  { name: 'saver-pause-real', seed: 'svPicPauseReal', keys: SV_PAUSE }, { name: 'saver-pause-poster-en', seed: 'svPicPausePosterEn', keys: SV_PAUSE },
+  // hold: Aufnahme nach ms ab Start (PAUSE bei ~4,6 s, Schoner + Bild ~7 s, Wandern nach 5 s Takt ~12,5 s, naechstes ~17,5 s)
+  { name: 'saver-pause-poster-pos1', seed: 'svPicPausePosterPos1', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,PAUSE', hold: 10000 },   // Lage 1 (vor dem Wandern)
+  { name: 'saver-pause-poster-pos2', seed: 'svPicPausePosterMove', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,PAUSE', hold: 15000 });   // nach dem Wandern: Lage 2, Plakat mit
 
 var running = null;                                          // laufender Firefox (der Worker beendet ihn beim Abbruch)
 function shot(port, sc, done) {
@@ -1085,7 +1224,7 @@ var CHANGE_MAP = [
   [/^(docs|design|public|installer|loader)\/|^[^/]+\.md$|^tests\/(?!visual\/|synthetic\/)|^tools\/(?!visual\.js|preview\.html|build\.js|layout)|^src\/dev\//, []],
   [/^src\/(player\/|views\/player\.js|ui\/loupeview\.js)/, ['player-*', 'p5-player-*', 'accent-player-*', 'book-*', 'music-*']],
   [/^src\/(plex\/music\.js|views\/(album|artist|nowplaying)\.js|ui\/(miniplayer|tracklist|trackpanel)\.js)/, ['music-*', 'book-*', 'amb-music']],
-  [/^src\/views\/(settings|pinsettings|help)\.js/, ['*settings*', 'p5-keys', 'p2-*', 'accent-*']],
+  [/^src\/views\/(settings|pinsettings|help)\.js/, ['*settings*', 'p5-keys*', 'p2-*', 'accent-*']],
   [/^src\/(views|plex)\/search\.js|^src\/plex\/subsearch\.js/, ['search*', 'p4-discover*', 'p5-player-subs']],
   [/^src\/(plex\/discover\.js|views\/(extdetails|soon)\.js)/, ['p4-*']],
   [/^src\/(plex\/inspire\.js|views\/insprows\.js)/, ['p4-insp*', 'p4-settings-insp*']],
@@ -1164,40 +1303,54 @@ function main() {
     return console.log('Keine betroffene Szene – nichts zu rendern.');
   }
   if (args.indexOf('--list') >= 0) return console.log(scenes.map(function (s) { return s.name; }).join('\n'));
-  var jobs = Math.min(JOBS, scenes.length), t0 = Date.now(), results = new Array(scenes.length), next = 0, selfPending = LAYOUT, done = 0, exited = 0, W = String(scenes.length).length;
+  var jobs = Math.min(JOBS, scenes.length), t0 = Date.now(), W = String(scenes.length).length;
   console.log('Build: app/' + APPFILE + ' · ' + scenes.length + ' Szene(n) · ' + jobs + ' parallel (PN_VIS_JOBS)' +
     (MAX_TOTAL > 0 ? ' · rechnerweit hoechstens ' + MAX_TOTAL + ' Firefox (PN_VIS_MAX)' : ''));
   process.on('SIGINT', function () { process.exit(130); });
   process.on('SIGTERM', function () { process.exit(143); });
+  runPool({ script: __filename, args: (MIN ? [] : ['--readable']).concat(LAYOUT ? [] : ['--no-layout']), jobs: jobs, names: scenes.map(function (s) { return s.name; }),
+    selftest: LAYOUT, onSelftest: function (ok) { if (!ok) process.exitCode = 1; },   // Selbsttest der Layout-Pruefung zuerst
+    onResult: function (m, done, secs) {
+      if (m.layout) layoutRes[scenes[m.i].name] = m.layout;
+      console.log('[' + ('    ' + done).slice(-W) + '/' + scenes.length + '] ' + scenes[m.i].name + ' ' + (m.ok ? 'ok' : 'FEHLT') + ' (' + secs.toFixed(1) + ' s)');
+    },
+    done: function (rs) {
+      console.log('Gerendert in ' + Math.round((Date.now() - t0) / 1000) + ' s.');
+      report(rs.map(function (m, i) { return { sc: scenes[i], ok: m.ok }; }));                            // Bericht in fester Szenen-Reihenfolge
+    } });
+}
+/* Job-Pool (auch fuer andere Bildtest-Laeufer, die ihn importieren): o.jobs Worker-Prozesse "node <o.script> --worker <o.args>", je Auftrag ein
+ * rechnerweiter Platz (slotAcquire, PN_VIS_MAX). Protokoll: Worker meldet {ready}; bekommt {i, name} bzw. {selftest: true} und
+ * antwortet {i, ok, layout} bzw. {selftest: ok}. o.onResult(m, fertig, sekunden) je Szene, o.done(ergebnisse) mit einem Eintrag
+ * je Name in Auftragsreihenfolge (abgestuerzter Worker -> ok: false). */
+function runPool(o) {
+  var n = o.names.length, jobs = Math.max(1, Math.min(o.jobs, n)), results = new Array(n), next = 0, selfPending = !!o.selftest, done = 0, exited = 0;
   for (var w = 0; w < jobs; w++) spawnWorker();
   function spawnWorker() {
-    var ch = cp.fork(__filename, ['--worker'].concat(MIN ? [] : ['--readable'], LAYOUT ? [] : ['--no-layout']), { stdio: ['ignore', 'inherit', 'inherit', 'ipc'] }), cur = -1, rel = null, ts = 0;
+    var ch = cp.fork(o.script, ['--worker'].concat(o.args || []), { stdio: ['ignore', 'inherit', 'inherit', 'ipc'] }), cur = -1, rel = null, ts = 0;
     function free() { if (rel) { rel(); rel = null; } }
     function feed() {
-      if (selfPending) { selfPending = false; cur = -2; return slotAcquire(function (r) { rel = r; ch.send({ selftest: true }); }); }   // Selbsttest der Layout-Pruefung zuerst
-      if (next >= scenes.length) return ch.disconnect();
+      if (selfPending) { selfPending = false; cur = -2; return slotAcquire(function (r) { rel = r; ch.send({ selftest: true }); }); }
+      if (next >= n) return ch.disconnect();
       cur = next++;
-      slotAcquire(function (r) { rel = r; ts = Date.now(); ch.send({ i: cur, name: scenes[cur].name }); });
+      slotAcquire(function (r) { rel = r; ts = Date.now(); ch.send({ i: cur, name: o.names[cur] }); });
     }
     ch.on('message', function (m) {
       if (m.ready) return feed();
       free();
-      if (m.selftest !== undefined) { if (!m.selftest) process.exitCode = 1; cur = -1; return feed(); }
-      if (m.layout) layoutRes[scenes[m.i].name] = m.layout;
-      results[m.i] = { sc: scenes[m.i], ok: m.ok }; cur = -1; done++;
-      console.log('[' + ('    ' + done).slice(-W) + '/' + scenes.length + '] ' + scenes[m.i].name + ' ' + (m.ok ? 'ok' : 'FEHLT') + ' (' + ((Date.now() - ts) / 1000).toFixed(1) + ' s)');
+      if (m.selftest !== undefined) { if (o.onSelftest) o.onSelftest(m.selftest); cur = -1; return feed(); }
+      results[m.i] = m; cur = -1; done++;
+      if (o.onResult) o.onResult(m, done, (Date.now() - ts) / 1000);
       feed();
     });
     ch.on('exit', function () {
       free();
-      if (cur >= 0 && !results[cur]) { results[cur] = { sc: scenes[cur], ok: false }; done++; }
-      if (++exited === jobs) finish();
+      if (cur >= 0 && !results[cur]) { results[cur] = { i: cur, ok: false }; done++; }
+      if (++exited === jobs) {
+        for (var i = 0; i < n; i++) if (!results[i]) results[i] = { i: i, ok: false };                   // Worker abgestuerzt
+        o.done(results);
+      }
     });
-  }
-  function finish() {
-    for (var i = 0; i < scenes.length; i++) if (!results[i]) results[i] = { sc: scenes[i], ok: false };   // Worker abgestuerzt
-    console.log('Gerendert in ' + Math.round((Date.now() - t0) / 1000) + ' s.');
-    report(results);                                                                                       // Bericht in fester Szenen-Reihenfolge
   }
 }
 function report(results) {
@@ -1229,4 +1382,4 @@ function layoutReport(results) {
 
 if (require.main === module) main();
 module.exports = { compare: compare, readPng: readPng, writePng: writePng, solidPng: solidPng, startServer: startServer, makeSeeds: makeSeeds, SCENES: SCENES,
-  slotAcquire: slotAcquire, matchAny: matchAny, seedsFor: seedsFor };
+  slotAcquire: slotAcquire, matchAny: matchAny, seedsFor: seedsFor, runPool: runPool, JOBS: JOBS, MAX_TOTAL: MAX_TOTAL };

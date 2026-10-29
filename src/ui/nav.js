@@ -37,6 +37,11 @@
       var i = r * cols + c;
       return i < count ? i : -1;
     },
+    /* nebeneinander nach Textbreite (einmal gemessen): rects [[x, w], …] -> Index des getroffenen Elements */
+    spans: function (rects, x) {
+      for (var i = 0; i < rects.length; i++) if (x >= rects[i][0] && x < rects[i][0] + rects[i][1]) return i;
+      return -1;
+    },
     /* Rechteck */
     rect: function (x0, y0, w, h, x, y) { return x >= x0 && x < x0 + w && y >= y0 && y < y0 + h; }
   };

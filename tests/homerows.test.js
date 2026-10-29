@@ -155,3 +155,16 @@ test('Seitenleiste anpassen (W1): umsortieren, ausblenden, Start immer an, neue 
   // kaputte/doppelte Eintraege werden ignoriert
   eq(RR.enabled([{ id: 'home', on: false }, null, { id: 'home', on: true }, { x: 1 }], RR.avail([], false)), ['home', 'search']);
 });
+
+test('Erweiterungs-Reihen (neutral, N.ext home:*): "x-…" immer aus und hinten, nur gemeldete; ohne Erweiterung keine', function () {
+  var c = H.load(), M = c.N;
+  eq(M.homeRows.extAvail(), []);
+  eq(M.homeRows.parse('x-foo'), { group: 'ext' });
+  M.ext.on('home:avail', function () { return [{ id: 'x-a' }, { id: 'kaputt' }, { id: 'x-b', rm: true }, null]; });
+  var av = M.homeRows.avail(LIBS, null);
+  eq(av.slice(-2), [{ id: 'x-a', def: false, rm: false }, { id: 'x-b', def: false, rm: true }]);
+  eq(M.homeRows.enabled(null, av), ['cw', 'deck', 'new-1', 'new-2'], 'Standard aus');
+  var saved = [{ id: 'x-b', on: true }, { id: 'cw', on: true }];
+  eq(M.homeRows.enabled(saved, av), ['x-b', 'cw', 'deck', 'new-1', 'new-2']);
+  eq(M.hubs.order(saved, LIBS, LIBS), ['x-b', 'cw', 'deck', 'new-1', 'new-2'], 'Startseite nimmt eingeschaltete Erweiterungs-Reihen');
+});

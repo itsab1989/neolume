@@ -37,6 +37,11 @@
   var P = { on: true, root: null, x: -1, y: -1, pend: false, timer: 0, lastMove: 0, keyT: 0, ax: -1, ay: -1, idleT: 0, arrows: null, arrowsOn: false,
     rx: -1e4, ry: -1e4, rawT: 0, holdT: 0, gaps: [], lockT: 0, lx: 0, ly: 0, edge: null, edgeT: 0, edgeEl: null, wheelT: 0 };
   P.accel = true;
+  /* Einstellung "Mit dem Zeiger am Rand weiterblaettern" (state.ptrEdge, Standard an; TV-Befund 1.0.5): an = Verweilen in einer
+   * Randzone rollt (edgeCheck), Verweilen auf einer angeschnittenen Zeile/naechsten Reihe holt sie herein (P.hold). Aus = Inhalt
+   * bewegt sich nur per Klick (Klick in die Randzone = ein Schritt, Klick auf die angeschnittene Zeile), Taste oder Mausrad. */
+  P.edgeAuto = true;
+  P.setEdge = function (on) { P.edgeAuto = on !== false; if (!P.edgeAuto) { edgeStop(); P.holdCancel(); } };
   /* Takt der Randzone (rein, getestet): Wartezeit vor Schritt k+1, nachdem k Schritte gelaufen sind (k >= 1).
    * Beschleunigt: 3 Schritte im Abstand von 400 ms, dann je Schritt x0,8 bis 120 ms; aus: gleichmaessig 300 ms */
   P.edgeDelay = function (k, accel) {
@@ -144,14 +149,17 @@
   }
   P.edgeStop = edgeStop;
   /* Verweilen auf einem Element (z. B. angeschnittene Zeile): fn nach ms, wenn bis dahin keine Taste/kein Klick/kein neues
-   * Verweilen kam. fn prueft selbst, ob der Punkt (P.x/P.y) noch dort ist. */
+   * Verweilen kam. fn prueft selbst, ob der Punkt (P.x/P.y) noch dort ist. Nur fuer Rollen durch Verweilen -> mit
+   * "Am Rand weiterblaettern: Aus" kein Verweilen (Rueckgabe false: der Aufrufer weiss, dass nichts kommt). */
   P.hold = function (fn, ms) {
     P.holdCancel();
-    P.holdT = setTimeout(function () { P.holdT = 0; if (P.on && !P.keyT) fn(); }, ms || HOLD);
+    if (!P.edgeAuto) return false;
+    P.holdT = setTimeout(function () { P.holdT = 0; if (P.on && !P.keyT && P.edgeAuto) fn(); }, ms || HOLD);
+    return true;
   };
   P.holdCancel = function () { if (P.holdT) { clearTimeout(P.holdT); P.holdT = 0; } };
   function edgeCheck(t) {
-    var e = edgeAt(t, P.x, P.y);
+    var e = P.edgeAuto ? edgeAt(t, P.x, P.y) : null;   // Aus: kein Verweil-Rollen, keine Pille (Klick in die Zone rollt weiter)
     if (!e) { if (P.edge) edgeStop(); return; }
     if (P.edge && P.edge.d === e.d && P.edgeT) return;
     edgeStop();

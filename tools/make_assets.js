@@ -17,6 +17,7 @@
  * - scrim-np.png   1280x720 Jetzt laeuft + Kuenstlerseite: scrim-det.png + gleichmaessige Abdunklung (F24: weisse Fotos hinter weissem Text)
  *                  Nur die Scrims neu erzeugen: node tools/make_assets.js --scrims
  * - scrim-saver*.png Bildschirmschoner-Einblendungen (siehe saverScrims; Eck-Schatten je Ecke fertig gespiegelt); nur diese: node tools/make_assets.js --saver
+ * - saver-shadow[-sq].png Schatten unter dem Plakat im Schoner-Modus "Poster und Cover" (entsteht mit den Schoner-Scrims)
  * - scrim-clock.png weicher Eckschatten hinter der Startseiten-Uhr ohne Kasten (entsteht mit den Schoner-Scrims)
  * Braucht: rsvg-convert (Homebrew librsvg) fuer den Sprite, npm-Paket qrcode.
  */
@@ -77,7 +78,7 @@ if (process.argv.indexOf('--saver') >= 0) { saverScrims(); process.exit(0); }
  * Zusammen mit der Bild-Abdunklung 0,35 bleibt weisser Text auch auf weissen Bildern lesbar (Ziel Kontrast >= 4,5:1:
  * Hintergrund <= ~110 von 255 -> Alpha >= ~0,3 hinter jedem Text; hier 0,55-0,78). Kein CSS-Verlauf, kein Blur (Orsay).
  * - scrim-saver.png   1000x460 Ecke links unten (Ambient, Minimal; andere Ecken per scale(-1,1)/(1,-1) gespiegelt)
- * - scrim-saver-b.png 1280x340 Band unten (Filmplakat, Untertitel-Leiste)
+ * - scrim-saver-b.png 1280x520 Band unten (Filmplakat, Untertitel-Leiste)
  * - scrim-saver-c.png 1200x600 weiche Ellipse (Grosse Uhr) */
 /* TV-Befund 28.10. abends ("auf hellem Grund wirkt der Verlauf hinter der Uhr wenig anmutig"): die alten Formen – Ellipse um die
  * Bildecke mit Plateau 0,8 bis r 0,55, dann smoothstep; Ellipse 0,66 um die grosse Uhr – zeichneten sich auf hellen Bildern als
@@ -97,7 +98,7 @@ function scrimCfg() { return {   // als Funktion: --saver laeuft oben, bevor var
   corner: { w: 1000, h: 460, peak: 0.7, k: 2.5, win: 90, g: [[0, 0, 420, 230], [420, 60, 300, 150]] },     // Ambient (Ecke unten links)
   minimal: { w: 420, h: 200, peak: 0.66, k: 3, win: 60, g: [[110, 72, 170, 78]] },                        // Nur kleine Uhr
   clock: { w: 1200, h: 600, peak: 0.62, k: 2, win: 90, g: [[480, 300, 230, 135], [720, 300, 230, 135]] },   // Grosse Uhr: zwei Glocken = flacher, kein Ei
-  band: { w: 1280, h: 340, peak: 0.74, y1: 215 }                                                              // Leisten unten
+  band: { w: 1280, h: 520, peak: 0.5, y1: 310 }                                                               // Leisten unten (s. scrimBand)
 }; }
 function smoother(t) { t = Math.max(0, Math.min(1, t)); return t * t * t * (t * (t * 6 - 15) + 10); }
 /* Deckkraft an (x, y) aus den Glocken; edges: Raender, an denen das Bild NICHT am Bildschirmrand liegt ({l,r,t,b}: true) */
@@ -112,6 +113,11 @@ function scrimSoft(c, x, y, edges) {
 /* Ecke unten links: x ab der Ecke nach rechts, yb ab der Unterkante nach oben; aussen liegen rechts (x = w) und oben (yb = h) */
 function scrimCorner(c, x, yb) { return scrimSoft(c, x, yb, { r: 1, b: 1 }); }
 function scrimClock(c, x, y) { return scrimSoft(c, x, y, { l: 1, r: 1, t: 1, b: 1 }); }
+/* Band unten (Filmplakat, Untertitel-Leiste). TODO nach 1.0.5 ("die Abdunklung beginnt sichtbar oben am Band"): bis 1.0.5 340 hoch,
+ * smootherstep ueber 215 px auf 0,74 – auf hellen Bildern stieg die Helligkeit (L*) dort um bis zu 0,44 je Pixel, der Beginn bei
+ * y ~410 las sich als Kante. Jetzt 520 hoch (ab y 200), dieselbe Kurve ueber 310 px auf 0,5: halb so steil, Kruemmung ~1/3 –
+ * der Beginn verliert sich im Bild. 0,5 reicht: Zeile/Uhr text-soft brauchen auf weissem Bild >= 0,45, Titel text-1 >= 0,34;
+ * der Text beginnt fruehestens bei y 504 (Band-y 304), dort ist die Kurve schon bei 0,5 (Test tests/saver.test.js). */
 function scrimBand(c, y) { return c.peak * smoother(y / c.y1); }
 function saverScrims() {
   var SAVER_SCRIM = scrimCfg();
@@ -130,9 +136,28 @@ function saverScrims() {
     out(k[1] + '-tr.png', W, H, function (x, y) { return scrimCorner(c, W - x, y); });
     out(k[1] + '-tl.png', W, H, function (x, y) { return scrimCorner(c, x, y); });
   });
-  out('scrim-saver-b.png', 1280, 340, function (x, y) { return scrimBand(SAVER_SCRIM.band, y); });
+  out('scrim-saver-b.png', SAVER_SCRIM.band.w, SAVER_SCRIM.band.h, function (x, y) { return scrimBand(SAVER_SCRIM.band, y); });
+  posterShadows(out);
   clockScrims();
   out('scrim-saver-c.png', 1200, 600, function (x, y) { return scrimClock(SAVER_SCRIM.clock, x, y); });
+}
+
+/* ---------- Schatten unter dem Plakat ("Poster und Cover", core/saverlogic.js SHADOW/shadowBox) ----------
+ * TODO nach 1.0.5: das Plakat lag flach auf dem Grund. Kein box-shadow/Blur am Orsay -> vorgerechnetes PNG hinter dem Plakat, auf
+ * das echte Plakat gestreckt. Form: Abstand d ausserhalb eines Rechtecks (Plakat 6 px eingerueckt, 6 px nach unten versetzt),
+ * alpha = peak * (1 - smootherstep(d / R))^2 – faellt schon AM Plakatrand ab (erster Versuch mit Plateau bis an den Rand wirkte
+ * wie ein dicker schwarzer Rahmen), unten am kraeftigsten, nach aussen lang und weich, Steigung 0 am Ende (kein Rand);
+ * R = Rand - Versatz, damit es vor jeder Bildkante 0 ist. Der Grund ist hoechstens
+ * 89/255 hell (PM_BG) – der Schatten ist dort als Tiefe sichtbar, aber nie ein schwarzer Kasten. Schwarz = Token c.black. */
+function posterShadows(out) {
+  var OY = 6, IN = 6, PEAK = 0.5;
+  [['saver-shadow.png', 300, 450, 40], ['saver-shadow-sq.png', 380, 380, 40]].forEach(function (d) {
+    var pw = d[1], ph = d[2], m = d[3], R = m - OY, x0 = m + IN, x1 = m + pw - IN, y0 = m + IN + OY, y1 = m + ph - IN + OY;
+    out(d[0], pw + 2 * m, ph + 2 * m, function (x, y) {
+      var dx = Math.max(x0 - x, 0, x - x1), dy = Math.max(y0 - y, 0, y - y1), g = 1 - smoother(Math.sqrt(dx * dx + dy * dy) / R);
+      return PEAK * g * g;
+    });
+  });
 }
 
 /* ---------- Startseiten-Uhr ohne Kasten (settings.clockStyle free/date/small): je Stil ein eigener Eckschatten ----------

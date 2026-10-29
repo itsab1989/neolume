@@ -12,6 +12,12 @@
  * Leistung: Elemente einmal angelegt (Pools, je Darstellung beim ersten Gebrauch), Aufbau nur beim Oeffnen; je Zeigerbewegung
  * 2 Transforms + 1 Textknoten (+ Sichtbarkeit der Enden bei Wechsel; film: + 1 Transform bei Bildwechsel, Zielbild hoechstens alle
  * 250 ms); gespielter Teil 1x/s per scaleX. Bewegung nur opacity/transform, 120 ms (reduzierte Bewegung: sofort), Ausblenden sofort.
+ * Runde 6 (TV 9,8,1 Lasche: 6 Frames > 50 ms – Oeffnen 67 ms mit Loupe.show 20 ms, 71 ms ohne JS am Ende der Einblendung, 59 ms ohne
+ * JS nach dem Schliessen): Behaelter + Keil werden nie mehr per display ein-/ausgeblendet (das legte bei jedem Oeffnen ~70 Renderer
+ * und mehrere GPU-Ebenen an und verwarf sie beim Schliessen), sondern per visibility – Ebenen bleiben fuer die ganze Wiedergabe
+ * bestehen; .lpv-l ist eine dauerhafte Ebene (die Deckkraft-Blende legte sonst eine an und verwarf sie am Ende samt Neumalen).
+ * Oeffnen in Stufen: Frame 1 Behaelter/Lage/Kopfzeile/Knopf (noch unsichtbar unter der Kante), Frame 2 Feinleiste + Keil,
+ * Frame 3 Einblenden.
  * o: {parent, ox, oy (Bildschirm -> parent), barTop, barH (Hauptbalken, Bildschirm-y),
  *     barX, barW, islY, islX, islW (Bedien-Insel: Laschen-Unterkante, Hohlkehlen nur mit Abstand zu den Inselecken)} */
 (function (N) {
@@ -20,7 +26,7 @@
   function LoupeView(o) {
     var r = this;
     r.o = o;
-    r.lnk = U.el('div', 'lpv-l', o.parent, 'display:none');          // Ausschnitt auf dem Balken + Keil (alle ausser B)
+    r.lnk = U.el('div', 'lpv-l', o.parent, 'visibility:hidden');     // Ausschnitt auf dem Balken + Keil (alle ausser B)
     r.cv = U.el('canvas', 'lpv-w', r.lnk);                          // Keil-Linien (unter dem Ausschnitt: er deckt die Fussenden)
     r.ctx = r.cv.getContext ? r.cv.getContext('2d') : null; r.wc = null;
     if (!r.ctx) r.cv.style.display = 'none';
@@ -37,7 +43,7 @@
     r.a = U.txt('div', 'lpv-a', f, ''); r.b = U.txt('div', 'lpv-b', f, '');
     r.v = U.txt('div', 'lpv-v', f, '');
     r.box = {}; r.cur = null; r.on = false; r.g = null; r.st = ''; r.endA = true; r.endB = true; r.fmt = null; r.info = null;
-    r.sl = -1; r.fr = null; r.fsrc = []; r.fT = 0; r.fTok = 0; r.xT = 0; r.xWant = -1; r.xLast = 0; r.zs = null; r.go = false; r.pos0 = 0;
+    r.tbh = 0; r.sl = -1; r.fr = null; r.fsrc = []; r.fT = 0; r.fTok = 0; r.xT = 0; r.xWant = -1; r.xLast = 0; r.zs = null; r.go = false; r.pos0 = 0;
   }
   var P = LoupeView.prototype;
   /* Behaelter je Darstellung, beim ersten Gebrauch angelegt */
@@ -45,7 +51,7 @@
     var r = this, b = r.box[st], o = r.o, i;
     if (b) return b;
     if (st === 'stretch') {
-      b = { root: U.el('div', 'lpv-x', o.parent, 'display:none'), z: [] };
+      b = { root: U.el('div', 'lpv-x', o.parent, 'visibility:hidden'), z: [] };
       for (var k = 0; k < 3; k++) {
         var z = { el: U.el('div', 'lpv-z' + (k === 1 ? ' lpv-zm' : k ? ' lpv-zr' : ' lpv-zl'), b.root) };
         z.bg = U.el('div', 'lpv-zb', z.el); z.fill = U.el('div', 'lpv-zf', z.el); z.segs = []; z.gaps = [];
@@ -58,7 +64,7 @@
       b.hd = U.el('div', 'lpv-hd', b.root);
       b.tg = U.el('div', 'lpv-tg', b.root);
     } else {
-      b = { root: U.el('div', 'lpv-tb', o.parent, 'display:none') };     // Huelle (schneidet an der Inselkante ab)
+      b = { root: U.el('div', 'lpv-tb', o.parent, 'visibility:hidden') };   // Huelle (schneidet an der Inselkante ab)
       b.inn = U.el('div', 'lpv-in', b.root);
       b.p = U.el('div', 'pl-isl lpv-p', b.inn);
       b.fl = U.el('div', 'lpv-fl', b.inn); b.fr = U.el('div', 'lpv-fr', b.inn);
@@ -76,14 +82,15 @@
   /* g aus N.Loupe.geom; info {style, fmt(ms) -> Text, chs, coff, markers, pos (gespielt, Balkenzeit), dur, title (Kopfzeile A/D),
    * img(ms) -> Bild-URL oder '' (D), fail() (D: ein Bild kam nicht)} */
   P.show = function (g, info) {
-    var r = this, o = r.o, Lp = N.Loupe, st = info.style || N.Loupe.DEF, b = r.boxFor(st), i;
-    if (r.cur && r.cur !== b) r.cur.root.style.display = 'none';
+    var r = this, o = r.o, Lp = N.Loupe, st = info.style || N.Loupe.DEF, b = r.boxFor(st), i, stage = !r.on;
+    if (r.cur && r.cur !== b) U.vis(r.cur.root, false);
     r.cur = b; r.g = g; r.st = st; r.zs = null; r.fmt = info.fmt; r.info = info; r.endA = r.endB = true; r.sl = -1;
-    var ra = o.barX + o.barW * Math.max(0, g.a) / g.dur, rb = o.barX + o.barW * Math.min(g.dur, g.b) / g.dur;
-    if (st === 'stretch') r.showStretch(g, info, b);
+    var ra = o.barX + o.barW * Math.max(0, g.a) / g.dur, rb = o.barX + o.barW * Math.min(g.dur, g.b) / g.dur, tb = null;
+    if (st === 'stretch') { r.showStretch(g, info, b); if (!stage) r.stretchTicks(g, b); }
     else {
-      var tb = Lp.tab(st, g, o.islY), pad = Lp.STY[st].pad, fy, x0;   // fy/x0: Lage der Feinleiste im Behaelter
-      b.root.style.cssText = 'left:' + (tb.x - FILL - o.ox) + 'px;top:' + (tb.y - o.oy) + 'px;width:' + (tb.w + 2 * FILL) + 'px;height:' + tb.h + 'px;display:block';
+      var pad = Lp.STY[st].pad, fy, x0;   // fy/x0: Lage der Feinleiste im Behaelter
+      tb = Lp.tab(st, g, o.islY);
+      b.root.style.cssText = 'left:' + (tb.x - FILL - o.ox) + 'px;top:' + (tb.y - o.oy) + 'px;width:' + (tb.w + 2 * FILL) + 'px;height:' + tb.h + 'px';
       b.p.style.cssText = 'left:' + FILL + 'px;width:' + tb.w + 'px;height:' + tb.h + 'px';
       // Hohlkehlen nur mit Abstand zu den runden Inselecken (sonst Spalt); sie liegen auf der Inselkante
       U.show(b.fl, tb.x - FILL >= o.islX + FILL); U.show(b.fr, tb.x + tb.w + FILL <= o.islX + o.islW - FILL);
@@ -92,24 +99,32 @@
       U.setText(b.hd, info.title || '');
       fy = st === 'film' ? 126 : 43; x0 = FILL + pad;
       if (st === 'film') r.showFilm(g, info, b, x0);
-      U.tf(b.inn, 0, tb.h);                                    // Start: unter der Kante versteckt
-      r.link(ra, rb, g.L, g.L + g.w, o.islY);
+      U.tf(b.inn, 0, tb.h); r.tbh = tb.h;                      // Start: unter der Kante versteckt
       if (r.fn.parentNode !== b.inn) b.inn.appendChild(r.fn);
       r.fn.style.cssText = 'left:' + x0 + 'px;top:' + fy + 'px;width:' + g.w + 'px';
-      r.fine(g, info);
+      if (!stage) r.rest(g, info, ra, rb);                       // schon offen (neu ausgerichtet): alles sofort
     }
     r.played(info.pos);
     r.point({ ms: g.t0, x: g.x0 });
     if (!r.on) {
       r.on = true;
-      U.cls(b.root, 'on', false); U.cls(r.lnk, 'on', false);
-      U.raf(function () {                                         // naechster Frame: Uebergaenge (120 ms) starten
-        if (!r.on || r.cur !== b) return;
+      U.cls(b.root, 'on', false); U.cls(r.lnk, 'on', false); U.cls(r.lnk, 'off', false); U.cls(b.root, 'off', false);
+      var go = function () {                                      // Uebergaenge (120 ms) starten
+        if (!r.on || r.cur !== b || r.g !== g) return;
         U.cls(b.root, 'on', true); U.cls(r.lnk, 'on', true);
         if (b.inn) U.tf(b.inn, 0, 0);
         if (r.zs) { r.go = true; r.stretchGo(b); }
+      };
+      U.raf(function () {                                         // Frame 2: Feinleiste + Keil (Lasche liegt noch unter der Kante,
+        if (!r.on || r.cur !== b || r.g !== g) return;            // Keil hat Deckkraft 0), Frame 3: einblenden
+        if (stage) { if (st === 'stretch') r.stretchTicks(g, b); else r.rest(g, info, ra, rb); U.raf(go); } else go();
       });
     }
+  };
+  /* zweite Stufe des Oeffnens (A/D): Ausschnitt + Keil auf dem Balken, Teilstriche/Kapitel/Marker/Endzeiten der Feinleiste */
+  P.rest = function (g, info, ra, rb) {
+    this.link(ra, rb, g.L, g.L + g.w, this.o.islY);
+    this.fine(g, info);
   };
   /* Ausschnitt auf dem Balken (grobe Skala) + zwei Keil-Linien nach oben zu x1/x2 auf Hoehe y2 (Laschen-Unterkante, Bildschirm).
    * Keil (TV-Befund 28.10.: gedrehte 2-px-Divs hatten ungleiche, harte Enden – Dicke einseitig zum Drehpunkt, Enden schraeg
@@ -119,7 +134,7 @@
    * der Laschen-Unterkante; Helligkeit laeuft vom Fuss (voll) zum Kopf auf WEDGE.fade aus (kein hartes Ende im Leeren). */
   P.link = function (ra, rb, x1, x2, y2) {
     var r = this, o = r.o, y1 = o.barTop, L = Math.round(ra), R = L + Math.max(4, Math.round(rb - ra));
-    r.lnk.style.display = 'block';
+    U.vis(r.lnk, true);
     r.rng.style.cssText = 'left:' + (L - o.ox) + 'px;top:' + (y1 - o.oy) + 'px;width:' + (R - L) + 'px;height:' + o.barH + 'px';
     if (r.ctx) r.wedge(L + WEDGE.inset, R - WEDGE.inset, x1, x2, y1 - WEDGE.w / 2, y2);
   };
@@ -165,7 +180,7 @@
       r.segs[i].style.cssText = 'left:' + (sg[i].x - g.L) + 'px;width:' + sg[i].w + 'px';
     }
     U.setText(r.a, info.fmt(Math.max(0, g.a))); U.setText(r.b, info.fmt(Math.min(g.dur, g.b)));
-    r.a.parentNode.style.visibility = ''; r.b.parentNode.style.visibility = '';
+    r.a.parentNode.style.visibility = r.endA ? '' : 'hidden'; r.b.parentNode.style.visibility = r.endB ? '' : 'hidden';   // point() lief evtl. schon
   };
   /* D: Bilder an ihre Abschnitte, Platzhalter zuerst; Laden startet nach dem Einblenden (die Animation bleibt frei) */
   P.showFilm = function (g, info, b, x0) {
@@ -214,8 +229,8 @@
   /* B: Gruppen (links/Mitte/rechts) gedehnt anlegen und auf die grobe Lage zurueck-transformieren; stretchGo laesst sie aufgehen */
   P.showStretch = function (g, info, b) {
     var r = this, o = r.o, Lp = N.Loupe, zs = Lp.stretch(g, o.barX, o.barW), i, k;
-    r.zs = zs; r.lnk.style.display = 'none';
-    b.root.style.cssText = 'left:' + (o.barX - o.ox) + 'px;top:' + (o.barTop - o.oy) + 'px;width:' + o.barW + 'px;height:' + o.barH + 'px;display:block';
+    r.zs = zs; U.vis(r.lnk, false);
+    b.root.style.cssText = 'left:' + (o.barX - o.ox) + 'px;top:' + (o.barTop - o.oy) + 'px;width:' + o.barW + 'px;height:' + o.barH + 'px';
     var cut = [g.a, g.b], segL = info.markers || [];
     for (k = 0; k < 3; k++) {
       var z = b.z[k], gr = zs.grp[k], lo = k ? cut[k - 1] : 0, hi = k < 2 ? cut[k] : g.dur;
@@ -234,7 +249,14 @@
       }
       for (; si < SEGS; si++) if (z.segs[si].style.display !== 'none') z.segs[si].style.display = 'none';
     }
-    var tk = Lp.ticks(g);
+    b.tg.style.top = Math.round(o.barH / 2 - 9) + 'px';
+    b.hd.style.top = Math.round(o.barH / 2 - 12) + 'px';
+    U.tf(b.hd, Math.round(o.barX + o.barW * U.clamp(info.pos / g.dur, 0, 1) - o.barX - 12), 0);   // Start: grobe Lage des Kopfes
+  };
+  /* Runde 7 (TV 9,8,1: Stretch-Oeffnen 70 ms, Timer 35 ms JS, Loupe.show 17 ms): Teilstriche (bis 40 Elemente, Klasse + Lage) erst
+   * im zweiten Frame wie bei A/D – im ersten steht der Ueberzug in der groben Lage, wo die Striche ohnehin auf wenige px gestaucht sind */
+  P.stretchTicks = function (g, b) {
+    var tk = N.Loupe.ticks(g), i;
     for (i = 0; i < TICKS; i++) {
       var tt = tk[i], e = b.ticks[i];
       if (!tt) { if (e.style.display !== 'none') e.style.display = 'none'; continue; }
@@ -242,9 +264,6 @@
       e.className = tt.major ? 'lpv-mj' : 'lpv-mn';
       e.style.cssText = 'left:' + (tt.x - g.L) + 'px;top:' + (-2 - h) + 'px;height:' + h + 'px';
     }
-    b.tg.style.top = Math.round(o.barH / 2 - 9) + 'px';
-    b.hd.style.top = Math.round(o.barH / 2 - 12) + 'px';
-    U.tf(b.hd, Math.round(o.barX + o.barW * U.clamp(info.pos / g.dur, 0, 1) - o.barX - 12), 0);   // Start: grobe Lage des Kopfes
   };
   P.stretchGo = function (b) {
     var r = this;
@@ -312,8 +331,11 @@
     r.on = false; r.go = false; r.g = null; r.zs = null; r.fTok++; r.sl = -1; r.xWant = -1;
     if (r.fT) { clearTimeout(r.fT); r.fT = 0; }
     if (r.xT) { clearTimeout(r.xT); r.xT = 0; }
-    if (r.cur) { U.cls(r.cur.root, 'on', false); r.cur.root.style.display = 'none'; }
-    U.cls(r.lnk, 'on', false); r.lnk.style.display = 'none';
+    /* Runde 7 (TV 9,8,1: 72-ms-Frame beim seitlichen Verlassen, nur 0,7 ms JS): Schliessen nur noch ueber den Compositor – Lasche
+     * ohne Uebergang zurueck unter die Inselkante (die Huelle schneidet sie ab), Keil und Stretch-Ueberzug Deckkraft 0 (Klasse off,
+     * ohne Blende). Keine visibility mehr: Ebenen UND ihre gemalten Inhalte bleiben, nichts wird neu gemalt. */
+    if (r.cur) { U.cls(r.cur.root, 'on', false); if (r.cur.inn) U.tf(r.cur.inn, 0, r.tbh || 400); else U.cls(r.cur.root, 'off', true); }
+    U.cls(r.lnk, 'on', false); U.cls(r.lnk, 'off', true);
   };
   N.ui.LoupeView = LoupeView;
 })(N);

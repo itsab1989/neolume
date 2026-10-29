@@ -1,6 +1,6 @@
 /* N.srch – Logik der Suche (SPEC 5.14, 7.9, 15). Reine Funktionen bis auf recent()/addRecent() (N.store):
  * Bildschirmtastatur (abc/123, breite Tasten), Navigation, T9-Eingabe ueber die Zifferntasten (900 ms), Ergebnisgruppen aus
- * /hubs/search (Serien, Filme, Folgen, Personen, Sammlungen; Musik u. a. ausgeblendet), letzte Suchen je Profil. */
+ * /hubs/search (Serien, Filme, Folgen, Personen, Sammlungen; Musik u. a. ausgeblendet), letzte Suchen je Profil (Chip-Umbruch). */
 (function (N) {
   var U = N.util, M = N.model;
   var ABC = ['abcdef', 'ghijkl', 'mnopqr', 'stuvwx', 'yzäöüß'];
@@ -17,7 +17,7 @@
     { id: 'collections', tk: 'search.group.collections', types: { collection: 1 }, kind: 'posterQ' }
   ];
   var S = {
-    KX: 144, KY: 152, KS: 60, KW: 52, WIDE: 172, MAX_RECENT: 6, DELAY: 400, T9MS: 900,
+    KX: 144, KY: 152, KS: 60, KW: 52, WIDE: 172, MAX_RECENT: 8, DELAY: 400, T9MS: 900,
     /* Tastatur-Modell: Zeilen von Tasten {k (Zeichen) | act ('space','del','mode'), x, y, w} */
     layout: function (mode, lang) {
       var en = (lang || N.i18n.lang()) === 'en', rows = [], src = mode === 'num' ? (en ? NUM_EN : NUM) : (en ? ABC_EN : ABC), r, c;
@@ -105,17 +105,84 @@
       var kind = it.type === 'show' ? N.t('search.kind.show') : it.type === 'movie' ? N.t('search.kind.movie') : '';
       return [it.title, N.fmt.join([kind, it.year || ''])];
     },
-    /* ---------- Zuletzt gesucht (je Profil, max. 6; pfx 'disc' = eigene Liste fuer Entdecken, P4) ---------- */
+    /* ---------- Zuletzt gesucht (je Profil; pfx 'disc' = eigene Liste fuer Entdecken, P4) ----------
+     * Nutzer-Feedback 28.10. ("nimmt irgendwann viel Platz in Anspruch"): Einstellung recentSearches (0 = Aus, 4, 8; Standard 8 –
+     * 8 normale Begriffe fuellen die 2 Chip-Zeilen)
+     * begrenzt Liste und Anzeige; Aus merkt nichts mehr und loescht die Listen des Profils. Einzelne Eintraege entfernbar (Rot). */
+    LIMITS: [0, 4, 8],
+    limit: function () {
+      var v = N.session && N.session.settings ? N.session.settings.recentSearches : undefined;
+      if (v === null || v === '' || typeof v === 'boolean') return S.MAX_RECENT;   // leer gespeichert ist nicht "Aus" (Number(null) = 0)
+      v = Number(v);
+      if (v === 3) v = 4;                               // fruehere Stufe 3 (6 -> 8 ueber den Standard); sonst C.applyDefaults
+      return v === 0 || v === 4 ? v : S.MAX_RECENT;     // fehlend/unbekannt = 8
+    },
     file: function (pfx) { return (pfx || 'search') + '-' + (N.session.profile ? N.session.profile.uuid : 'x') + '.json'; },
-    recent: function (pfx) { var r = N.store.get(S.file(pfx)); return r && U.isArray(r.q) ? r.q : []; },
-    addRecent: function (list, q) {
+    recent: function (pfx) { var r = N.store.get(S.file(pfx)), l = r && U.isArray(r.q) ? r.q : []; return l.slice(0, S.limit()); },
+    addRecent: function (list, q, max) {
       q = String(q || '').replace(/^\s+|\s+$/g, '');
-      if (!q) return list;
+      if (max === undefined) max = S.MAX_RECENT;
+      if (!q || max <= 0) return max <= 0 ? [] : list;
       var out = [q], low = q.toLowerCase();
-      for (var i = 0; i < list.length && out.length < S.MAX_RECENT; i++) if (String(list[i]).toLowerCase() !== low) out.push(list[i]);
+      for (var i = 0; i < list.length && out.length < max; i++) if (String(list[i]).toLowerCase() !== low) out.push(list[i]);
       return out;
     },
-    remember: function (q, pfx) { N.store.set(S.file(pfx), { q: S.addRecent(S.recent(pfx), q) }); },
+    /* Eintrag entfernen (Gross/Klein egal) -> neue Liste */
+    without: function (list, q) {
+      var out = [], low = String(q || '').toLowerCase();
+      for (var i = 0; i < list.length; i++) if (String(list[i]).toLowerCase() !== low) out.push(list[i]);
+      return out;
+    },
+    remember: function (q, pfx) { var m = S.limit(); if (m) N.store.set(S.file(pfx), { q: S.addRecent(S.recent(pfx), q, m) }); },
+    forget: function (q, pfx) { N.store.set(S.file(pfx), { q: S.without(S.recent(pfx), q) }); },
+    clearRecent: function (pfx) { if (N.store.get(S.file(pfx))) N.store.remove(S.file(pfx)); },
+    /* Einstellung geaendert: auf die neue Zahl kuerzen (Aus = beide Listen loeschen) */
+    applyLimit: function () {
+      if (!N.session || !N.session.profile) return;
+      var m = S.limit(), p = ['search', 'disc'];
+      for (var i = 0; i < p.length; i++) {
+        var r = N.store.get(S.file(p[i]));
+        if (!r || !U.isArray(r.q)) continue;
+        if (!m) S.clearRecent(p[i]); else if (r.q.length > m) N.store.set(S.file(p[i]), { q: r.q.slice(0, m) });
+      }
+    },
+    /* Chips nebeneinander, Umbruch in hoechstens maxLines Zeilen (Nutzer-Feedback 28.10.). widths: Breiten der Eintraege
+     * (neueste zuerst, schon auf die Hoechstbreite gekuerzt), clearW: Breite von "Verlauf loeschen" (steht immer zuletzt).
+     * Passt nicht alles, fallen die aeltesten Eintraege weg. -> {n: gezeigte Eintraege, pos: [{x, l}] (n Eintraege + Loeschen-Chip),
+     * lines} */
+    pack: function (widths, clearW, maxW, gap, maxLines) {
+      for (var n = widths.length; n >= 0; n--) {
+        var pos = [], x = 0, l = 0, ok = true, all = widths.slice(0, n).concat([clearW]);
+        for (var i = 0; i < all.length; i++) {
+          var w = Math.min(all[i], maxW);
+          if (x > 0 && x + w > maxW) { l++; x = 0; }
+          if (l >= maxLines) { ok = false; break; }
+          pos.push({ x: x, l: l, w: w }); x += w + gap;
+        }
+        if (ok) return { n: n, pos: pos, lines: l + 1 };
+      }
+      return { n: 0, pos: [], lines: 0 };
+    },
+    /* Pfeiltasten zwischen den Chips: links/rechts in der Zeile, hoch/runter zum Chip mit der naechsten Mitte. -1 = Kante */
+    chipMove: function (pos, i, dir) {
+      var p = pos[i], j, best = -1, bd = 1e9;
+      if (!p) return -1;
+      if (dir === 'LEFT') return i > 0 && pos[i - 1].l === p.l ? i - 1 : -1;
+      if (dir === 'RIGHT') return i < pos.length - 1 && pos[i + 1].l === p.l ? i + 1 : -1;
+      var tl = dir === 'UP' ? p.l - 1 : p.l + 1, cx = p.x + p.w / 2;
+      for (j = 0; j < pos.length; j++) if (pos[j].l === tl) { var d = Math.abs(pos[j].x + pos[j].w / 2 - cx); if (d < bd) { bd = d; best = j; } }
+      return best;
+    },
+    /* erster Chip einer Zeile (von unten: Rueckweg aus den Reihen) */
+    chipLineStart: function (pos, l) { for (var j = 0; j < pos.length; j++) if (pos[j].l === l) return j; return -1; },
+    /* Zeiger: Chip unter (x, y) relativ zum Listenanfang (Chips ab y top, Zeilenschritt step, Hoehe h) */
+    hitChip: function (pos, x, y, top, step, h) {
+      for (var j = 0; j < pos.length; j++) {
+        var p = pos[j], cy = top + p.l * step;
+        if (x >= p.x && x < p.x + p.w && y >= cy && y < cy + h) return j;
+      }
+      return -1;
+    },
     /* Vorschlaege aus dem Home-Cache (0 Anfragen): erste Poster-Reihe */
     suggestions: function (cache) {
       var rows = cache && cache.rows || [];
@@ -137,5 +204,6 @@
   /* nach 900 ms Ruhe bzw. vor jeder anderen Eingabe: Kandidat uebernehmen */
   S.T9.prototype.flush = function () { var c = this.pending(); this.d = ''; this.i = 0; return c; };
   S.T9.prototype.active = function () { return !!this.d; };
+  if (N.evt) N.evt.on('settings:changed', function (d) { if (d && d.key === 'recentSearches') S.applyLimit(); });
   N.srch = S;
 })(N);

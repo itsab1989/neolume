@@ -9,12 +9,12 @@
  * Plex-Katalog hat Vorrang, die Erweiterung fuellt Luecken. Ohne Helfer: nur was die PMS-Suche liefert (Jahr, Art,
  * Beschreibung) und – nur wenn die Beschreibung fehlt – ein freundlicher Hinweis, was der Helfer bringen wuerde.
  * Bilder (Besetzung, Art) sind https-Adressen; der Fernseher laedt sie ueber den Foto-Umrechner des PMS (N.img.url), verzoegert.
- * params: {it: fremder Eintrag aus N.disc (ext:true, guid, title, year, sum, thumb, type)} */
+ * params: {it: fremder Eintrag aus N.disc (ext:true, guid, title, year, sum, thumb, type), rail (optional, Standard 'discover')} */
 (function (N) {
   var U = N.util, D = N.disc, PEEK = 580, ANCHOR = 340;
 
   N.router.define('extdetails', function (params) {
-    var it = params.it || {}, s = { rail: 'discover', wheelKeys: ['LEFT', 'RIGHT'] };
+    var it = params.it || {}, s = { rail: params.rail || 'discover', wheelKeys: ['LEFT', 'RIGHT'] };   // rail: von der Startseite 'home'
     var root, hero, pg, bar, row = null, ring, btns = [], bdefs = [], btnRects = null, bf = 0, dead = false, task = null, dtask = null, busy = false, xt = null;
     /* TV-Befund 28.10.: Knopfreihe sprang (eine Erweiterung setzte spaeter einen Knopf davor, Fokus wechselte) und die
      * Freigabe wechselte von der US- auf die deutsche Angabe. Meldet eine Erweiterung, dass ihr Stand noch kommt (xt.pending()), werden die Knoepfe
@@ -181,7 +181,11 @@
         }
         return false;
       }
-      if (row && py >= PEEK + 52 && py < PEEK + 52 + row.g.h && y < 632) {
+      var ez = s.pointerEdge(px0, y);
+      if (ez) { if (kind === 'click') s.pointerScroll(ez.d); return true; }   // Randzone: rollt (Verweilen/Klick), fokussiert nicht
+      /* Besetzung nur, wenn ihr Abschnitt eingerastet ist (NAV-2, DET-9): unter den Knoepfen lugt nur ihr Kopf herein (Karten ab
+       * y 632) – frueher rollte schon das Zeigen dorthin die Seite. Hin und zurueck ueber die Randzonen bzw. per Klick. */
+      if (row && N.RowMath.secVis(PEEK + 52 - off, row.g.h, off === PEEK - ANCHOR, off ? ANCHOR - 24 : 0) === 'full' && py >= PEEK + 52 && py < PEEK + 52 + row.g.h && y < N.RowMath.VIS) {
         var h = row.hit(px0);
         if (h < 0) return false;
         if (zone !== 'row') toRow();
@@ -191,6 +195,14 @@
       return false;
     };
     s.pointerSig = function () { return off; };             // Zeiger-Scroll-Sperre (N.pointer)
+    /* Randzonen wie bei eigenen Titeln (details.js): oben y 276–332 zurueck zu den Knoepfen, unten ab 604 bis 656 zur Besetzung */
+    s.pointerEdge = function (px0, y) {
+      if (px0 < 128 || px0 >= 1216) return null;
+      if (off > 0 && y >= 276 && y < 332) return { d: -1, x: 600, y: 304 };
+      if (!off && row && row.count() && y >= N.RowMath.EDGE_B && y < 656) return { d: 1, x: 600, y: 636 };
+      return null;
+    };
+    s.pointerScroll = function (d) { if (d > 0) toRow(); else toBtn(); };
     s.relabel = function () { paint(); buildButtons(); if (row) row.relabel(); };
     return s;
   });

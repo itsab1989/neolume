@@ -2,6 +2,7 @@
  * Reine Logik ohne DOM/Netz. Reihen-Schluessel sind stabil und sprachneutral:
  *   'cw' Weiterschauen · 'deck' Naechste Folgen · 'new-<lib>' Neu in Bibliothek (Standard an)
  *   'hub-<lib>-<typ>' Server-Hub aus /hubs/sections/<lib> (z. B. hub-1-movie.topunwatched) · 'pl' Playlists (Standard aus)
+ *   'x-…' Reihe einer optionalen Erweiterung (N.ext 'home:avail' meldet sie, Standard aus; Daten ueber 'home:row')
  * Gespeichert: [{id, on}] in Nutzer-Reihenfolge (null = Standard). Reihen, die (gerade) nicht verfuegbar sind, bleiben mit
  * ihrer Position gespeichert; neu auftauchende Standard-Reihen (z. B. neue Bibliothek) kommen hinter ihren Vorgaenger in der
  * Standard-Reihenfolge, neue Zusatz-Reihen (aus) ans Ende. */
@@ -62,6 +63,7 @@
       if (m) return { group: 'hub', lib: Number(m[1]), type: m[2] };
       m = /^new-(\d+)$/.exec(id);
       if (m) return { group: 'new', lib: Number(m[1]) };
+      if (/^x-/.test(id)) return { group: 'ext' };
       return { group: id === 'pl' ? 'pl' : 'base' };   // 'ab' = Weiterhoeren (M4) ist eine Grundreihe
     },
     /* verfuegbare Reihen in Standard-Reihenfolge: libs = Film/Serien-Bibliotheken, cat = Katalog {hubs:[...], pl:{title}} */
@@ -72,6 +74,12 @@
       var hubs = cat && cat.hubs || [];
       for (i = 0; i < hubs.length; i++) out.push({ id: hubs[i].id, def: false });
       if (cat && cat.pl) out.push({ id: 'pl', def: false });
+      return out.concat(HR.extAvail());
+    },
+    /* Reihen einer optionalen Erweiterung (N.ext 'home:avail' -> [{id: 'x-…', rm}]): immer aus, hinter allen anderen */
+    extAvail: function () {
+      var l = N.ext && N.ext.has('home:avail') ? N.ext.call('home:avail') || [] : [], out = [];
+      for (var i = 0; i < l.length; i++) if (l[i] && /^x-/.test(l[i].id)) out.push({ id: l[i].id, def: false, rm: !!l[i].rm });
       return out;
     },
     /* Gespeicherte + verfuegbare Reihen -> volle Liste [{id, on, avail}] (gespeicherte Reihenfolge, neue eingefuegt) */

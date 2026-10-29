@@ -77,6 +77,7 @@
       N.pointer.setCursorMode(N.config.cursorMode);
       N.pointer.setEnabled(st.pointer !== false);
       N.pointer.setAccel(st.ptrAccel !== false);         // Randzonen-Rollen beschleunigen (Standard an)
+      N.pointer.setEdge(st.ptrEdge !== false);           // am Rand/auf der naechsten Reihe verweilen rollt (Standard an)
       mark('chrome');
       if (N.devperf) N.devperf.init(root, ctx);         // dev/-Module fehlen im Release-Build (app.min.js)
       N.ui.saver.init(root, chrome);                  // P5: Bildschirmschoner, Uhr auf der Startseite, Willkommenskarte

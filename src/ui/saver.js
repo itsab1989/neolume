@@ -16,7 +16,7 @@
   var ID = 'translate3d(0,0,0)', OV_FADE = 400, SETTLE = 150, TILE_SETTLE = 400, INFO_SETTLE = 100, CLEAN_MS = 400, PREP_MS = 1500;
   var S = { on: false }, root = null, timer = 0, lastAct = 0, lastMin = '', homeT0 = 0;
   var blk, hc, hcT, hcS, hcD, hcSt = '', hcDay = '', el, ov, scr, ck, ti, sb, tilesEl = null, tiles = [], Ls = [], f = 0;
-  var kind = '', gen = 0, cyc = 0, nextAt = 0, ready = null, busy = false, loading = false, fails = 0, lastFx = '', lastDur = 0;
+  var kind = '', gen = 0, cyc = 0, nextAt = 0, ready = null, busy = false, loading = false, fails = 0, lastFx = '', lastDur = 0, hadPic = false;   // hadPic: schon ein Bild gezeigt (erstes kommt aus Schwarz)
   var homeItems = [], bag = null, noArt = false, force = null, onGo = null;
 
   function now() { return U.now(); }
@@ -42,7 +42,7 @@
   function hcDate() { if (hcSt !== 'date') return; var d = dateText(); if (d !== hcDay) { hcDay = d; U.setText(hcD, d); } }
   function act() { lastAct = now(); }
   function rnd() { return N.config.fixedClock ? 0 : Math.random(); }   // Tests: feste Ecke/Bildfolge
-  function interval() { return force ? 600000 : SL.interval(setting('saverInterval', 30)); }
+  function interval() { return force ? 600000 : N.config.saverIvMs || SL.interval(setting('saverInterval', 30)); }   // saverIvMs: nur Bildtests
   /* Stil-Helfer (nur -webkit-, wie im ganzen Projekt) */
   function tr(e, v) { e.style.webkitTransition = v; }
   function tf(e, v) { e.style.webkitTransform = v; }
@@ -78,8 +78,9 @@
     for (var i = 0; i < 2; i++) {
       var w = U.el('div', 'scs-l', el), inn = U.el('div', 'scs-in', w), im = U.el('img', 'scs-img', inn);
       im.src = N.img.BLANK; U.el('div', 'scs-dim', inn);
-      var pst = U.el('img', 'scs-pst', inn, 'display:none'); pst.src = N.img.BLANK;   // "Poster und Cover": Plakat scharf ueber dem Grund
-      Ls.push({ w: w, inn: inn, img: im, pst: pst, kb: '', pm: false });
+      var psh = U.el('img', 'scs-psh', inn, 'display:none'); psh.src = N.img.BLANK;   // "Poster und Cover": weicher Schatten unter dem Plakat
+      var pst = U.el('img', 'scs-pst', inn, 'display:none'); pst.src = N.img.BLANK;   // ... Plakat scharf ueber dem Grund
+      Ls.push({ w: w, inn: inn, img: im, psh: psh, pst: pst, kb: '', pm: false });
     }
     tilesEl = U.el('div', 'scs-tiles', el, 'display:none');   // Jalousie/Kacheln: Teile erst bei Bedarf
     ov = U.el('div', 'scs-ov', el);
@@ -144,7 +145,7 @@
   var MAX_SKIP = 12;
   function asPoster(x) { return x && x.thumb ? { pm: true, thumb: x.thumb, sq: x.sq, art: x.art, title: x.title, sub: x.sub } : x; }
   function nextItem(cb) {
-    if (kind === 'paused') { cb(homeItems[0] || null); return; }
+    if (kind === 'paused') { pausedItem(cb); return; }
     var mode = pics(), g = gen, skipped = 0, first = null;
     (function one() {
       srcNext(function (x) {
@@ -162,6 +163,18 @@
       });
     })();
   }
+  /* Pause-Schoner: der pausierte Titel nach "Bilder im Bildschirmschoner" (SL.pausedPic; Standbild-Pruefung wie im Schoner, eine
+   * Anfrage beim Start der Pause-Ansicht) */
+  function pausedItem(cb) {
+    var x = homeItems[0] || null, g = gen;
+    if (!x) { cb(null); return; }
+    (function pick(k) {
+      var p = SL.pausedPic(pics(), !!x.art, !!x.thumb, N.saverArt ? k : '');
+      if (p === 'check') { N.saverArt.kind(x.art, function (k2) { if (g === gen) pick(k2 || ''); }); return; }
+      cb(p === 'poster' ? asPoster(x) : p === 'art' ? x : null);
+    })();
+  }
+  function pausedList(p) { var it = p || {}; return [{ art: it.art || '', thumb: it.thumb || '', sq: SL.square(it), title: C.pausedText(p), sub: '' }]; }
   function url(x) {
     // F21: weich oder scharf (beide 1280x720 wie der Hero, ohne Skalierung). TV 27.10. nachmittags: 640x360 blur 24 gestreckt war ein
     // unkenntlicher Farbbrei mit JPEG-Bloecken -> nativ, blur 8 (ruhig, Motiv erkennbar), quality 95 (Block-Kennzahl 2,38 -> 1,15; ~150 KB)
@@ -181,14 +194,24 @@
   function compose(l, x) {
     var s = l.img.style;
     if (!x.pm) {
-      if (l.pm) { l.pm = false; l.inn.className = 'scs-in'; s.left = s.top = s.width = s.height = ''; U.show(l.pst, false); }
+      if (l.pm) { l.pm = false; l.inn.className = 'scs-in'; s.left = s.top = s.width = s.height = ''; U.show(l.pst, false); U.show(l.psh, false); }
       return null;
     }
     var nw = l.img.naturalWidth || 640, nh = l.img.naturalHeight || (x.sq ? 640 : 960), c = N.img.cover(nw * 2, nh * 2, 1280, 720);
-    var p = SL.posterBox(setting('saverInfo', 'ambient'), cyc + 1, l.pst.naturalWidth || (x.sq ? 1 : 2), l.pst.naturalHeight || (x.sq ? 1 : 3));
-    box(l.img, c); box(l.pst, p);
-    if (!l.pm) { l.pm = true; l.inn.className = 'scs-in pm'; U.show(l.pst, true); }
-    return { bg: { u: l.img._pnUrl, x: c.x, y: c.y, w: c.w, h: c.h }, p: { u: l.pst._pnUrl, x: p.x, y: p.y, w: p.w, h: p.h } };
+    box(l.img, c);
+    l.sq = !!x.sq;
+    var pp = posterAt(l, cyc + 1);
+    if (!l.pm) { l.pm = true; l.inn.className = 'scs-in pm'; U.show(l.pst, true); U.show(l.psh, true); }
+    return { bg: { u: l.img._pnUrl, x: c.x, y: c.y, w: c.w, h: c.h }, p: { u: l.pst._pnUrl, x: pp.p.x, y: pp.p.y, w: pp.p.w, h: pp.p.h },
+      sh: { u: pp.su, x: pp.sh.x, y: pp.sh.y, w: pp.sh.w, h: pp.sh.h }, ck: pp.ck };
+  }
+  /* Plakat + Schatten der Ebene l fuer Lage n setzen (compose; moveInfo beim Pause-Schoner: Einblendung wandert, das Plakat mit) */
+  function posterAt(l, n) {
+    var st = setting('saverInfo', 'ambient'), pw = l.pst.naturalWidth || (l.sq ? 1 : 2), ph = l.pst.naturalHeight || (l.sq ? 1 : 3);
+    var p = SL.posterBox(st, n, pw, ph), sh = SL.shadowBox(p), su = N.assetBase + sh.f;
+    box(l.pst, p); box(l.psh, sh);
+    if (l.psh.getAttribute('src') !== su) l.psh.src = su;   // statisches Bild (12 KB, beim Start vorgeladen); dekodiert, waehrend die Ebene verdeckt ist
+    return { p: p, sh: sh, su: su, ck: st === 'bigclock' ? SL.bigGroup(n, pw, ph).ck : null };
   }
 
   /* ---------- Ablauf: laden (hintere Ebene) -> zeichnen lassen -> Uebergang -> tauschen -> naechstes laden ---------- */
@@ -199,6 +222,7 @@
     l.kb = '';
     tr(l.inn, 'none'); tf(l.inn, ID); op(l.inn, 1);
     tr(l.w, 'none'); tf(l.w, ID);
+    if (l.pst.style.opacity !== '') { tr(l.pst, 'none'); tr(l.psh, 'none'); l.pst.style.opacity = l.psh.style.opacity = ''; }   // nach moveInfo (Plakat-Lage)
   }
   function later(ms, fn) { var g = gen; setTimeout(function () { if (g === gen && S.on) fn(); }, ms); }
   /* zwei Frames + Pause: WebKit hat das Bild der hinteren Ebene sicher dekodiert und gezeichnet */
@@ -310,9 +334,9 @@
       var g = R[i];
       st.display = ''; st.left = g.x + 'px'; st.top = g.y + 'px'; st.width = g.w + 'px'; st.height = g.h + 'px';
       if (pm) {
-        var P = comp.p, B = comp.bg, sz = P.w + 'px ' + P.h + 'px, ' + B.w + 'px ' + B.h + 'px';
-        st.backgroundImage = 'url("' + P.u + '"), url("' + B.u + '")';
-        st.backgroundPosition = (P.x - g.x) + 'px ' + (P.y - g.y) + 'px, ' + (B.x - g.x) + 'px ' + (B.y - g.y) + 'px';
+        var P = comp.p, H = comp.sh, B = comp.bg, sz = P.w + 'px ' + P.h + 'px, ' + H.w + 'px ' + H.h + 'px, ' + B.w + 'px ' + B.h + 'px';
+        st.backgroundImage = 'url("' + P.u + '"), url("' + H.u + '"), url("' + B.u + '")';
+        st.backgroundPosition = (P.x - g.x) + 'px ' + (P.y - g.y) + 'px, ' + (H.x - g.x) + 'px ' + (H.y - g.y) + 'px, ' + (B.x - g.x) + 'px ' + (B.y - g.y) + 'px';
         st.webkitBackgroundSize = sz; st.backgroundSize = sz;
       } else if (u) {
         st.backgroundImage = 'url("' + u + '")'; st.backgroundPosition = (-g.x) + 'px ' + (-g.y) + 'px';
@@ -350,18 +374,21 @@
     nextAt = now() + interval();
     /* TV-Nachmessung 28.10.: der Info-Block wurde MITTEN im Bilduebergang umgesetzt (Text + Lage neu = Ebene neu malen, 47–78 ms).
      * Jetzt (ausser Schnitt): stage -> Info-Block ausblenden -> unsichtbar umsetzen und malen lassen, waehrend sich nichts bewegt ->
-     * Uebergang + Info-Block blendet gleichzeitig wieder ein. Schnitt: wie bisher alles in einem Frame (dort bewegt sich nichts). */
+     * Uebergang -> erst wenn das neue Bild steht, blendet der Info-Block wieder ein (SL.infoIn; TV-Test 29.10.: neuer Titel stand
+     * sonst kurz ueber dem alten Bild). Schnitt: wie bisher alles in einem Frame (dort bewegt sich nichts). */
     var hard = fx === 'cut';
     if (D.stage) D.stage(F, B, r.url, r.comp);
     settle(D.settle || 30, function () {
       if (hard) { go(); return; }
       tr(ov, 'opacity ' + OV_FADE + 'ms ease-in-out'); op(ov, 0);
-      later(OV_FADE + 50, function () { pmNow = !!r.x.pm; place(); setInfo(r.x); settle(INFO_SETTLE, go); });
+      later(OV_FADE + 50, function () { pmSet(r); place(); setInfo(r.x); settle(INFO_SETTLE, go); });
     });
     function go() {
       var d = D.go(F, B, ms(fx));
       lastDur = d;
-      if (hard) { pmNow = !!r.x.pm; place(); setInfo(r.x); } else op(ov, 1);
+      if (hard) { pmSet(r); place(); setInfo(r.x); }
+      else { var w = SL.infoIn(fx, d, !hadPic); if (w) later(w, function () { op(ov, 1); }); else op(ov, 1); }   // neuer Titel erst ueber dem neuen Bild
+      hadPic = true;
       if (onGo) { var h = onGo; onGo = null; h(d); }   // Messlauf: Beginn des sichtbaren Uebergangs
       if (d) later(d + 100, swap); else swap();
     }
@@ -385,9 +412,12 @@
   }
   /* Info-Block: Text + Ecke; mit Bildwechsel in run (vor dem Uebergang umgesetzt, Schnitt: im selben Frame) */
   /* Einblendung (saverInfo): Stil-Klasse, Groesse, Abdunklung und Lage aus N.saverLogic.info; nur bei Aenderung ins DOM */
-  var ovSig = '', pmNow = false;   // pmNow: aktuelles Bild ist ein Plakat (Poster und Cover) -> Einblendung ohne Abdunklung
+  var ovSig = '', pmNow = false, pmCk = null;   // pmNow: aktuelles Bild ist ein Plakat (Poster und Cover) -> Einblendung ohne Abdunklung
+  /* pmCk: Grosse Uhr + Plakat – Uhr-Platz {x, w} der Gruppe (SL.bigGroup, Bildschirm-x): die Uhr steht dann neben dem Plakat statt mittig */
+  function pmSet(r) { pmNow = !!r.x.pm; pmCk = pmNow && r.comp && r.comp.ck || null; }
   function place() {
-    var c = SL.info(setting('saverInfo', 'ambient'), cyc), sig = c.style + c.r + c.t + c.ty + pmNow, dark = !!c.scr && !pmNow;
+    var c = SL.info(setting('saverInfo', 'ambient'), cyc), ck0 = pmCk && c.style === 'bigclock' ? pmCk : null, dark = !!c.scr && !pmNow;
+    var sig = c.style + c.r + c.t + c.ty + pmNow + (ck0 ? ck0.x - c.x : '');
     if (sig !== ovSig) {
       ovSig = sig;
       ov.className = 'scs-ov st-' + c.style + (c.r ? ' r' : '') + (c.t ? ' t' : '');
@@ -397,6 +427,8 @@
       U.show(scr, dark);
       scr.setAttribute('data-layout-edge', c.edge.join(','));   // Abdunklung buendig am Rand (nur fuer die Layout-Pruefung)
       blk.style.webkitTransform = c.ty ? 'translate(0,' + -c.ty + 'px)' : '';   // Leisten: nur der Text wandert, die Abdunklung bleibt unten
+      blk.style.left = ck0 ? ck0.x - c.x + 'px' : ''; blk.style.width = ck0 ? ck0.w + 'px' : '';   // Grosse Uhr + Plakat: Uhr-Platz der Gruppe
+      blk.style.right = ck0 ? 'auto' : '';
     }
     tf(ov, 'translate3d(' + c.x + 'px,' + c.y + 'px,0)');
   }
@@ -408,28 +440,35 @@
     U.show(ov, p.any);
   }
   /* ohne Bildwechsel (nur Uhr, Pause, Ladefehler): ausblenden, umsetzen, einblenden (mit Bild: run) */
+  /* Plakat-Bild (Pause-Schoner, Ladefehler): Plakat und Schatten gehoeren zur Einblendung (Gruppe, SL.posterBox gegenueber dem
+   * Text) -> sie blenden mit aus, wechseln die Lage und blenden mit wieder ein (Audit 1.0.6: sonst Text ueber dem Plakat) */
   function moveInfo() {
     cyc++;
-    tr(ov, 'opacity ' + OV_FADE + 'ms ease-in-out'); op(ov, 0);
-    later(OV_FADE + 50, function () { place(); setInfo(null); op(ov, 1); });
+    var l = front(), pm = pmNow && l.pm, fx = 'opacity ' + OV_FADE + 'ms ease-in-out';
+    tr(ov, fx); op(ov, 0);
+    if (pm) { tr(l.pst, fx); tr(l.psh, fx); op(l.pst, 0); op(l.psh, 0); }
+    later(OV_FADE + 50, function () {
+      if (pm && l.pm) { var pp = posterAt(l, cyc); pmCk = pp.ck; op(l.pst, 1); op(l.psh, 1); }
+      place(); setInfo(null); op(ov, 1);
+    });
   }
   S.start = function (ps) {
     var prof = N.session && N.session.profile;
     gen++;
     kind = !prof ? 'clock' : ps && ps.paused ? 'paused' : 'art';
     homeItems = kind === 'art' ? C.saverItems(N.session.homeCache(), 0, pics() === 'poster' ? 'thumb' : 'art') : [];
-    bag = null; noArt = kind === 'clock'; ready = null; busy = false; loading = false; fails = 0; lastFx = '';
+    bag = null; noArt = kind === 'clock'; ready = null; busy = false; loading = false; fails = 0; lastFx = ''; hadPic = false;
     if (kind === 'paused') {
-      var it = ps.item || {};
-      homeItems = [{ art: it.art || '', title: C.pausedText(it), sub: '' }];   // ohne Art kein Bild (kein Poster-Ersatz)
+      homeItems = pausedList(ps.item);
     }
     S.on = true; f = 0; cyc = N.config.saverPos !== undefined ? N.config.saverPos - 1 : N.config.fixedClock ? -1 : Math.floor(Math.random() * 4);   // run() zaehlt vor dem 1. Bild hoch (Tests: Ecke 0 bzw. saverPos)
     rest0(Ls[0]); rest0(Ls[1]); Ls[0].w.style.zIndex = 2; Ls[1].w.style.zIndex = 1;
-    ovSig = ''; pmNow = false; tr(ov, 'none'); op(ov, 1); place();
+    ovSig = ''; pmNow = false; pmCk = null; tr(ov, 'none'); op(ov, 1); place();
     U.show(hc, false);
     U.setText(ti, ''); U.setText(sb, ''); setInfo(null);
     U.show(el, true);
     if (kind === 'art') preParts(setting('saverFx', 'fade'));   // Teile-Ebenen jetzt (Schwarz), nicht im 1. Uebergang
+    if (kind !== 'clock') for (var i = 0; i < 2; i++) Ls[i].psh.src = N.assetBase + SL.SHADOW.tall.f;   // Plakat-Schatten vorladen (unsichtbar)
     nextAt = 0;                                           // erstes Bild: sobald es da ist (aus Schwarz)
     if (!noArt) prepare(); else nextAt = now() + interval();
     N.log('Bildschirmschoner an (' + kind + ')');
@@ -438,7 +477,7 @@
     if (!S.on) return;
     S.on = false; gen++; act();
     U.show(el, false);
-    for (var i = 0; i < 2; i++) { rest0(Ls[i]); N.img.drop(Ls[i].img); N.img.drop(Ls[i].pst); }
+    for (var i = 0; i < 2; i++) { rest0(Ls[i]); N.img.drop(Ls[i].img); N.img.drop(Ls[i].pst); Ls[i].psh.src = N.img.BLANK; }
     if (tilesEl) { tilesEl.style.display = 'none'; for (i = 0; i < tiles.length; i++) tiles[i].style.backgroundImage = 'none'; }   // Speicher frei
     if (N.saverLib) N.saverLib.abort();
     if (N.saverArt) N.saverArt.abort();
@@ -446,6 +485,7 @@
     N.log('Bildschirmschoner aus');
   };
   S._tick = tick; S._pointer = onPointer; S._nextItem = nextItem;   // Tests
+  S._pausedNext = function (it, cb) { kind = 'paused'; homeItems = pausedList(it); nextItem(cb); };   // Tests (Schoner aus)
   /* Messlauf (dev/bench.js 'saver-<fx>'): Schoner mit festem Uebergang starten; cb(go) sobald das 2. Bild bereit liegt,
    * go() startet den Uebergang sofort und liefert seine Dauer (ms) */
   S.bench = function (fx, cb) {

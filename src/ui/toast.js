@@ -1,6 +1,7 @@
 /* N.ui.toast – Toast (SPEC 5.12, NAV-10): max. 1, 4 s (mit Rueckgaengig 6 s), nicht fokussierbar, Text vor dem Einblenden.
  * Lage: unten links (y 568); Bildschirme mit fester Beschreibung unten (Einstellungen: .set-desc bis y 608) setzen
- * toastLow = true -> y 628 unter der Beschreibung, nie ueber Text. */
+ * toastLow = true -> y 628 unter der Beschreibung, nie ueber Text. Player: toastHigh = true -> oben links unter der Titel-Insel
+ * (y 124, x 64), nie ueber Bedien-Insel, Knopf-Beschriftung oder Untertiteln (TV-Test 29.10.: "Sprung zu …" lag ueber dem Label). */
 (function (N) {
   var U = N.util, T = { el: null, txt: null, ic: null, timer: 0 };
   T.init = function (parent) {
@@ -17,6 +18,7 @@
     U.setText(T.txt, text);
     var top = N.router && N.router.top ? N.router.top() : null;
     U.cls(T.el, 'low', o.low !== undefined ? !!o.low : !!(top && top.toastLow));
+    U.cls(T.el, 'high', !!(top && top.toastHigh) && !o.low);
     U.cls(T.el, 'on', true);
     T.timer = setTimeout(T.hide, o.ms || (o.undo ? 6000 : 4000));
   };

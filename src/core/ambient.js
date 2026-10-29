@@ -14,7 +14,9 @@
   /* mix: Anteil der Titelfarbe gegen den Grund; lmax: Obergrenze der relativen Luminanz (Grund ~0,005; Zweitzeile #858B92 ~0,25:
    * 0,022 -> Kontrast >= 4:1, 0,045 -> >= 3:1); op/blur: Titel-/Zufallsbild vom Server (Deckkraft in % ueber #0E0F11, Radius;
    * fast weisses Bild: 16 % -> ~#333 bzw. 26 % -> ~#4A4A4A, Bildtests amb-art-*) */
-  var LOOK = { soft: { mix: 0.6, lmax: 0.022, op: 16, blur: 18 }, strong: { mix: 0.85, lmax: 0.045, op: 26, blur: 16 } };
+  /* sat: Anteil der Buntheit, der bleibt (Abstand jedes Kanals zum eigenen Grauwert). TV-Test 29.10.: "Dezent" machte bei kraeftigen
+   * Postern den ganzen Hintergrund magenta – jetzt dezent 35 % Buntheit und etwas dunkler, kraeftiger 70 %. */
+  var LOOK = { soft: { mix: 0.6, sat: 0.35, lmax: 0.017, op: 16, blur: 18 }, strong: { mix: 0.85, sat: 0.7, lmax: 0.045, op: 26, blur: 16 } };
   /* Groesse des Verlaufsbilds (16:9). TV-Test 28.10. (Nachmessung): amb.apply noch 4,7–20 ms, davon amb.png 6–19 ms – das PNG-Rechnen
    * dominiert (img.src einer data:-URI ist der kleine Rest). 16x9 statt 32x18 = ein Viertel der Pixel/Bytes (CRC, Adler, Base64);
    * die Farben sind abgedunkelt und liegen eng beieinander (benachbarte Pixel unterscheiden sich um 1–3 Stufen), die GPU skaliert
@@ -30,6 +32,11 @@
     return (c | 0) === c && c >= 0 && c < 256 ? LIN[c] : linf(c);
   }
   function lum(rgb) { return 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]); }
+  function desat(c, s) {
+    if (!(s < 1)) return c;
+    var g = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+    return [Math.round(g + (c[0] - g) * s), Math.round(g + (c[1] - g) * s), Math.round(g + (c[2] - g) * s)];
+  }
   function mixc(a, b, t) { return [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)]; }
 
   /* ---------- PNG (RGB, 8 Bit, unkomprimierter Deflate-Block) als data:-URI ----------
@@ -166,7 +173,7 @@
     },
     /* Titelfarbe abdunkeln: mit dem Grund mischen, dann Luminanz auf lmax deckeln (Farbton bleibt, nur dunkler) */
     shade: function (rgb, strength) {
-      var L = LOOK[strength] || LOOK.soft, c = mixc(BASE, rgb, L.mix);
+      var L = LOOK[strength] || LOOK.soft, c = desat(mixc(BASE, rgb, L.mix), L.sat);
       if (lum(c) <= L.lmax) return c;
       var lo = 0, hi = 1, t;
       for (var i = 0; i < 12; i++) { t = (lo + hi) / 2; if (lum(mixc(BASE, c, t)) > L.lmax) hi = t; else lo = t; }

@@ -246,39 +246,99 @@
       }
       return true;
     };
+    /* Zeiger wie auf den Film-/Seriendetails (NAV-2, DET-9): Fokus ohne Rollen nur im eingerasteten Abschnitt (Reihe bzw. Beliebte
+     * Titel); ein anderer, zu >= 40 % sichtbarer (erste Zeile von "Beliebte Titel" unter der letzten Reihe) kommt nach 250 ms
+     * Verweilen bzw. per Klick herein, danach Zeiger-Sperre; sonst Randzonen. Frueher rollte schon das Zeigen auf eine andere
+     * Reihe die Seite, und ausgeblendete Reihen ueber dem Kopf (showRows) blieben Trefferflaechen -> Rueckkopplung. */
+    var RM = N.RowMath, SEC_TOP = 236;
+    function clipTop() { return off ? SEC_TOP : 0; }
+    /* Stopps der Seite (aufsteigend): Knoepfe, je Reihe mit Inhalt, Beliebte Titel */
+    function stops() {
+      var a = [{ o: 0, z: 'btn' }];
+      for (var i = 0; i < rowsN(); i++) if (rows[i].count()) a.push({ o: rows[i].top - SEC_TOP, z: 'row', i: i });
+      if (popular.length) a.push({ o: popY - SEC_TOP, z: 'pop' });
+      return a;
+    }
+    /* Ziel unter dem Punkt: {z: 'row', i | z: 'pop', j, v: RowMath.secVis} */
+    function ptrAt(x, y) {
+      if (y >= RM.VIS) return null;
+      var py = y + off, i, v;
+      for (i = 0; i < rowsN(); i++) {
+        var r = rows[i], cy = r.top + 52 - off;
+        if (!r.count() || y < cy || y >= cy + 176) continue;
+        v = RM.secVis(cy, 176, r.top - SEC_TOP === off, clipTop());
+        return v && r.hit(x) >= 0 ? { z: 'row', i: i, v: v } : null;
+      }
+      if (!popular.length || x < 144 || x >= 1136) return null;
+      var anch = popY - SEC_TOP === off, j = pop.hit(py - popY - 44);
+      if (j < 0 || (anch && j - pop.sc >= pop.use())) return null;          // eingerastet: nur ganz sichtbare Zeilen
+      v = RM.secVis(popY + 44 + (j - pop.sc) * 56 - off, 56, anch, clipTop());
+      return v ? { z: 'pop', j: j, v: v } : null;
+    }
+    function ptrAct(t, x, kind) {
+      if (t.z === 'pop') {
+        if (zone !== 'pop') to('pop');
+        if (t.j !== pop.f) pop.focusTo(t.j, true);            // still: Liste rollt nicht unter dem Punkt
+        if (kind === 'click') playPop(t.j);
+        return true;
+      }
+      var r = rows[t.i], h = r.hit(x);
+      if (h < 0) return false;
+      if (zone !== 'row' || ri !== t.i) to('row', t.i);
+      if (h !== r.f) placeRing(r.hoverCol(h));
+      if (kind === 'click') MU.open(r.item(h));
+      return true;
+    }
+    function reveal(t, x, kind) {
+      N.fx.step(true);
+      ptrAct(t, x, kind === 'click' ? 'click' : 'move');
+      N.pointer.scrolled();                                 // Inhalt ist unter dem Punkt gewandert -> Sperre bis zur naechsten Bewegung
+    }
     s.pointer = function (x, y, kind) {
       if (sb.on) return sb.pointer(x, y, kind);
-      var py = y + off, i;
+      var py = y + off, i, t;
       if (zone === 'btn' && py >= 448 && py < 496 && btnRects) {
+        N.pointer.holdCancel();
         for (i = 0; i < btnRects.length; i++) if (x >= btnRects[i][0] && x < btnRects[i][0] + btnRects[i][1]) { if (i !== bf) setBtn(i); if (kind === 'click') btnAct(bdefs[i].id); return true; }
         return false;
       }
-      for (i = 0; i < rowsN(); i++) {
-        var r = rows[i], cy = r.top + 52;
-        if (!r.count() || py < cy || py >= cy + 176 || y >= 632) continue;
-        var h = r.hit(x); if (h < 0) return false;
-        if (zone !== 'row' || ri !== i) to('row', i);
-        if (h !== r.f) placeRing(r.hoverCol(h));
-        if (kind === 'click') MU.open(r.item(h));
+      var ez = s.pointerEdge(x, y);
+      if (ez) { N.pointer.holdCancel(); if (kind === 'click') s.pointerScroll(ez.d); return true; }   // Randzone: rollt, fokussiert nicht
+      t = ptrAt(x, y);
+      if (!t) { N.pointer.holdCancel(); return false; }
+      if (t.v === 'part') {                                 // anderer Abschnitt: Vorbeiziehen loest nichts aus
+        if (kind === 'click') { N.pointer.holdCancel(); reveal(t, x, kind); return true; }
+        N.pointer.hold(function () { var c = ptrAt(N.pointer.x, N.pointer.y); if (!dead && !away && !sb.on && c && c.v === 'part' && c.z === t.z && c.i === t.i) reveal(c, N.pointer.x); });
         return true;
       }
-      if (popular.length && x >= 144 && x < 1136 && y < 656) {
-        var ez = s.pointerEdge(x, y);
-        if (ez) { if (kind === 'click') s.pointerScroll(ez.d); return true; }   // Randzone: rollt, fokussiert nicht
-        var j = pop.hit(py - popY - 44); if (j < 0 || j - pop.sc >= pop.use()) return false;
-        if (zone !== 'pop') to('pop');
-        if (j !== pop.f) pop.focusTo(j, true);                // still: Liste rollt nicht unter dem Punkt
-        if (kind === 'click') playPop(j);
-        return true;
-      }
-      return false;
+      N.pointer.holdCancel();
+      return ptrAct(t, x, kind);
     };
     s.pointerSig = function () { return off + ',' + pop.sc; };   // Zeiger-Scroll-Sperre (N.pointer)
-    s.pointerEdge = function (x, y) {                       // Randzonen "Beliebte Titel" wie auf der Albumseite
-      if (sb.on || zone !== 'pop' || x < 144 || x >= 1136) return null;
-      return N.ui.TrackList.edge(pop, popY + 44 - off, x, y);
+    /* Randzonen: in "Beliebte Titel" die der Liste (N.ui.TrackList.edge, wie auf der Albumseite), ganz oben zurueck zur letzten
+     * Reihe; sonst oben y 248–280 (ueber dem Abschnitt, solange gerollt) und unten ab RowMath.secEdgeB bis 656 je ein Abschnitt */
+    s.pointerEdge = function (x, y) {
+      if (sb.on || x < 144 || x >= 1136) return null;
+      if (zone === 'pop') {
+        var top = popY + 44 - off, e = N.ui.TrackList.edge(pop, top, x, y);
+        return e || (y >= top - 32 && y < top ? { d: -1, x: 640, y: top - 16 } : null);
+      }
+      var st = stops(), o = [], b = [], i;
+      for (i = 0; i < st.length; i++) o.push(st[i].o);
+      if (off > 0 && y >= SEC_TOP + 12 && y < SEC_TOP + 44) return { d: -1, x: 640, y: SEC_TOP + 28 };
+      for (i = 0; i < rowsN(); i++) if (rows[i].count()) b.push({ cy: rows[i].top + 52 - off, h: 176 });
+      if (popular.length) b.push({ cy: popY + 44 - off, h: 56 });
+      if (RM.secNext(o, off, 1) >= 0 && y >= RM.secEdgeB(b, clipTop()) && y < 656) return { d: 1, x: 640, y: 628 };
+      return null;
     };
-    s.pointerScroll = function (d) { pop.scrollBy(d); };
+    /* ein Schritt: in "Beliebte Titel" die Liste, sonst ein Abschnitt (wie ▼/▲) */
+    s.pointerScroll = function (d) {
+      if (zone === 'pop' && pop.canScroll(d)) { pop.scrollBy(d); return; }
+      var st = stops(), o = [], k, i;
+      for (i = 0; i < st.length; i++) o.push(st[i].o);
+      k = RM.secNext(o, off, d);
+      if (k >= 0) to(st[k].z, st[k].i);
+    };
     s.relabel = function () { paint(); buildButtons(); for (var i = 0; i < rows.length; i++) rows[i].relabel(); };
     return s;
   });

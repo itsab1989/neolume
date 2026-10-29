@@ -18,7 +18,7 @@
     /* Video-Titel, fuer die eine Einordnung Sinn hat (Musik, Hoerbuecher, Playlists, Fotos: nie) */
     relevant: function (it) {
       return !!it && (it.type === 'movie' || it.type === 'show' || it.type === 'season' || it.type === 'episode') &&
-        it.kind !== 'music' && it.kind !== 'audio' && !it.extra;
+        it.kind !== 'music' && it.kind !== 'audio' && !it.extra && !it.ext;   // Titel ausserhalb des Servers: keine PMS-Daten
     },
     /* Schluessel: Serie fuer Folge/Staffel, sonst der Titel selbst */
     key: function (it) {

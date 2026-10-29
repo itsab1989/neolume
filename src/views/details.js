@@ -9,7 +9,7 @@
  * - Titelmelodie (Einstellung, Standard aus): einmal, ausgeblendet beim Verlassen und vor der Wiedergabe.
  * params: {it: normalisiertes Item (movie|show|season|episode)} */
 (function (N) {
-  var U = N.util, M = N.model, D = N.det, REST = 300, ANCHOR = 340, TMORE = 44, SEC = 248, PEEK = 580;
+  var U = N.util, M = N.model, D = N.det, REST = 300, ANCHOR = 340, TMORE = 44, SEC = 248, PEEK = 580, HOLD = 2500;
   var PITCH = { land: 288, poster: 360, cast: 248 };
 
   N.router.define('details', function (params) {
@@ -26,11 +26,16 @@
     var s = { rail: it0.lib ? railId(it0.lib) : N.ui.rail && N.ui.rail.cur || 'home', wheelKeys: ['LEFT', 'RIGHT'] };
     var root, hero, pg, bar, btns = [], bdefs = [], btnRects = null, blbl, blblT, hideT = 0, sec = null;
     var tclip, tstrip, tabEls = [], tabX = [], tabV = null, tmore = [], arrowH = -1, strip, stripT, sbar, sbarT, segs = [], epRow = null, rows = [], ring, sb, bubble, bubbleT;
-    var d = null, seasons = [], sIdx = 0, tabF = 0, eps = [], epsTotal = 0, epPages = {}, seasonCache = new N.LRU(10), gen = 0, tasks = [];
+    var d = null, seasons = [], sIdx = 0, tabF = 0, eps = [], epsTotal = 0, epPages = {}, epWait = {}, seasonCache = new N.LRU(10), gen = 0, tasks = [];
     var zone = 'btn', bf = 0, rk = 0, off = 0, infoFor = null, infoT = 0, seasonT = 0, dead = false, away = false, dirty = false;
     var wishS = it0.type === 'season' ? it0.s : it0.type === 'episode' ? it0.s : null, wishE = it0.type === 'episode' ? it0.e : 0;
     var jump = { digits: '', t: 0 }, bubbleTm = 0, onPlayed = null, onWatched = null, onAnime = null, epMeta = new N.LRU(30);
     var xt = null, baseSeasons = [], pmsEps = null, btnDirty = false;   // optionale Erweiterung (core/ext.js 'details:open'): Steuerobjekt
+    /* TV-Befund 1.0.5: "Staffel 2" stand sofort, "Staffel 1" (nur im Katalog der Erweiterung) ploppte kurz danach davor. Meldet die
+     * Erweiterung, dass ihre Staffeln noch kommen (xt.pending()), wird die Reiterzeile erst gebaut, wenn sie da sind (X.ready/X.tabs,
+     * hoechstens HOLD ms); Folgen der gewaehlten (vorhandenen) Staffel laden trotzdem sofort. tabSig: zuletzt gebaute Reiter.
+     * shownS/shownV: Staffel (Nummer, nur im Katalog?), deren Karten gerade in der Folgenreihe stehen */
+    var tabHold = false, tabHoldT = 0, tabSig = '', shownS = null, shownV = false;
 
     /* Schnittstelle fuer eine optionale Erweiterung (N.ext 'details:open'): lesen + gezielt neu zeichnen, ohne Fokussprung */
     var X = {
@@ -40,16 +45,12 @@
       /* Knoepfe neu (Erweiterung fuegt vor "⋯" ein): der fokussierte Knopf bleibt stehen; liegt der Fokus auf "⋯", erst beim Verlassen */
       buttons: function () { if (!d || dead) return; if (zone === 'btn' && !away && bdefs[bf] && bdefs[bf].id === 'more') btnDirty = true; else buildButtons(d.it); },
       info: function () { if (infoFor && !dead) paintInfo(infoFor); },
-      tabs: function () {
-        if (dead || !baseSeasons.length) return;
-        var cur = seasons[sIdx], fi = seasons[tabF];
-        applySeasons(); buildTabs();
-        for (var i = 0; i < seasons.length; i++) { if (cur && seasons[i].index === cur.index) sIdx = i; if (fi && seasons[i].index === fi.index) tabF = i; }
-        markTabs();
-      },
+      tabs: function () { if (tabHold) releaseTabs(); else retab(); },
+      /* Erweiterung fertig (auch ohne Ergebnis): zurueckgehaltene Reiter jetzt bauen */
+      ready: function () { releaseTabs(); },
       /* aktuelle Staffel neu mischen (Daten der Erweiterung kamen spaeter oder haben sich geaendert) */
       redecorate: function () {
-        if (dead || !epRow || !seasons[sIdx]) return;
+        if (dead || !epRow || !seasons[sIdx] || seasonT) return;   // Staffelwechsel steht noch aus: loadSeason mischt gleich selbst
         if (seasons[sIdx].virtual) { var cv = eps[epRow.f]; eps = xt.virtualEps(seasons[sIdx]); epsTotal = eps.length; allPages(epsTotal); epRow.setModel({ id: 'eps', kind: 'land', tk: 'det.row.episodes', items: eps }, U.clamp(epRow.f, 0, eps.length - 1)); }
         else {
           var f = decorate(epRow.f);
@@ -156,6 +157,9 @@
       infoT = setTimeout(function wait() {
         infoT = 0;
         if (N.idle.restFor() < REST) { infoT = setTimeout(wait, REST - N.idle.restFor()); return; }
+        /* Platzhalter gemerkt, Folgen inzwischen geladen: die echte Folge an derselben Stelle zeigen (Audit 1.0.6) */
+        if (x && x.ph && !x.miss && (zone === 'eps' || zone === 'tabs') && eps[epRow.f] && !eps[epRow.f].ph) x = eps[epRow.f];
+        if (!x) return;
         if (x !== infoFor) paintInfo(x);
         if (x.type === 'episode' && !x.ph) { paintStrip(); prefetchEp(x); }
       }, REST);
@@ -215,6 +219,8 @@
     function kinds() { var hc = N.session.homeCache(), k = N.hubs.libKinds(srv ? srvLibs() : hc && (hc.alibs || hc.libs) || []); return k; }
     function load() {
       gen++; var g = gen;
+      /* Erweiterung schon vor den Antworten: sie weiss so frueh wie moeglich, ob sie Staffeln ergaenzt (pending, s. tabHold) */
+      if (!xt && N.ext.has('details:open')) xt = N.ext.call('details:open', X) || null;
       var mrk = isShow ? showRk : it0.rk;
       track(get('/library/metadata/' + mrk, D.query(isShow ? 'show' : 'movie'), { timeout: 12000 }, function (err, dd) {
         if (g !== gen || dead) return;
@@ -230,7 +236,6 @@
         hero.setPoster(d.it.thumb || it0.thumb, d.it.title);   // ohne jedes Bild: Farbflaeche, bis ein Folgenbild kommt
         if (hero.needBg) bgFromEpisodes();
         buildRows();
-        if (!xt && N.ext.has('details:open')) xt = N.ext.call('details:open', X) || null;
         if (isShow) N.theme.play(d.theme);
         N.idle.add(updateHints, 'det-hints');
       }));
@@ -238,6 +243,11 @@
         if (g !== gen || dead) return;
         if (err) { N.diag.log('warn', 'seasons ' + (err.status || err.type)); return; }
         baseSeasons = D.seasons(dd);
+        if (!tabSig && !tabHold && baseSeasons.length && xt && xt.pending && xt.pending()) {
+          tabHold = true;
+          tabWait();
+          tabHoldT = setTimeout(function () { tabHoldT = 0; if (!dead) releaseTabs(); }, HOLD);
+        }
         applySeasons();
         buildTabs();
         if (!seasons.length) return;
@@ -266,7 +276,31 @@
 
     /* ---------- Staffeln ---------- */
     function applySeasons() { seasons = xt && xt.seasons ? xt.seasons(baseSeasons.slice()) || baseSeasons : baseSeasons; }
+    /* Reiter neu (Erweiterung hat Staffeln ergaenzt/geaendert): gewaehlte und fokussierte Staffel bleiben dieselben (gleiche Nummer) */
+    function retab() {
+      if (dead || !baseSeasons.length) return;
+      var cur = seasons[sIdx], fi = seasons[tabF];
+      applySeasons();
+      sIdx = D.seasonPos(seasons, cur, sIdx); tabF = D.seasonPos(seasons, fi, tabF);
+      if (D.tabSig(seasons) !== tabSig) buildTabs();
+      markTabs();
+    }
+    /* TV-Test 29.10.: erstes Oeffnen ohne gemerkten Stand dauerte ~2,4 s (Katalog), HOLD 1 s war zu kurz – "Staffel 1" rutschte danach
+     * vor "Staffel 2". Jetzt hoechstens 2,5 s; solange steht an der Stelle der Reiter ein dezenter Lade-Platzhalter (nichts darunter
+     * oder daneben verschiebt sich, buildTabs ersetzt ihn). */
+    function tabWait() {
+      while (tstrip.firstChild) tstrip.removeChild(tstrip.firstChild);
+      U.el('span', 'tab is-wait', tstrip).appendChild(document.createTextNode('…'));
+    }
+    function releaseTabs() {
+      if (!tabHold) return;
+      tabHold = false;
+      if (tabHoldT) { clearTimeout(tabHoldT); tabHoldT = 0; }
+      retab();
+    }
     function buildTabs() {
+      if (tabHold) return;                                 // Reiter kommen gleich vollstaendig (s. tabHold)
+      tabSig = D.tabSig(seasons);
       while (tstrip.firstChild) tstrip.removeChild(tstrip.firstChild);
       tabEls = []; tabX = [];
       for (var i = 0; i < seasons.length; i++) {
@@ -306,6 +340,10 @@
     /* Staffel waehlen: Tab sofort, Folgen/Streifen erst nach 300 ms Ruhe (SPEC 7.7) */
     function selectSeason(i, now, focusEp) {
       sIdx = i; tabF = i; markTabs(); scrollTabs(now);
+      /* TV-Befund 1.0.5: unter dem Reiter "Staffel 1" (nur im Katalog) standen bis zum Wechsel noch die Bilder der Staffel 2. Ist eine
+       * Katalog-Staffel beteiligt (Ziel oder gerade gezeigt), verschwinden die alten Karten sofort (eine Deckkraft am Karten-Bereich,
+       * Row.setVisible); die neuen kommen wie immer nach der Ruhe. Ohne Erweiterung gibt es keine Katalog-Staffeln: unveraendert. */
+      if (!now && epRow && seasons[i]) { var tv = !!seasons[i].virtual; epRow.setVisible(!(tv || shownV) || (seasons[i].index === shownS && tv === shownV)); }
       if (seasonT) clearTimeout(seasonT);
       var run = function () { seasonT = 0; if (!dead) loadSeason(i, focusEp); };
       if (now) run(); else seasonT = setTimeout(function wait() { if (N.idle.restFor() < REST) { seasonT = setTimeout(wait, REST); return; } run(); }, REST);
@@ -315,6 +353,7 @@
     function tabInfo(se) { if (zone === 'tabs' && se && se.virtual && infoT) { clearTimeout(infoT); infoT = 0; } return zone === 'tabs' && se && se.virtual && xt && xt.seasonInfo ? (paintInfo(se), true) : false; }
     function loadSeason(i, focusEp) {
       var se = seasons[i]; if (!se) return;
+      shownS = se.index; shownV = !!se.virtual;
       tabInfo(se);
       if (se.virtual) { pmsEps = null; eps = xt && xt.virtualEps ? xt.virtualEps(se) : []; epsTotal = eps.length; allPages(epsTotal); showEps(focusEp); return; }   // Staffel nur im Katalog
       var c = seasonCache.get(se.rk), g = gen;
@@ -325,11 +364,17 @@
       showEps(focusEp, true);
       loadEpPage(se, 0, function () { if (g === gen && seasons[sIdx] === se) showEps(focusEp); });
     }
+    /* Audit 1.0.6: showEps(.., true) -> ensureEpPages startet Seite 0 ohne Rueckruf; der folgende Aufruf mit Rueckruf (loadSeason)
+     * kam dann zu spaet (epPages[0] schon 1) und Folgenwahl, Mischen der Erweiterung, Info-Block und Sprung in die Folgenreihe
+     * fielen aus. Rueckrufe fuer eine Seite, die gerade laedt, warten deshalb hier (je Folgenliste, epWait). */
     function loadEpPage(se, p, cb) {
-      if (epPages[p]) return;
+      var w = epWait[p];
+      if (epPages[p]) { if (cb && w && w.list === eps) w.cbs.push(cb); return; }
       epPages[p] = 1;
       var g = gen, list0 = eps;
+      w = epWait[p] = { list: list0, cbs: cb ? [cb] : [] };
       track(get('/library/metadata/' + se.rk + '/children', D.seasonQuery(p * 50, 50), { timeout: 12000 }, function (err, dd) {
+        if (epWait[p] === w) delete epWait[p];
         if (g !== gen || list0 !== eps) return;
         var mc = !err && dd && dd.MediaContainer;
         if (!mc) { epPages[p] = 0; return; }
@@ -338,7 +383,7 @@
         for (var k = 0; k < list.length; k++) eps[p * 50 + k] = list[k];
         bgFromEpisodes();
         seasonCache.set(se.rk, { eps: eps, total: epsTotal, pages: epPages, ts: U.now() });
-        if (cb) cb(); else if (epRow.model && epRow.model.items === eps) { for (k = 0; k < list.length; k++) epRow.refreshItem(p * 50 + k); paintStrip(); }
+        if (w.cbs.length) { for (k = 0; k < w.cbs.length; k++) w.cbs[k](); } else if (epRow.model && epRow.model.items === eps) { for (k = 0; k < list.length; k++) epRow.refreshItem(p * 50 + k); paintStrip(); }
       }));
     }
     /* Serie ganz ohne Bilder: erstes Folgenbild als Hintergrund (abgedunkelt) */
@@ -350,9 +395,10 @@
       var f = placeholders ? 0 : D.pickEpisode(eps, focusEp !== undefined ? focusEp : wishE);
       if (!placeholders) f = decorate(f);
       if (!placeholders) wishE = 0;
+      if (epRow.vis === false) epRow.setVisible(true);    // nach einem Wechsel mit Katalog-Staffel (selectSeason) wieder zeigen
       epRow.setModel({ id: 'eps', kind: 'land', tk: 'det.row.episodes', items: eps }, f);
       if (zone === 'eps') { epRow.setFocused(true); placeRing(epRing(epRow.ringPos())); infoLater(eps[epRow.f]); }
-      else if (zone === 'tabs' && !placeholders && infoFor && infoFor.virtual && !tabInfo(seasons[sIdx]) && eps[epRow.f]) infoLater(eps[epRow.f]);   // zurueck von der Katalog-Staffel
+      else if (zone === 'tabs' && !placeholders && !tabInfo(seasons[sIdx]) && eps[epRow.f] && eps[epRow.f] !== infoFor) infoLater(eps[epRow.f]);   // Reiter: Info zur gewaehlten Staffel (auch zurueck von der Katalog-Staffel)
       paintStrip();
       ensureEpPages();
       if (!placeholders && it0.type === 'episode' && zone === 'btn' && !s.entered) { s.entered = true; toEps(); }
@@ -383,7 +429,8 @@
      *    in der Reiter-Zeile (Klasse ss-solo). Platzhalter einer Erweiterung (miss) zaehlen nicht: der Streifen zeigt nur
      *    Folgen auf dem Server (TV-Befund 28.10.: sonst "Folge 1 von 12" mit Balken statt der Felder). Nur Schreiben, kein Messen. */
     function paintStrip() {
-      var st = N.session.settings || {}, se = seasons[sIdx], epOn = !!st.episodeProgress && !!se, sbl = st.seriesProgress && se ? N.SeasonStrip.seriesBar(baseSeasons, se.index) : { mode: 'none' };   // nur Staffeln vom Server (ohne Katalog-Staffeln der Erweiterung, sonst springt die Zahl)
+      // ganz fehlende Staffel (Katalog der Erweiterung): kein leerer Streifen (TV-Test 29.10.: duenne Linie ohne Text)
+      var st = N.session.settings || {}, se = seasons[sIdx], epOn = !!st.episodeProgress && !!se && !se.virtual, sbl = st.seriesProgress && se ? N.SeasonStrip.seriesBar(baseSeasons, se.index) : { mode: 'none' };   // nur Staffeln vom Server (ohne Katalog-Staffeln der Erweiterung, sonst springt die Zahl)
       var i;
       if (epOn) {
         var cur = eps[epRow.f], foc = (zone === 'eps' || zone === 'tabs') && cur && !cur.ph ? cur : null, src = D.stripSource(eps);
@@ -437,11 +484,13 @@
     function setOff(o) { if (o !== off) { off = o; N.fx.move(pg); U.tf(pg, 0, -o); } hideAbove(); }
     /* Abschnitte, die nach oben unter den Kopf geschoben sind, ausblenden (nach der Bewegung): das Kopfband laeuft nach rechts
      * aus (TV-Befund 28.10.: Bild rechts sonst unnoetig dunkel), dort darf nichts Altes durchscheinen. Keine Messung (feste Positionen). */
+    /* Abschnitt (Seiten-y seiner Oberkante) liegt beim aktuellen Versatz unter dem Kopf -> ausgeblendet, fuer den Zeiger nicht da */
+    function above(top) { return top - off < ANCHOR - 24; }
     function hideAbove() {
       var b = [], i, show = [], hide = [];                // Knoepfe: dimButtons; display, weil Kinder (Pfeile) visibility setzen
       if (isShow) b.push([sec, SEC + 332]);
       for (i = 0; i < rows.length; i++) b.push([rows[i].row.el, rows[i].top]);
-      for (i = 0; i < b.length; i++) (b[i][1] - off < ANCHOR - 24 ? hide : show).push(b[i][0]);
+      for (i = 0; i < b.length; i++) (above(b[i][1]) ? hide : show).push(b[i][0]);
       if (hideT) clearTimeout(hideT);
       for (i = 0; i < show.length; i++) U.show(show[i], true);
       hideT = hide.length ? setTimeout(function () { hideT = 0; if (!dead) for (var k = 0; k < hide.length; k++) U.show(hide[k], false); }, 180) : 0;
@@ -461,6 +510,7 @@
       markTabs(); N.router.refreshHints();
     }
     function toTabs() {
+      if (tabHold) releaseTabs();                          // Nutzer will zu den Reitern: nicht weiter warten
       if (!seasons.length) return;
       if (btnDirty && d) buildButtons(d.it);
       leaveZone(); zone = 'tabs'; setOff(SEC); heroInfo(false); ring.hide(); dimButtons(true);
@@ -469,6 +519,7 @@
       N.router.refreshHints();
     }
     function toEps() {
+      if (seasonT && epRow && epRow.vis === false) { clearTimeout(seasonT); seasonT = 0; loadSeason(sIdx); }   // Karten der neuen Staffel sofort
       if (!epRow || !epRow.count()) return;
       leaveZone(); zone = 'eps'; setOff(SEC); heroInfo(false); dimButtons(true); markTabs();
       epRow.setFocused(true); placeRing(epRing(epRow.ringPos()));
@@ -650,8 +701,9 @@
     /* ---------- Hinweisleiste ---------- */
     s.hints = function () {
       if (sb.on) return [{ k: 'ret', t: 'hint.back' }];
-      var x = focusedItem(), list = [{ k: 'red', t: 'hint.fromStart' }, { k: 'green', t: 'hint.tracks' }];
-      if (zone === 'row') list = [];
+      /* Rot/Gruen nur, wo sie etwas tun: Knoepfe und echte Folgen (TV-Test 29.10.: auf dem Reiter einer ganz fehlenden Staffel stand
+       * "Von vorne / Ton & UT"; in der Reiter-Zeile tun beide nichts) */
+      var x = focusedItem(), list = zone === 'btn' || (zone === 'eps' && x) ? [{ k: 'red', t: 'hint.fromStart' }, { k: 'green', t: 'hint.tracks' }] : [];
       if (x && M.isVideo(x)) list.push({ k: 'yellow', t: M.watched(x) ? 'hint.markUnwatched' : 'hint.markWatched' });
       list.push({ k: 'blue', t: 'hint.search' });
       if (list.length < 5) list.push({ k: 'INFO', t: 'hint.details' });
@@ -680,7 +732,7 @@
       if (xt && xt.close) xt.close();
       for (var i = 0; i < tasks.length; i++) if (tasks[i]) tasks[i].abort();
       N.evt.off('playback:stopped', onPlayed); N.evt.off('watched:changed', onWatched); N.evt.off('anime:changed', onAnime);
-      if (seasonT) clearTimeout(seasonT); if (bubbleTm) clearTimeout(bubbleTm); if (jump.t) clearTimeout(jump.t);
+      if (seasonT) clearTimeout(seasonT); if (tabHoldT) clearTimeout(tabHoldT); if (bubbleTm) clearTimeout(bubbleTm); if (jump.t) clearTimeout(jump.t);
       if (epRow) epRow.clear();
       for (i = 0; i < rows.length; i++) rows[i].row.clear();
       N.theme.stop();
@@ -763,28 +815,52 @@
     };
 
     /* ---------- Zeiger (Index-Mathe + einmal gemessene Rechtecke) ---------- */
-    s.pointer = function (x, y, kind) {
-      if (sb.on) return sb.pointer(x, y, kind);
-      var py = y + off, onArrow = -1;                     // Seitenkoordinaten
-      if (isShow && tabV && py >= SEC + 332 && py < SEC + 372 && x >= 128 && x < 592)
-        onArrow = tabV.left && x < 128 + TMORE ? 0 : tabV.right && x >= 128 + tabX[tabV.last][0] + tabX[tabV.last][1] - tabV.o + tabV.shift ? 1 : -1;
-      if (onArrow < 0 && arrowH >= 0) hoverArrow(-1);
-      if (!off && py >= 448 && py < 496 && btnRects) {   // gescrollt: Knoepfe unsichtbar, kein Treffer unter dem Kopf
-        for (var i = 0; i < btnRects.length; i++) if (x >= btnRects[i][0] && x < btnRects[i][0] + btnRects[i][1]) {
-          if (zone !== 'btn') toBtn();
-          if (i !== bf) setBtn(i);
-          if (kind === 'click') btnAct(bdefs[i].id);
-          return true;
-        }
-        return false;
-      }
-      if (isShow && py >= SEC + 332 && py < SEC + 372 && x >= 128 && x < 592 && tabX.length) {
-        var tx = x - 128 + (tstrip._off || 0), v = tabV || { first: 0, last: tabX.length - 1 }, mi = -1;
-        if (v.left && x < 128 + TMORE) mi = v.first - 1; else if (v.right && x >= 128 + tabX[v.last][0] + tabX[v.last][1] - v.o + v.shift) mi = v.last + 1;   // Pfeil: naechste Staffel
-        if (mi >= 0) {
+    /* Wie Suche/Bibliothek (NAV-2, DET-9). Bisher rollte jeder Zeiger-Fokus auf einen anderen Abschnitt die Seite (toTabs/toEps/
+     * toRow), und ausgeblendete Abschnitte ueber dem Kopf blieben Trefferflaechen -> Rueckkopplung Hover -> Rollen -> anderer
+     * Abschnitt unter dem stehenden Punkt -> Rollen … Jetzt: Fokus ohne Rollen nur im eingerasteten Abschnitt; ein anderer, zu
+     * >= 40 % sichtbarer (die Staffel-Reiter unter den Knoepfen) kommt erst nach 250 ms Verweilen bzw. per Klick herein, danach
+     * Zeiger-Sperre; sonst Randzonen (ein Abschnitt je Schritt, Fokus kommt mit) oder Rad. Treffer in Seitenkoordinaten
+     * (y + off); ausgeblendete Abschnitte (above) sind keine Ziele. */
+    var RM = N.RowMath, TOP_CLIP = ANCHOR - 24;
+    /* Stopps der Seite: Knoepfe 0, Staffeln/Folgen SEC, je Reihe ihr Versatz (aufsteigend) */
+    function secStops() {
+      var a = [{ o: 0, z: 'btn' }];
+      if (isShow && (seasons.length || (epRow && epRow.count()))) a.push({ o: SEC, z: 'sec' });
+      for (var i = 0; i < rows.length; i++) a.push({ o: rows[i].top - ANCHOR, z: 'row', i: i });
+      return a;
+    }
+    function stopOffs(a) { for (var o = [], i = 0; i < a.length; i++) o.push(a[i].o); return o; }
+    /* Zeigeziele (ohne Knoepfe): {z: 'tabs'|'eps'|'row', i, cy (Bildschirm-y), h, v (RowMath.secVis)} */
+    function targets() {
+      var out = [], top = off ? TOP_CLIP : 0, i;
+      function add(z, k, blockTop, py, h, stop) { if (!above(blockTop)) out.push({ z: z, i: k, cy: py - off, h: h, v: RM.secVis(py - off, h, stop === off, top) }); }
+      if (isShow && tabX.length) add('tabs', 0, SEC + 332, SEC + 332, 40, SEC);
+      if (isShow && epRow.count()) add('eps', 0, SEC + 332, SEC + 392, 162, SEC);
+      for (i = 0; i < rows.length; i++) add('row', i, rows[i].top, rows[i].top + 52, rows[i].row.g.h, rows[i].top - ANCHOR);
+      return out;
+    }
+    function ptrAt(x, y) {
+      if (y >= RM.VIS) return null;
+      var t = targets();
+      for (var i = 0; i < t.length; i++) if (t[i].v && y >= t[i].cy && y < t[i].cy + t[i].h) return t[i].z === 'tabs' && (x < 128 || x >= 592) ? null : t[i];
+      return null;
+    }
+    /* Pfeil ‹/› der Reiterzeile unter x: 0 links, 1 rechts, -1 keiner */
+    function tabArrow(x) {
+      var v = tabV;
+      if (!v) return -1;
+      if (v.left && x < 128 + TMORE) return 0;
+      return v.right && x >= 128 + tabX[v.last][0] + tabX[v.last][1] - v.o + v.shift ? 1 : -1;
+    }
+    /* Ziel im eingerasteten Abschnitt bedienen (Fokus wie die Tasten; der Versatz bleibt, also rollt nichts) */
+    function ptrAct(t, x, kind) {
+      var i;
+      if (t.z === 'tabs') {
+        var v = tabV || { first: 0, last: tabX.length - 1 }, tx = x - 128 + (tstrip._off || 0), a = tabArrow(x);
+        if (a >= 0) {                                    // Pfeil: naechste Staffel
           if (zone !== 'tabs') toTabs();
-          hoverArrow(onArrow);
-          if (kind === 'click') { hoverArrow(-1); if (mi !== tabF) selectSeason(mi); }   // danach zeigt der neue Reiter den Fokus
+          hoverArrow(a);
+          if (kind === 'click') { hoverArrow(-1); i = a ? v.last + 1 : v.first - 1; if (i !== tabF) selectSeason(i); }   // danach zeigt der neue Reiter den Fokus
           return true;
         }
         for (i = v.first; i <= v.last; i++) if (tx >= tabX[i][0] && tx < tabX[i][0] + tabX[i][1]) {
@@ -795,7 +871,7 @@
         }
         return false;
       }
-      if (isShow && epRow.count() && py >= SEC + 392 && py < SEC + 392 + 162) {
+      if (t.z === 'eps') {
         var j = epRow.hit(x);
         if (j < 0) return false;
         if (zone !== 'eps') toEps();
@@ -804,18 +880,68 @@
         else if (kind === 'click' && eps[j] && !eps[j].ph) play(eps[j], 'ask');
         return true;
       }
-      for (i = 0; i < rows.length; i++) {
-        var r = rows[i].row, cy = rows[i].top + 52;
-        if (py >= cy && py < cy + r.g.h && y < 632) {
-          var h = r.hit(x);
-          if (h < 0) return false;
-          if (zone !== 'row' || rk !== i) toRow(i);
-          if (h !== r.f) placeRing(r.hoverCol(h));
-          if (kind === 'click') rowOpen(r.item(h));
+      var r = rows[t.i].row, h = r.hit(x);
+      if (h < 0) return false;
+      if (zone !== 'row' || rk !== t.i) toRow(t.i);
+      if (h !== r.f) placeRing(r.hoverCol(h));
+      if (kind === 'click') rowOpen(r.item(h));
+      return true;
+    }
+    /* angeschnittenen Abschnitt hereinholen (ein Schritt wie ▼/▲), Ziel unter dem Punkt fokussieren, dann Zeiger-Sperre */
+    function reveal(t, x, kind) {
+      N.fx.step(true);
+      ptrAct(t, x, 'move');
+      if (kind === 'click') ptrAct(t, x, 'click');
+      N.pointer.scrolled();                             // Inhalt ist unter dem Punkt gewandert -> Sperre bis zur naechsten Bewegung
+    }
+    s.pointer = function (x, y, kind) {
+      if (sb.on) return sb.pointer(x, y, kind);
+      var py = y + off, t, i;                           // Seitenkoordinaten
+      if (!off && py >= 448 && py < 496 && btnRects) {   // gescrollt: Knoepfe unsichtbar, kein Treffer unter dem Kopf
+        N.pointer.holdCancel(); if (arrowH >= 0) hoverArrow(-1);
+        for (i = 0; i < btnRects.length; i++) if (x >= btnRects[i][0] && x < btnRects[i][0] + btnRects[i][1]) {
+          if (zone !== 'btn') toBtn();
+          if (i !== bf) setBtn(i);
+          if (kind === 'click') btnAct(bdefs[i].id);
           return true;
         }
+        return false;
       }
-      return false;
+      var ez = s.pointerEdge(x, y);
+      if (ez) {                                         // Randzone: rollt (Verweilen/Klick), fokussiert nicht
+        N.pointer.holdCancel(); if (arrowH >= 0) hoverArrow(-1);
+        if (kind === 'click') s.pointerScroll(ez.d);
+        return true;
+      }
+      t = ptrAt(x, y);
+      if (arrowH >= 0 && !(t && t.z === 'tabs' && t.v === 'full' && tabArrow(x) >= 0)) hoverArrow(-1);
+      if (!t) { N.pointer.holdCancel(); return false; }
+      if (t.v === 'part') {                             // anderer Abschnitt: Vorbeiziehen loest nichts aus
+        if (kind === 'click') { N.pointer.holdCancel(); reveal(t, x, kind); return true; }
+        N.pointer.hold(function () { var c = ptrAt(N.pointer.x, N.pointer.y); if (!dead && !away && !sb.on && c && c.v === 'part' && c.z === t.z && c.i === t.i) reveal(c, N.pointer.x); });
+        return true;
+      }
+      N.pointer.holdCancel();
+      return ptrAct(t, x, kind);
+    };
+    /* Randzonen ueber der Inhaltsbreite: oben y 276–332 (zwischen Info-Block und Abschnitt), solange die Seite gerollt ist; unten
+     * ab RowMath.secEdgeB bis 656 (ueber der Hinweisleiste), solange ein weiterer Abschnitt folgt. Pille bei x 600 (zwischen
+     * Reitern und Staffelstreifen). */
+    s.pointerEdge = function (x, y) {
+      if (sb.on || zone === 'state' || x < 128 || x >= 1216) return null;
+      var st = stopOffs(secStops());
+      if (off > 0 && y >= 276 && y < 332 && RM.secNext(st, off, -1) >= 0) return { d: -1, x: 600, y: 304 };
+      if (y >= RM.secEdgeB(targets(), off ? TOP_CLIP : 0) && y < 656 && RM.secNext(st, off, 1) >= 0) return { d: 1, x: 600, y: 636 };
+      return null;
+    };
+    /* ein Schritt = ein Abschnitt (wie ▼/▲): nach unten in Staffeln/Folgen zuerst die Reiter, nach oben zuerst die Folgen */
+    s.pointerScroll = function (d) {
+      var st = secStops(), k = RM.secNext(stopOffs(st), off, d), t = k >= 0 ? st[k] : null;
+      if (!t) return;
+      if (arrowH >= 0) hoverArrow(-1);
+      if (t.z === 'btn') toBtn();
+      else if (t.z === 'sec') { if (d > 0 ? seasons.length : !epRow.count()) toTabs(); else toEps(); }
+      else toRow(t.i);
     };
     s.pointerSig = function () { return off; };             // Zeiger-Scroll-Sperre (N.pointer)
     s.relabel = function () { if (d) buildButtons(d.it); if (seasons.length) buildTabs(); if (infoFor) paintInfo(infoFor); };

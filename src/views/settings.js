@@ -45,8 +45,15 @@
         toggle('passthrough'), boostRow(), toggle('thumbs'),
         choice('skipIntro', vals(['off', 'button', 'auto'])), choice('skipCredits', vals(['off', 'button', 'auto'])), toggle('autoNext'),
         choice('countdown', secs([5, 8, 10, 15, 20, 30])), choice('stillWatching', stills()), choice('stillTime', hours()), choice('sleepDefault', sleeps()),
-        toggle('lowerOffer'), choice('seekArrows', secs([5, 10, 15, 30]).concat(secBF('10/30'))), choice('seekFf', secs([10, 30, 60]).concat(secBF('15/30'))),
+        toggle('lowerOffer'), choice('seekArrows', secs([5, 10, 15, 30]).concat(secBF('10/30'))), ffrwRow(), choice('seekFf', secs([10, 30, 60]).concat(secBF('15/30'))),
         loupeRow(), loupeStyleRow(), choice('aspect', [['auto', v('auto')], ['orig', v('orig')], ['fill', v('fill')], ['43', v('a43')], ['zoom', v('zoom')]])];
+    }
+    /* Vor-/Rueckspultasten im Video (SPEC PLAY-32): Springen (Standard: gleiches Verhalten bei jedem Video, bis der Trick-Modus am
+     * TV erprobt ist) oder Schnell spulen (SEF-Trick-Modus 2x…16x, ohne Ton, nur direkte Wiedergabe); INFO erklaert beides */
+    function ffrwRow() {
+      var r = choice('ffrw', [['jump', v('ffJump'), null, v('ffJump.s')], ['trick', v('ffTrick'), null, v('ffTrick.s')]]);
+      r.help = 'help.ffrw';
+      return r;
     }
     /* ===== P5 Einstellungen & Komfort (SPEC 10.4): Ton & Untertitel, Anime, Oberflaeche, Hilfe & Info ===== */
     function rewinds() { var o = []; N.comfort.REWIND.forEach(function (n) { o.push([n, n ? N.t('set.v.sec', { n: n }) : v('off')]); }); return o; }
@@ -106,7 +113,7 @@
       return choice('accent', o);
     }
     function displayRows(S) {
-      var out = [toggle('backgrounds')].concat(libBgRows(), [toggle('spoiler'), toggle('clock'), clockStyleRow(), hintsRow()]);
+      var out = [toggle('backgrounds')].concat(libBgRows(), [toggle('spoiler'), toggle('clock'), clockStyleRow(), hintsRow(), recentRow()]);
       if (!S.isKid()) out = out.concat(discRows());   // P4 Entdecken + Merkliste (Kinderprofile: nicht vorhanden)
       if (!S.isKid()) out.push(choice('screensaver', [[0, v('off')]].concat(N.comfort.SAVER_MIN.slice(1).map(function (n) { return [n, N.t('set.v.min', { n: n })]; }))));
       if (!S.isKid()) out = out.concat(saverRows());
@@ -126,6 +133,13 @@
     function hintsRow() {
       var r = choice('hints', [['always', v('hAlways'), null, v('hAlways.s')], ['brief', v('hBrief'), null, v('hBrief.s')], ['off', v('hOff'), null, v('hOff.s')]]);
       r.help = 'help.hints';
+      return r;
+    }
+    /* Zuletzt gesucht (N.srch.limit, Nutzer-Feedback 28.10.): Aus / 4 / 8 Begriffe (Standard 8; fruehere 6/3 -> 8/4 in N.comfort.applyDefaults), auch fuer Kinderprofile; Aus loescht die Listen
+     * (N.srch.applyLimit ueber settings:changed). INFO erklaert Rot zum Entfernen und "Verlauf loeschen" */
+    function recentRow() {
+      var r = choice('recentSearches', [[0, v('off')], [4, N.tn('set.v.terms', 4)], [8, N.tn('set.v.terms', 8)]]);
+      r.help = 'help.recentSearches';
       return r;
     }
     /* Bildschirmschoner (ui/saver.js, core/saverlogic.js): Quelle, Bibliotheken, Ungesehenes, Takt, Uebergang, Einblendung, unscharf.
@@ -261,9 +275,14 @@
           get: function () { return !!(S.settings && S.settings.reduceMotion); }, set: function (v) { S.setSetting('reduceMotion', v); N.fx.setReduced(v); } },
         { id: 'ptr', type: 'toggle', label: 'set.pointer', desc: 'set.pointer.desc',
           get: function () { return S.state.pointer !== false; }, set: function (v) { S.state.pointer = v; S.save(); N.pointer.setEnabled(v); } },
-        // TV-Befund 27.10. nachmittags: Randzonen-Rollen erst langsam, dann schneller; nur mit Zeiger-Steuerung (sonst ausgegraut)
-        { id: 'ptracc', type: 'toggle', label: 'set.ptrAccel', desc: 'set.ptrAccel.desc', ddesc: 'set.ptrAccel.off.desc',
+        // TV-Befund 1.0.5: Weiterblaettern durch Verweilen am Rand (Randzonen, naechste Reihe der Startseite) abschaltbar
+        { id: 'ptredge', type: 'toggle', label: 'set.ptrEdge', desc: 'set.ptrEdge.desc', ddesc: 'set.ptrEdge.off.desc', help: 'help.ptrEdge',
           disabled: function () { return S.state.pointer === false; },
+          get: function () { return S.state.ptrEdge !== false; }, set: function (v) { S.state.ptrEdge = v; S.save(); N.pointer.setEdge(v); } },
+        // TV-Befund 27.10. nachmittags: Randzonen-Rollen erst langsam, dann schneller; nur mit Zeiger-Steuerung (sonst ausgegraut)
+        { id: 'ptracc', type: 'toggle', label: 'set.ptrAccel', desc: 'set.ptrAccel.desc',
+          ddesc: function () { return S.state.pointer === false ? 'set.ptrAccel.off.desc' : 'set.ptrAccel.edge.desc'; },
+          disabled: function () { return S.state.pointer === false || S.state.ptrEdge === false; },
           get: function () { return S.state.ptrAccel !== false; }, set: function (v) { S.state.ptrAccel = v; S.save(); N.pointer.setAccel(v); } }
       ] });
       // "Startseite anpassen" (SPEC 7.3.1) – nicht in Kinderprofilen (7.13)

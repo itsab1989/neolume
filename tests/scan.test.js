@@ -1,5 +1,5 @@
 'use strict';
-/* "Mediathek aktualisieren": Fortschritt aus /activities, Abfrage bis fertig, 401/403-Meldung. Kein echter Refresh. */
+/* "Bibliotheken aktualisieren": Fortschritt aus /activities, Abfrage bis fertig, 401/403-Meldung. Kein echter Refresh. */
 var test = require('node:test'), assert = require('node:assert');
 var H = require('./helpers/load');
 
@@ -26,7 +26,7 @@ test('Alle Bibliotheken: Refresh, Abfrage alle 3 s, fertig wenn kein Scan mehr l
   N.i18n.set('de');
   N.scan.start(null);
   assert.deepStrictEqual(r.log.writes, ['GET /library/sections/all/refresh']);
-  assert.strictEqual(r.log.toasts[0], 'Mediathek wird aktualisiert …');
+  assert.strictEqual(r.log.toasts[0], 'Bibliotheken werden aktualisiert …');
   r.T.tick(3000); assert.strictEqual(r.log.toasts[1], 'Aktualisiere … 40 %');
   r.T.tick(3000); r.T.tick(3000);
   assert.strictEqual(r.log.ev, 1); assert.ok(!N.scan.running());

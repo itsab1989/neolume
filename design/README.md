@@ -259,3 +259,5 @@ Sources: `design/icons/<name>.svg`. Column order: `design/icons/order.json` (app
 | 25 | `note` | <img src="icons/note.svg" width="28" height="28" alt="note"> | `-800px` |
 | 26 | `book` | <img src="icons/book.svg" width="28" height="28" alt="book"> | `-832px` |
 | 27 | `compass` | <img src="icons/compass.svg" width="28" height="28" alt="compass"> | `-864px` |
+| 28 | `ff` | <img src="icons/ff.svg" width="28" height="28" alt="ff"> | `-896px` |
+| 29 | `rw` | <img src="icons/rw.svg" width="28" height="28" alt="rw"> | `-928px` |

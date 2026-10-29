@@ -2,7 +2,7 @@
  * Netz-Standards sind im Repo leer: tools/build.js setzt die lokalen Werte aus local.json (git-ignoriert) ins gebaute app.js. */
 (function (N) {
   var C = {
-    version: '1.0.5',
+    version: '1.0.6',
     product: N.brand.name,
     platform: 'Samsung',
     platformVersion: 'Orsay 2014',
@@ -49,7 +49,10 @@
       if (Number(o.hintMs) > 0) C.hintMs = Number(o.hintMs);         // nur Tests: Tastenhinweise "Nur kurz" blenden nach ms aus
       if (o.welcome === false) C.welcome = false;                     // nur Tests: keine Willkommenskarte
       if (Number(o.saverMs) > 0) C.saverMs = Number(o.saverMs);
+      if (Number(o.saverIvMs) > 0) C.saverIvMs = Number(o.saverIvMs);   // nur Bildtests: Bildwechsel/Wandern der Einblendung nach ms
       if (o.saverPos >= 0 && o.saverPos <= 3) C.saverPos = Math.floor(o.saverPos);   // nur Bildtests: Lage der Schoner-Einblendung (0..3)       // nur visuelle Tests: Schoner nach ms statt Minuten
+      // Schnellspulen (PLAY-32): Stufen fuer den TV-Test, z. B. [2,4,8,16,32]; N.trick.speeds prueft (Vielfache von 2, 2…64), Standard 2/4/8/16
+      if (Object.prototype.toString.call(o.trickSpeeds) === '[object Array]' && o.trickSpeeds.length) C.trickSpeeds = o.trickSpeeds.slice(0, 8);   // nur eine Liste (kein Text "2,4")
       if (o.cropBase === 'video' || o.cropBase === 'app') C.cropBase = o.cropBase;   // Zoom: Koordinaten fuer SetCropArea (A/B)
       if (typeof o.helperUrl === 'string' && /^http:\/\/[0-9.]+(:\d{1,5})?\/?$/.test(o.helperUrl)) C.helperUrl = o.helperUrl;   // P4: Merkliste-Helfer (Entwicklung; sonst setup.json)
       if (typeof o.helperKey === 'string' && /^[A-Za-z0-9_\-]{16,128}$/.test(o.helperKey)) C.helperKey = o.helperKey;

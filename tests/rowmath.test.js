@@ -81,3 +81,43 @@ test('N.hit: Liste, Raster (PIN-Block wie im Dialog), Rechteck', function () {
   assert.ok(h.rect(144, 568, 240, 48, 200, 590));
   assert.ok(!h.rect(144, 568, 240, 48, 200, 620));
 });
+
+/* TV-Befund 1.0.5: Reihen-Listen per Zeiger (Startseite, Suche/Entdecken) */
+test('Startseite: Zone "naechste Reihe" ab ihrem Kopf, bei hoher Posterreihe ab der Kartenunterkante + fester Hinweis', function () {
+  // Startseite: Kopf y 320, Karten ab 372; Abstand land 288, poster 360, sq 280
+  H.eq(R.nextZone(320 + 288, 372 + 162), { y: 608, cue: false }, 'Querformat: Kopf der naechsten Reihe im Bild');
+  H.eq(R.nextZone(320 + 280, 372 + 176), { y: 600, cue: false }, 'quadratisch: Kopf im Bild');
+  H.eq(R.nextZone(320 + 360, 372 + 264), { y: 640, cue: true }, 'Poster: Kopf (y 680) nicht im Bild -> Band unter den Karten');
+});
+
+test('Sichtbarkeit fuer den Zeiger: ganz (sofort), >= 40 % (nach Verweilen), sonst nicht zeigbar; untere Randzone', function () {
+  assert.strictEqual(R.vis(100, 180, 52), 'full');
+  assert.strictEqual(R.vis(452, 180, 52), 'full', 'endet genau an der Unterkante 632');
+  assert.strictEqual(R.vis(520, 180, 52), 'part', '112 von 180 px sichtbar');
+  assert.strictEqual(R.vis(572, 180, 52), '', '60 von 180 px: zu wenig');
+  assert.strictEqual(R.vis(640, 180, 52), '', 'unter der Kante');
+  assert.strictEqual(R.vis(40, 180, 52), '', 'oben unter dem Ausschnittrand');
+  assert.strictEqual(R.edgeB([{ cy: 100, h: 180 }, { cy: 416, h: 162 }], 52), 604);
+  assert.strictEqual(R.edgeB([{ cy: 100, h: 180 }, { cy: 520, h: 180 }], 52), 604, 'zeigbare angeschnittene Reihe: schmales Band');
+  assert.strictEqual(R.edgeB([{ cy: 100, h: 180 }, { cy: 572, h: 180 }], 52), 572, 'nicht zeigbare Reihe gehoert zur Randzone');
+});
+
+test('Detailseiten per Zeiger (DET-9): nur der eingerastete Abschnitt bekommt sofort Fokus', function () {
+  // Serie, Knoepfe (Versatz 0): Staffel-Reiter y 580–620 ganz im Bild, aber anderer Abschnitt -> erst hereinholen
+  assert.strictEqual(R.secVis(580, 40, false, 0), 'part');
+  assert.strictEqual(R.secVis(640, 162, false, 0), '', 'Folgen unter der Kante');
+  assert.strictEqual(R.secVis(392, 162, true, 316), 'full', 'eingerastete Folgenreihe');
+  assert.strictEqual(R.secVis(392, 264, true, 316), 'full', 'eingerastete Posterreihe ragt in den Verlauf: trotzdem ganz');
+  assert.strictEqual(R.secVis(144, 120, false, 316), '', 'ausgeblendeter Abschnitt ueber dem Kopf');
+  assert.strictEqual(R.secVis(596, 56, false, 236), 'part', 'erste Zeile "Beliebte Titel" unter der letzten Reihe (64 %)');
+  assert.strictEqual(R.secVis(604, 176, false, 236), '', 'naechste Kuenstler-Reihe: 16 % sichtbar');
+  var st = [0, 248, 536, 784];
+  assert.strictEqual(R.secNext(st, 0, 1), 1);
+  assert.strictEqual(R.secNext(st, 248, 1), 2);
+  assert.strictEqual(R.secNext(st, 784, 1), -1, 'letzter Abschnitt');
+  assert.strictEqual(R.secNext(st, 536, -1), 1);
+  assert.strictEqual(R.secNext(st, 0, -1), -1, 'ganz oben');
+  assert.strictEqual(R.secEdgeB([{ cy: 580, h: 40 }, { cy: 640, h: 162 }], 0), 620, 'Reiter ragen in die Zone: sie beginnt darunter');
+  assert.strictEqual(R.secEdgeB([{ cy: 392, h: 162 }, { cy: 680, h: 162 }], 316), 604);
+  assert.strictEqual(R.secEdgeB([{ cy: 288, h: 176 }, { cy: 592, h: 176 }], 236), 592, 'nicht zeigbare angeschnittene Reihe gehoert zur Zone');
+});

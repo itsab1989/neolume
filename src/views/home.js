@@ -14,12 +14,12 @@
 
   N.router.define('home', function () {
     var s = { rail: 'home', railReturnExits: true, wheelKeys: ['LEFT', 'RIGHT'] };
-    var root, pg, ring, hero, sb, fade, slots = [], rows = [], tops = [], colMem = {}, R = 0;
+    var root, pg, ring, hero, sb, fade, cue, cueT, cueOn = false, slots = [], rows = [], tops = [], colMem = {}, R = 0;
     var slotRow = [-1, -1, -1, -1], heroT = 0, task = null, loadedAt = 0, pending = null, interacted = false;
     var undo = null, hideCommit = null, retryT = 0, retryN = 0, offline = false, pingT = 0, railOpen = false;
     var seasonCache = new N.LRU(10), stripTask = null, drawn = false;
     var skel = null, away = false, parked = null, resume = false, prepRaf = false, dead = false, onFlush = null, onSet = null, onBack = null, onPlayed = null, onScanned = null, onAnime = null, cfgDirty = false;
-    var played = null, playT = 0;                     // {rk, n}: gerade gestoppter Film/Folge, auf den Weiterschauen warten soll
+    var played = null, playT = 0, cueDisp = false;                     // {rk, n}: gerade gestoppter Film/Folge, auf den Weiterschauen warten soll
 
     /* ---------- Aufbau ---------- */
     s.create = function (el) {
@@ -28,7 +28,14 @@
       pg = U.el('div', 'pg', root);
       for (var i = 0; i < SLOTS; i++) slots.push(new N.ui.Row(pg, { captions: function (kind) { return kind === 'land'; } }));
       fade = U.el('img', 'fade', root); fade.src = N.assetBase + 'fade-bottom.png';
+      // HOME-11: fester "darunter geht es weiter"-Hinweis unten links (Glyphe wie .more-dn + Titel der naechsten Reihe), nur wenn
+      // deren Kopf nicht im Bild ist (hohe Posterreihe); zeigen/klicken = eine Reihe tiefer. Runde 6: dauerhafte GPU-Ebene (.hmore
+      // translate3d), Zeigen/Verbergen per visibility – siehe markMore
+      cue = U.el('div', 'hmore', root, 'visibility:hidden');
+      U.el('span', 'more-dn', cue).appendChild(document.createTextNode('›'));
+      cueT = U.txt('span', 'ht', cue, '');
       ring = new N.ui.Ring(root);
+      ring.prep(['poster', 'sq']);                    // Runde 7: je Form ein Ring – Formwechsel Querformat <-> Poster ohne Groessenaenderung
       sb = new N.ui.StateBlock(root);
       onFlush = function () { if (hideCommit) hideCommit.run(); };
       N.evt.on('app:flush', onFlush);                 // EXIT-Taste: ausstehendes Ausblenden sofort senden (L8)
@@ -102,8 +109,20 @@
       markMore();
     }
     /* Hinweis "darunter geht es weiter" (HOME-11): nur am Kopf der angeschnittenen naechsten Reihe; an der letzten Reihe keiner.
-     * Je Slot nur ein display-Wechsel, wenn er sich aendert (kein Messen im Fokusschritt) */
-    function markMore() { for (var k = 0; k < SLOTS; k++) slots[k].setMore(slotRow[k] >= 0 && slotRow[k] === R + 1); }
+     * Je Slot nur ein display-Wechsel, wenn er sich aendert (kein Messen im Fokusschritt).
+     * Runde 6 (TV 9,8,6: die langen Frames @U32+0 79 ms / @D33+0 54 ms mit nur ~4 ms JS lagen genau bei den Wechseln Querformat <->
+     * Poster = wenn der feste Hinweis unten erscheint/verschwindet): .hmore liegt ueber der Seiten-Ebene und wurde deshalb bei jedem
+     * display-Wechsel als GPU-Ebene neu angelegt bzw. verworfen (Ebenenbaum neu, Flaeche in der Wurzel-Ebene neu malen – dort liegen
+     * Hero-Bild + Scrim ohne eigene Ebene). Jetzt dauerhafte Ebene, Wechsel nur per visibility (malt nur die kleine Ebene).
+     * cueDisp = Gegenprobe des Messlaufs (hvar-cue0: alter display-Wechsel ohne Ebene). */
+    function markMore() {
+      for (var k = 0; k < SLOTS; k++) slots[k].setMore(slotRow[k] >= 0 && slotRow[k] === R + 1);
+      var on = !sb.on && R + 1 < rows.length && nextZone().cue;     // Kopf der naechsten Reihe nicht im Bild: fester Hinweis unten
+      if (on) U.setText(cueT, H.rowTitle(rows[R + 1]));
+      if (on !== cueOn) { cueOn = on; if (cueDisp) U.show(cue, on); else U.vis(cue, on); }
+    }
+    /* Zeiger-Zone "naechste Reihe" (RowMath.nextZone): ab ihrem Kopf, sonst ab der Unterkante der Fokus-Karten */
+    function nextZone() { return RM.nextZone(tops[R + 1] - pageY(), CARD_Y + slotFor(R).g.h); }
     function recycleLater() {
       N.idle.add(function () {
         for (var r = R - 1; r <= R + 2; r++) ensure(r, r === R ? 0 : 2, r > R + 1 || r < R);
@@ -133,8 +152,12 @@
       scheduleHero(0);
       N.idle.add(updateHints, 'home-hints');
       N.idle.add(warm, 'home-warm');
+      N.idle.add(extNear, 'home-ext');
     }
-    function placeRing(p) { if (p && !railOpen && !sb.on) ring.to(p.shape, p.x, CARD_Y); }
+    function placeRing(p) {
+      if (rows[R] && !rows[R].items.length) { ring.hide(); return; }   // Hinweis-Reihe einer Erweiterung ("Wird geladen …"): keine Karte
+      if (p && !railOpen && !sb.on) ring.to(p.shape, p.x, CARD_Y);
+    }
     function curItem() { var sl = slotFor(R); return rows.length ? sl.item(sl.f) : null; }
 
     /* ---------- Hero (300 ms Ruhe) + Staffelstreifen ---------- */
@@ -145,7 +168,7 @@
         var rest = N.idle.restFor();
         if (rest < HERO_REST) { scheduleHero(HERO_REST - rest); return; }
         var it = curItem();
-        if (it === hero.item) return;
+        if (it === hero.item || (!it && rows[R] && rows[R].note)) return;   // Hinweis-Reihe: Hero bleibt stehen
         var stripOn = !!(N.session.settings && N.session.settings.episodeProgress);
         hero.set(it, { stripEnabled: stripOn });
         if (it && it.type === 'episode' && stripOn && it.seasonRk) loadStrip(it);
@@ -182,6 +205,8 @@
       if (sb.on) return sb.ids.length ? [{ k: 'ret', t: 'hint.exit' }] : [{ k: 'blue', t: 'hint.search' }, { k: 'ret', t: 'hint.exit' }];
       if (!rows.length) return [{ k: 'blue', t: 'hint.search' }];      // Lade-Skelett: keine Karten-Aktionen
       var it = curItem(), list = [];
+      if (it && it.ext) return [{ k: 'OK', t: 'hint.details' }, { k: 'blue', t: 'hint.search' }];   // Erweiterungs-Karte: nur Details
+      if (!it && rows[R] && rows[R].note) return [{ k: 'blue', t: 'hint.search' }];   // Hinweis-Reihe ohne Karten
       if (rows[R] && rows[R].id === 'cw') list.push({ k: 'red', t: 'hint.hide' });
       if (M.isVideo(it)) list.push({ k: 'yellow', t: M.watched(it) ? 'hint.markUnwatched' : 'hint.markWatched' });
       list.push({ k: 'blue', t: 'hint.search' });
@@ -191,7 +216,39 @@
     };
 
     /* ---------- Fokus-Schritte ---------- */
-    function afterMove() { scheduleHero(); N.idle.add(updateHints, 'home-hints'); N.idle.add(warm, 'home-warm'); }
+    function afterMove() { scheduleHero(); N.idle.add(updateHints, 'home-hints'); N.idle.add(warm, 'home-warm'); N.idle.add(extNear, 'home-ext'); }
+    /* Reihen einer optionalen Erweiterung (N.hubs.extRow): erst laden, wenn sie in die Naehe kommen (R-1 … R+2), immer aus der
+     * Idle-Queue (nie im Fokusschritt); naht der Fokus dem Ende einer geladenen Reihe, die mehr hat, die naechste Seite holen. */
+    function extNear() {
+      if (dead || away || !rows.length || !N.ext.has('home:want')) return;
+      for (var r = Math.max(0, R - 1); r <= R + 2 && r < rows.length; r++) {
+        var row = rows[r];
+        if (row.ext && row.want) N.ext.call('home:want', row.id, gotExt);
+      }
+      var cur = rows[R], sl = slotFor(R);
+      if (cur && cur.ext && cur.more && sl.model === cur && sl.f >= cur.items.length - 6) N.ext.call('home:more', cur.id, function (id) { grewExt(id); });
+    }
+    /* geladene Erweiterungs-Reihe an die Stelle ihres Platzhalters (gleiche Hoehe: nichts springt) */
+    function gotExt(row) {
+      if (dead || !row) return;
+      var r = -1, i;
+      for (i = 0; i < rows.length; i++) if (rows[i].id === row.id) r = i;
+      if (r < 0 || rows[r] === row) return;
+      if (rows[r].kind !== row.kind) row.kind = rows[r].kind;   // Hoehe bleibt (layoutTops)
+      rows[r] = row;
+      var k = r % SLOTS;
+      if (slotRow[k] === r) {
+        slots[k].setModel(row, colMem[r] || 0, r === R ? 0 : 2); slots[k].setTop(tops[r]); slots[k].setVisible(r >= R);
+        if (r === R && !away) { slots[k].setFocused(true); placeRing(slots[k].ringPos()); scheduleHero(0); N.idle.add(updateHints, 'home-hints'); }
+      }
+      markMore();
+    }
+    /* weitere Seite einer Erweiterungs-Reihe: die Erweiterung hat ihr Modell schon verlaengert -> Fenster neu herstellen */
+    function grewExt(id) {
+      if (dead) return;
+      for (var k = 0; k < SLOTS; k++) { var r = slotRow[k]; if (r >= 0 && rows[r] && rows[r].id === id) slots[k].render(2, 2); }
+      if (N.pointer && N.pointer.syncArrows) N.pointer.syncArrows();
+    }
     /* Vorab-Dekodieren (Runde 5, N.img.warm): Der TV malt Karten-Ebenen unter dem Bildschirmrand bzw. rechts ausserhalb des Clips
      * erst, wenn sie hereinkommen – samt Dekodieren ihrer Bilder im Frame nach ▼/▶ (56–75 ms ohne DOM-Aenderung). In Ruhe: sichtbare
      * Spalten von R+1 und R+2 (kommen mit ▼ herein) und die naechsten Karten rechts/links in R (kommen mit ▶/◀). */
@@ -253,6 +310,7 @@
     function soon(area) { N.router.push('soon', { area: area }); }
     function openItem(it, play) {
       if (!it) return;
+      if (it.ext) { if (!N.ext.call('home:open', it)) N.router.push('extdetails', { it: it, rail: 'home' }); return; }   // Titel ausserhalb des Servers (Erweiterungs-Reihe)
       if (N.music.isAudio(it)) { if (play && N.music.play(it)) return; if (N.music.open(it)) return; }   // M4 Musik/Hoerbuecher
       if (!M.isVideo(it)) { N.router.push('soon', { area: 'details', label: N.t('soon.music') }); return; }   // Musik/Hoerbuch/Playlist
       // OK auf Weiterschauen/Naechste Folgen und PLAY auf jeder Film-/Folgenkarte spielen ab (M3); sonst Details (M3b)
@@ -279,7 +337,7 @@
     /* Gelb (SPEC 6.5): Film/Folge ohne Rueckfrage + Rueckgaengig; Serie/Staffel mit Bestaetigung (Fokus Abbrechen) */
     function toggleWatched() {
       var it = curItem();
-      if (!M.isVideo(it)) return;
+      if (!M.isVideo(it) || it.ext) return;
       if (undo && undo.kind === 'watched' && U.now() < undo.until) { var u = undo; undo = null; N.ui.toast.hide(); u.revert(); return; }
       var w = !M.watched(it);
       if (it.type === 'show' || it.type === 'season') {
@@ -367,6 +425,7 @@
     }
     function menu() {
       var it0 = curItem(); if (!it0) return;
+      if (it0.ext) { openItem(it0, false); return; }   // Titel ausserhalb des Servers: kein Menue, die Detailseite hat alles
       N.anime.ensure(it0, function () { if (curItem() === it0 && N.router.top() === s && !N.router.hasOverlay()) menuOpen(it0); });   // Einordnung fuer "Als Anime behandeln"
     }
     function menuOpen(it) {
@@ -488,6 +547,7 @@
         if (id === 'retry') { if (retryT) clearTimeout(retryT); retryT = 0; sb.hide(); if (!rows.length) showSkel(true); refresh(); }
         else if (id === 'switch') N.app.switchProfile();
       } });
+      markMore();                                     // fester Hinweis unten aus
     }
     function showEmpty() {
       var kids = N.session.isKid(), p = kids ? 'empty.home.kids' : 'empty.home';
@@ -518,7 +578,11 @@
         redraw = rows.length > 0;
       }
       if (redraw) renderAll();
-      else if (rows.length && !sb.on) { var sl = slotFor(R); sl.setFocused(true); placeRing(sl.ringPos()); heroBack(); }
+      else if (rows.length && !sb.on) {
+        var sl = slotFor(R);
+        if (curItem() && curItem().ext) sl.refreshItem(sl.f);    // Marke der Karte kann sich auf der Detailseite geaendert haben (Erweiterung)
+        sl.setFocused(true); placeRing(sl.ringPos()); heroBack();
+      }
       if (!rows.length && !sb.on) { ring.hide(); showSkel(true); }
       away = false;
       if (parked) { var pk = parked; parked = null; handle(pk.err, pk.res); }
@@ -574,7 +638,7 @@
         case 'RED': hideCard(); return true;
         case 'YELLOW': toggleWatched(); return true;
         case 'BLUE': N.router.push('search'); return true;
-        case 'INFO': N.details.open(it); return true;
+        case 'INFO': if (it && it.ext) openItem(it, false); else N.details.open(it); return true;
         case 'TOOLS': menu(); return true;
         case 'FF': moveCol(Math.min(sl.count() - 1, f + 5)); return true;
         case 'RW': moveCol(Math.max(0, f - 5)); return true;
@@ -586,24 +650,39 @@
     };
 
     /* ---------- Zeiger (Index-Mathe) ---------- */
+    /* Naechste Reihe per Zeiger (NAV-2, HOME-11): Zone ab ihrem Kopf bzw. – wenn hohe Poster ihn aus dem Bild schieben – ab der
+     * Unterkante der Fokus-Karten bis zum Bildrand (Hinweisleiste ausgenommen). Verweilen (HOLD, Einstellung "Zeiger blaettert am
+     * Rand weiter") oder Klick = eine Reihe tiefer; danach Zeiger-Sperre (Seite ist unter dem Punkt gewandert). Vorbeiziehen
+     * loest nichts aus. */
+    function inNext(x, y) {
+      if (R + 1 >= rows.length || x < 128) return false;
+      if (y < nextZone().y || y >= 720) return false;
+      return !(N.ui.hints && N.ui.hints.hit && N.ui.hints.hit(x, y));
+    }
+    function goNext(x) {
+      var r = R + 1, nx = slotFor(r);
+      if (r >= rows.length) return;
+      var j = nx.model === rows[r] ? nx.hit(x) : -1;
+      N.fx.step(true);
+      moveRow(r, j >= 0 ? j : undefined);
+      if (N.pointer) N.pointer.scrolled();
+    }
     s.pointer = function (x, y, kind) {
       if (sb.on) return sb.pointer(x, y, kind);
       if (!rows.length) return false;
-      var r = -1, sl = slotFor(R);
-      if (y >= CARD_Y && y < CARD_Y + sl.g.h) r = R;
-      else if (R + 1 < rows.length && y >= tops[R + 1] - pageY() && y < 632) r = R + 1;   // angeschnittene naechste Reihe
-      if (r < 0) return false;
-      if (r !== R) {
-        var nx = slotFor(r);
-        if (nx.model !== rows[r]) return false;
-        var j = nx.hit(x);
-        moveRow(r, j >= 0 ? j : undefined);
+      var sl = slotFor(R);
+      if (y >= CARD_Y && y < CARD_Y + sl.g.h) {
+        N.pointer.holdCancel();
+        var i = sl.hit(x);
+        if (i < 0) return false;
+        if (i !== sl.f) { placeRing(sl.hoverCol(i)); afterMove(); }
+        if (kind === 'click') openItem(sl.item(i), false);
         return true;
       }
-      var i = sl.hit(x);
-      if (i < 0) return false;
-      if (i !== sl.f) { placeRing(sl.hoverCol(i)); afterMove(); }
-      if (kind === 'click') openItem(sl.item(i), false);
+      if (!inNext(x, y)) { N.pointer.holdCancel(); return false; }
+      if (kind === 'click') { N.pointer.holdCancel(); goNext(x); return true; }
+      var r0 = R;
+      N.pointer.hold(function () { if (!dead && !away && R === r0 && inNext(N.pointer.x, N.pointer.y)) goNext(N.pointer.x); });
       return true;
     };
     s.pointerSig = function () { return pageY(); };          // Zeiger-Scroll-Sperre (N.pointer): Reihenwechsel rollt die Seite
@@ -623,7 +702,13 @@
     s.bench = {
       top: function () { if (rows.length) toTop(); },
       row: function () { return R; },
-      counts: function () { var c = []; for (var i = 0; i < rows.length; i++) c.push(rows[i].items.length); return c; }
+      counts: function () { var c = []; for (var i = 0; i < rows.length; i++) c.push(rows[i].items.length); return c; },
+      /* Runde 6, Gegenprobe hvar-cue0: Hinweis unten wie bis 1.0.5 per display (Klasse hcue0 am body nimmt ihm die Ebene) */
+      cueDisplay: function (on) {
+        cueDisp = !!on;
+        U.cls(document.body, 'hcue0', cueDisp);
+        if (cueDisp) { U.vis(cue, true); U.show(cue, cueOn); } else { U.show(cue, true); U.vis(cue, cueOn); }
+      }
     };
     s.relabel = function () { for (var k = 0; k < SLOTS; k++) if (slotRow[k] >= 0) slots[k].relabel(); };
     return s;

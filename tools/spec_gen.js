@@ -92,7 +92,7 @@ function settingsData() {
   var rows = {}, order = [], cats = [];
   SCEN.forEach(function (sc) {
     var settings = defaults(sc.kind), users = [{ uuid: 'spec', name: 'Main', admin: true, kind: 'main', pin: true }, { uuid: 'k', name: 'Kid', kind: 'kid' }];
-    var state = { pointer: undefined, ptrAccel: undefined, server: { name: 'My server' }, startProfile: undefined, pinSwitch: null, users: users };
+    var state = { pointer: undefined, ptrAccel: undefined, ptrEdge: undefined, server: { name: 'My server' }, startProfile: undefined, pinSwitch: null, users: users };
     /* real session logic on the scenario state (defaults such as "profile switch needs PIN" = on, start profile) */
     function viaReal(name) { return function () { var ks = real.state, kp = real.pkg; real.state = state; real.pkg = N.session.pkg; try { return real[name](); } finally { real.state = ks; real.pkg = kp; } }; }
     N.session = { settings: settings, state: state, pkg: sc.pkg ? { createdAt: '2026-01-01T00:00:00Z', profiles: [] } : null,

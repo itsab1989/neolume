@@ -55,13 +55,27 @@
       if (sp) out.push(sp);
       return out;
     },
-    /* Start-Staffel: Wunsch (index) > Staffel der naechsten Folge > erste mit Ungesehenem > erste */
+    /* Start-Staffel: Wunsch (index) > Staffel der naechsten Folge > erste mit Ungesehenem > erste. Staffeln, die nur eine Erweiterung
+     * kennt (virtual, z. B. ganz fehlend), waehlt nur der ausdrueckliche Wunsch – sonst die erste vorhandene (TV-Befund 1.0.5: nur
+     * Staffel 2 auf dem Server, Staffel 1 fehlt -> Staffel 2 bleibt gewaehlt, egal ob der Reiter "Staffel 1" schon steht) */
     pickSeason: function (seasons, wish, ondeck) {
       var i;
       if (wish !== undefined && wish !== null) for (i = 0; i < seasons.length; i++) if (seasons[i].index === wish) return i;
-      if (ondeck) for (i = 0; i < seasons.length; i++) if (seasons[i].index === ondeck.s) return i;
-      for (i = 0; i < seasons.length; i++) if (seasons[i].index !== 0 && seasons[i].vleaf < seasons[i].leaf) return i;
+      if (ondeck) for (i = 0; i < seasons.length; i++) if (seasons[i].index === ondeck.s && !seasons[i].virtual) return i;
+      for (i = 0; i < seasons.length; i++) if (seasons[i].index !== 0 && !seasons[i].virtual && seasons[i].vleaf < seasons[i].leaf) return i;
+      for (i = 0; i < seasons.length; i++) if (!seasons[i].virtual) return i;
       return 0;
+    },
+    /* Position der Staffel mit derselben Nummer wie se in der (neu gemischten) Liste; nicht mehr da -> fb (geklemmt) */
+    seasonPos: function (seasons, se, fb) {
+      for (var i = 0; se && i < seasons.length; i++) if (seasons[i].index === se.index) return i;
+      return Math.max(0, Math.min(fb || 0, seasons.length - 1));
+    },
+    /* Kennung der Reiterzeile (Nummer + blass): gleich -> Reiter nicht neu bauen (kein Flackern, kein Neumessen) */
+    tabSig: function (seasons) {
+      var out = [];
+      for (var i = 0; i < seasons.length; i++) out.push(seasons[i].index + (seasons[i].miss ? 'm' : ''));
+      return out.join(',');
     },
     /* Staffel-Reiter: Verschiebung so, dass der fokussierte Reiter ganz sichtbar ist und links immer ein Reiter-Anfang steht
      * (nie "eason 1", TV-Test 27.10., F14). tabX [[left, width]], cur = bisherige Verschiebung, w = sichtbare Breite */

@@ -1,4 +1,4 @@
-/* N.scan – "Mediathek aktualisieren" (Nutzerwunsch 26.10., nur Hauptkonto): GET /library/sections/all|<id>/refresh, dann
+/* N.scan – "Bibliotheken aktualisieren" (Nutzerwunsch 26.10., nur Hauptkonto): GET /library/sections/all|<id>/refresh, dann
  * /activities alle 3 s (max. 10 Min.) bis kein Bibliotheks-Scan mehr laeuft -> Toast "Fertig", Ereignis library:scanned
  * (Startseite laedt still neu). Profilwechsel beendet die Abfrage. 401/403 -> klare Meldung. */
 (function (N) {

@@ -17,7 +17,10 @@
     for (var i = 0; i < list.length && out.length < MAX_LIBS; i++) {
       var d = list[i];
       if (!types[d.type] || (d.hidden && Number(d.hidden) === 1)) continue;
-      out.push({ id: Number(d.key), title: String(d.title || ''), type: d.type, kind: libKind(d) });
+      /* loc: Ordner der Bibliothek (PMS "Location", hoechstens 4) – fuer Erweiterungen, die eine Bibliothek einem Ordner zuordnen */
+      var loc = [], ls = d.Location || [];
+      for (var j = 0; j < ls.length && loc.length < 4; j++) if (ls[j] && typeof ls[j].path === 'string' && ls[j].path) loc.push(ls[j].path.substring(0, 256));
+      out.push({ id: Number(d.key), title: String(d.title || ''), type: d.type, kind: libKind(d), loc: loc });
     }
     return out;
   }
@@ -110,24 +113,36 @@
         } else if (id === 'pl') {
           items = M.normList(data.pl || [], kinds);
           if (items.length) row = { id: id, kind: 'poster', tk: 'home.row.playlists', tp: null, title: data.plTitle || '', items: items };
-        }
+        } else if (p.group === 'ext') row = H.extRow(id);
         if (row) rows.push(row);
       }
       return rows;
     },
     /* Reihen nach neuer Auswahl/Reihenfolge (sofort nach "Startseite anpassen", vor dem Netz-Refresh) */
     pick: function (rows, ids) {
-      var by = {}, out = [], i;
+      var by = {}, out = [], i, x;
       for (i = 0; i < rows.length; i++) by[rows[i].id] = rows[i];
-      for (i = 0; i < ids.length; i++) if (by[ids[i]]) out.push(by[ids[i]]);
+      for (i = 0; i < ids.length; i++) {
+        x = by[ids[i]] || (HR.parse(ids[i]).group === 'ext' ? H.extRow(ids[i]) : null);   // Erweiterungs-Reihe: nie im Cache, gleich ihr Stand
+        if (x) out.push(x);
+      }
       return out;
+    },
+    /* Reihe einer optionalen Erweiterung (N.ext 'home:row'): fertige Reihe {id, kind, title, items, ext: true, more} oder
+     * Platzhalter {…, items: [], note, want: true} – geladen wird erst, wenn sie in die Naehe des Fokus kommt ('home:want'
+     * aus views/home.js, im Leerlauf). Nie im Startseiten-Cache (forCache), damit kein alter Stand erscheint. */
+    extRow: function (id) {
+      var r = N.ext && N.ext.has('home:row') ? N.ext.call('home:row', id) : null;
+      if (!r || r.id !== id || !r.items) return null;
+      r.ext = true;
+      return r;
     },
     /* eingeschaltete Reihen-ids fuer die Startseite */
     order: function (cfg, libs, alibs) { return HR.enabled(cfg, HR.homeAvail(cfg, libs || [], alibs || libs || [])); },
     rowTitle: function (row) { return row.title || N.t(row.tk, row.tp); },
     /* gleiche Reihe? (Reihenfolge, Keys, Fortschritt, Gesehen-Status) -> keine DOM-Arbeit beim Hintergrund-Refresh */
     sameRow: function (a, b) {
-      if (!a || !b || a.id !== b.id || a.items.length !== b.items.length || (a.title || '') !== (b.title || '')) return false;
+      if (!a || !b || a.id !== b.id || a.items.length !== b.items.length || (a.title || '') !== (b.title || '') || (a.note || '') !== (b.note || '')) return false;
       for (var i = 0; i < a.items.length; i++) {
         var x = a.items[i], y = b.items[i];
         if (x.rk !== y.rk || x.off !== y.off || x.vc !== y.vc || x.vleaf !== y.vleaf || x.leaf !== y.leaf || x.nNew !== y.nNew) return false;
@@ -157,7 +172,9 @@
     /* Cache-Kopie <= 60 KB (SPEC 14.9): erst Beschreibungen kuerzen, dann hintere Reihen ohne Beschreibung */
     forCache: function (rows, maxBytes) {
       maxBytes = maxBytes || 60000;
-      var copy = JSON.parse(JSON.stringify(rows)), s = JSON.stringify(copy), r, i;
+      var keep = [], r, i;
+      for (r = 0; r < rows.length; r++) if (!rows[r].ext) keep.push(rows[r]);   // Erweiterungs-Reihen: eigener Speicher, nie hier
+      var copy = JSON.parse(JSON.stringify(keep)), s = JSON.stringify(copy);
       if (s.length <= maxBytes) return copy;
       for (r = 0; r < copy.length; r++) for (i = 0; i < copy[r].items.length; i++) copy[r].items[i].sum = U.trim(copy[r].items[i].sum, 160);
       s = JSON.stringify(copy);

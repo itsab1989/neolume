@@ -268,3 +268,88 @@ test('Zeiger-Steuerung aus: Bewegung, Randzone, Klick und Mausrad wirken nirgend
   P.move(420, 330); T.tick(50);
   assert.strictEqual(s.moves, m + 1, 'wieder an: wirkt sofort');
 });
+
+/* TV-Befund 1.0.5 (Suche/Entdecken: "Elemente springen wild umher"): Reihen-Liste nach der neuen Regel – ganz sichtbare Reihe =
+ * Fokus ohne Rollen, angeschnittene erst nach Verweilen (ein Schritt, dann Sperre). Ein ruhender oder zitternder Punkt rollt
+ * hoechstens einmal; ueber ganz sichtbaren Reihen nie. */
+function rowsList() {
+  var ctx = H.load({ fakeTimers: true }), N = ctx.N, T = ctx.timers, RM = N.RowMath;
+  N.router._reset(T.now);
+  N.ui.hints = { el: null, set: function () {}, refresh: function () {}, hit: function () { return null; } };
+  N.ui.rail = { el: null, isOpen: function () { return false; }, attached: function () { return false; } };
+  var s = { off: 0, g: 0, scrolls: 0, tops: [48, 364, 680, 996, 1312], h: 180 };
+  function row(y) { for (var i = 0; i < s.tops.length; i++) { var cy = s.tops[i] + 52 - s.off; if (y >= cy && y < cy + s.h) return { i: i, v: RM.vis(cy, s.h, 52) }; } return null; }
+  function reveal(i) { s.g = i; s.off = s.tops[i] - 48; s.scrolls++; N.pointer.scrolled(); }
+  N.router.define('rows', function () {
+    return { create: function () {}, onKey: function () { return true; },
+      pointer: function (x, y) {
+        var r = row(y);
+        if (!r || !r.v) { N.pointer.holdCancel(); return false; }
+        if (r.v === 'part') { N.pointer.hold(function () { var c = row(N.pointer.y); if (c && c.i === r.i) reveal(r.i); }); return true; }
+        N.pointer.holdCancel(); s.g = r.i; return true;      // ganz sichtbar: still
+      },
+      pointerSig: function () { return s.off; } };
+  });
+  N.router.reset('rows');
+  return { N: N, T: T, P: N.pointer, s: s };
+}
+test('Suche/Entdecken: Zeiger auf ganz sichtbarer Reihe rollt nie; angeschnittene erst nach Verweilen, genau einmal', function () {
+  var c = rowsList(), P = c.P, T = c.T, s = c.s;
+  P.move(700, 200); T.tick(50);
+  assert.strictEqual(s.g, 0); assert.strictEqual(s.off, 0);
+  P.move(700, 500); T.tick(50);                               // zweite Reihe (416 … 596) ganz sichtbar
+  assert.strictEqual(s.g, 1); assert.strictEqual(s.off, 0, 'kein Rollen unter dem Punkt');
+  s.tops = [48, 420, 792]; s.g = 0;                            // zweite Reihe angeschnitten (472 … 652, 89 % sichtbar)
+  P.move(700, 560); T.tick(P.HOLD - 10);
+  assert.strictEqual(s.scrolls, 0, 'Vorbeiziehen loest nichts aus');
+  T.tick(20);
+  assert.strictEqual(s.scrolls, 1); assert.strictEqual(s.off, 372);
+  for (var i = 0; i < 60; i++) { P.move(700 + (i % 3), 560 + (i % 2) * 2); T.tick(50); }   // Punkt ruht und zittert
+  assert.strictEqual(s.scrolls, 1, 'keine Rueckkopplung');
+});
+
+test('Einstellung "Zeiger blaettert am Rand weiter" aus: kein Verweil-Rollen, keine Randzone; Klick bleibt', function () {
+  var c = anchored(), P = c.P, s = c.s, n = 0;
+  P.setEdge(false);
+  assert.strictEqual(P.hold(function () { n++; }), false, 'Verweilen meldet: kommt nicht');
+  c.T.tick(1000); assert.strictEqual(n, 0);
+  P.move(400, 640); c.live(P.EDGE_DWELL * 4);
+  assert.strictEqual(s.scrolls, 0, 'Randzone rollt nicht durch Verweilen');
+  P.setEdge(true);
+  assert.strictEqual(P.hold(function () { n++; }), true);
+  c.T.tick(P.HOLD); assert.strictEqual(n, 1);
+  P.move(420, 645); c.live(P.EDGE_DWELL + 10);
+  assert.strictEqual(s.scrolls, 1, 'wieder an: Randzone wirkt');
+  P.move(400, 645); c.live(100); P.setEdge(false); c.live(P.EDGE_DWELL * 3);
+  assert.strictEqual(s.scrolls, 1, 'Ausschalten beendet ein laufendes Rollen');
+});
+
+/* TV-Befund 1.0.5 (Bibliothek: Reiter "Ansicht" in Sortieren & Filter nicht zuverlaessig waehlbar) */
+test('Reiter nach Textbreite: Treffer ueber gemessene Rechtecke (nicht feste 152-px-Felder)', function () {
+  var N = H.load().N;
+  var rects = [[872, 119], [1007, 79], [1102, 103]];         // Sortieren | Filter | Ansicht (gemessen, je 16 px Abstand)
+  assert.strictEqual(N.hit.spans(rects, 1150), 2, 'Mitte von "Ansicht" (frueher: Filter)');
+  assert.strictEqual(N.hit.spans(rects, 1010), 1);
+  assert.strictEqual(N.hit.spans(rects, 900), 0);
+  assert.strictEqual(N.hit.spans(rects, 995), -1, 'Luecke zwischen den Reitern');
+  assert.strictEqual(N.hit.spans(rects, 1210), -1);
+});
+
+test('Reiter-Panel per Taste: ▲ vom ersten Eintrag auf die Reiterzeile, ◀▶ wechselt ueberall, ▼/OK zurueck', function () {
+  var N = H.load().N, step = N.ui.tabPanel.step;
+  var st = { zone: 'list', tab: 0, n: 3, f: 2, m: 5 };
+  H.eq(step(st, 'UP'), { zone: 'list', tab: 0, f: 1, pick: false });
+  st.f = 0;
+  H.eq(step(st, 'UP'), { zone: 'tabs', tab: 0, f: 0, pick: false }, 'erster Eintrag -> Reiterzeile');
+  st.zone = 'tabs';
+  assert.strictEqual(step(st, 'RIGHT').tab, 1);
+  st.tab = 2;
+  assert.strictEqual(step(st, 'RIGHT').tab, 2, 'kein Wrap');
+  assert.strictEqual(step(st, 'UP').zone, 'tabs');
+  assert.strictEqual(step(st, 'DOWN').zone, 'list');
+  H.eq(step(st, 'ENTER'), { zone: 'list', tab: 2, f: 0, pick: false }, 'OK auf dem Reiter waehlt nichts aus der Liste');
+  assert.strictEqual(step({ zone: 'tabs', tab: 0, n: 3, f: 0, m: 0 }, 'DOWN').zone, 'tabs', 'leere Liste: Fokus bleibt oben');
+  assert.strictEqual(step({ zone: 'list', tab: 1, n: 3, f: 3, m: 5 }, 'LEFT').tab, 0, 'aus der Liste: ◀ wechselt wie bisher');
+  assert.strictEqual(step({ zone: 'list', tab: 1, n: 3, f: 3, m: 5 }, 'ENTER').pick, true);
+  assert.strictEqual(step({ zone: 'list', tab: 1, n: 3, f: 3, m: 5 }, 'RETURN'), null, 'RETURN schliesst (Router)');
+});

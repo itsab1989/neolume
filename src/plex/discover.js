@@ -215,7 +215,8 @@
       function day(v) { return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : ''; }
       var x = D.emptyInfo(), c = arr(d.cast);
       x.src = 'plex'; x.sum = s(d.summary, 1500); x.tagline = s(d.tagline, 200); x.date = day(d.date); x.thumb = D.img(d.thumb); x.art = D.img(d.art);
-      x.cr = s(d.contentRating, 20); x.dur = Number(d.duration) > 0 ? Number(d.duration) : 0; x.rating = Number(d.rating) > 0 && Number(d.rating) <= 10 ? Number(d.rating) : 0;
+      x.cr = s(d.contentRating, 20); if (x.cr && !/^[a-z]{2}\//.test(x.cr)) x.cr = 'us/' + x.cr;   // Katalog ohne Land = US-Freigabe ("US: R", nie wie FSK)
+      x.dur = Number(d.duration) > 0 ? Number(d.duration) : 0; x.rating = Number(d.rating) > 0 && Number(d.rating) <= 10 ? Number(d.rating) : 0;
       x.studio = s(d.studio, 100); x.network = s(d.network, 60);
       x.genres = names(d.genres, 5); x.directors = names(d.directors, 3); x.writers = names(d.writers, 3);
       for (var i = 0; i < c.length && x.cast.length < 15; i++) if (c[i] && typeof c[i].name === 'string' && c[i].name) x.cast.push({ name: U.trim(c[i].name, 80), role: s(c[i].role, 80), thumb: D.img(c[i].thumb) });
@@ -233,7 +234,8 @@
         var va = a[k], vb = b[k];
         o[k] = va && (typeof va !== 'object' || va.length === undefined || va.length) ? va : vb !== undefined ? vb : o[k];
       }
-      if (/^[a-z]{2}\//.test(b.cr || '') && !/^[a-z]{2}\//.test(a.cr || '')) o.cr = b.cr;   // Freigabe mit Land ("de/16" = FSK 16) vor der US-Angabe des Katalogs
+      var own = N.i18n && N.i18n.lang() === 'en' ? 'us/' : 'de/';                        // Freigabe des eigenen Landes ("de/16" = FSK 16) vor der US-Angabe des Katalogs
+      if ((b.cr || '').indexOf(own) === 0 && (a.cr || '').indexOf(own) !== 0) o.cr = b.cr;
       o.src = a.src && b.src ? a.src + '+' + b.src : a.src || b.src;
       return o;
     },

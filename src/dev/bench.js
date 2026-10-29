@@ -3,7 +3,7 @@
  * drueckt die Tasten selbst (N.router.key im festen Takt) und misst per rAF.
  * Start: Ziffernfolge 9,8,7 auf der Fernbedienung (je < 4 s Abstand) | window.PN_BENCH = 'all' | 'home,lib,leak' (tools/dev.py serve
  * --bench …, Vorschau &bench=…). RETURN/EXIT bricht ab. Ergebnis: je Szenario eine Zeile "bench <name>: …" im Protokoll (ctx.log).
- * Szenarien: home, home-hero, lib-L/M/S/list, details-movie, details-show, search, discover, player-osd (readOnly erzwungen, keine
+ * Szenarien: home, home-hero, lib-L/M/S/list, details-movie, details-show, search, discover, player-osd, xtab (nur auf Wunsch: erster Erweiterungs-Reiter mit Quelle) (readOnly erzwungen, keine
  * Fortschritts-/Spur-Schreibzugriffe), loupe (Feinauswahl am Balken: Zeiger ruht -> oeffnet, Hin-und-her im 40-ms-Takt, nach oben weg;
  * nur mit Zeiger-Steuerung, Einstellung waehrend des Laufs an; Darstellung A Lasche = Standard, frueher 'loupe-panel'),
  * loupe-stretch / loupe-film (dasselbe in den anderen Darstellungen, SPEC PLAY-31; film misst nur mit Vorschaubildern des ersten Films den Filmstreifen, sonst das Panel), leak (Details Film/Serie, Bibliothek, Suche, Einstellungen, Musik, Player je Runde
@@ -111,7 +111,21 @@
     var F = this, MO = window.MutationObserver || window.WebKitMutationObserver, W = window;
     F.cur = {}; F.js = 0; F.mut = 0; F.top = []; F.topJs = []; F.n = 0; F.sum = 0; F.sumJs = 0; F.sumMut = 0; F.last = 0; F.img = imgN(); F.dec = decN(); F.dec0 = F.dec; F.undo = [];
     F.kn = 0; F.kl = ''; F.since = 0;                   // TV 28.10.: letzte Taste (#Nummer) + Frames seither -> lange Frames einem Schritt zuordnen
-    F.mo = MO ? new MO(function (l) { F.mut += l.length; }) : null;
+    /* Runde 6: Marken je Frame aus den DOM-Aenderungen (ohne JS-Zeit, nur "kam vor"): cue = Hinweis unten auf der Startseite
+     * zeigen/verbergen, ring = Form des Fokus-Rings (Runde 7: Wechsel zwischen den Ring-Elementen je Form), lpv = Feinauswahl
+     * sichtbar/unsichtbar */
+    F.mk = {};
+    F.note = function (l) {
+      F.mut += l.length;
+      for (var i = 0; i < l.length; i++) {
+        var r = l[i], c = r.type === 'attributes' && r.target ? r.target.className : '';
+        if (typeof c !== 'string' || !c) continue;
+        if (c.indexOf('hmore') === 0) F.mk.cue = 1;
+        else if (c.indexOf('focus-ring') === 0 && r.attributeName === 'class') F.mk.ring = 1;
+        else if (/^lpv-(l|tb|x|in)\b/.test(c)) F.mk.lpv = 1;   // Runde 7: Schliessen per Klasse off / Transform der Lasche
+      }
+    };
+    F.mo = MO ? new MO(function (l) { F.note(l); }) : null;
     if (F.mo) F.mo.observe(document.body, { subtree: true, attributes: true, characterData: true, childList: true });
     F.depth = 0;
     F.add = function (lb, d) { F.cur[lb] = (F.cur[lb] || 0) + d; };
@@ -140,6 +154,7 @@
     var LV = N.ui.LoupeView && N.ui.LoupeView.prototype;
     wrap('Loupe.show', LV, 'show'); wrap('Loupe.point', LV, 'point'); wrap('Loupe.hide', LV, 'hide');
     wrap('Loupe.frames', LV, 'loadFrames'); wrap('Loupe.exact', LV, 'exact'); wrap('Loupe.played', LV, 'played');
+    wrap('Loupe.fine', LV, 'fine'); wrap('Loupe.link', LV, 'link');   // Runde 6: Feinleiste + Keil laufen jetzt einen Frame nach dem Oeffnen
     wrap('diag.flush', N.diag, 'flush'); wrap('store.flush', N.store, 'flush');
     var sT = W.setTimeout, raf = U.raf;
     F.sT = sT; F.raf = raf;
@@ -161,15 +176,17 @@
   };
   Frames.prototype.tick = function (t) {
     var F = this;
-    if (F.mo && F.mo.takeRecords) F.mut += F.mo.takeRecords().length;
+    if (F.mo && F.mo.takeRecords) F.note(F.mo.takeRecords());
     if (F.last) {
-      var d = t - F.last, im = imgN(), dc = decN(), fr = { d: d, js: F.js, mut: F.mut, img: im - F.img, dec: dc - F.dec, w: F.cur, k: F.kn ? F.kl + F.kn + '+' + F.since : '' };
+      var mk = [], q;
+      for (q in F.mk) mk.push(q);
+      var d = t - F.last, im = imgN(), dc = decN(), fr = { d: d, js: F.js, mut: F.mut, img: im - F.img, dec: dc - F.dec, w: F.cur, k: F.kn ? F.kl + F.kn + '+' + F.since : '', mk: mk.join('/') };
       F.since++;
       F.n++; F.sum += d; F.sumJs += F.js; F.sumMut += F.mut; F.img = im; F.dec = dc;
       F.top.push(fr); F.top.sort(function (a, b) { return b.d - a.d; }); if (F.top.length > 5) F.top.pop();
       F.topJs.push(fr); F.topJs.sort(function (a, b) { return b.js - a.js; }); if (F.topJs.length > 3) F.topJs.pop();
     }
-    F.last = t; F.cur = {}; F.js = 0; F.mut = 0;
+    F.last = t; F.cur = {}; F.js = 0; F.mut = 0; F.mk = {};
   };
   Frames.prototype.end = function (name) {
     var F = this, r = function (v) { return Math.round(v * 10) / 10; }, n = Math.max(1, F.n);
@@ -182,7 +199,7 @@
         for (var k in fr.w) ks.push(k);
         ks.sort(function (a, b) { return fr.w[b] - fr.w[a]; });
         for (var j = 0; j < ks.length && j < 5; j++) if (fr.w[ks[j]] >= 0.05) parts.push(ks[j] + ' ' + r(fr.w[ks[j]]));
-        o += ' [' + r(fr.d) + 'ms' + (fr.k ? ' @' + fr.k : '') + ' js ' + r(fr.js) + ' mut ' + fr.mut + (fr.img ? ' img ' + fr.img : '') + (fr.dec ? ' dec ' + fr.dec : '') + (parts.length ? ': ' + parts.join(', ') : '') + ']';
+        o += ' [' + r(fr.d) + 'ms' + (fr.k ? ' @' + fr.k : '') + ' js ' + r(fr.js) + ' mut ' + fr.mut + (fr.img ? ' img ' + fr.img : '') + (fr.dec ? ' dec ' + fr.dec : '') + (fr.mk ? ' {' + fr.mk + '}' : '') + (parts.length ? ': ' + parts.join(', ') : '') + ']';
       }
       return o;
     }
@@ -240,13 +257,25 @@
   /* Runde 5 (TV 28.10.): Startseite bisher ab der zuletzt fokussierten Reihe – aus der letzten Reihe waren die ▼ wirkungslos (1 statt
    * 4 lange Frames), home-hero lief je nach Reihe ganz ohne Hero-Wechsel (66 fps) oder mit 8 (52,9 fps). Jetzt fester Ausgangspunkt. */
   function homeBench() { var t = R().top(); return R().topName() === 'home' && t && t.bench ? t.bench : null; }
-  S.home = function (done, label) {
+  S.home = function (done, label, prep) {
     home();
     later(300, function () {
       var hb = homeBench();
       if (hb) { hb.top(); log('bench ' + (label || 'home') + ' start: Reihe 0, Karten je Reihe ' + hb.counts().join('/')); }
-      later(2500, function () { measure(label || 'home', BM.keys('R12 D R8 D R8 U U D'), GAP, done); });
+      var undo = prep && hb ? prep(hb) : null;
+      later(2500, function () { measure(label || 'home', BM.keys('R12 D R8 D R8 U U D'), GAP, function () { if (undo) undo(); done(); }); });
     });
+  };
+  /* Runde 6, Gegenproben der Startseite (nicht in 'all'; Ziffern 9,8,0 = home + hvar mit Frame-Protokoll):
+   * hvar-cue0  = Hinweis unten wie bis 1.0.5 (display-Wechsel, ohne eigene Ebene) – zeigt, ob die dauerhafte Ebene die langen
+   *              Frames bei Querformat <-> Poster beseitigt hat (home muss besser sein als hvar-cue0);
+   * hvar-herol = Hero-Bilder + Scrim als eigene GPU-Ebenen (Klasse herol am body) – ist hvar-herol deutlich besser als home, kostet das
+   *              Neumalen der Wurzel-Ebene (Hero-Bild 1280x720 neu dekodieren, weil WebKit dessen Pixel verworfen hat) die Zeit. */
+  var HVARS = ['hvar-cue0', 'hvar-herol'];
+  S['hvar-cue0'] = function (done) { S.home(done, 'hvar-cue0', function (hb) { if (!hb.cueDisplay) return null; hb.cueDisplay(true); return function () { hb.cueDisplay(false); }; }); };
+  S['hvar-herol'] = function (done) {
+    U.cls(document.body, 'herol', true);
+    S.home(function () { U.cls(document.body, 'herol', false); done(); }, 'hvar-herol');
   };
   /* home-hero: erste Reihe mit >= 9 Karten (sonst die laengste), damit jeder der 8 Schritte den Hero wirklich wechselt */
   S['home-hero'] = function (done) {
@@ -272,6 +301,15 @@
       later(3000, function () { measure(label || 'lib-' + v, BM.keys('R3 D12 R U6 D12'), GAP, function () { R().back(); later(800, done); }); });
     };
   });
+  /* Reiter einer Erweiterung mit Quelle (z. B. "Entdecken": Liste waechst seitenweise beim Rollen); nicht in 'all' – ohne Erweiterung
+   * gibt es den Reiter nicht. Takt 350 ms (Tippen statt Dauerdruck): die naechste Seite kommt aus dem Leerlauf (160 ms nach der letzten
+   * Taste) mitten im Rollen – gemessen wird also auch das Anwachsen der Liste */
+  S.xtab = function (done) {
+    var lb = lib('movie') || lib('show');
+    if (!lb || !N.ext.has('lib:tabs')) { skip('xtab', 'keine Erweiterung', done); return; }
+    home(); R().push('library', { lib: lb, view: 'L', xtab: '*' });
+    later(4000, function () { measure('xtab', BM.keys('R3 D12 R U6 D12'), 350, function () { R().back(); later(800, done); }); });
+  };
   /* perf2: Haeppchen-Groesse am TV vergleichen ('chunks' = Klein/Mittel mit 1, 3, 9 Karten je Frame; nicht in 'all') */
   var CHUNKS = [];
   function variant(nm, base, on, off) {
@@ -368,6 +406,9 @@
         var ro = N.config.readOnly, st = N.session.settings || {}, old = st.ptrLoupe, oldS = st.loupeStyle;
         N.config.readOnly = true; st.ptrLoupe = true; st.loupeStyle = style;   // nur im Speicher, danach zurueck
         home(); N.player.open(it, 0);
+        /* Runde 6: das Einblenden der Bedienleiste (erster Zeigerschritt, TV 66 ms / 35 ms JS) gehoert zu player-osd, nicht zur
+         * Feinauswahl -> 600 ms vor dem Messfenster aufwecken (Vergleich mit Runde 5: dort war es 1 der langen Frames) */
+        later(5400, function () { N.pointer.move(640, 300); });
         later(6000, function () {
           measure(name, loupeSteps(), 40, function () {
             st.ptrLoupe = old; st.loupeStyle = oldS;
@@ -481,7 +522,7 @@
       });
     };
   });
-  var NAMES = ['home', 'home-hero', 'lib-L', 'lib-M', 'lib-S', 'lib-list', 'details-movie', 'details-show', 'search', 'discover', 'player-osd', 'loupe', 'loupe-stretch', 'loupe-film', 'leak'].concat(CHUNKS, SAVERS);
+  var NAMES = ['home', 'home-hero', 'lib-L', 'lib-M', 'lib-S', 'lib-list', 'details-movie', 'details-show', 'search', 'discover', 'player-osd', 'loupe', 'loupe-stretch', 'loupe-film', 'leak', 'xtab'].concat(CHUNKS, SAVERS, HVARS);
 
   function waitHome(my, tries, fn) {
     if (run !== my || my.stop) return;
@@ -519,7 +560,8 @@
       // 4 = Bildschirmschoner, 3 = Hintergrund in Bibliotheken (amb-off/mood/art je Ansicht M/S/Liste, amb-fade-mood/art) mit Frame-Protokoll
       // 2 = Entdecken (▼ ueber Merkliste/Inspirations-Reihen) mit Frame-Protokoll
       // 1 = Feinauswahl (loupe, loupe-stretch, loupe-film; Video mit Ton) mit Frame-Protokoll
-      var LAST = { '7': 'all', '6': 'home,lib,frames', '5': 'chunk,nocapl,frames', '4': 'saver,frames', '3': 'amb,frames', '2': 'discover,frames', '1': 'loupe,frames' };   // 4: Bildschirmschoner-Uebergaenge, 3: Hintergrund in Bibliotheken
+      // 0 = Startseite + Gegenproben (home, hvar-cue0, hvar-herol) mit Frame-Protokoll (Runde 6)
+      var LAST = { '0': 'home,hvar,frames', '7': 'all', '6': 'home,lib,frames', '5': 'chunk,nocapl,frames', '4': 'saver,frames', '3': 'amb,frames', '2': 'discover,frames', '1': 'loupe,frames' };   // 4: Bildschirmschoner-Uebergaenge, 3: Hintergrund in Bibliotheken
       if (seq === SEQ.length - 1 && LAST[k] && U.now() - seqT < SEQ_MS) { seq = 0; B.start(LAST[k]); return true; }
       if (k === SEQ[seq] && (seq === 0 || U.now() - seqT < SEQ_MS)) { seq++; seqT = U.now(); if (seq === SEQ.length) { seq = 0; B.start('all'); return true; } }
       else seq = k === SEQ[0] ? 1 : 0;

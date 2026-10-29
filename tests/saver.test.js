@@ -328,7 +328,14 @@ test('Poster-Modus: Plakat immer im Bild, gegenueber dem Text (Ecken) bzw. ueber
         [b.x, b.y, b.w, b.h].forEach(function (v) { assert.strictEqual(v, Math.round(v)); });
         if (st === 'ambient' || st === 'classic' || st === 'minimal') assert.ok(c.r ? b.x + b.w <= 760 : b.x >= 520, 'gegenueber dem Text ' + tag);
         if (st === 'poster' || st === 'lower') assert.ok(b.y + b.h <= 470, 'ueber der Leiste ' + tag);
-        if (st === 'bigclock') assert.ok(b.x + b.w <= 400, 'neben den Ziffern der grossen Uhr (ab x ~400) ' + tag);
+        if (st === 'bigclock') {                         // Gruppe Plakat + Uhr-Platz: mittig (+ Lage), Plakat-Mitte = Ziffern-Mitte, nie darunter
+          var G = L.bigGroup(i, a[0], a[1]);
+          assert.strictEqual(JSON.stringify(G.p), JSON.stringify(b));
+          assert.strictEqual(G.ck.x, b.x + b.w + L.CK_GAP, 'Abstand ' + tag);
+          assert.ok(Math.abs((b.x + G.ck.x + G.ck.w) / 2 - (640 + c.x - 40)) <= 1, 'Gruppe mittig ' + tag);
+          assert.ok(Math.abs(b.y + b.h / 2 - (c.y + 300)) <= 1, 'senkrecht auf Ziffern-Mitte ' + tag);
+          assert.ok(G.ck.x + G.ck.w <= c.x + c.w, 'Uhr-Platz in der Einblendung ' + tag);
+        }
       });
     }
   });
@@ -404,6 +411,55 @@ test('Bildauswahl: Standard ueberspringt Standbilder; "Auch Standbilder" zeigt s
   assert.strictEqual(g3.length, 6, 'Poster: auch Titel ohne Hintergrundbild'); assert.strictEqual(e3.arts().length, 0);
   g3.forEach(function (x) { assert.ok(x.pm && /\/thumb\//.test(x.thumb)); });
 });
+test('Pause-Schoner folgt "Bilder im Bildschirmschoner": Standbild -> Plakat (nur echte), Poster-Modus -> Plakat, ohne Hintergrund -> Plakat', function () {
+  var P = L.pausedPic;
+  // pure Entscheidung: (Modus, Hintergrundbild?, Plakat?, Pruefergebnis)
+  assert.strictEqual(P('art', true, true, undefined), 'check', 'erst pruefen');
+  assert.strictEqual(P('art', true, true, 'still'), 'poster');
+  assert.strictEqual(P('art', true, true, 'real'), 'art');
+  assert.strictEqual(P('art', true, true, ''), 'art', 'unbekannt = echt');
+  assert.strictEqual(P('art', true, false, undefined), 'art', 'ohne Plakat nichts zu pruefen: Standbild bleibt (nie schwarz)');
+  assert.strictEqual(P('stills', true, true, undefined), 'art');
+  assert.strictEqual(P('poster', true, true, undefined), 'poster');
+  assert.strictEqual(P('poster', true, false, undefined), 'art', 'Poster-Modus ohne Plakat: Hintergrundbild');
+  ['art', 'stills', 'poster', 'x'].forEach(function (m) {
+    assert.strictEqual(P(m, false, true), 'poster', 'ohne Hintergrundbild: Plakat (' + m + ')');
+    assert.strictEqual(P(m, false, false), '', 'gar kein Bild: nur Text (' + m + ')');
+  });
+  assert.strictEqual(P(undefined, true, true, 'still'), 'poster', 'unbekannter Modus = Standard');
+  // Ablauf im Schoner: eine /arts-Anfrage fuer den pausierten Titel, Text bleibt "Pausiert · …"
+  var ep = { type: 'episode', title: 'Serie', s: 1, e: 5, art: '/library/metadata/77/art/1', thumb: '/library/metadata/77/thumb/1' }, r = null;
+  var e = artEnv({ 77: 'still' }, {});
+  e.N.ui.saver._pausedNext(ep, function (x) { r = x; }); e.T.tick(200);
+  assert.ok(r && r.pm && r.thumb === ep.thumb, 'Standbild -> Plakat'); assert.match(r.title, /^Pausiert · Serie S1/);
+  assert.strictEqual(e.arts().length, 1);
+  var e2 = artEnv({ 77: 'real' }, {}); r = null;
+  e2.N.ui.saver._pausedNext(ep, function (x) { r = x; }); e2.T.tick(200);
+  assert.ok(r && !r.pm && r.art === ep.art, 'echtes Hintergrundbild bleibt');
+  var e3 = artEnv({ 77: 'still' }, { saverPics: 'stills' }); r = null;
+  e3.N.ui.saver._pausedNext(ep, function (x) { r = x; }); e3.T.tick(200);
+  assert.ok(r && !r.pm, 'Auch Standbilder: Standbild'); assert.strictEqual(e3.arts().length, 0, 'ohne Pruefung');
+  var e4 = artEnv({}, { saverPics: 'poster' }); r = null;
+  e4.N.ui.saver._pausedNext(ep, function (x) { r = x; }); e4.T.tick(200);
+  assert.ok(r && r.pm, 'Poster und Cover: Plakat'); assert.strictEqual(e4.arts().length, 0);
+  var e5 = artEnv({}, {}); r = 'x';
+  e5.N.ui.saver._pausedNext(null, function (x) { r = x; }); e5.T.tick(200);
+  assert.strictEqual(r, null, 'ohne Titel: kein Bild');
+});
+test('Plakat-Schatten: umschliesst das Plakat mit dem gestreckten Rand, Hoch- und Querformat je ein eigenes Bild', function () {
+  [[{ x: 238, y: 140, w: 293, h: 440 }, 'saver-shadow.png'], [{ x: 460, y: 90, w: 360, h: 540 }, 'saver-shadow.png'], [{ x: 100, y: 100, w: 374, h: 374 }, 'saver-shadow-sq.png']].forEach(function (c) {
+    var p = c[0], b = L.shadowBox(p), S = c[1] === 'saver-shadow.png' ? L.SHADOW.tall : L.SHADOW.sq;
+    assert.strictEqual(b.f, c[1]);
+    assert.ok(b.x < p.x && b.y < p.y && b.x + b.w > p.x + p.w && b.y + b.h > p.y + p.h, 'rundum groesser');
+    assert.ok(Math.abs((p.x - b.x) - S.m * p.w / S.pw) <= 1 && Math.abs((p.y - b.y) - S.m * p.h / S.ph) <= 1, 'Rand gestreckt wie das Plakat');
+    var png = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'assets', S.f));
+    assert.deepStrictEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [S.pw + 2 * S.m, S.ph + 2 * S.m], 'Bildgroesse passt zu SHADOW');
+    var A = readPngAlpha(require('path').join(__dirname, '..', 'src', 'assets', S.f)), i;   // weich bis 0 an jedem Rand, unter dem Plakat kraeftig
+    for (i = 0; i < A.w; i++) assert.ok(A.a(i, 0) <= 1 / 255 && A.a(i, A.h - 1) <= 1 / 255, 'Schatten oben/unten 0');
+    for (i = 0; i < A.h; i++) assert.ok(A.a(0, i) <= 1 / 255 && A.a(A.w - 1, i) <= 1 / 255, 'Schatten links/rechts 0');
+    assert.ok(A.a(A.w >> 1, A.h - S.m + 4) > 0.3, 'Schatten unter der Unterkante sichtbar');
+  });
+});
 test('Bildauswahl: nur Standbilder -> nach 12 Versuchen das Plakat des ersten (nie schwarz), hoechstens 12 Pruefungen je Bild', function () {
   var arts = {}, i;
   for (i = 0; i < 40; i++) arts[100 + i] = 'still';
@@ -461,9 +517,20 @@ test('Schoner-Abdunklungen: Text auf weissem Bild >= 4,5:1, weich bis 0 an jedem
   assert.ok(minContrast(k, 395, 234, 805, 366, T1) >= 4.5, 'Grosse Uhr');
   for (var i = 0; i < k.w; i++) assert.ok(k.a(i, 0) <= 1 / 255 && k.a(i, k.h - 1) <= 1 / 255, 'Grosse Uhr oben/unten');
   for (i = 0; i < k.h; i++) assert.ok(k.a(0, i) <= 1 / 255 && k.a(k.w - 1, i) <= 1 / 255, 'Grosse Uhr links/rechts');
-  var b = readPngAlpha(path.join(A, 'scrim-saver-b.png'));
-  assert.ok(minContrast(b, 64, 124, 1216, 174, TS) >= 4.5, 'Leiste: Uhr (Filmplakat)');
-  assert.ok(minContrast(b, 64, 176, 1216, 300, T1) >= 4.5, 'Leiste: Titel');
+  var b = readPngAlpha(path.join(A, 'scrim-saver-b.png')), B0 = 720 - b.h;   // Band liegt unten buendig (SL.INFO poster/lower)
+  eq([L.info('poster', 0).y, L.info('lower', 0).y, L.info('poster', 0).h], [B0, B0, b.h]);
+  // Text ab y 504 (Filmplakat, Lage mit ty 16) bis 680: alles text-soft-tauglich (Uhr, Zeile), damit auch der Titel
+  assert.ok(minContrast(b, 64, 504 - B0, 1216, 680 - B0, TS) >= 4.5, 'Leiste: Uhr/Titel/Zeile');
+  // TODO nach 1.0.5 "Beginn des Bands sichtbar": auf weissem Bild aendert sich die Helligkeit (L*) je Pixel hoechstens um 0,25
+  // (bis 1.0.5: 0,44 auf 215 px) und das Band ist oben ganz transparent
+  function Ls(v) { var Y = lum(v); return Y > 0.008856 ? 116 * Math.cbrt(Y) - 16 : 903.3 * Y; }
+  var prevL = null, maxD = 0;
+  for (i = 0; i < b.h; i++) {
+    var av = 0; for (var xx = 0; xx < 64; xx++) av += b.a(xx * 20, i); av /= 64;   // Mittel ueber die Zeile (Rauschen)
+    var Lv = Ls(166 * (1 - av)); if (prevL !== null) maxD = Math.max(maxD, Math.abs(Lv - prevL)); prevL = Lv;
+  }
+  assert.ok(maxD <= 0.25, 'Band zu steil: ' + maxD.toFixed(3) + ' L*/px');
+  for (i = 0; i < b.w; i++) assert.ok(b.a(i, 0) <= 1 / 255, 'Band oben transparent');
   // keine Stufe: entlang einer Zeile/Spalte durch die Mitte aendert sich die Deckkraft je Pixel um hoechstens 2 Stufen (+ Rauschen)
   function smooth(img, pts) { for (var j = 1; j < pts.length; j++) assert.ok(Math.abs(img.a(pts[j][0], pts[j][1]) - img.a(pts[j - 1][0], pts[j - 1][1])) <= 3 / 255, 'Stufe bei ' + pts[j]); }
   var row = [], col = [];
@@ -473,4 +540,12 @@ test('Schoner-Abdunklungen: Text auf weissem Bild >= 4,5:1, weich bis 0 an jedem
   var c0 = readPngAlpha(path.join(A, 'scrim-saver.png')), diag = [];
   for (i = 0; i < 460; i++) diag.push([Math.round(i * 999 / 459), 459 - i]);
   smooth(c0, diag);
+});
+
+test('Info-Block blendet erst ueber dem NEUEN Bild ein (TV-Test 29.10.: neuer Titel ueber dem alten Bild); Schnitt im selben Frame', function () {
+  assert.strictEqual(L.infoIn('cut', 0), 0);
+  assert.strictEqual(L.infoIn('fade', 1500), 1500, 'nach dem Ueberblenden');
+  ['dip', 'zoom', 'drift', 'fly', 'curtain', 'blinds', 'tiles'].forEach(function (fx) { assert.strictEqual(L.infoIn(fx, L.FX_MS[fx]), L.FX_MS[fx], fx); });
+  assert.strictEqual(L.infoIn('fade', 0), 0, 'ohne Dauer sofort');
+  assert.strictEqual(L.infoIn('fade', 1500, true), 0, 'erstes Bild aus Schwarz: kein altes Bild, sofort');
 });

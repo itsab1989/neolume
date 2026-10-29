@@ -101,10 +101,14 @@
     saverFx: 'fade', saverInterval: 30, saverSrc: 'libs', saverLibs: null, saverUnwatched: false, saverInfo: 'ambient', saverPics: 'art',   // Schoner (N.saverLogic)
     clockStyle: 'box', hints: 'always',   // Uhr auf der Startseite (C.CLOCK_STYLES), Tastenhinweise (N.ui.hints.MODES)
     accent: N.brand.accent,   // Akzentfarbe (N.accent): Standard = Farbe der Marke
-    libBg: 'mood', libBgStrength: 'soft' };   // Hintergrund in Bibliotheken (N.amb): Farbstimmung, dezent
+    libBg: 'mood', libBgStrength: 'soft',   // Hintergrund in Bibliotheken (N.amb): Farbstimmung, dezent
+    recentSearches: 8 };   // Zuletzt gesucht (N.srch.limit): 0 = Aus, 4, 8
   C.applyDefaults = function (st, kid) {
     if (!st) return st;
     for (var k in C.DEFAULTS) if (Object.prototype.hasOwnProperty.call(C.DEFAULTS, k) && st[k] === undefined) st[k] = k === 'stillTime' && kid ? 1 : C.DEFAULTS[k];
+    var rs = Number(st.recentSearches);               // Zuletzt gesucht: fruehere Stufen 6/3 (bis 28.10.) -> 8/4, Aus bleibt Aus
+    if (rs === 6) st.recentSearches = 8; else if (rs === 3) st.recentSearches = 4;
+    if (st.recentSearches === null || st.recentSearches === '') st.recentSearches = C.DEFAULTS.recentSearches;   // leer ist nicht "Aus"
     return st;
   };
   /* Uhr auf der Startseite: box = Kasten (bisher, Standard), free = grosse duenne Ziffern frei auf weichem Eckschatten,

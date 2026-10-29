@@ -146,6 +146,10 @@ test('Toast (NAV-10): unten links; Bildschirm mit toastLow (Einstellungen) -> ti
     R.top().toastLow = true;
     T.show('y'); assert.ok(/(^| )low( |$)/.test(T.el.className), T.el.className);
     T.show('z', { low: false }); assert.ok(!/(^| )low( |$)/.test(T.el.className), T.el.className);
+    R.top().toastLow = false; R.top().toastHigh = true;     // Player (TV-Test 29.10.: "Sprung zu …" ueber der Knopf-Beschriftung)
+    T.show('p'); assert.ok(/(^| )high( |$)/.test(T.el.className) && !/(^| )low( |$)/.test(T.el.className), T.el.className);
+    R.top().toastHigh = false;
+    T.show('q'); assert.ok(!/(^| )high( |$)/.test(T.el.className), T.el.className);
     T.hide();
   } finally { N.ui.setIcon = icon; T.el = null; }
 });

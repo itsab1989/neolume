@@ -323,9 +323,11 @@
       if (x >= 144 && x < 1136 && y < 656) {
         var ez = s.pointerEdge(x, y);
         if (ez) { if (kind0 === 'click') s.pointerScroll(ez.d); return true; }   // Randzone: rollt (Verweilen/Klick), fokussiert nicht
+        /* Titelliste nur, wenn sie eingerastet ist (NAV-2, DET-9): unter den Knoepfen lugt nur ihr Kopf herein – frueher rollte
+         * schon das Zeigen auf den Rand der ersten Zeile die Seite unter dem Punkt. Hin ueber die untere Randzone bzw. per Klick. */
+        if (zone !== 'list') return false;
         var j = list.hit(py - LIST_Y);
         if (j < 0 || j - list.sc >= list.use()) return false;               // nur ganz sichtbare Zeilen
-        if (zone !== 'list') toList();
         if (j !== list.f) { N.fx.step(true); list.focusTo(j, true); }   // still: Liste rollt nicht unter dem Punkt
         if (kind0 === 'click') playRow(j);
         return true;
@@ -333,12 +335,19 @@
       return false;
     };
     s.pointerSig = function () { return off + ',' + list.sc; };   // Zeiger-Scroll-Sperre (N.pointer)
-    /* Zeiger-Randzonen der Titelliste (N.ui.TrackList.edge): Streifen ueber der ersten Zeile, angeschnittene Zeile unten bis zur Hinweisleiste */
+    /* Zeiger-Randzonen der Titelliste (N.ui.TrackList.edge): Streifen ueber der ersten Zeile, angeschnittene Zeile unten bis zur
+     * Hinweisleiste. Dazu (DET-9) die Abschnitts-Schritte: unter den Knoepfen ab y 604 zur Liste, ueber der ersten Zeile der ganz
+     * oben stehenden Liste zurueck zu den Knoepfen. */
     s.pointerEdge = function (x, y) {
-      if (sb.on || zone !== 'list' || x < 144 || x >= 1136) return null;
-      return N.ui.TrackList.edge(list, LIST_Y - off, x, y);
+      if (sb.on || x < 144 || x >= 1136) return null;
+      if (zone !== 'list') return list.count() && y >= N.RowMath.EDGE_B && y < 656 ? { d: 1, x: 640, y: 628 } : null;
+      var top = LIST_Y - off, e = N.ui.TrackList.edge(list, top, x, y);
+      return e || (y >= top - 32 && y < top ? { d: -1, x: 640, y: top - 16 } : null);
     };
-    s.pointerScroll = function (d) { list.scrollBy(d); };
+    s.pointerScroll = function (d) {
+      if (zone !== 'list') { if (d > 0) toList(); return; }
+      if (d < 0 && !list.canScroll(-1)) toBtn(); else list.scrollBy(d);
+    };
     s.relabel = function () { paint(); list.refresh(); };
     return s;
   });

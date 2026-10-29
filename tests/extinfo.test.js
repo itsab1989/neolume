@@ -52,7 +52,12 @@ test('Metazeile, Zeile unter der Beschreibung, Genre-Chips, Besetzungs-Karten', 
   var c = D.extCast(x);
   H.eq([c.length, c[0].type, c[0].title, c[0].role, c[0].thumb], [2, 'person', 'Ann Eins', 'Laurie', 'https://metadata-static.plex.tv/p/1.jpg']);
   var sh = { type: 'show', year: 2022, title: 'Graue Pferde' }, xs = D.infoFromHelper({ seasons: 6, continuing: true, contentRating: 'TV-MA', rating: 8.7, network: 'Demo TV', duration: 3000000 });
-  assert.strictEqual(D.extMeta(sh, xs), '2022 · 6 Staffeln · Läuft noch · TV-MA · 8,7/10 · Hier nicht abspielbar');
+  assert.strictEqual(D.extMeta(sh, xs), '2022 · 6 Staffeln · Läuft noch · US: TV-MA · 8,7/10 · Hier nicht abspielbar', 'US-Freigabe nie wie FSK (TV-Test 29.10.)');
+  N.i18n.set('en');
+  assert.strictEqual(N.fmt.rated(xs.cr), 'TV-MA', 'Englisch: US ist das eigene Land');
+  assert.strictEqual(N.fmt.rated('gb/15'), 'GB: 15');
+  N.i18n.set('de');
+  assert.strictEqual(N.fmt.rated('gb/15'), 'GB: 15'); assert.strictEqual(N.fmt.rated('R'), 'R', 'ohne Land (alte Plex-Daten) unveraendert');
   assert.strictEqual(D.extLine(sh, xs), 'Sender: Demo TV');
   xs.creators = ['Ida Idee'];
   assert.strictEqual(D.extLine(sh, xs), 'Sender: Demo TV · Idee: Ida Idee');

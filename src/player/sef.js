@@ -27,11 +27,11 @@
     };
   }
   function fake(onEvent) {
-    var t = 0, dur = 0, timer = 0, paused = false, still = N.config.sefFake === 'still', on = false;
+    var t = 0, dur = 0, timer = 0, paused = false, still = N.config.sefFake === 'still', on = false, speed = 1;
     function loop() {
       timer = setTimeout(function () {
         if (!on) return;
-        if (!paused) { t += still ? 1 : 500; onEvent(14, t); }
+        if (!paused) { t = Math.max(0, t + (still ? 1 : 500) * speed); onEvent(14, t); }   // Schnellspulen: speed x Takt
         loop();
       }, 500);
     }
@@ -39,7 +39,7 @@
     return {
       exec: function (name, a) {
         switch (name) {
-          case 'InitPlayer': stop(); return 1;
+          case 'InitPlayer': stop(); speed = 1; return 1;
           case 'StartPlayback':
             t = (Number(a) || 0) * 1000; paused = false; on = true;
             setTimeout(function () { if (!on) return; onEvent(11); onEvent(9); onEvent(12); onEvent(14, t); loop(); }, 50);
@@ -49,6 +49,7 @@
           case 'Stop': stop(); return 1;
           case 'JumpForward': t += (Number(a) || 0) * 1000; return 1;
           case 'JumpBackward': t = Math.max(0, t - (Number(a) || 0) * 1000); return 1;
+          case 'SetPlaybackSpeed': speed = Number(a) || 1; return 1;
           case 'GetDuration': return dur;
           default: return 1;
         }

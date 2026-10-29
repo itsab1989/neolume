@@ -22,19 +22,22 @@
    * (Einbrennen): Ecken reihum, Grosse Uhr in 4 leicht versetzten Lagen um die Mitte, Leisten unten mit 4 Text-Hoehen bzw. links/rechts.
    * Abdunklung buendig (TV-Befund 28.10.: Luecke zwischen Schatten und Bildschirmrand): Eck-Schatten liegen immer exakt in der Ecke,
    * je Ecke ein eigenes, fertig gespiegeltes Bild (scrim-saver[-br|-tr|-tl].png, keine CSS-Spiegelung); die Leisten-Abdunklung liegt
-   * immer unten am Rand (y 380) – fuer das Wandern bewegt sich nur der Text (ty). edge = Raender, die die Abdunklung beruehren muss
-   * (Layout-Pruefung "edge"). */
+   * immer unten am Rand (y BAND_Y) – fuer das Wandern bewegt sich nur der Text (ty). edge = Raender, die die Abdunklung beruehren muss
+   * (Layout-Pruefung "edge").
+   * Band unten (Filmplakat, Untertitel-Leiste): 1280 x 520 ab y 200 (bis 1.0.5: 340 hoch ab y 380, Rampe 215 px auf 0,74 – der Beginn
+   * der Abdunklung war auf hellen Bildern als Kante sichtbar). Jetzt laeuft sie ueber 310 px sanft auf nur 0,5 (genau so viel, wie
+   * Zeile und Uhr in text-soft auf weissem Bild fuer 4,5:1 brauchen); siehe tools/make_assets.js scrimBand. */
   function pos(x, y, r, t, ty) { return { x: x, y: y, r: !!r, t: !!t, ty: ty || 0 }; }
   function cornerScr(p) { return 'scrim-saver' + (p.r || p.t ? '-' + (p.t ? 't' : 'b') + (p.r ? 'r' : 'l') : '') + '.png'; }
   /* Nur kleine Uhr: eigene kleine Eck-Schatten in Anzeigegroesse 420x200 (TV-Befund 28.10. abends: das gestauchte 1000x460-Bild war ein harter Fleck) */
   function miniScr(p) { return cornerScr(p).replace('scrim-saver', 'scrim-saver-m'); }
   function cornerEdge(p) { return [p.r ? 'r' : 'l', p.t ? 't' : 'b']; }
-  var BAND_EDGE = ['l', 'r', 'b'];
+  var BAND_EDGE = ['l', 'r', 'b'], BAND_H = 520, BAND_Y = 720 - BAND_H;
   var INFO = {
     ambient: { w: OV_W, h: OV_H, scr: cornerScr, edge: cornerEdge, p: CORNERS },
     classic: { w: OV_W, h: OV_H, scr: '', p: CORNERS },
-    poster: { w: 1280, h: 340, scr: 'scrim-saver-b.png', edge: BAND_EDGE, p: [pos(0, 380), pos(0, 380, 1), pos(0, 380, 0, 0, 16), pos(0, 380, 1, 0, 16)] },
-    lower: { w: 1280, h: 340, scr: 'scrim-saver-b.png', edge: BAND_EDGE, p: [pos(0, 380), pos(0, 380, 0, 0, 24), pos(0, 380, 0, 0, 12), pos(0, 380, 0, 0, 36)] },
+    poster: { w: 1280, h: BAND_H, scr: 'scrim-saver-b.png', edge: BAND_EDGE, p: [pos(0, BAND_Y), pos(0, BAND_Y, 1), pos(0, BAND_Y, 0, 0, 16), pos(0, BAND_Y, 1, 0, 16)] },
+    lower: { w: 1280, h: BAND_H, scr: 'scrim-saver-b.png', edge: BAND_EDGE, p: [pos(0, BAND_Y), pos(0, BAND_Y, 0, 0, 24), pos(0, BAND_Y, 0, 0, 12), pos(0, BAND_Y, 0, 0, 36)] },
     bigclock: { w: 1200, h: 600, scr: 'scrim-saver-c.png', p: [pos(40, 60), pos(76, 80), pos(40, 100), pos(4, 80)] },
     minimal: { w: 420, h: 200, scr: miniScr, edge: cornerEdge, p: [pos(0, 520), pos(860, 520, 1), pos(860, 0, 1, 1), pos(0, 0, 0, 1)] },
     off: { w: 0, h: 0, scr: '', p: [pos(0, 0)] }
@@ -68,6 +71,11 @@
       return reduced && !CALM[want] ? 'fade' : want;
     },
     /* Bildwechsel alle n Sekunden -> ms (nur Werte aus SEC, sonst 30 s) */
+    /* Wann blendet der Info-Block mit dem NEUEN Titel wieder ein (ms nach Beginn des Bilduebergangs)? Schnitt: im selben Frame
+     * (Bild und Text wechseln zusammen). Sonst erst, wenn das neue Bild ganz steht (TV-Test 29.10.: ein Kamerabild zeigte den neuen
+     * Titel noch ueber dem alten Bild, weil der Text gleichzeitig mit dem Uebergang einblendete). Erstes Bild (aus Schwarz, kein altes
+     * Bild darunter): sofort. */
+    infoIn: function (fx, d, first) { return first || fx === 'cut' || !(d > 0) ? 0 : d; },
     interval: function (sec) { var n = Number(sec); return (L.SEC.indexOf(n) >= 0 ? n : 30) * 1000; },
     corner: function (i) { return CORNERS[((i % 4) + 4) % 4]; },
     INFO: INFO, INFOS: ['ambient', 'classic', 'poster', 'lower', 'bigclock', 'minimal', 'off'],
@@ -177,18 +185,56 @@
       return n && med === n ? 'still' : '';
     },
     /* Modus "Poster und Cover": Groesse aus dem Seitenverhaeltnis (nw x nh; Musik meist quadratisch) und Lage passend zur
-     * Einblendung Nr. i: Eck-Stile -> Poster auf der Seite gegenueber dem Text, Leisten unten -> mittig darueber, Grosse Uhr -> links neben den Ziffern, sonst mittig.
-     * -> {x, y, w, h} (ganze Pixel, immer im Bild) */
+     * Einblendung Nr. i: Eck-Stile -> Poster auf der Seite gegenueber dem Text, Leisten unten -> mittig darueber, Grosse Uhr -> Gruppe
+     * mit der Uhr (bigGroup), sonst mittig. -> {x, y, w, h} (ganze Pixel, immer im Bild) */
     posterBox: function (style, i, nw, nh) {
       var c = L.info(style, i), st = c.style, band = st === 'poster' || st === 'lower', ar = nw > 0 && nh > 0 ? nw / nh : 2 / 3;
-      var big = st === 'bigclock', H = band ? 400 : big ? 440 : 540, W = big ? 296 : 600, w, h;
+      if (st === 'bigclock') return L.bigGroup(i, nw, nh).p;
+      var H = band ? 400 : 540, W = 600, w, h;
       if (ar > 0.9) H = Math.round(H * 0.85);             // quadratisch (Cover/Kuenstler): etwas kleiner, wirkt sonst wuchtig
       h = H; w = Math.round(H * ar);
       if (w > W) { w = W; h = Math.round(W / ar); }
       var x = Math.round((1280 - w) / 2);
       if (st === 'ambient' || st === 'classic' || st === 'minimal') x = c.r ? 150 : 1280 - 150 - w;
-      if (big) x = 96;                                     // Grosse Uhr: Ziffern ab x ~400 -> Plakat links daneben, nie darunter
       return { x: x, y: band ? 56 : Math.round((720 - h) / 2), w: w, h: h };
+    },
+    /* Grosse Uhr + Poster (TODO nach 1.0.5: Plakat links + Uhr wirkten nicht als Gruppe): Plakat und Uhr bilden EINE Gruppe, die als
+     * Ganzes waagerecht mittig steht – Plakat links, CK_GAP Abstand, dann ein fester Uhr-Platz CK_W (Ziffern darin mittig; sichtbarer Abstand zur
+     * ersten Ziffer so ~70–80 px, etwa ein Viertel der Plakatbreite). Fest statt
+     * gemessen: die Uhr ist immer HH:MM (24 h, in jeder Sprache gleich), CK_W = breiteste Zeit "00:00" in Inter 180/300 (~420 px) +
+     * Reserve fuer die breitere TV-Systemschrift; so springt die Gruppe nicht jede Minute und es gibt kein Messen (Layout) zur Laufzeit.
+     * Senkrecht: Plakat-Mitte = Ziffern-Mitte (Zeilenmitte der Uhr: Einblendung y + 300). Die 4 Lagen gegen Einbrennen verschieben die
+     * ganze Gruppe (dx = x - 40, Uhr-Mitte = y + 300). -> {p: {x, y, w, h}, ck: {x, w}} in Bildschirm-Koordinaten */
+    CK_W: 440, CK_GAP: 56,
+    bigGroup: function (i, nw, nh) {
+      var c = L.info('bigclock', i), ar = nw > 0 && nh > 0 ? nw / nh : 2 / 3, H = 440, W = 296, w, h;
+      if (ar > 0.9) H = Math.round(H * 0.85);
+      h = H; w = Math.round(H * ar);
+      if (w > W) { w = W; h = Math.round(W / ar); }
+      var x = Math.round((1280 - (w + L.CK_GAP + L.CK_W)) / 2) + c.x - 40, cy = c.y + 300;
+      return { p: { x: x, y: Math.round(cy - h / 2), w: w, h: h }, ck: { x: x + w + L.CK_GAP, w: L.CK_W } };
+    },
+    /* Schatten unter dem Plakat (TODO nach 1.0.5: Plakat ohne Tiefe): vorgerechnetes PNG (tools/make_assets.js posterShadows), weich,
+     * leicht nach unten versetzt; kein CSS-Schatten/-Blur (Orsay). Das Bild ist fuer ein Plakat pw x ph mit Rand m gerechnet und wird
+     * auf das echte Plakat gestreckt (Rand mitgestreckt; Hochformat und quadratisch je ein eigenes Bild, damit die Streckung klein bleibt).
+     * p = Plakat {x, y, w, h} -> {f: Datei, x, y, w, h} */
+    SHADOW: { tall: { f: 'saver-shadow.png', pw: 300, ph: 450, m: 40 }, sq: { f: 'saver-shadow-sq.png', pw: 380, ph: 380, m: 40 } },
+    shadowBox: function (p) {
+      var s = p.w / p.h > 0.9 ? L.SHADOW.sq : L.SHADOW.tall, sx = p.w / s.pw, sy = p.h / s.ph;
+      return { f: s.f, x: Math.round(p.x - s.m * sx), y: Math.round(p.y - s.m * sy), w: Math.round((s.pw + 2 * s.m) * sx), h: Math.round((s.ph + 2 * s.m) * sy) };
+    },
+    /* Pause-Schoner (ein Bild: der pausierte Titel) nach "Bilder im Bildschirmschoner": mode (pics), hasArt/hasThumb (Hintergrund-
+     * bild/Plakat vorhanden), kind = Ergebnis der Standbild-Pruefung (undefined = noch nicht geprueft, '' = unbekannt -> gilt als echt).
+     * -> 'art' (Hintergrundbild), 'poster' (Poster-Darstellung), 'check' (erst pruefen) oder '' (kein Bild, nur Text/Uhr).
+     * Poster und Cover: Plakat. Nur echte Hintergrundbilder: ist das Hintergrundbild ein Standbild, zeigt der Pause-Schoner das Plakat
+     * (wie der Schoner, der nach 12 Standbildern das Plakat nimmt); ohne Plakat bleibt das Standbild (nie schwarz). Auch Standbilder:
+     * Hintergrundbild. Ohne Hintergrundbild in jedem Modus das Plakat (es gibt keinen anderen Titel, den man stattdessen zeigen koennte). */
+    pausedPic: function (mode, hasArt, hasThumb, kind) {
+      mode = L.pics(mode);
+      if (!hasArt || (mode === 'poster' && hasThumb)) return hasThumb ? 'poster' : '';
+      if (mode !== 'art' || !hasThumb) return 'art';
+      if (kind === undefined) return 'check';
+      return kind === 'still' ? 'poster' : 'art';
     },
     Bag: Bag,
     Pool: Pool

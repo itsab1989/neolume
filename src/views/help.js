@@ -58,7 +58,7 @@
         if (!d) continue;
         while (r.cap.firstChild) r.cap.removeChild(r.cap.firstChild);   // nur beim Wechsel des Bildschirms (kein Fokusschritt in einer Reihe)
         cap(r.cap, d[0]);
-        U.setText(r.t, N.t('keys.' + KEYS[c][0] + '.' + d[1]));
+        U.setText(r.t, N.t('keys.' + KEYS[c][0] + '.' + d[1] + (KEYS[c][0] === 'player' && d[1] === 'ffrw' && (N.session.settings || {}).ffrw === 'trick' ? 'Trick' : '')));   // folgt der Einstellung (Audit 1.0.6)
       }
     }
     s.enter = function (p, restore) { show(restore ? restore.c || 0 : 0); };

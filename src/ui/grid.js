@@ -187,7 +187,27 @@
     this.items.splice(i, 0, it); this.n++;
     this.setModel(this.items, this.n, i);
   };
+  /* Liste waechst (Erweiterungs-Reiter mit seitenweisem Nachladen): Fokus/Scroll-Zeile bleiben, nur neue Indizes im Fenster werden
+   * befuellt (sichtbare sofort, Puffer in Haeppchen) – nie im Fokusschritt aufrufen, nur wenn Daten ankommen */
+  Grid.prototype.grow = function (items, n) {
+    this.items = items; if (n <= this.n) { this.n = n; return; }
+    this.n = n; this.render(0, 1);
+    if (this.endEl) this.endNote(this.endT);
+  };
+  /* Hinweis unter der letzten Zeile (z. B. "Mehr zeigt dieser Reiter nicht"); wandert mit dem Seiten-Container, '' = weg.
+   * Ein Element, nur beim Laden/Wachsen gesetzt. */
+  Grid.prototype.endNote = function (t) {
+    this.endT = t || '';
+    if (!this.endT) { if (this.endEl) this.endEl.style.display = 'none'; return; }
+    if (!this.endEl) { this.endTx = U.txt('div', 'gend t-small c2', this.pg, ''); this.endEl = this.endTx.parentNode; }
+    var G = this.G;
+    U.setText(this.endTx, this.endT);
+    this.endEl.style.left = G.X0 + 'px'; this.endEl.style.width = Math.min(G.width(), 960) + 'px';
+    this.endEl.style.top = (G.Y0 + G.rows(this.n) * G.SY - CLIP_Y) + 'px';
+    this.endEl.style.display = '';
+  };
   Grid.prototype.clear = function () {
+    if (this.endEl) { this.endEl.style.display = 'none'; this.endT = ''; }
     for (var i = 0; i < this.pool.length; i++) this._free(this.pool[i]);
     this.byIdx = {}; this.items = []; this.n = 0; this.f = 0; this.r = 0;
   };
