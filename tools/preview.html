@@ -2,7 +2,10 @@
 <!-- Desktop-Vorschau (nur Entwicklung, nicht Teil des TV-Pakets).
      Laedt ../app/app.js mit einem nachgebauten Lader-Kontext (Speicher = localStorage) und uebersetzt Tastatur -> TV-Codes:
      Pfeile, Enter = OK, Backspace/Esc = RETURN, r/g/y/b = Farbtasten, i = INFO, t = TOOLS, p = PLAY, Leertaste = PAUSE, s = STOP, f/w = FF/RW, u = SUBTITLE, 0-9 = Ziffern.
-     Parameter: ?keys=DOWN,RIGHT,ENTER (automatische Tastenfolge, 400 ms Abstand, Start nach &wait=ms)
+     Parameter: ?keys=DOWN,RIGHT,ENTER (automatische Tastenfolge, 400 ms Abstand, Start nach &wait=ms; waitMS = Pause;
+                untilMS:<CSS-Selektor>[~<Regex>] = warten, bis ein sichtbares passendes Element da ist (Text passt zur Regex) –
+                MS ist das in &hold eingeplante Zeitbudget; dauert es laenger, verlaengert die Seite &hold um die Ueberziehung,
+                damit der Screenshot trotzdem erst nach dem Rest der Folge entsteht. Keys mit Sonderzeichen URL-kodiert uebergeben)
                 &seed=<URL einer JS-Datei, die window.PN_SEED = {'state.json': '…'} (und optional window.PN_SETUP = setup.json-Text) setzt> (lokal, nie einchecken)
                 &src=dev (ctx.source, schaltet Dev-Funktionen ein)  &min=1 (app.min.js = Release-Build statt app.js)  &clear=1 (Speicher leeren)  &hold=ms (Screenshot-Hilfe)
                 &moves=x:y,click@x:y (Zeiger)  &gap=ms (Tastenabstand)  &probe=<URL> (Layout-Pruefung vor dem Screenshot, tools/layout_probe.js)
@@ -20,6 +23,7 @@
     // &hold=ms: haelt das load-Ereignis auf (fuer Kopflos-Screenshots); braucht einen lokalen Sleep-Server auf :8765
     // &probe=<URL>: Layout-Pruefung (tools/layout_probe.js) direkt vor dem Screenshot, Ergebnis per POST an die URL
     if (q.probe) document.write('<script src="layout_probe.js"><\/script>');
+    window.PN_HOLD_END = q.hold ? performance.now() + Number(q.hold) : 0;   // fuer untilMS-Schritte (Haltezeit verlaengern)
     if (q.hold) document.write('<img style="display:none"' + (q.probe ? ' onload="window.PN_PROBE&amp;&amp;PN_PROBE()"' : '') + ' src="' + (q.holdurl || 'http://127.0.0.1:8765/sleep').replace(/"/g, '') + '?ms=' + Number(q.hold) + '">');
   })();
 </script>
@@ -72,12 +76,36 @@
         setTimeout(mstep, 300);
       }, Number(q.mwait || 2500));
     }
+    /* untilMS:sel~re – auf einen Bereitschaftszustand warten statt fester Pause (hoechstens 30 s). Laeuft das Budget MS ab, haelt
+     * die Seite das load-Ereignis mit kurzen Halte-Bildern auf und verschiebt am Ende das Haltende um die Ueberziehung. */
+    function holdImg(ms) {
+      var im = document.createElement('img');
+      im.style.display = 'none'; im.src = (q.holdurl || 'http://127.0.0.1:8765/sleep') + '?ms=' + Math.max(0, Math.round(ms));
+      document.body.appendChild(im);
+    }
+    function until(budget, sel, re, next) {
+      var t0 = performance.now(), ext = 0;
+      (function poll() {
+        var els = document.querySelectorAll(sel), hit = false, now = performance.now();
+        for (var j = 0; j < els.length && !hit; j++) hit = els[j].getClientRects().length > 0 && (!re || re.test(els[j].textContent));
+        var over = now - t0 - budget;
+        if (hit || over > 30000) {
+          if (!hit && window.console) console.log('until: ' + sel + ' nicht erreicht');
+          if (over > 0 && window.PN_HOLD_END) { window.PN_HOLD_END += over; holdImg(window.PN_HOLD_END - now); }
+          return next();
+        }
+        if (over > -100 && window.PN_HOLD_END && now >= ext) { holdImg(600); ext = now + 400; }   // load-Ereignis offen halten
+        setTimeout(poll, 50);
+      })();
+    }
     if (q.keys) {
       var list = q.keys.split(','), i = 0;
       setTimeout(function step() {
         if (i >= list.length) return;
         var k = list[i++];
         if (/^wait\d+$/.test(k)) { setTimeout(step, Number(k.slice(4))); return; }
+        var u = /^until(\d+):([^~]+)(?:~(.*))?$/.exec(k);
+        if (u) { until(Number(u[1]), u[2], u[3] ? new RegExp(u[3]) : null, step); return; }
         App.onKey(CODES[k]); setTimeout(step, Number(q.gap || 400));
       }, Number(q.wait || 1500));
     }

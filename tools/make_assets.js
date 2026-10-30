@@ -7,6 +7,7 @@
  * - rail.png       120x720 Seitenleiste (deckend c.bg bis x 80 -> transparent bei x 120, dieselbe Kurve wie fade-frame:
  *                  zusammen ein Rahmen mit weicher Ecke unten links, siehe "Rahmen links + unten")
  * - scrim-hdr.png  1280x88 Kopfband Film/Serie in den Abschnitten: wie fade-bottom, nach rechts auf 30 % auslaufend
+ * - all-grid.png   48x48 Raster-Symbol der Karte "Alle anzeigen" (HOME-14), Form aus design/icons/grid.svg, Farbe c.text-1
  * - qr.png         264x264 QR-Code fuer https://plex.tv/link (Inhalt ist fest -> kein QR-Code zur Laufzeit)
  * - scrim.png      wird aus app/scrim.png uebernommen (am TV abgestimmte Ueberblendmaske)
  * - <pointer>[-press].png  Smart-Control-Zeiger je Marke und pointer-<id>[-press].png je Akzentfarbe der Palette
@@ -45,6 +46,19 @@ fs.readdirSync(path.join(ROOT, 'brand')).filter(function (f) { return /\.json$/.
   var b = JSON.parse(fs.readFileSync(path.join(ROOT, 'brand', f), 'utf8'));
   ptrs.push([b.pointer, b.accent, b.accentPress]);
 });
+/* ---------- all-grid.png: Raster-Symbol der Karte "Alle anzeigen" (HOME-14) in 48 x 48 (nur die vier Quadrate, ohne Rand) ----------
+ * TV-Test 30.10.: das 32er Sprite-Symbol (sichtbar 18 px) wirkte aus 3 m klein und leer; hochskaliert waere es unscharf. Gleiche
+ * Form wie design/icons/grid.svg, Farbe Token c.text-1. Nur dieses: node tools/make_assets.js --allgrid */
+function allGrid() {
+  var it = T.icons().filter(function (x) { return x.name === 'grid'; })[0], col = T.color('text-1'), S = 48, k = S / 18;
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + S + '" height="' + S + '"><g transform="scale(' + k + ') translate(-5 -5)" ' +
+    it.attrs.replace(/currentColor/g, col) + '>' + it.body.replace(/currentColor/g, col) + '</g></svg>';
+  var t = path.join(require('os').tmpdir(), 'neo-all-grid.svg');
+  fs.writeFileSync(t, svg);
+  try { cp.execFileSync('rsvg-convert', ['-o', path.join(OUT, 'all-grid.png'), t]); } catch (e) { console.error('rsvg-convert fehlt – all-grid.png'); }
+}
+if (process.argv.indexOf('--allgrid') >= 0) { allGrid(); process.exit(0); }
+if (process.argv.indexOf('--saver') < 0) allGrid();
 if (process.argv.indexOf('--saver') < 0) ptrs.forEach(function (b) {
   [[b[0] + '.png', b[1]], [b[0] + '-press.png', b[2]]].forEach(function (p) {
     var t = path.join(require('os').tmpdir(), 'neo-' + p[0] + '.svg');

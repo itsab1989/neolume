@@ -1,0 +1,114 @@
+name: Collection submission
+description: Offer your finished app for another TV (or another media server) for the maintainer's collection – reviewed, rebuilt from your source and offered as a download here.
+title: "Collection: <name> for <TV / OS>"
+labels: ["collection-submission"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for offering your app! Please read **"Submit your app for the collection"** in [PORTS.md](https://github.com/itsab1989/neolume/blob/main/PORTS.md#submit-your-app-for-the-collection) first. In short:
+
+        - Only with **public source code** – no binaries are accepted without source. The maintainer rebuilds the app from your source and offers *that* build, never yours.
+        - The maintainer reviews the code (no telemetry, no network calls beyond the media server and the services the spec allows), rebuilds it, runs a privacy scan and – if he has such a TV – the smoke test. One person does this in his spare time, so it can take a while, and a submission can be declined.
+        - **Never** paste tokens, passwords, IP addresses of your home network, names or titles from your own library here. Nobody will ask you for credentials.
+
+        Just want your port listed with a link? Use the **Port submission** form instead.
+  - type: input
+    id: name
+    attributes:
+      label: Name of the app
+      description: Must not contain "Plex" (or "Jellyfin"/"Emby") and must not look like an official app.
+    validations:
+      required: true
+  - type: input
+    id: tv
+    attributes:
+      label: TV brand, models and operating system
+      placeholder: "LG – OLED C1 (2021), webOS 6.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: server
+    attributes:
+      label: Media server
+      multiple: true
+      options:
+        - Plex Media Server
+        - Jellyfin
+        - Emby
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source repository and the exact tag or commit to review (https)
+      placeholder: "https://github.com/<you>/<repo> at tag v1.0.0"
+    validations:
+      required: true
+  - type: textarea
+    id: build
+    attributes:
+      label: How to build it
+      description: One command per package, the tools and versions needed (e.g. the TV platform's SDK), and the SHA-256 checksum of your own build so the maintainer can compare.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: platform
+    attributes:
+      label: platform.json
+      description: The platform description from your repository root (format in PORTS.md).
+      render: json
+    validations:
+      required: true
+  - type: input
+    id: specVersion
+    attributes:
+      label: Spec version you built against
+      description: The version shown at the top of docs/SPEC.md when you built the app.
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: Test-plan results
+      description: The filled-in results template of docs/TEST-PLAN.md (section 6) – at least the device setup checklist, the smoke test and the privacy and security checks. A link to the file in your repository is fine.
+    validations:
+      required: true
+  - type: input
+    id: guide
+    attributes:
+      label: Install guide for that TV (link)
+      description: Beginner-friendly, step by step, like docs/INSTALL.md. Pictures as drawings or screenshots with demo content only.
+    validations:
+      required: true
+  - type: textarea
+    id: network
+    attributes:
+      label: Network addresses the app contacts, and third-party libraries
+      description: For example "the media server in the home network; plex.tv for sign-in". List every third-party library with its licence.
+    validations:
+      required: true
+  - type: input
+    id: licence
+    attributes:
+      label: Licence
+      description: MIT or compatible with it (e.g. BSD-2-Clause, BSD-3-Clause, ISC, Apache-2.0).
+      placeholder: "MIT"
+    validations:
+      required: true
+  - type: checkboxes
+    id: policy
+    attributes:
+      label: Confirmations
+      options:
+        - label: The repository contains the complete source; the app builds from it with the commands above (plus the platform's SDK).
+          required: true
+        - label: The app has no telemetry, analytics, ads or tracking, loads no code from the internet at run time, and sends tokens only to the user's own server (SPEC A18).
+          required: true
+        - label: The submission, the repository and its pictures contain no tokens, passwords, home-network addresses, personal names or titles from my own library.
+          required: true
+        - label: I am the author (or have the author's permission) and agree that the maintainer may build, sign and distribute the app under its licence.
+          required: true
+        - label: I understand that the maintainer may decline the submission or remove the app from the collection later.
+          required: true

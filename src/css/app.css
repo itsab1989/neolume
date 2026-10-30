@@ -35,14 +35,18 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .is-focus .ic, .ic.s3 { background-position-y: @ic.row.on-accent@; }
 
 /* ---------- Fokus-Ring & Karten (SPEC 5.1–5.3) ---------- */
-.focus-ring { position: absolute; left: 0; top: 0; z-index: @z.ring@; border: @fo.ring-width@ solid @accent@; border-radius: @fo.ring-radius@; visibility: hidden;
+.focus-ring { position: absolute; left: 0; top: 0; border: @fo.ring-width@ solid @accent@; border-radius: @fo.ring-radius@;
   -webkit-transform-origin: 50% 50%; -webkit-transform: translate3d(0,0,0);
   -webkit-transition: -webkit-transform @mo.base@ @mo.ease@; }
 .fr-poster { width: 192px; height: 280px; }
 .fr-land { width: 304px; height: 178px; }
 .fr-prof { width: 176px; height: 176px; border-radius: 88px; }
 /* Runde 7: ruhende Form (ui/ring.js, ein Element je Form) – unsichtbar, Ebene + Inhalt bleiben, folgt ohne Uebergang */
-.focus-ring.fr-off { opacity: 0; -webkit-transition: none; }
+/* Runde 8: Huelle je Form (ui/ring.js) – leere, dauerhafte Ebene; verborgen/ruhend = Deckkraft 0 an der Huelle, der Ring darin
+ * bleibt gemalt (Deckkraft 0 bzw. visibility am Ring selbst liess den TV dessen Inhalt neu malen) */
+.frw { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: @z.ring@; -webkit-transform: translate3d(0,0,0); }
+.frw.off { opacity: 0; }
+.frw.off .focus-ring { -webkit-transition: none; }
 
 .pg { position: absolute; left: 0; top: 0; width: @l.screen-w@; height: @l.screen-h@;
   -webkit-transform: translate3d(0,0,0); -webkit-transition: -webkit-transform @mo.base@ @mo.ease@; }
@@ -79,6 +83,16 @@ body { color: @c.text-1@; font-family: @ty.family@;
   background: @c.text-1@; color: @c.on-accent@; font-size: @ty.label.size@; line-height: @ty.label.lh@; font-weight: @ty.label.weight@; text-align: center; }
 .bdg.done { display: block; right: 8px; top: 8px; width: 24px; height: 24px; border-radius: 12px; background-color: @c.text-1@;
   background-image: url(@A/icons.png); background-repeat: no-repeat; background-position: -420px -100px; }
+/* HOME-14 Karte "Alle anzeigen" am Reihenende: ruhige Flaeche, Raster-Symbol 48 px (Abzeichen-Element, eigenes Bild all-grid.png) + Text
+ * in der Groesse der Kartentitel; Symbol + 12 px + eine Textzeile (24) als Block mittig. TV-Test 30.10.: das 32er Sprite-Symbol
+ * (sichtbar 18 px) wirkte aus 3 m klein/leer. */
+.card.is-all { background: @c.surface-3@; }
+.bdg.all { display: block; left: 50%; margin-left: -24px; width: 48px; height: 48px; background-image: url(@A/all-grid.png); background-repeat: no-repeat; }
+.card .ph.all { left: 8px; right: 8px; top: 0; bottom: auto; max-height: 48px; text-align: center; color: @c.text-1@;
+  font-size: @ty.body.size@; line-height: 24px; font-weight: 600; }
+.card-land .bdg.all { top: 39px; } .card-land .ph.all { top: 99px; }
+.card-poster .bdg.all { top: 90px; } .card-poster .ph.all { top: 150px; }
+.card-sq .bdg.all { top: 46px; } .card-sq .ph.all { top: 106px; }
 .cap { position: absolute; -webkit-transform: translate3d(0,0,0); }   /* perf3: eigene kleine GPU-Ebene (TV: 9,8,5 capl-M 57,4 statt 53,5 fps) */
 .cap-land { width: 288px; } .cap-poster { width: 176px; }
 .cap .t1 { font-size: 18px; line-height: 24px; font-weight: 600; color: @c.text-2@; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -173,6 +187,22 @@ body { color: @c.text-1@; font-family: @ty.family@;
 #pn-toast.high { left: @l.safe-x@; top: 124px; }   /* Player: unter der Titel-Insel (y 36–108), weg von Bedien-Insel und Untertiteln */
 #pn-toast.on { opacity: 1; visibility: visible; -webkit-transform: translate3d(0,0,0); }
 #pn-toast .ic { left: 14px; top: 12px; }
+/* Hinweis bei neuen Inhalten (SPEC HOME-13, ui/newsbanner.js): leere, dauerhafte Huelle #pn-news blendet (Runde 8), der Kasten .nb
+ * ist eine eigene Ebene. Startseite rechts unter der Uhr (y 112, unter "Mit Datum" bis y ~100; rechts von .hero-txt, die bei x 784
+ * endet), .at-top oben rechts (Bibliothek, Jetzt laeuft), .at-pl im Player an der Stelle der Toasts (x 64, y 124). */
+#pn-news { position: absolute; right: @l.safe-x@; top: 112px; width: 0; height: 0; z-index: @z.toast@; opacity: 0;
+  -webkit-transform: translate3d(0,0,0); -webkit-transition: opacity @mo.slow@ @mo.ease@; }
+#pn-news.on { opacity: 1; }
+#pn-news.at-top { top: @l.safe-y@; }
+#pn-news.at-pl { left: @l.safe-x@; right: auto; top: 124px; }
+#pn-news .nb { position: absolute; right: 0; top: 0; max-width: 420px; height: 64px; padding: 0 20px 0 56px; border-radius: @r.lg@;
+  background: @c.surface-3@; white-space: nowrap; -webkit-transform: translate3d(0,0,0); }
+#pn-news.at-pl .nb { left: 0; right: auto; }
+#pn-news .nb .ic { left: 14px; top: 16px; }
+#pn-news .nb-h { padding-top: 9px; font-size: 16px; line-height: 20px; color: @c.text-2@; overflow: hidden; text-overflow: ellipsis; }
+#pn-news .nb-l { font-size: 18px; line-height: 24px; font-weight: 600; color: @c.text-1@; overflow: hidden; text-overflow: ellipsis; }
+#pn-news .nb.one .nb-h { display: none; }
+#pn-news .nb.one .nb-l { line-height: 64px; }
 #pn-over { z-index: @z.over@; visibility: hidden; }
 #pn-over.on { visibility: visible; }
 /* leichte Abdunklung hinter Seitenpanels und aufgeklappter Leiste (statisch, kein Ueberblenden grosser Flaechen) */
@@ -187,6 +217,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .dlg .db.v { height: auto; }
 .dlg.c { left: 370px; top: 230px; width: 540px; min-height: 0; padding: 40px 40px 36px; text-align: center; }
 .dlg.c .btn.inl { min-width: 176px; margin: 0 @sp.2@; text-align: center; }
+.dlg.c3 { left: 260px; width: 760px; }
 
 /* ---------- Auswahl-/Hilfe-Panel (SPEC 5.19, 10.6) ---------- */
 .panel { position: absolute; left: @l.panel-x@; top: 0; width: @l.panel-w@; height: @l.screen-h@; background: @c.panel@; }
@@ -196,11 +227,12 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .panel .pe .ic { left: 8px; top: 16px; background-position-y: @ic.row.text-1@; visibility: hidden; }
 .panel .pe.sel .ic { visibility: visible; }
 .panel .pe.is-focus { background: @accent@; } .panel .pe.is-focus .lb { color: @c.on-accent@; } .panel .pe.is-focus .ic { background-position-y: @ic.row.on-accent@; }
-/* Mehr-Hinweis im Auswahl-Panel (Option more): kleines › wie .d-tmore, gedreht; nur sichtbar, wenn dort weitere Eintraege liegen */
-.panel .pmore { position: absolute; left: 206px; top: 80px; width: 28px; height: 28px; text-align: center; font-size: 28px; line-height: 26px; font-weight: 600;
+/* Mehr-Hinweis (NAV-11, N.ui.more): kleines › wie .d-tmore, gedreht; nur sichtbar (visibility), wenn dort weitere Eintraege liegen.
+ * Gleiches Aussehen in Panels, Einstellungen, Listen-Editoren und Titellisten; Lage setzt der Aufrufer (Panel: Mitte, ueber der Liste) */
+.pmore { position: absolute; left: 206px; top: 80px; width: 28px; height: 28px; text-align: center; font-size: 28px; line-height: 26px; font-weight: 600;
   color: @c.text-2@; visibility: hidden; -webkit-transform: rotate(90deg); }
-.panel .pmore.up { -webkit-transform: rotate(-90deg); }
-.panel .pmore.on { visibility: visible; }
+.pmore.up { -webkit-transform: rotate(-90deg); }
+.pmore.on { visibility: visible; }
 /* Mehrfachauswahl mit Abschluss (Option done): Hinweiszeile unter dem Titel, letzter Eintrag "Anfragen (2) ›" – gedimmt, solange zu wenig gewaehlt */
 .panel .phint { position: absolute; left: 32px; top: 82px; width: 376px; font-size: @ty.small.size@; line-height: @ty.small.lh@; color: @c.text-2@; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .panel .pwait { left: 32px; top: 116px; } .panel .px.pwait-t { left: 72px; width: 336px; }   /* Panel "laedt" (N.ui.panel.wait): Kreis + Text in einer Zeile */
@@ -449,6 +481,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
  * Farbtasten-Hinweise als eigene Insel darunter (Lage der Hinweisleiste). Koordinaten muessen zu N.osd passen. */
 .pl-bot { left: @l.safe-x@; top: 458px; width: 1152px; height: 180px; }
 /* Scrubber (SPEC 5.10): 6 px, fokussiert 10 px (nur Klasse), Marker-Segmente, Kapitelgrenzen als 3-px-Luecken */
+/* Runde 8 (Huellen .pl-trw/.pl-trl/.pl-hdw) am TV schlechter (9,8,1: Lasche/Stretch/Film 3/5/5 statt 2/3/3) -> zurueck auf Runde 7 */
 .pl-tr { position: absolute; left: 32px; top: 24px; width: 1088px; height: 6px; border-radius: 3px; background: @c.line@; overflow: hidden; }
 .pl-bot.foc .pl-tr { top: 22px; height: 10px; border-radius: 5px; }
 .pl-segs i { position: absolute; top: 0; height: 10px; background: @c.marker@; }
@@ -489,19 +522,24 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .pl-spt { position: absolute; left: 16px; top: 64px; width: 368px; height: 48px; text-align: center; font-size: 16px; line-height: 20px; color: @c.text-1@; overflow: hidden; }
 .pl-skip { position: absolute; right: @l.safe-x@; top: 398px; height: 48px; padding: 0 14px 0 22px; border-radius: @r.md@; background: @accent@; color: @c.on-accent@;
   font-size: 18px; line-height: 48px; font-weight: 600; white-space: nowrap; }
-.pl-skip .kc { display: inline-block; margin-left: 14px; height: 24px; padding: 0 6px; border: 1px solid @c.on-accent@; border-radius: @r.xs@;
-  font-size: 16px; line-height: 22px; vertical-align: middle; margin-top: -3px; }
+/* "OK" in der Insel ist ein Tastenhinweis, kein zweiter Knopf (Nutzerbefund 30.10.): schmaler Rahmen, gedaempft, normale Schrift */
+.pl-skip .kc { display: inline-block; margin-left: @sp.3@; height: 22px; padding: 0 5px; border: 1px solid @c.on-accent@; border-radius: @r.xs@;
+  font-size: 16px; line-height: 20px; font-weight: 400; vertical-align: middle; margin-top: -3px; opacity: 0.6; }
 .pl-skip.is-focus { background: @c.text-1@; }
 .pl-up { position: absolute; left: 816px; top: 420px; width: 400px; height: 232px; border-radius: @r.2xl@; background: @c.surface-1@; }
 .pl-up img { position: absolute; left: 16px; top: 16px; width: 176px; height: 99px; border-radius: @r.sm@; }
-.pl-upbar { position: absolute; left: 16px; top: 123px; width: 176px; height: 4px; background: @c.line@; overflow: hidden; }
+/* Rueckzaehl-Balken: feste Huelle mit runden Enden (Pille, Radius = halbe Hoehe) schneidet den Balken, der nur per scaleX schrumpft
+ * (eigene Ebene, nur Compositor) – die Rundung sitzt an der nicht skalierenden Huelle und verzerrt nie (Muster .pl-tr/.pl-pl) */
+.pl-upbar { position: absolute; left: 16px; top: 123px; width: 176px; height: 4px; border-radius: 2px; background: @c.line@; overflow: hidden; }
 .pl-upbar i { position: absolute; left: 0; top: 0; width: 176px; height: 4px; background: @accent@; -webkit-transform-origin: 0 0; }
 .pl-upov { position: absolute; left: 208px; top: 16px; width: 176px; font-size: @ty.label.size@; line-height: @ty.label.lh@; font-weight: @ty.label.weight@; color: @c.text-2@; }
 .pl-upti { position: absolute; left: 208px; top: 40px; width: 176px; height: 48px; overflow: hidden; font-size: 18px; line-height: 24px; font-weight: 600; color: @c.text-1@; }
 .pl-upin { position: absolute; left: 208px; top: 96px; width: 176px; font-size: @ty.small.size@; line-height: @ty.small.lh@; color: @c.text-2@; }
 .pl-upb { top: 168px; width: 176px; padding: 0; text-align: center; }
-.pl-last { top: 468px; height: 184px; } .pl-last .pl-upb { top: 120px; }   /* kompakt, Knoepfe auf derselben Hoehe wie beim Countdown (y 588) */
-.pl-osd .pl-up { top: 214px; } .pl-osd .pl-last { top: 262px; }   /* OSD sichtbar: Karten ueber der Bedien-Insel (Knoepfe y 382) */
+.pl-last { top: 468px; height: 184px; } .pl-last .pl-upb { top: 120px; }   /* kompakt, Knoepfe auf derselben Hoehe wie beim Countdown (y 588; mit Rueckzaehler .cd y 576) */
+.pl-lastbar { top: 180px; width: 368px; } .pl-lastbar i { width: 368px; }   /* Rueckzaehler am echten Ende (PLAY-18): genau unter der Knopfreihe (x 16–384) */
+.pl-last.cd { top: 456px; height: 196px; }   /* mit Rueckzaehler 12 px hoeher (Unterkante bleibt y 652): je 12 px Luft ueber und unter dem Balken */
+.pl-osd .pl-up { top: 214px; } .pl-osd .pl-last { top: 262px; } .pl-osd .pl-last.cd { top: 250px; }   /* OSD sichtbar: Karten ueber der Bedien-Insel (Knoepfe y 382) */
 .pl-lastti { position: absolute; left: 16px; top: 16px; width: 368px; font-size: 18px; line-height: 24px; font-weight: 600; color: @c.text-1@; }
 .pl-lastx { position: absolute; left: 16px; top: 48px; width: 368px; font-size: @ty.small.size@; line-height: @ty.small.lh@; color: @c.text-2@; }
 .pl-sub { position: absolute; left: 140px; bottom: 56px; width: 1000px; text-align: center; }
@@ -566,6 +604,8 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .chip-tech { display: inline-block; height: 28px; padding: 0 10px; margin-right: @sp.2@; border: 1px solid @c.line@; border-radius: @r.sm@;
   font-size: 16px; line-height: 26px; color: @c.text-2@; vertical-align: top; }
 .d-chl { display: inline-block; max-width: 560px; height: 28px; line-height: 28px; vertical-align: top; }   /* fremder Titel: "Regie: …" hinter den Genres */
+.d-note { display: inline-block; max-width: 620px; height: 28px; line-height: 28px; vertical-align: top; opacity: 1; -webkit-transition: opacity @mo.slow@ @mo.ease@; }   /* Zeile einer Erweiterung (N.ui.DetHero.note) */
+.d-note.out { opacity: 0; -webkit-transition: none; }
 .d-btns { position: absolute; left: 352px; top: 448px; width: 1072px; height: 48px; white-space: nowrap; }
 .btn.ib { width: 48px; padding: 0; }
 .btn.ib .ic { left: 8px; top: 8px; background-position-y: @ic.row.text-1@; }
@@ -737,6 +777,10 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .mini-bar i { position: absolute; left: 0; top: 0; width: 0; height: 3px; background: @accent@; }
 /* Gegenprobe (nur per Messlauf 'nocapl' aktiv): Beschriftungen ohne eigene Ebene wie bis perf2 */
 .nocapl .cap { -webkit-transform: none; }
+/* Gegenproben Runde 8 (nur Messlauf 'rvar-*', Ziffern 9,8,8): rv-op0 = Formwechsel/Verbergen per Deckkraft 0 am Ring selbst wie
+ * Runde 7, rv-none = ganz ohne Ring (zeigt, ob die langen Frames ueberhaupt vom Ring kommen) */
+.rv-op0 .frw.off { opacity: 1; } .rv-op0 .frw.off .focus-ring { opacity: 0; }
+.rv-none .frw { display: none; }
 /* Gegenprobe Runde 6 (nur Messlauf 'hvar-herol'): Hero-Bilder + Scrim als eigene Ebenen statt in der Wurzel-Ebene */
 .herol .hero-img, .herol .full { -webkit-transform: translate3d(0,0,0); }
 /* Feinauswahl am Fortschrittsbalken (N.ui.LoupeView, SPEC PLAY-30/31). Bewegung nur opacity/transform, @mo.fast@ ease-out,
@@ -745,7 +789,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .lpv-l.on { opacity: 1; }
 .lpv-l.off, .lpv-x.off { opacity: 0; -webkit-transition: none; }   /* Runde 7: Schliessen sofort, ohne visibility (Ebene + Inhalt bleiben) */
 .lpv-r { position: absolute; border-radius: 3px; background: @c.text-1@; opacity: 0.85; }
-.lpv-w { position: absolute; left: 0; top: 0; color: @c.wedge@; }   /* Canvas der Keil-Linien; color = Linienfarbe (JS liest sie einmal) */
+.lpv-w { position: absolute; left: 0; top: 0; color: @c.wedge@; }   /* Canvas der Keil-Linien; color = Linienfarbe (JS liest sie einmal). Runde 8 (eigene Ebenen) am TV schlechter -> zurueck */
 /* Feinleiste in der Lasche (A, D): Ursprung linkes Fensterende, y = Mitte der Leiste */
 .lpv-fn { position: absolute; height: 0; }
 .lpv-t { position: absolute; left: 0; top: -3px; width: 100%; height: 6px; border-radius: 3px; background: @c.line@; overflow: hidden; }

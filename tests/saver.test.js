@@ -549,3 +549,200 @@ test('Info-Block blendet erst ueber dem NEUEN Bild ein (TV-Test 29.10.: neuer Ti
   assert.strictEqual(L.infoIn('fade', 0), 0, 'ohne Dauer sofort');
   assert.strictEqual(L.infoIn('fade', 1500, true), 0, 'erstes Bild aus Schwarz: kein altes Bild, sofort');
 });
+
+/* ---------- Nachtruhe + Speicher (SAV-6, Nutzer-Befund 29.10.: TV nach ~8 h Schoner eingefroren) ---------- */
+/* Schoner mit kleiner DOM-Attrappe und kuenstlichen Timern: Bilder "laden" nach 20 ms, der 1-s-Takt wird von Hand angestossen */
+function saverEnv(set, cfg) {
+  var c = H.load({ fakeTimers: true }), M = c.N, T = c.timers;
+  function El(tag) { this.tagName = tag; this.style = {}; this.childNodes = []; this.className = ''; this.attrs = {}; }
+  El.prototype.appendChild = function (x) { this.childNodes.push(x); x.parentNode = this; return x; };
+  El.prototype.setAttribute = function (k, v) { this.attrs[k] = String(v); if (k === 'src') this.src = String(v); };
+  El.prototype.getAttribute = function (k) { return k === 'src' ? this.src : this.attrs[k]; };
+  c.document = { createElement: function (t) { return new El(t); }, createTextNode: function (t) { return { nodeValue: t }; } };
+  M.log = function () {};
+  var warns = [], wants = 0;
+  M.diag.log = function (lv, m) { if (lv === 'warn') warns.push(m); };
+  M.i18n.set('de');
+  M.router.topName = function () { return 'home'; };
+  var items = [];
+  for (var i = 0; i < 8; i++) items.push({ type: 'movie', title: 'Demo ' + i, art: '/library/metadata/' + (200 + i) + '/art/1', thumb: '/library/metadata/' + (200 + i) + '/thumb/1' });
+  var hc = { rows: [{ id: 'cw', items: items }] };
+  M.session = { profile: { uuid: 'p' }, settings: M.comfort.applyDefaults(Object.assign({ saverSrc: 'home', saverPics: 'stills' }, set || {}), false),
+    homeCache: function () { return hc; }, isKid: function () { return false; } };
+  M.img.url = function (p) { return 'http://pms.example/img?' + p; };
+  M.img.want = function (img, u, prio, done) {
+    wants++;
+    T.setTimeout(function () { img._pnUrl = u; img.src = u; if (done) done(true); }, 20);
+  };
+  for (var k in cfg || {}) M.config[k] = cfg[k];
+  var root = new El('div'), S = M.ui.saver;
+  S.init(root, new El('div'));
+  function all(e, cls, out) { out = out || []; (e.childNodes || []).forEach(function (x) { if (x.className && (' ' + x.className + ' ').indexOf(' ' + cls + ' ') >= 0) out.push(x); all(x, cls, out); }); return out; }
+  function run(ms) { for (var t = 0; t < ms; t += 1000) { T.tick(1000); S._tick(); } }
+  return { N: M, T: T, S: S, root: root, warns: warns, wants: function () { return wants; }, all: function (cls) { return all(root, cls); }, run: run };
+}
+test('Nachtruhe: Standard 2 Std., Werte 1/2/4 Std./Nie, Unbekanntes/fehlend -> 2 Std. (0 nur ausdruecklich = Nie)', function () {
+  assert.strictEqual(N.comfort.applyDefaults({}, false).saverNight, 120);
+  eq(L.NIGHT, [60, 120, 240, 0]);
+  assert.strictEqual(L.night(60), 3600000); assert.strictEqual(L.night('240'), 14400000); assert.strictEqual(L.night(0), 0);
+  [undefined, null, '', false, 30, 'x', 999].forEach(function (v) { assert.strictEqual(L.night(v), 7200000, String(v)); });
+  var p = L.infoParts('ambient', true, true);
+  assert.ok(p.clock && !p.title && p.any, 'Nachtruhe: nur die Uhr');
+  assert.ok(!L.infoParts('ambient', false, true).any, 'ohne Uhr: ganz schwarz');
+  assert.ok(L.infoParts('ambient', true, false).title, 'sonst wie bisher');
+});
+test('Nachtruhe: nach der eingestellten Zeit keine Bilder mehr, beide Ebenen und Teile frei, Uhr wandert ohne Titel; Herzschlag alle 30 Min.', function () {
+  var e = saverEnv({ saverNight: 60, saverInterval: 10, saverFx: 'tiles' });
+  e.S.start({});
+  e.run(59 * 60000);
+  assert.strictEqual(e.S._night(), false, 'vor 60 Min. noch Bilder');
+  var n0 = e.wants();
+  assert.ok(n0 > 100, 'Bilder wechseln: ' + n0);
+  assert.strictEqual(e.warns.filter(function (w) { return /^saver heartbeat 30 min, \d+ pics, img q\d+/.test(w); }).length, 1, e.warns.join('\n'));
+  e.run(2 * 60000);
+  assert.strictEqual(e.S._night(), true);
+  assert.ok(e.warns.some(function (w) { return /^saver night 6\d min, \d+ pics, night/.test(w); }), 'Wechsel protokolliert');
+  var n1 = e.wants();
+  e.run(30 * 60000);
+  assert.ok(e.wants() - n1 <= 1, 'danach kein Bild mehr (hoechstens das, das gerade lud)');
+  e.all('scs-img').concat(e.all('scs-pst')).forEach(function (im) { assert.strictEqual(im.src, e.N.img.BLANK, 'Ebene freigegeben'); });
+  e.all('scs-in').forEach(function (l) { assert.strictEqual(String(l.style.opacity), '1'); });
+  assert.strictEqual(e.all('scs-tiles')[0].style.display, 'none');
+  e.S._tiles().forEach(function (t) { assert.strictEqual(t.style.backgroundImage, 'none'); });
+  var ti = e.all('scs-ti')[0];
+  assert.strictEqual(ti.style.display, 'none', 'kein Titel'); assert.strictEqual(ti.childNodes[0].nodeValue, '');
+  assert.notStrictEqual(e.all('scs-ck')[0].style.display, 'none', 'Uhr bleibt');
+  var ov = e.all('scs-ov')[0], pos = ov.style.webkitTransform;
+  e.run(25000);
+  assert.notStrictEqual(ov.style.webkitTransform, pos, 'Uhr wandert weiter');
+  assert.strictEqual(String(ov.style.opacity), '1');
+  e.S.stop();
+  assert.ok(/^saver end 9\d min/.test(e.warns[e.warns.length - 1]), 'Ende eines langen Laufs protokolliert');
+  e.S.start({});
+  assert.strictEqual(e.S._night(), false, 'neuer Schoner beginnt wieder mit Bildern');
+});
+test('Nachtruhe "Nie": Bilder wechseln weiter; Test-Ueberschreibung saverNightMs; Pause-Schoner bleibt unberuehrt', function () {
+  var e = saverEnv({ saverNight: 0, saverInterval: 10 });
+  e.S.start({});
+  e.run(250 * 60000);
+  assert.strictEqual(e.S._night(), false);
+  var n = e.wants(); e.run(60000); assert.ok(e.wants() > n, 'Bilder kommen weiter');
+  var e2 = saverEnv({ saverNight: 240, saverInterval: 10 }, { saverNightMs: 20000 });
+  e2.S.start({});
+  e2.run(19000); assert.strictEqual(e2.S._night(), false);
+  e2.run(10000); assert.strictEqual(e2.S._night(), true);
+  var e3 = saverEnv({ saverNight: 60 }, { saverNightMs: 5000 });
+  e3.S.start({ paused: true, item: { type: 'movie', title: 'Demo', art: '/library/metadata/1/art/1', thumb: '/library/metadata/1/thumb/1' } });
+  e3.run(20000);
+  assert.strictEqual(e3.S._night(), false, 'Pause-Schoner: ein stehendes Bild, keine Nachtruhe');
+});
+test('Speicher zwischen Bildern: nach einem Kacheln-/Jalousie-Uebergang halten die verdeckten Teile kein Bild mehr', function () {
+  ['tiles', 'blinds'].forEach(function (fx) {
+    var e = saverEnv({ saverInterval: 10, saverFx: fx });
+    e.S.start({});
+    var seen = false;
+    for (var t = 0; t < 60000; t += 100) {
+      e.T.tick(100); if (t % 1000 === 0) e.S._tick();
+      if (e.S._tiles().some(function (x) { return /url\(/.test(x.style.backgroundImage || ''); })) seen = true;
+    }
+    assert.ok(seen, fx + ': Teile zeigten waehrend des Uebergangs das Bild');
+    // Takt so legen, dass gerade kein Uebergang laeuft: bis kurz nach der Aufraeum-Stufe des letzten Tauschs
+    var ok = false;
+    for (t = 0; t < 12000 && !ok; t += 50) {
+      e.T.tick(50); if (t % 1000 === 0) e.S._tick();
+      ok = e.S._tiles().every(function (x) { return x.style.backgroundImage === 'none' || !x.style.backgroundImage; });
+    }
+    assert.ok(ok, fx + ': nach dem Aufraeumen ohne Bild');
+  });
+});
+test('Langlauf (TV-Test 30.10.: Bild stand nach ~12 Min. 50 Min. lang): Zufaellig im 3-s-Takt wechselt 60 Min. lang weiter', function () {
+  var e = saverEnv({ saverNight: 0, saverFx: 'random' }, { saverIvMs: 3000 });
+  e.S.start({});
+  var last = 0;
+  for (var m = 1; m <= 60; m++) {
+    e.run(60000);
+    var n = e.wants();
+    assert.ok(n > last, 'Minute ' + m + ': kein neues Bild (' + n + ')');
+    last = n;
+  }
+});
+test('Langlauf wie am TV: Bibliotheken + "Nur echte Hintergrundbilder" (/arts je Bild, viele Standbilder), Zufaellig 3 s, 60 Min.', function () {
+  var e = saverEnv({ saverNight: 0, saverFx: 'random', saverSrc: 'libs', saverPics: 'art', saverLibs: null }, { saverIvMs: 3000 });
+  var M = e.N, T = e.T, SIZE = 540, seed = 7;
+  function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+  var x = H.FakeXHR(function (m, u) {
+    var q = new URL(u), p = q.pathname;
+    if (/\/arts$/.test(p)) {                            // jedes 3. Bild ein Standbild
+      var rk = /metadata\/(\d+)\//.exec(p)[1];
+      return { status: 200, body: '{"MediaContainer":{"Metadata":[{"ratingKey":"' + (rk % 3 === 0 ? 'media://x' : 'upload://y') + '","selected":true}]}}', delay: 20 + Math.floor(rnd() * 200), timers: T };
+    }
+    var st = Number(q.searchParams.get('X-Plex-Container-Start')), sz = Number(q.searchParams.get('X-Plex-Container-Size')), md = [];
+    for (var i = st; i < Math.min(SIZE, st + sz); i++) md.push({ ratingKey: String(1000 + i), type: 'movie', title: 'T' + i, year: 2000, art: '/library/metadata/' + (1000 + i) + '/art/1', thumb: '/library/metadata/' + (1000 + i) + '/thumb/1' });
+    return { status: 200, body: { MediaContainer: { size: md.length, totalSize: SIZE, Metadata: md } }, delay: 30 + Math.floor(rnd() * 300), timers: T };
+  });
+  M.http._setFactory(x.factory); M.http._setTimers({ set: T.setTimeout, clear: T.clearTimeout }); M.http._reset();
+  M.plex.setServer('http://192.0.2.10:32400', 'TOKEN');
+  M.session.homeCache = function () { return { alibs: [{ id: 1, type: 'movie', title: 'Filme' }] }; };
+  e.S.start({});
+  var last = 0;
+  for (var m = 1; m <= 60; m++) {
+    e.run(60000);
+    var n = e.wants();
+    assert.ok(n > last, 'Minute ' + m + ': kein neues Bild (' + n + ', Anfragen ' + x.log.opened.length + ')');
+    last = n;
+  }
+});
+test('Kurzer Takt + langsame Bilder (TV-Test 30.10.: "saver stuck img" nach 6 Min.): nie in die Ebene laden, die swap noch aufraeumt', function () {
+  ['fade', 'random', 'tiles'].forEach(function (fx) {
+    var e = saverEnv({ saverNight: 0, saverFx: fx }, { saverIvMs: 3000 });
+    var M = e.N, T = e.T, n = 0, jobs = {};
+    /* wie N.img: ein Auftrag je <img>; drop verwirft ihn ohne Rueckruf; Laden dauert 0,4–2,5 s */
+    M.img.want = function (img, u, prio, done) {
+      n++;
+      var id = {}; jobs[img.__id = img.__id || Math.random()] = id;
+      T.setTimeout(function () { if (jobs[img.__id] !== id) return; delete jobs[img.__id]; img._pnUrl = u; img.src = u; if (done) done(true); }, 400 + (n * 700) % 2100);
+    };
+    M.img.drop = function (img) { if (img.__id) delete jobs[img.__id]; img._pnUrl = null; img.src = M.img.BLANK; };
+    e.S.start({});
+    var last = 0;
+    for (var m = 1; m <= 20; m++) {
+      e.run(60000);
+      assert.ok(n > last, fx + ', Minute ' + m + ': kein neues Bild');
+      last = n;
+    }
+    assert.ok(!e.warns.some(function (w) { return /saver stuck/.test(w); }), fx + ': ' + e.warns.join('\n'));
+  });
+});
+test('Waechter: ein Rueckruf kommt nie an (Bild-Ereignis bzw. Frame) -> nach 2 Min. "saver stuck <Schritt>" im Protokoll, danach wieder Bilder', function () {
+  var e = saverEnv({ saverNight: 0, saverFx: 'fade' }, { saverIvMs: 3000 });
+  var M = e.N, T = e.T, n = 0, lost = false;
+  M.img.want = function (img, u, prio, done) {
+    n++;
+    if (n === 6 && !lost) { lost = true; return; }       // dieses Bild meldet sich nie (wie am TV)
+    T.setTimeout(function () { img._pnUrl = u; img.src = u; if (done) done(true); }, 20);
+  };
+  e.S.start({});
+  e.run(60000);
+  assert.ok(lost, 'Rueckruf verschluckt');
+  var n0 = n;
+  e.run(30000);
+  assert.strictEqual(n, n0, 'haengt: kein neues Bild');
+  assert.strictEqual(e.S._state().loading, true);
+  e.run(100000);
+  assert.ok(e.warns.some(function (w) { return /^saver stuck img \d+s loading #1 /.test(w); }), e.warns.join('\n'));
+  var n1 = n;
+  e.run(30000);
+  assert.ok(n > n1 + 3, 'Bilder kommen wieder: ' + (n - n1));
+  assert.ok(/, stuck 1/.test(e.warns[e.warns.length - 1]), 'Zaehler in den Protokollzeilen');
+  /* Uebergang haengt (Frame kommt nie): busy -> ebenfalls zurueck in Ruhe */
+  var e2 = saverEnv({ saverNight: 0, saverFx: 'fade' }, { saverIvMs: 3000 });
+  e2.run(1);
+  e2.S.start({});
+  e2.run(20000);
+  var raf = e2.N.util.raf, eaten = false;
+  e2.N.util.raf = function (fn) { if (!eaten && e2.S._state().busy) { eaten = true; return 0; } return raf(fn); };
+  e2.run(200000);
+  assert.ok(eaten);
+  assert.ok(e2.warns.some(function (w) { return /^saver stuck (stage|info|fx) \d+s busy/.test(w); }), e2.warns.join('\n'));
+  var w0 = e2.wants(); e2.run(30000); assert.ok(e2.wants() > w0 + 3, 'danach wieder Bilder');
+});

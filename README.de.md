@@ -43,6 +43,12 @@ eigenen Plex Media Server im Heimnetz**.
 - Startet in Sekundenbruchteilen aus dem eigenen Zwischenspeicher; Bedienung mit Fernbedienung **und** Smart-Control-Zeiger.
 - Startseite mit Weiterschauen, Nächste Folgen, Neu je Bibliothek, Hintergrundbild und Staffelstreifen; je Profil anpassbar.
   Auf der Serienseite zusätzlich ein Balken für die ganze Serie (beides abschaltbar).
+- **Alle anzeigen** am Ende einer Startseiten-Reihe, wie in der Plex-App fürs Handy: „Neu: Filme“ öffnet die ganze
+  Bibliothek nach *Zuletzt hinzugefügt* (nur für diesen Besuch), andere Reihen zeigen ihre ganze Liste als Raster mit den
+  Ansichten Groß, Mittel, Klein oder Liste.
+- Ein kurzer Hinweis blendet sich ein, wenn etwas Neues auf deinem Server ankommt (z. B. „Neue Folge“ mit Serie, Staffel
+  und Folge), und verschwindet von selbst – genau, allgemein oder aus, auf Wunsch auch während eines Videos. Startseite
+  und Bibliotheken bemerken neue Titel von selbst, ohne dass sich unter der Markierung etwas verschiebt.
 - Bibliotheken mit Raster, Sortieren, Filtern, A–Z; Detailseiten für Filme, Serien, Staffeln, Folgen; Suche.
 - Player: Direktwiedergabe oder Umwandlung durch deinen Server (z. B. HEVC), Ton- und Untertitelwahl je Serie,
   Intro/Abspann überspringen, nächste Folge, Kapitel, Sleep-Timer, Vorschaubilder beim Spulen; ⏮ / ⏭ für vorige/nächste
@@ -53,7 +59,10 @@ eigenen Plex Media Server im Heimnetz**.
 - Entdecken, Plex-Merkliste und Infos zu Titeln, die nicht auf deinem Server sind, über einen optionalen Helfer im Heimnetz;
   die plex.tv-Reihen schlagen nur Titel vor, die du noch nicht hast (abschaltbar). Der Helfer kann mit dem Computer starten,
   zeigt ein kleines Symbol in der Menüleiste bzw. neben der Uhr und ist mit einem Klick wieder entfernt.
-- Bildschirmschoner mit Bildern aus deinen ganzen Bibliotheken, neun Übergängen (oder Zufall) und sechs Einblendungen zur Wahl.
+- Bildschirmschoner mit Bildern aus deinen ganzen Bibliotheken, neun Übergängen (oder Zufall) und sechs Einblendungen zur Wahl;
+  nach langer Zeit (Standard 2 Stunden) nur noch die Uhr auf Schwarz – schonender für ältere Fernseher und den Bildschirm.
+- `RETURN` führt oben in einer Bibliothek, der Suche, Entdecken oder den Einstellungen zur Startseite – oder auf Wunsch
+  wie „Zurück“ im Browser durch die zuletzt geöffneten Bereiche (*Zurück aus einem Bereich* in den Einstellungen).
 - Optional: Bibliotheken von **Servern, die jemand für dich freigegeben hat** (z. B. ein Freund), mit Herkunft in der Seitenleiste.
 - Oberfläche Deutsch und Englisch, Akzentfarbe je Profil wählbar (sieben Farben). Keine Werbung, kein Tracking.
 - Gern auch ruhiger: vier Stile für die Uhr auf der Startseite, und Tastenhinweise, die immer zu sehen sind, nach ein paar
@@ -127,8 +136,12 @@ Funktionen von Neolume dort haben, kann sie dir ein [KI-Agent nachbauen](#für-d
 Neolume selbst läuft nur auf Samsung-Fernsehern von 2014. Für einen neueren Fernseher (Samsung Tizen, LG webOS,
 Android TV / Google TV, Fire TV, Apple TV …) kann ein KI-Coding-Agent dieselbe App bauen. Alles, was er dafür braucht,
 liegt in diesem Repository und wird mit dem Code aktuell gehalten. Du brauchst einen KI-Coding-Agenten, der einen Ordner
-und ein Terminal auf deinem Computer benutzen darf, deinen Fernseher im Entwicklermodus und Geduld für mehrere Sitzungen;
-programmieren tut der Agent, du erledigst die Handgriffe am Fernseher.
+und ein Terminal auf deinem Computer benutzen darf, deinen Fernseher im Entwicklermodus, eine Möglichkeit für den Agenten,
+den Bildschirm zu sehen, und Geduld für mehrere Sitzungen; programmieren tut der Agent, du erledigst die Handgriffe am
+Fernseher. Um den Bildschirm zu sehen, nimmt der Agent den eigenen Bildschirmfoto-Befehl des Fernsehers, wo es einen gibt
+(Android TV, Google TV und Fire TV haben einen), oder eine Kamera, die auf den Fernseher zeigt – eine Webcam, ein altes
+Handy mit einer IP-Kamera-App oder eine Netzwerkkamera auf einem Ständer. Ohne beides beschreibst du ihm den Bildschirm in
+Worten; das geht, ist aber viel langsamer, und kleine Fehler rutschen leichter durch.
 
 **1. Diesen Befehl in den Agenten kopieren** und den Teil in spitzen Klammern durch Marke und Modell deines Fernsehers
 ersetzen (der Befehl ist Englisch, weil die Anleitungen für den Agenten Englisch sind – antworten kann er dir trotzdem auf

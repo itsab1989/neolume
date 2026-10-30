@@ -10,16 +10,29 @@
   /* Rueckkehr aus dem Player: erst nach PLAY_SETTLE laden (Timeline "stopped" ist dann beim PMS), fehlt der Titel noch in
    * Weiterschauen, die Antwort NICHT anwenden (nichts verschwindet) und nach PLAY_RETRY erneut fragen; danach gilt der Server */
   var PLAY_SETTLE = 1500, PLAY_RETRY = [2500, 5000];
+  /* HOME-12 (TV-Test 30.10.): der PMS erhoeht contentChangedAt, sobald er eine neue Datei aufnimmt, nennt den Titel in "Zuletzt
+   * hinzugefuegt" aber erst nach dem Zuordnen (am TV 16 s nach dem Signal noch nicht, Ankunft ~1:45 min nach dem Import) – und das
+   * Signal steigt danach nicht noch einmal. Deshalb dieselben Reihen nach FOLLOW ms noch einmal holen (Abstaende ab der letzten Antwort) */
+  var FOLLOW = [30000, 60000, 120000];
   var PITCH = { land: 288, poster: 360, sq: 280 };   // sq: Musik/Hoerbuecher (quadratisch, M4)
 
   N.router.define('home', function () {
-    var s = { rail: 'home', railReturnExits: true, wheelKeys: ['LEFT', 'RIGHT'] };
+    var s = { rail: 'home', wheelKeys: ['LEFT', 'RIGHT'], news: 'clock' };   // HOME-13: Hinweis bei neuen Inhalten rechts unter der Uhr
     var root, pg, ring, hero, sb, fade, cue, cueT, cueOn = false, slots = [], rows = [], tops = [], colMem = {}, R = 0;
     var slotRow = [-1, -1, -1, -1], heroT = 0, task = null, loadedAt = 0, pending = null, interacted = false;
     var undo = null, hideCommit = null, retryT = 0, retryN = 0, offline = false, pingT = 0, railOpen = false;
     var seasonCache = new N.LRU(10), stripTask = null, drawn = false;
     var skel = null, away = false, parked = null, resume = false, prepRaf = false, dead = false, onFlush = null, onSet = null, onBack = null, onPlayed = null, onScanned = null, onAnime = null, cfgDirty = false;
     var played = null, playT = 0, cueDisp = false;                     // {rk, n}: gerade gestoppter Film/Folge, auf den Weiterschauen warten soll
+    /* HOME-12: Bibliothek geaendert (N.libwatch) -> nur die betroffenen Reihen holen; held = neue Fassung der fokussierten Reihe
+     * (wartet, bis der Fokus die Reihe verlaesst oder die Startseite neu betreten wird); dirty = betroffene Reihen, waehrend ein
+     * anderer Bildschirm oben war */
+    var held = {}, dirty = [], onChanged = null, watchFn = null;
+    /* heldT: fokussierte Reihe wartet hoechstens HELD_MS ohne Taste (auch unter dem Schoner), dann wird sie in Ruhe eingesetzt; fehlt die
+     * fokussierte Karte in der neuen Fassung (auf dem Server entfernt), sofort (TV-Test 30.10.: geloeschte Serie blieb unter dem Fokus) */
+    var heldT = 0, HELD_MS = 30000;
+    /* again = Reihen einer Aenderung, die kam, waehrend schon geladen wurde (danach holen); chase/chaseN/chaseT = Nachsehen (FOLLOW) */
+    var again = null, chase = [], chaseN = 0, chaseT = 0;
 
     /* ---------- Aufbau ---------- */
     s.create = function (el) {
@@ -56,10 +69,26 @@
       N.evt.on('playback:stopped', onPlayed);         // Rueckkehr aus dem Player: Weiterschauen neu laden (SPEC 6.3.2)
       onScanned = function () { loadedAt = 0; if (!away && !dead) refresh(); };
       N.evt.on('library:scanned', onScanned);         // "Mediathek aktualisieren" fertig: still neu laden
+      onChanged = function (e) {
+        if (dead) return;
+        var ids = H.affected(e && e.libs, order());
+        N.log('home changed libs ' + (e && e.libs || []).join(',') + ' -> ' + ids.join(',') + (task ? ' (laedt schon)' : '') + (away ? ' (verdeckt)' : ''));
+        if (!ids.length) return;
+        merge(chase, ids); chaseN = 0;                // Nachsehen (FOLLOW) beginnt nach der naechsten Antwort von vorn
+        if (chaseT) { clearTimeout(chaseT); chaseT = 0; }
+        // laeuft gerade ein Laden, kann seine Liste schon VOR der Aenderung geholt sein (Signal aus einer eigenen Anfrage) -> danach holen
+        if (task) { again = merge(again || [], ids); return; }
+        if (away) { merge(dirty, ids); return; }
+        refresh(ids);
+      };
+      N.evt.on('library:changed', onChanged);         // HOME-12: neue Titel auf dem Server -> betroffene Reihen an Ort und Stelle
+      watchFn = function () { return !dead && !away; };
+      N.libwatch.want(watchFn);                       // solange die Startseite oben ist: alle 2 Min. im Leerlauf nachsehen
     };
     /* Hero passend zum Fokus: anderes Element -> neu setzen; gleiches -> Bild auffrischen */
     function heroBack() {
       var it = curItem();
+      if (it && it.all) it = rows[R].items[H.realCount(rows[R]) - 1] || null;
       if (it !== hero.item) scheduleHero(0); else hero.refresh();
     }
     function cfg() { var st = N.session.settings; return st && st.homeRows || null; }
@@ -168,6 +197,7 @@
         var rest = N.idle.restFor();
         if (rest < HERO_REST) { scheduleHero(HERO_REST - rest); return; }
         var it = curItem();
+        if (it && it.all) it = rows[R].items[H.realCount(rows[R]) - 1] || null;   // "Alle anzeigen" (HOME-14): Hero der letzten Karte davor
         if (it === hero.item || (!it && rows[R] && rows[R].note)) return;   // Hinweis-Reihe: Hero bleibt stehen
         var stripOn = !!(N.session.settings && N.session.settings.episodeProgress);
         hero.set(it, { stripEnabled: stripOn });
@@ -206,6 +236,7 @@
       if (!rows.length) return [{ k: 'blue', t: 'hint.search' }];      // Lade-Skelett: keine Karten-Aktionen
       var it = curItem(), list = [];
       if (it && it.ext) return [{ k: 'OK', t: 'hint.details' }, { k: 'blue', t: 'hint.search' }];   // Erweiterungs-Karte: nur Details
+      if (it && it.all) return [{ k: 'OK', t: 'hint.showAll' }, { k: 'blue', t: 'hint.search' }];   // HOME-14 "Alle anzeigen"
       if (!it && rows[R] && rows[R].note) return [{ k: 'blue', t: 'hint.search' }];   // Hinweis-Reihe ohne Karten
       if (rows[R] && rows[R].id === 'cw') list.push({ k: 'red', t: 'hint.hide' });
       if (M.isVideo(it)) list.push({ k: 'yellow', t: M.watched(it) ? 'hint.markUnwatched' : 'hint.markWatched' });
@@ -235,6 +266,9 @@
       for (i = 0; i < rows.length; i++) if (rows[i].id === row.id) r = i;
       if (r < 0 || rows[r] === row) return;
       if (rows[r].kind !== row.kind) row.kind = rows[r].kind;   // Hoehe bleibt (layoutTops)
+      /* TV-Test 30.10.: die geladene Reihe kam ohne ext-Kennung (die setzt sonst N.hubs.extRow) -> s.enter zeichnete ihre
+       * Karten nach der Rueckkehr von der Detailseite nicht neu, die Marke einer Erweiterung fehlte bis zum naechsten Laden der Startseite */
+      row.ext = true;
       rows[r] = row;
       var k = r % SLOTS;
       if (slotRow[k] === r) {
@@ -286,6 +320,7 @@
       recycleLater();
       prepareSoon();
       afterMove();
+      for (var hk in held) { N.idle.add(applyHeld, 'home-held'); break; }   // Reihe verlassen: ihre neue Fassung in Ruhe einsetzen
     }
     /* Nachbarreihen (R-1 … R+2) einen Frame nach dem Schritt fuellen, nicht erst nach der Idle-Ruhe: bei Tastenwiederholung
      * (120–160 ms) waere R+1 sonst beim naechsten Schritt noch leer und wuerde IM Tastenhandler gebaut (M6) */
@@ -310,6 +345,7 @@
     function soon(area) { N.router.push('soon', { area: area }); }
     function openItem(it, play) {
       if (!it) return;
+      if (it.all) { openAll(rows[R]); return; }      // HOME-14: Karte "Alle anzeigen" (OK, PLAY, Klick)
       if (it.ext) { if (!N.ext.call('home:open', it)) N.router.push('extdetails', { it: it, rail: 'home' }); return; }   // Titel ausserhalb des Servers (Erweiterungs-Reihe)
       if (N.music.isAudio(it)) { if (play && N.music.play(it)) return; if (N.music.open(it)) return; }   // M4 Musik/Hoerbuecher
       if (!M.isVideo(it)) { N.router.push('soon', { area: 'details', label: N.t('soon.music') }); return; }   // Musik/Hoerbuch/Playlist
@@ -317,6 +353,26 @@
       if (M.isLeaf(it) && (play || rows[R].kind === 'land')) { N.player.play(it, play === true ? 'resume' : play || 'ask'); return; }
       if (play) { N.details.play(it, 'resume'); return; }          // PLAY auf Serie: naechste Folge (SPEC 7.3)
       N.details.open(it);
+    }
+    /* HOME-14 "Alle anzeigen": ganze Liste hinter der Reihe als Unterebene (NAV-5/6: RETURN kommt hierher zurueck, Fokus wieder auf
+     * dieser Karte). Neu in … -> die Bibliothek, nur fuer diesen Besuch nach "Zuletzt hinzugefuegt" (gemerkte Sortierung bleibt);
+     * Server-Hub, Weiterschauen, Naechste Folgen -> Raster der ganzen Liste; Erweiterungs-Reihe -> Raster aus ihrer Quelle.
+     * Erst hier wird etwas geladen. */
+    function libById(id) {
+      var l = (s.alibs || []).concat(s.libs || []);
+      for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i];
+      return null;
+    }
+    function openAll(row) {
+      var a = row && row.all, lib = a && a.lib ? libById(a.lib) : null;
+      if (!a) return;
+      if (a.t === 'lib') { if (lib) N.router.push('library', { lib: lib, once: { sort: a.sort } }); return; }
+      /* Erweiterungs-Reihe mit eigener Karte (row.all = {t: 'x'}): Raster, dessen Titel die Erweiterung seitenweise liefert (lib:list) */
+      if (a.t === 'x') { N.router.push('library', { lib: { id: 0, title: '', type: 'movie' }, rail: 'home', list: { title: H.rowTitle(row), src: 'x', id: row.id } }); return; }
+      var cw = [], i, r;
+      for (r = 0; r < rows.length; r++) if (rows[r].id === 'cw') for (i = 0; i < rows[r].items.length; i++) if (!rows[r].items[i].all) cw.push({ rk: rows[r].items[i].rk, showRk: rows[r].items[i].showRk });
+      N.router.push('library', { lib: lib || { id: 0, title: '', type: 'movie' }, rail: 'home',
+        list: { title: H.rowTitle(row), src: a.src, key: a.key || '', n: a.n || 0, kinds: H.libKinds(s.alibs || s.libs || []), cw: cw, cwOn: order().indexOf('cw') >= 0 } });
     }
     function scrobble(it, watched, cb) {
       N.plex.write('GET', watched ? '/:/scrobble' : '/:/unscrobble', { identifier: 'com.plexapp.plugins.library', key: it.rk }, cb);
@@ -371,7 +427,7 @@
       if (undo && undo.kind === 'hide' && U.now() < undo.until) { var u = undo; undo = null; N.ui.toast.hide(); u.revert(); return; }
       if (hideCommit) hideCommit.run();
       var row = rows[R], sl = slotFor(R), idx = sl.f, it = sl.item(idx);
-      if (!it) return;
+      if (!it || it.all) return;
       removeCard(idx);
       var who = N.plex.target();                     // Token jetzt festhalten: Commit kann erst nach dem Profilwechsel laufen
       var c = { done: false, t: 0, run: function () {
@@ -391,8 +447,9 @@
     }
     /* Karte entfernen; Fokus: nachrueckende Karte, sonst vorherige, leere Reihe -> naechste bzw. vorherige Reihe (6.3.1) */
     function removeCard(idx) {
-      var sl = slotFor(R), left = sl.removeAt(idx);
-      if (left) { placeRing(sl.ringPos()); afterMove(); return; }
+      var sl = slotFor(R);
+      sl.removeAt(idx);
+      if (H.realCount(rows[R])) { placeRing(sl.ringPos()); afterMove(); return; }   // nur noch "Alle anzeigen" = Reihe leer
       rows.splice(R, 1);
       if (R >= rows.length) R = Math.max(0, rows.length - 1);
       colMem = {}; colMem[R] = 0;
@@ -401,7 +458,7 @@
     function reinsert(row, idx, it) {
       var r = rows.indexOf(row);
       if (r < 0) {                                   // Reihe war leer geworden -> wieder einsetzen
-        row.items = [it];
+        row.items = [it]; H.withAll(row);
         rows.splice(Math.min(row.id === 'cw' ? 0 : 1, rows.length), 0, row);
         r = rows.indexOf(row); slotFor(R).setFocused(false); R = r; colMem = {}; colMem[r] = 0; renderAll(); return;
       }
@@ -425,7 +482,7 @@
     }
     function menu() {
       var it0 = curItem(); if (!it0) return;
-      if (it0.ext) { openItem(it0, false); return; }   // Titel ausserhalb des Servers: kein Menue, die Detailseite hat alles
+      if (it0.ext || it0.all) { openItem(it0, false); return; }   // Titel ausserhalb des Servers / "Alle anzeigen": kein Menue
       N.anime.ensure(it0, function () { if (curItem() === it0 && N.router.top() === s && !N.router.hasOverlay()) menuOpen(it0); });   // Einordnung fuer "Als Anime behandeln"
     }
     function menuOpen(it) {
@@ -451,45 +508,118 @@
 
     /* ---------- Daten ---------- */
     function libsChanged(libs) { N.ui.rail.setData(N.session.profile, libs); }
-    function applyNetwork(res) {
-      loadedAt = U.now();
+    function applyNetwork(res, inPlace) {
+      N.log('home net ' + (inPlace ? 'teilweise' : 'ganz') + (interacted ? ', bedient' : '') + (H.sameLayout(rows, res.rows) ? '' : ', andere Anordnung -> beim naechsten Betreten'));
+      if (!inPlace) loadedAt = res.at || U.now();     // Zeitpunkt der Anfrage (eine geparkte Antwort ist so alt wie ihr Laden)
       if (res.libs && (!s.libs || JSON.stringify(s.libs) !== JSON.stringify(res.libs))) { s.libs = res.libs; libsChanged(res.alibs || res.libs); }
       if (res.alibs) { if (s.alibs && JSON.stringify(s.alibs) !== JSON.stringify(res.alibs)) libsChanged(res.alibs); s.alibs = res.alibs; }   // M4: Rail auch mit Musik/Hoerbuechern
       if (res.hubCat) N.idle.add(function () { updateCatalog(res.hubCat); }, 'home-hubcat');
       // Teil-Fehler: Cache nicht mit Luecken ueberschreiben; naechster Versuch nach TTL
       if (!res.partial) N.session.setHomeCache({ v: 1, ts: loadedAt, libs: s.libs || [], alibs: s.alibs || [], rows: H.forCache(res.rows) });
       var nr = res.rows;
-      if (!rows.length || sb.on || (!interacted && !sameAll(rows, nr))) { rows = nr; R = 0; colMem = {}; renderAll(); return; }
-      if (!interacted) return;
+      if (!inPlace && (!rows.length || sb.on || (!interacted && !sameAll(rows, nr)))) { rows = nr; R = 0; colMem = {}; held = {}; renderAll(); return; }
+      if (!interacted && !inPlace) return;
       if (!H.sameLayout(rows, nr)) { pending = nr; return; }      // beim naechsten Betreten (6.3.3)
       for (var r = 0; r < nr.length; r++) {
-        if (H.sameRow(rows[r], nr[r])) continue;
-        if (r === R) { pending = pending || nr; continue; }     // fokussierte Reihe nie umbauen
-        rows[r] = nr[r];
-        var k = r % SLOTS;
-        // P7 27.10.: nur die angeschnittene naechste Reihe sichtbar sofort, verdeckte Reihen in Haeppchen
-        if (slotRow[k] === r) { slots[k].setModel(nr[r], colMem[r] || 0, r === R + 1 ? 1 : 2); slots[k].setTop(tops[r]); slots[k].setVisible(r >= R); }
+        if (H.sameRow(rows[r], nr[r])) { if (r === R) delete held[nr[r].id]; continue; }
+        if (r === R) {                                   // fokussierte Reihe nicht unter dem Fokus umbauen: wartet (Fokus verlaesst sie, 30 s Ruhe)
+          held[nr[r].id] = nr[r];
+          var fit = slotFor(R).item(slotFor(R).f), gone = !!(fit && !fit.all && fit.rk && !nr[r].items.some(function (x) { return x.rk === fit.rk; }));
+          N.log('home reihe ' + nr[r].id + (gone ? ' fokussierte Karte entfernt -> sofort' : ' wartet (Fokus)'));
+          if (gone) swapFocused(true); else holdLater();
+          continue;
+        }
+        N.log('home reihe ' + nr[r].id + ' neu: ' + (nr[r].items[0] && nr[r].items[0].title || ''));
+        putRow(r, nr[r]);
       }
+    }
+    /* Reihe r (nicht fokussiert) an Ort und Stelle ersetzen: gemerkte Spalte folgt derselben Karte (H.keepFocus), Hoehe gleich */
+    function putRow(r, row) {
+      var old = rows[r], k = r % SLOTS, g = N.RowMath.geom(row.kind), f0 = colMem[r] || 0;
+      if (old && old.kind !== row.kind) row.kind = old.kind;
+      /* Reihe am Anfang (gemerkte Spalte 0, nie hineingeblaettert): bleibt am Anfang, damit neue Titel vorn sichtbar sind (TV-Test 30.10.:
+       * die neue Serie stand an Stelle 0, die Reihe folgte der alten ersten Karte und schob sie links aus dem Bild). Sonst folgt die
+       * gemerkte Spalte derselben Karte (H.keepFocus). */
+      colMem[r] = f0 > 0 ? H.keepFocus(old ? old.items : [], row.items, f0, N.RowMath.scroll(old ? old.items.length : 0, f0, g.full), g.full).f : 0;
+      rows[r] = row;
+      delete held[row.id];
+      // P7 27.10.: nur die angeschnittene naechste Reihe sichtbar sofort, verdeckte Reihen in Haeppchen
+      if (slotRow[k] === r) { slots[k].setModel(row, colMem[r], r === R + 1 ? 1 : 2); slots[k].setTop(tops[r]); slots[k].setVisible(r >= R); }
+    }
+    /* zurueckgehaltene Fassung einer Reihe, die nicht mehr fokussiert ist, einsetzen (Leerlauf, nie im Fokusschritt) */
+    /* neue Fassung der FOKUSSIERTEN Reihe einsetzen: dieselbe Karte bleibt fokussiert an derselben Stelle, fehlt sie, dieselbe Spalte
+     * (begrenzt); andere Reihen bewegen sich nicht. ring: Fokusring/Hero nachziehen (in Ruhe auf der Startseite; beim Betreten macht das enter) */
+    function swapFocused(ring) {
+      if (heldT) { clearTimeout(heldT); heldT = 0; }
+      if (!rows[R] || !held[rows[R].id]) return;
+      var hsl = slotFor(R), nrow = held[rows[R].id], kf = H.keepFocus(rows[R].items, nrow.items, hsl.f, hsl.sc, hsl.g.full);
+      if (rows[R].kind !== nrow.kind) nrow.kind = rows[R].kind;
+      rows[R] = nrow; delete held[nrow.id];
+      N.log('home reihe ' + nrow.id + ' eingesetzt (Fokus, Spalte ' + kf.f + ')');
+      if (slotRow[R % SLOTS] !== R) return;
+      hsl.setModel(nrow, kf.f, 0, kf.sc);
+      if (ring && !away && !dead) { hsl.setFocused(true); placeRing(hsl.ringPos()); heroBack(); }
+    }
+    /* fokussierte Reihe wartet: nach HELD_MS ohne Taste einsetzen (Schoner zaehlt als Ruhe; Tasten verschieben den Zeitpunkt) */
+    function holdLater() {
+      if (heldT) clearTimeout(heldT);
+      var rest = N.idle && N.idle.restFor ? N.idle.restFor() : HELD_MS;
+      heldT = setTimeout(function () {
+        heldT = 0;
+        if (dead || away || !rows[R] || !held[rows[R].id]) return;
+        if (N.idle && N.idle.restFor && N.idle.restFor() < HELD_MS) { holdLater(); return; }
+        swapFocused(true);
+      }, Math.max(1000, HELD_MS - rest));
+    }
+    function applyHeld() {
+      if (dead || away) return;
+      for (var r = 0; r < rows.length; r++) if (r !== R && held[rows[r].id]) putRow(r, held[rows[r].id]);
     }
     function sameAll(a, b) {
       if (!H.sameLayout(a, b)) return false;
       for (var i = 0; i < a.length; i++) if (!H.sameRow(a[i], b[i])) return false;
       return true;
     }
+    function merge(list, ids) { for (var i = 0; ids && i < ids.length; i++) if (list.indexOf(ids[i]) < 0) list.push(ids[i]); return list; }
+    /* nach jeder Antwort: Reihen einer Aenderung, die waehrend des Ladens kam, jetzt holen; sonst das naechste Nachsehen planen */
+    function kick() {
+      if (dead) return;
+      if (again && !task) { var a = again; again = null; if (away) merge(dirty, a); else refresh(a); return; }
+      if (chaseT || !chase.length) return;
+      if (chaseN >= FOLLOW.length) { chase = []; chaseN = 0; return; }
+      chaseT = setTimeout(function () {
+        chaseT = 0;
+        if (dead || !chase.length) return;
+        var ids = chase.slice();
+        N.log('home nachsehen ' + chaseN + '/' + FOLLOW.length + ': ' + ids.join(',') + (away ? ' (verdeckt)' : ''));
+        if (away) merge(dirty, ids);                  // beim Zurueckkehren (danach geht das Nachsehen weiter)
+        else if (task) again = merge(again || [], ids);
+        else refresh(ids);
+      }, FOLLOW[chaseN++]);
+    }
     function later(ms) {
       if (playT) clearTimeout(playT);
       playT = setTimeout(function () { playT = 0; if (dead) return; if (away) loadedAt = 0; else refresh(); }, ms);
     }
-    function refresh() {
+    /* only: nur diese Reihen holen (HOME-12, Bibliothek geaendert) – alle anderen bleiben, wie sie sind */
+    function refresh(only) {
       if (task) return;
+      var t0 = U.now();
+      if (!only) dirty = [];
       task = H.fetch(function (err, res) {
         task = null;
         if (dead) return;
-        if (away) { parked = { err: err, res: res }; return; }      // anderer Bildschirm oben: erst beim Zurueckkehren anwenden
-        // P7 27.10.: Antwort mitten in einer Tastenfolge (erste Schritte nach dem Start) erst in der naechsten Ruhe anwenden
-        if (rows.length && !err) N.idle.add(function () { if (!dead && !away) handle(err, res); else if (!dead) parked = { err: err, res: res }; }, 'home-net');
-        else handle(err, res);
-      }, { libs: s.libs, alibs: s.alibs, rows: rows, cfg: cfg(), plTitle: plTitle() });
+        got(err, res, only, t0);
+        kick();
+      }, { libs: s.libs, alibs: s.alibs, rows: rows, cfg: cfg(), plTitle: plTitle(), only: only || null });
+    }
+    function got(err, res, only, t0) {
+      if (res) { res.at = t0; res.only = !!only; }
+      if (only && err) { merge(dirty, only); return; }                // still; beim naechsten Betreten erneut
+      if (away) { parked = { err: err, res: res }; return; }      // anderer Bildschirm oben: erst beim Zurueckkehren anwenden
+      // P7 27.10.: Antwort mitten in einer Tastenfolge (erste Schritte nach dem Start) erst in der naechsten Ruhe anwenden
+      if (rows.length && !err) N.idle.add(function () { if (!dead && !away) handle(err, res); else if (!dead) parked = { err: err, res: res }; }, 'home-net');
+      else handle(err, res);
     }
     function handle(err, res) {
       if (err) { onLoadError(err); return; }
@@ -499,7 +629,7 @@
       }
       retryN = 0;
       if (offline) { offline = false; N.ui.toast.show(N.t('toast.online'), { icon: 'confirm' }); }
-      applyNetwork(res);
+      applyNetwork(res, res.only && rows.length > 0);
     }
     function onLoadError(err) {
       var S = N.session, kind = N.errs.kind(err, 'pms'), kids = S.isKid();
@@ -561,7 +691,11 @@
       // TV-Test 28.10.: Start -> Seitenleiste -> anderer Bildschirm -> zurueck zur Startseite liess railOpen (aus railBlur) stehen,
       // der Fokusring blieb unsichtbar. Beim Betreten ist die Seitenleiste zu (activate schliesst sie vor dem Wechsel).
       railOpen = !!(N.ui.rail && N.ui.rail.isOpen && N.ui.rail.isOpen());
-      if (pending) { rows = pending; pending = null; redraw = true; }
+      if (pending) { rows = pending; pending = null; held = {}; redraw = true; }
+      else if (rows.length) for (var hr = 0; hr < rows.length; hr++) if (held[rows[hr].id]) {   // neu betreten: zurueckgehaltene Reihen einsetzen
+        if (hr !== R) { putRow(hr, held[rows[hr].id]); continue; }
+        swapFocused(false);
+      }
       if (cfgDirty && drawn) {                        // Reihen-Auswahl geaendert: sofort umordnen, dann frisch laden
         cfgDirty = false; rows = H.pick(rows, order()); R = 0; colMem = {}; interacted = false; loadedAt = 0; redraw = true; parked = null;
         if (task) { task.abort(); task = null; }
@@ -580,7 +714,8 @@
       if (redraw) renderAll();
       else if (rows.length && !sb.on) {
         var sl = slotFor(R);
-        if (curItem() && curItem().ext) sl.refreshItem(sl.f);    // Marke der Karte kann sich auf der Detailseite geaendert haben (Erweiterung)
+        // Marken von Erweiterungs-Karten koennen sich geaendert haben (Anfrage auf der Detailseite: auch dieselbe Karte in anderen Reihen)
+        for (var ek = 0; ek < SLOTS; ek++) if (slotRow[ek] >= 0 && slots[ek].model && slots[ek].model.ext) slots[ek].refreshAll();
         sl.setFocused(true); placeRing(sl.ringPos()); heroBack();
       }
       if (!rows.length && !sb.on) { ring.hide(); showSkel(true); }
@@ -589,6 +724,7 @@
       else if (resume) { resume = false; refresh(); }
       if (played && played.wait) { played.wait = false; later(PLAY_SETTLE); }   // nach dem Player: PMS erst kurz nachziehen lassen
       else if (!loadedAt || U.now() - loadedAt > TTL) { if (!playT) refresh(); }
+      else if (dirty.length && !playT) { var dl = dirty; dirty = []; refresh(dl); }   // HOME-12: nur die Reihen der geaenderten Bibliothek
       N.session.refreshUsersLater();
     };
     s.leave = function () {
@@ -603,12 +739,16 @@
     s.destroy = function () {
       dead = true;
       if (playT) { clearTimeout(playT); playT = 0; }
+      if (chaseT) { clearTimeout(chaseT); chaseT = 0; }
+      if (heldT) { clearTimeout(heldT); heldT = 0; }
       if (onFlush) N.evt.off('app:flush', onFlush);
       if (onSet) N.evt.off('settings:changed', onSet);
       if (onAnime) N.evt.off('anime:changed', onAnime);
       if (onBack) { N.evt.off('overlay:closed', onBack); N.evt.off('app:refocus', onBack); }
       if (onPlayed) N.evt.off('playback:stopped', onPlayed);
       if (onScanned) N.evt.off('library:scanned', onScanned);
+      if (onChanged) N.evt.off('library:changed', onChanged);
+      if (watchFn) N.libwatch.unwant(watchFn);
       if (task) task.abort(); task = null;
       if (retryT) clearTimeout(retryT);
       if (hideCommit) hideCommit.run();
@@ -626,7 +766,7 @@
         if (k === 'RETURN') { N.ui.dialog.exitApp(); return true; }
         return true;
       }
-      if (!rows.length) { if (k === 'LEFT' || k === 'RETURN') { N.ui.rail.open(); return true; } return true; }
+      if (!rows.length) { if (k === 'LEFT') N.ui.rail.open(); else if (k === 'RETURN') N.ui.dialog.exitApp(); return true; }
       var sl = slotFor(R), f = sl.f, it = sl.item(f);
       switch (k) {
         case 'LEFT': if (f > 0) moveCol(f - 1); else N.ui.rail.open(); return true;
@@ -638,12 +778,12 @@
         case 'RED': hideCard(); return true;
         case 'YELLOW': toggleWatched(); return true;
         case 'BLUE': N.router.push('search'); return true;
-        case 'INFO': if (it && it.ext) openItem(it, false); else N.details.open(it); return true;
+        case 'INFO': if (it && (it.ext || it.all)) openItem(it, false); else N.details.open(it); return true;
         case 'TOOLS': menu(); return true;
         case 'FF': moveCol(Math.min(sl.count() - 1, f + 5)); return true;
         case 'RW': moveCol(Math.max(0, f - 5)); return true;
         case 'RETURN':
-          if (R > 0 || f > 0) toTop(); else N.ui.rail.open();     // RETURN-Kette (6.2)
+          if (R > 0 || f > 0) toTop(); else N.ui.dialog.exitApp();     // RETURN-Kette (NAV-5): erste Karte, dann Beenden-Dialog (ohne Seitenleiste)
           return true;
       }
       return true;

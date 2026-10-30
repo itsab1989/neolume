@@ -316,7 +316,7 @@ From now on Neolume talks **only to your server**. Your computer can stay off; t
 | Button | What it does |
 |---|---|
 | Arrow buttons, `OK` | Move, select |
-| `RETURN` | Back (on Home: open the sidebar, then *Exit*) |
+| `RETURN` | Back. In a library, Search, Discover or Settings it first goes to the top, then to Home (or to the section before – *Back from a section* under **Settings → Display**). On Home: to the first card, then *Exit*. The sidebar opens with ◀ |
 | `PLAY` / `PAUSE` / `STOP` | Playback |
 | `◄◄` / `►►` | Skip back / forward (in lists: jump several items) |
 | `TOOLS` | Options for the focused item ("More" menu in the player) |

@@ -10,7 +10,12 @@
  *   deckenden vorderen) und wird dort gezeichnet (= dekodiert), BEVOR der Uebergang startet; animiert werden nur opacity und
  *   -webkit-transform. Jalousie/Kacheln: 8 bzw. 6 Teil-Ebenen mit demselben Bild als Hintergrund (einmal angelegt, sonst unsichtbar).
  * - Info-Block wechselt die Ecke nur zusammen mit dem Bild (ausblenden, Ecke, mit dem neuen Bild einblenden) – gegen Einbrennen.
- * - Jede Taste und jeder Zeiger-Klick beendet ihn OHNE die normale Funktion (App.onKey fragt saver.key zuerst). */
+ * - Jede Taste und jeder Zeiger-Klick beendet ihn OHNE die normale Funktion (App.onKey fragt saver.key zuerst).
+ * - Nachtruhe (SAV-6, Nutzer-Befund 29.10.: nach ~8 h Schoner und einem Tastendruck war der TV komplett eingefroren, nicht einmal
+ *   die Ein/Aus-Taste ging – vermutlich nativer Speicher des Orsay-Browsers, ~1000 dekodierte 1280x720-Bilder + je eine /arts-Anfrage):
+ *   nach "Nach langer Zeit nur noch die Uhr" (Standard 2 Std.) keine Bilder mehr, beide Ebenen und die Teile freigegeben, nur die
+ *   Uhr wandert auf Schwarz. Alle 30 Min. eine warn-Zeile ins Protokoll (Release speichert nur warn/error) -> ein Haengenbleiben laesst
+ *   sich spaeter datieren. */
 (function (N) {
   var U = N.util, C = N.comfort, SL = N.saverLogic, TICK = 1000, SAVER_BLUR = 8, SAVER_Q = 95;   // weicher Schoner (s. url)
   var ID = 'translate3d(0,0,0)', OV_FADE = 400, SETTLE = 150, TILE_SETTLE = 400, INFO_SETTLE = 100, CLEAN_MS = 400, PREP_MS = 1500;
@@ -18,6 +23,20 @@
   var blk, hc, hcT, hcS, hcD, hcSt = '', hcDay = '', el, ov, scr, ck, ti, sb, tilesEl = null, tiles = [], Ls = [], f = 0;
   var kind = '', gen = 0, cyc = 0, nextAt = 0, ready = null, busy = false, loading = false, fails = 0, lastFx = '', lastDur = 0, hadPic = false;   // hadPic: schon ein Bild gezeigt (erstes kommt aus Schwarz)
   var homeItems = [], bag = null, noArt = false, force = null, onGo = null;
+  /* Nachtruhe + Herzschlag (SAV-6): t0 = Start dieser Schoner-Sitzung, shown = gezeigte Bilder, hbAt = naechste Protokollzeile */
+  var night = false, t0 = 0, shown = 0, hbAt = 0, HB_MS = 1800000, NIGHT_FADE = 1500;
+  /* Waechter (TV-Test 30.10.: nach ~12 Min. stand ein Bild 50 Min. lang, Info-Block wanderte nicht mehr; im Simulator lief dieselbe Logik
+   * 60 Min. weiter -> am TV kam ein Rueckruf nie an: Frame-/Zeitgeber-, Bild- oder Netz-Ereignis). step/stepAt = letzter Fortschritt in
+   * prepare/run; haengt busy oder loading laenger als stuckMs ohne Fortschritt, protokolliert der Takt den Schritt (warn "saver stuck …")
+   * und setzt den Ablauf zurueck (gen++ verwirft spaete Rueckrufe), das stehende Bild bleibt. mvTok: Info-Wandern ohne Bild (moveInfo)
+   * wird abgebrochen, sobald ein Bildwechsel beginnt (sonst blendete es den alten Titel ueber dem neuen Bild wieder ein). */
+  var step = '', stepAt = 0, mvTok = 0, stucks = 0;
+  /* cleaning: Aufraeum-Stufe von swap steht noch aus (CLEAN_MS). Sie gibt die hintere Ebene frei (N.img.drop verwirft einen laufenden
+   * Ladeauftrag OHNE Rueckruf) -> so lange kein prepare (TV-Test 30.10., 3-s-Takt: due lud schon in die Ebene, die Aufraeum-Stufe
+   * verwarf den Auftrag, loading blieb fuer immer stehen = "saver stuck img"). */
+  var cleaning = false;
+  function mark(st) { step = st; stepAt = now(); }
+  function stuckMs() { return Math.max(120000, interval() * 2 + 15000); }
 
   function now() { return U.now(); }
   function settings() { return N.session && N.session.settings || null; }
@@ -104,10 +123,10 @@
   function tick() {
     try {
       var t = clockText();
-      if (t !== lastMin) { lastMin = t; U.setText(hcT, t); hcDate(); if (S.on && SL.infoParts(setting('saverInfo', 'ambient'), clockOn()).clock) U.setText(ck, t); }
+      if (t !== lastMin) { lastMin = t; U.setText(hcT, t); hcDate(); if (S.on && SL.infoParts(setting('saverInfo', 'ambient'), clockOn(), night).clock) U.setText(ck, t); }
       var top = N.router.topName();
       U.show(hc, !S.on && top === 'home' && !!(N.session && N.session.profile) && clockOn());
-      if (S.on) { due(); return; }
+      if (S.on) { beat(); due(); return; }
       var ps = playerState();
       var d = N.config.saverMs ? !ps.playing && rest() >= N.config.saverMs : C.saverDue(rest(), minutes(), ps);   // saverMs: nur visuelle Tests
       if (d && minutes() > 0) { S.start(ps); return; }
@@ -153,6 +172,7 @@
         if (!x) { cb(asPoster(first)); return; }
         if (mode === 'poster') { cb(asPoster(x)); return; }
         if (mode === 'stills' || !N.saverArt) { cb(x); return; }
+        mark('arts');
         N.saverArt.kind(x.art, function (k) {
           if (g !== gen) return;
           if (k !== 'still') { cb(x); return; }
@@ -192,11 +212,7 @@
   function box(e, b) { var s = e.style; s.left = px(b.x); s.top = px(b.y); s.width = px(b.w); s.height = px(b.h); }
   /* Ebene l fuer Bild x einrichten (nach dem Laden, Ebene noch verdeckt) -> Zusammensetzung {bg, p} fuer Jalousie/Kacheln oder null */
   function compose(l, x) {
-    var s = l.img.style;
-    if (!x.pm) {
-      if (l.pm) { l.pm = false; l.inn.className = 'scs-in'; s.left = s.top = s.width = s.height = ''; U.show(l.pst, false); U.show(l.psh, false); }
-      return null;
-    }
+    if (!x.pm) { plain(l); return null; }
     var nw = l.img.naturalWidth || 640, nh = l.img.naturalHeight || (x.sq ? 640 : 960), c = N.img.cover(nw * 2, nh * 2, 1280, 720);
     box(l.img, c);
     l.sq = !!x.sq;
@@ -204,6 +220,11 @@
     if (!l.pm) { l.pm = true; l.inn.className = 'scs-in pm'; U.show(l.pst, true); U.show(l.psh, true); }
     return { bg: { u: l.img._pnUrl, x: c.x, y: c.y, w: c.w, h: c.h }, p: { u: l.pst._pnUrl, x: pp.p.x, y: pp.p.y, w: pp.p.w, h: pp.p.h },
       sh: { u: pp.su, x: pp.sh.x, y: pp.sh.y, w: pp.sh.w, h: pp.sh.h }, ck: pp.ck };
+  }
+  /* Ebene l wieder ohne Plakat (normales Vollbild) */
+  function plain(l) {
+    var s = l.img.style;
+    if (l.pm) { l.pm = false; l.inn.className = 'scs-in'; s.left = s.top = s.width = s.height = ''; U.show(l.pst, false); U.show(l.psh, false); }
   }
   /* Plakat + Schatten der Ebene l fuer Lage n setzen (compose; moveInfo beim Pause-Schoner: Einblendung wandert, das Plakat mit) */
   function posterAt(l, n) {
@@ -228,11 +249,12 @@
   /* zwei Frames + Pause: WebKit hat das Bild der hinteren Ebene sicher dekodiert und gezeichnet */
   function settle(ms, fn) { var g = gen; U.raf(function () { U.raf(function () { setTimeout(function () { if (g === gen && S.on) fn(); }, ms); }); }); }
   function prepare() {
-    if (loading || ready || !S.on || noArt) return;
-    loading = true;
+    if (loading || ready || !S.on || noArt || cleaning) return;
+    loading = true; mark('item');
     var g = gen;
     nextItem(function (x) {
       if (g !== gen) return;
+      mark('img');
       if (!x || !(x.pm ? x.thumb : x.art)) { loading = false; noArt = true; nextAt = Math.max(nextAt, now() + interval()); return; }   // keine Bilder: nur Uhr/Info-Block
       var b = back(), u = url(x), bu = x.pm ? bgUrl(x) : '';
       rest0(b); b.w.style.zIndex = 1;
@@ -241,6 +263,7 @@
         if (g !== gen) return;
         if (!ok) { loading = false; if (++fails < 5) later(2000, prepare); return; }
         if (!x.pm) { if (b.pst._pnUrl) N.img.drop(b.pst); done(); return; }
+        mark('pst');
         N.img.want(b.pst, u, 0, function (ok2) {
           if (g !== gen) return;
           if (!ok2) { loading = false; if (++fails < 5) later(2000, prepare); return; }
@@ -248,14 +271,16 @@
         });
       });
       function done() {
-        fails = 0;
+        fails = 0; mark('draw');
         var comp = compose(b, x);
-        settle(SETTLE, function () { loading = false; ready = { x: x, url: u, comp: comp }; if (now() >= nextAt) run(); });
+        settle(SETTLE, function () { loading = false; mark('ready'); ready = { x: x, url: u, comp: comp }; if (now() >= nextAt) run(); });
       }
     });
   }
   function due() {
-    if (busy || now() < nextAt) return;
+    if ((busy || loading) && now() - stepAt > stuckMs()) unstick();
+    if (!busy && nightDue()) { goNight(); return; }      // nie mitten im Uebergang (busy: stage bis swap)
+    if (busy || cleaning || now() < nextAt) return;
     if (ready) { run(); return; }
     if (loading) return;                                  // Bild kommt gleich (danach sofort der Uebergang)
     nextAt = now() + interval(); moveInfo();   // kein Bild (nur Uhr, Pause, Ladefehler): Info-Block wandert trotzdem
@@ -345,10 +370,23 @@
       tr(e, 'none'); op(e, 0);
     }
   }
-  /* nach dem Uebergang: Teile unsichtbar (die neue vordere Ebene zeigt dasselbe Bild darunter -> kein sichtbarer Unterschied) */
+  /* nach dem Uebergang: Teile unsichtbar (die neue vordere Ebene zeigt dasselbe Bild darunter -> kein sichtbarer Unterschied) und
+   * ohne Bild (SAV-6): sonst hielten die verdeckten Teile das vorige Bild bis zum naechsten Jalousie-/Kachel-Uebergang fest (bei
+   * Zufaellig oft viele Bilder lang). Laeuft in der Aufraeum-Stufe von swap (CLEAN_MS nach dem Uebergang, nichts bewegt sich); das
+   * naechste stage setzt das neue Bild ohnehin, im go-Frame aendert sich dadurch nichts. */
   function hideTiles() {
     if (!tilesEl || tilesEl.style.display === 'none') return;
-    for (var i = 0; i < tiles.length; i++) if (tiles[i].style.opacity !== '0') { tr(tiles[i], 'none'); op(tiles[i], 0); }
+    for (var i = 0; i < tiles.length; i++) {
+      var st = tiles[i].style;
+      if (st.opacity !== '0') { tr(tiles[i], 'none'); op(tiles[i], 0); }
+      if (st.backgroundImage && st.backgroundImage !== 'none') st.backgroundImage = 'none';
+    }
+  }
+  /* Teile ganz weg und ohne Bild (Ende, Nachtruhe) */
+  function clearTiles() {
+    if (!tilesEl) return;
+    tilesEl.style.display = 'none';
+    for (var i = 0; i < tiles.length; i++) tiles[i].style.backgroundImage = 'none';
   }
   /* Uebergang mit Teilen eingestellt (Jalousie, Kacheln; Zufall: Kacheln): Ebenen vorab anlegen */
   function preParts(fx) {
@@ -368,7 +406,7 @@
   }
   function run() {
     var r = ready;
-    ready = null; busy = true; cyc++;
+    ready = null; busy = true; cyc++; shown++; mvTok++; mark('stage');
     var fx = force || SL.fx(setting('saverFx', 'fade'), N.fx.reduced(), rnd, lastFx), D = FXS[fx], F = front(), B = back();
     lastFx = fx;
     nextAt = now() + interval();
@@ -380,10 +418,12 @@
     if (D.stage) D.stage(F, B, r.url, r.comp);
     settle(D.settle || 30, function () {
       if (hard) { go(); return; }
+      mark('info');
       tr(ov, 'opacity ' + OV_FADE + 'ms ease-in-out'); op(ov, 0);
       later(OV_FADE + 50, function () { pmSet(r); place(); setInfo(r.x); settle(INFO_SETTLE, go); });
     });
     function go() {
+      mark('fx');
       var d = D.go(F, B, ms(fx));
       lastDur = d;
       if (hard) { pmSet(r); place(); setInfo(r.x); }
@@ -403,8 +443,9 @@
     var nw = front();
     nw.w.style.zIndex = 2; tr(nw.w, 'none'); tf(nw.w, ID);
     old.w.style.zIndex = 1;
-    busy = false;
+    busy = false; cleaning = true; mark('swap');
     later(CLEAN_MS, function () {
+      cleaning = false;
       if (old === front()) return;                         // inzwischen erneut getauscht (sehr kurzer Takt)
       rest0(old); N.img.drop(old.img); N.img.drop(old.pst); hideTiles();
       if (kind !== 'paused') later(PREP_MS, prepare);
@@ -416,8 +457,8 @@
   /* pmCk: Grosse Uhr + Plakat – Uhr-Platz {x, w} der Gruppe (SL.bigGroup, Bildschirm-x): die Uhr steht dann neben dem Plakat statt mittig */
   function pmSet(r) { pmNow = !!r.x.pm; pmCk = pmNow && r.comp && r.comp.ck || null; }
   function place() {
-    var c = SL.info(setting('saverInfo', 'ambient'), cyc), ck0 = pmCk && c.style === 'bigclock' ? pmCk : null, dark = !!c.scr && !pmNow;
-    var sig = c.style + c.r + c.t + c.ty + pmNow + (ck0 ? ck0.x - c.x : '');
+    var c = SL.info(setting('saverInfo', 'ambient'), cyc), ck0 = pmCk && c.style === 'bigclock' ? pmCk : null, dark = !!c.scr && !pmNow && !night;   // Nachtruhe: Schwarz, keine Abdunklung noetig
+    var sig = c.style + c.r + c.t + c.ty + pmNow + night + (ck0 ? ck0.x - c.x : '');
     if (sig !== ovSig) {
       ovSig = sig;
       ov.className = 'scs-ov st-' + c.style + (c.r ? ' r' : '') + (c.t ? ' t' : '');
@@ -433,7 +474,7 @@
     tf(ov, 'translate3d(' + c.x + 'px,' + c.y + 'px,0)');
   }
   function setInfo(x) {
-    var p = SL.infoParts(setting('saverInfo', 'ambient'), clockOn());
+    var p = SL.infoParts(setting('saverInfo', 'ambient'), clockOn(), night);
     U.setText(ck, p.clock ? clockText() : ''); U.show(ck.parentNode, p.clock);   // ck/ti/sb sind Textknoten (nodeValue)
     U.show(ti.parentNode, p.title); U.show(sb.parentNode, p.title);
     if (x) { U.setText(ti, x.title || ''); U.setText(sb, x.sub || ''); }
@@ -444,20 +485,70 @@
    * Text) -> sie blenden mit aus, wechseln die Lage und blenden mit wieder ein (Audit 1.0.6: sonst Text ueber dem Plakat) */
   function moveInfo() {
     cyc++;
-    var l = front(), pm = pmNow && l.pm, fx = 'opacity ' + OV_FADE + 'ms ease-in-out';
+    var l = front(), pm = pmNow && l.pm, fx = 'opacity ' + OV_FADE + 'ms ease-in-out', tok = ++mvTok;
     tr(ov, fx); op(ov, 0);
     if (pm) { tr(l.pst, fx); tr(l.psh, fx); op(l.pst, 0); op(l.psh, 0); }
     later(OV_FADE + 50, function () {
+      if (tok !== mvTok) return;                          // inzwischen beginnt ein Bildwechsel (run): der setzt Titel und Lage selbst
       if (pm && l.pm) { var pp = posterAt(l, cyc); pmCk = pp.ck; op(l.pst, 1); op(l.psh, 1); }
       place(); setInfo(null); op(ov, 1);
     });
+  }
+  /* ---------- Nachtruhe + Herzschlag (SAV-6) ---------- */
+  function nightMs() { return N.config.saverNightMs || SL.night(setting('saverNight', 120)); }   // saverNightMs: Tests/TV-Langlauf
+  function nightDue() { var lim = kind === 'art' && !night ? nightMs() : 0; return lim > 0 && now() - t0 >= lim; }
+  function runInfo() {
+    var s = N.img && N.img._stats ? N.img._stats() : {};
+    return Math.round((now() - t0) / 60000) + ' min, ' + shown + ' pics' + (night ? ', night' : '') + ', img q' + s.queued + ' r' + s.ready +
+      ' a' + s.active + ' lru ' + s.cached + ' sets ' + s.sets + ' loads ' + s.loads + ', step ' + step + ' ' + Math.round((now() - stepAt) / 1000) + 's' +
+      (stucks ? ', stuck ' + stucks : '');
+  }
+  function warn(m) { if (N.diag) N.diag.log('warn', 'saver ' + m + ' ' + runInfo()); }
+  /* Waechter: haengender Schritt -> Protokoll + zurueck in Ruhe. Haengt der Uebergang selbst (fx), liegt die neue Ebene schon sichtbar
+   * oben -> wie swap tauschen; davor (stage/info) ist die hintere Ebene noch verdeckt -> die vordere bleibt. */
+  function unstick() {
+    stucks++;
+    warn('stuck ' + step + ' ' + Math.round((now() - stepAt) / 1000) + 's' + (busy ? ' busy' : '') + (loading ? ' loading' : '') + ' #' + stucks);
+    gen++;
+    if (N.saverLib) N.saverLib.abort();
+    if (N.saverArt) N.saverArt.abort();
+    if (busy && step === 'fx') { f = 1 - f; front().w.style.zIndex = 2; back().w.style.zIndex = 1; }
+    var B = back();
+    B.w.style.zIndex = 1; N.img.drop(B.img); N.img.drop(B.pst); rest0(B); hideTiles();
+    busy = false; loading = false; cleaning = false; ready = null; fails = 0; mvTok++;
+    tr(ov, 'none'); op(ov, 1);
+    nextAt = now(); mark('unstuck');
+  }
+  function beat() { if (now() < hbAt) return; hbAt = now() + HB_MS; warn('heartbeat'); }
+  /* Ab jetzt nur noch die Uhr: wie Schoner ohne Bilder (kind 'clock': noArt, kein prepare). gen++ verwirft alles, was noch laeuft
+   * (Laden der hinteren Ebene, Bibliotheks-/Standbild-Anfragen, Aufraeum-Stufe von swap) – nur ein laufender Uebergang (busy) wird
+   * abgewartet (due). Das Bild blendet ueber NIGHT_FADE nach Schwarz aus (nur opacity der vorderen GPU-Ebene, wie "Ueberblenden");
+   * danach beide Ebenen freigeben und der Info-Block kommt ohne Titel/Zeile an der naechsten Stelle wieder (wandert dann per moveInfo). */
+  function goNight() {
+    night = true; noArt = true; gen++; ready = null; loading = false; cleaning = false; fails = 0;
+    if (N.saverLib) N.saverLib.abort();
+    if (N.saverArt) N.saverArt.abort();
+    var F = front(), B = back(), fx = 'opacity ' + OV_FADE + 'ms ease-in-out';
+    N.img.drop(B.img); N.img.drop(B.pst); rest0(B); plain(B);   // hintere Ebene liegt verdeckt unter der vorderen
+    clearTiles();                                         // (kurz nach einem Teile-Uebergang zeigen sie dasselbe Bild wie die vordere Ebene)
+    nextAt = now() + NIGHT_FADE + OV_FADE + interval();
+    tr(ov, fx); op(ov, 0);
+    trL(F, 'opacity ' + NIGHT_FADE + 'ms ease-in-out'); op(F.inn, 0);
+    later(NIGHT_FADE + 100, function () {
+      N.img.drop(F.img); N.img.drop(F.pst); rest0(F); plain(F);
+      for (var i = 0; i < 2; i++) Ls[i].psh.src = N.img.BLANK;
+      pmNow = false; pmCk = null; cyc++;
+      U.setText(ti, ''); U.setText(sb, ''); place(); setInfo(null); op(ov, 1);
+    });
+    warn('night');
   }
   S.start = function (ps) {
     var prof = N.session && N.session.profile;
     gen++;
     kind = !prof ? 'clock' : ps && ps.paused ? 'paused' : 'art';
     homeItems = kind === 'art' ? C.saverItems(N.session.homeCache(), 0, pics() === 'poster' ? 'thumb' : 'art') : [];
-    bag = null; noArt = kind === 'clock'; ready = null; busy = false; loading = false; fails = 0; lastFx = ''; hadPic = false;
+    bag = null; noArt = kind === 'clock'; ready = null; busy = false; loading = false; cleaning = false; fails = 0; lastFx = ''; hadPic = false;
+    night = false; t0 = now(); shown = 0; hbAt = t0 + HB_MS; stucks = 0; mvTok++; mark('start');
     if (kind === 'paused') {
       homeItems = pausedList(ps.item);
     }
@@ -475,16 +566,19 @@
   };
   S.stop = function () {
     if (!S.on) return;
+    if (now() - t0 >= HB_MS) warn('end');               // langer Lauf: Ende mit Zeitstempel ins Protokoll (Haengenbleiben datierbar)
     S.on = false; gen++; act();
     U.show(el, false);
-    for (var i = 0; i < 2; i++) { rest0(Ls[i]); N.img.drop(Ls[i].img); N.img.drop(Ls[i].pst); Ls[i].psh.src = N.img.BLANK; }
-    if (tilesEl) { tilesEl.style.display = 'none'; for (i = 0; i < tiles.length; i++) tiles[i].style.backgroundImage = 'none'; }   // Speicher frei
+    for (var i = 0; i < 2; i++) { rest0(Ls[i]); plain(Ls[i]); N.img.drop(Ls[i].img); N.img.drop(Ls[i].pst); Ls[i].psh.src = N.img.BLANK; }
+    clearTiles();                                         // Speicher frei
     if (N.saverLib) N.saverLib.abort();
     if (N.saverArt) N.saverArt.abort();
-    homeItems = []; ready = null; busy = false; loading = false; force = null; onGo = null;
+    homeItems = []; ready = null; busy = false; loading = false; cleaning = false; force = null; onGo = null;
     N.log('Bildschirmschoner aus');
   };
   S._tick = tick; S._pointer = onPointer; S._nextItem = nextItem;   // Tests
+  S._state = function () { return { busy: busy, loading: loading, step: step, stucks: stucks }; };   // Tests (Waechter)
+  S._night = function () { return night; }; S._tiles = function () { return tiles; };   // Tests (SAV-6)
   S._pausedNext = function (it, cb) { kind = 'paused'; homeItems = pausedList(it); nextItem(cb); };   // Tests (Schoner aus)
   /* Messlauf (dev/bench.js 'saver-<fx>'): Schoner mit festem Uebergang starten; cb(go) sobald das 2. Bild bereit liegt,
    * go() startet den Uebergang sofort und liefert seine Dauer (ms) */

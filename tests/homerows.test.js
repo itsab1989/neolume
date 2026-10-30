@@ -83,7 +83,8 @@ test('Reihen aus Konfiguration: Reihenfolge, Hub-Reihe mit Server-Titel, Kopf oh
   eq(ids(rows), ['hub-1-movie.recentlyreleased', 'deck', 'new-2']);
   assert.strictEqual(N.hubs.rowTitle(rows[0]), 'Zuletzt veröffentlichte Filme');
   assert.strictEqual(rows[0].kind, 'poster');
-  assert.strictEqual(rows[2].items.length, 3);                 // Nachtzug nur einmal
+  assert.strictEqual(N.hubs.realCount(rows[2]), 3);            // Nachtzug nur einmal (dahinter die Karte "Alle anzeigen", HOME-14)
+  assert.ok(rows[2].items[3].all && rows[2].all.t === 'lib' && rows[2].all.sort === 'added');
   N.i18n.set('de'); assert.strictEqual(N.hubs.rowTitle(rows[1]), 'Nächste Folgen');
   N.i18n.set('en'); assert.strictEqual(N.hubs.rowTitle(rows[1]), 'Next episodes'); N.i18n.set('de');
 });

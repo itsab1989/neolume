@@ -68,6 +68,11 @@ So they are part of every change:
   library.
 - Texts in the app, the setup program and the docs are friendly, beginner-friendly and correct, in German and English, and
   fit the length limits in `tools/i18n_rules.js`.
+- **Settings stay sorted sensibly.** Each settings category is one ordered list in `src/views/settings.js` (`defs()` and the
+  `…Rows()` functions). A new row goes into its thematically right place, never simply at the end: frequent and important
+  rows first, a row that depends on another (dimmed while that one is off) directly under its parent, information and
+  technical rows towards the end, reset, set-up and sign-out rows last. The order you choose is the order of the settings
+  table in `docs/SPEC.md` after `npm run spec` – check it there.
 - No real IP addresses, names, tokens or titles from your own media library in commits – use `<TV-IP>`, `<PMS-IP>`,
   RFC 5737 examples (192.0.2.x) and invented demo titles.
 - Community ports: one entry in [`ports.json`](ports.json) (format [`ports.schema.json`](ports.schema.json)); please read

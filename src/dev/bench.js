@@ -121,8 +121,9 @@
         var r = l[i], c = r.type === 'attributes' && r.target ? r.target.className : '';
         if (typeof c !== 'string' || !c) continue;
         if (c.indexOf('hmore') === 0) F.mk.cue = 1;
-        else if (c.indexOf('focus-ring') === 0 && r.attributeName === 'class') F.mk.ring = 1;
+        else if (c.indexOf('frw') === 0 && r.attributeName === 'class') F.mk.ring = 1;   // Runde 8: Huelle je Form (an/aus)
         else if (/^lpv-(l|tb|x|in)\b/.test(c)) F.mk.lpv = 1;   // Runde 7: Schliessen per Klasse off / Transform der Lasche
+        else if (/^pl-isl pl-bot\b/.test(c) && r.attributeName === 'class') F.mk.bar = 1;   // Player-Insel: Fokus/Feinauswahl (foc, lp, lp-stretch)
       }
     };
     F.mo = MO ? new MO(function (l) { F.note(l); }) : null;
@@ -277,6 +278,16 @@
     U.cls(document.body, 'herol', true);
     S.home(function () { U.cls(document.body, 'herol', false); done(); }, 'hvar-herol');
   };
+  /* Runde 8, Gegenproben Fokus-Ring (nicht in 'all'; Ziffern 9,8,8 = home + rvar + discover mit Frame-Protokoll):
+   * rvar-op0  = Formwechsel per Deckkraft 0 AM Ring wie Runde 7 (Klasse rv-op0 am body) – home muss besser sein als rvar-op0;
+   * rvar-none = ganz ohne Ring (rv-none) – Untergrenze: hat auch rvar-none lange Frames bei ▼/▲, kommen sie nicht vom Ring;
+   * rvar-op0-disc = Entdecken mit rv-op0 (Vergleich mit discover). */
+  function bodyVar(nm, base, cls) {
+    RVARS.push(nm);
+    S[nm] = function (done) { U.cls(document.body, cls, true); S[base](function () { U.cls(document.body, cls, false); done(); }, nm); };
+  }
+  var RVARS = [];
+  bodyVar('rvar-op0', 'home', 'rv-op0'); bodyVar('rvar-none', 'home', 'rv-none'); bodyVar('rvar-op0-disc', 'discover', 'rv-op0');
   /* home-hero: erste Reihe mit >= 9 Karten (sonst die laengste), damit jeder der 8 Schritte den Hero wirklich wechselt */
   S['home-hero'] = function (done) {
     home();
@@ -363,10 +374,10 @@
     });
   };
   /* TV-Test 28.10.: Entdecken leer (Merkliste + Inspirations-Reihen), Tastatur -> Reihen, dann ▼/▲ ueber die Reihen */
-  S.discover = function (done) {
-    if (!N.disc || !N.disc.enabled()) { skip('discover', 'Entdecken aus', done); return; }
+  S.discover = function (done, label) {
+    if (!N.disc || !N.disc.enabled()) { skip(label || 'discover', 'Entdecken aus', done); return; }
     home(); R().push('discover');
-    later(5000, function () { measure('discover', BM.keys('R10 D6 U3 D3'), GAP, function () { R().back(); later(800, done); }); });
+    later(5000, function () { measure(label || 'discover', BM.keys('R10 D6 U3 D3'), GAP, function () { R().back(); later(800, done); }); });
   };
   S['player-osd'] = function (done) {
     first('movie', function (it) {
@@ -522,7 +533,7 @@
       });
     };
   });
-  var NAMES = ['home', 'home-hero', 'lib-L', 'lib-M', 'lib-S', 'lib-list', 'details-movie', 'details-show', 'search', 'discover', 'player-osd', 'loupe', 'loupe-stretch', 'loupe-film', 'leak', 'xtab'].concat(CHUNKS, SAVERS, HVARS);
+  var NAMES = ['home', 'home-hero', 'lib-L', 'lib-M', 'lib-S', 'lib-list', 'details-movie', 'details-show', 'search', 'discover', 'player-osd', 'loupe', 'loupe-stretch', 'loupe-film', 'leak', 'xtab'].concat(CHUNKS, SAVERS, HVARS, RVARS);
 
   function waitHome(my, tries, fn) {
     if (run !== my || my.stop) return;
@@ -561,7 +572,8 @@
       // 2 = Entdecken (▼ ueber Merkliste/Inspirations-Reihen) mit Frame-Protokoll
       // 1 = Feinauswahl (loupe, loupe-stretch, loupe-film; Video mit Ton) mit Frame-Protokoll
       // 0 = Startseite + Gegenproben (home, hvar-cue0, hvar-herol) mit Frame-Protokoll (Runde 6)
-      var LAST = { '0': 'home,hvar,frames', '7': 'all', '6': 'home,lib,frames', '5': 'chunk,nocapl,frames', '4': 'saver,frames', '3': 'amb,frames', '2': 'discover,frames', '1': 'loupe,frames' };   // 4: Bildschirmschoner-Uebergaenge, 3: Hintergrund in Bibliotheken
+      // 8 = Fokus-Ring Runde 8: home, rvar-op0, rvar-none, discover, rvar-op0-disc mit Frame-Protokoll
+      var LAST = { '8': 'home,rvar-op0,rvar-none,discover,rvar-op0-disc,frames', '0': 'home,hvar,frames', '7': 'all', '6': 'home,lib,frames', '5': 'chunk,nocapl,frames', '4': 'saver,frames', '3': 'amb,frames', '2': 'discover,frames', '1': 'loupe,frames' };   // 4: Bildschirmschoner-Uebergaenge, 3: Hintergrund in Bibliotheken
       if (seq === SEQ.length - 1 && LAST[k] && U.now() - seqT < SEQ_MS) { seq = 0; B.start(LAST[k]); return true; }
       if (k === SEQ[seq] && (seq === 0 || U.now() - seqT < SEQ_MS)) { seq++; seqT = U.now(); if (seq === SEQ.length) { seq = 0; B.start('all'); return true; } }
       else seq = k === SEQ[0] ? 1 : 0;

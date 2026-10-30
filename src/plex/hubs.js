@@ -30,6 +30,7 @@
     libraries: function (json) { return dirs(json, { movie: 1, show: 1 }); },
     /* alle Bibliotheken mit Server-Hubs (auch Musik/Hoerbuecher) fuer optionale Reihen */
     allLibraries: function (json) { return dirs(json, { movie: 1, show: 1, artist: 1 }); },
+    libKind: libKind,                                 // Art einer Bibliothek aus /library/sections ('audio' = Hoerbuecher, HOME-13)
     libKinds: function (libs) { var k = {}; for (var i = 0; libs && i < libs.length; i++) k[libs[i].id] = libs[i].kind; return k; },
     /* Naechste Folgen ohne alles, was schon in Weiterschauen steht (ratingKey und grandparentRatingKey; SPEC 7.3, TECH-R14) */
     dedupe: function (cw, deck) {
@@ -83,7 +84,8 @@
       return n;
     },
     /* data: {libs, alibs, order:[ids] (fehlt = Standard), cw:[raw], deck:[raw], recent:{libId:[raw]}, hubs:{libId:json},
-     *        pl:[raw], plTitle, keep:{rowId:row}} -> Zeilen in order (leere werden weggelassen).
+     *        pl:[raw], plTitle, keep:{rowId:row}, tot:{cw|deck:{got, total}}} -> Zeilen in order (leere werden weggelassen).
+     * Jede Reihe mit Ziel (allTarget) bekommt row.all und als letzte Karte "Alle anzeigen" (HOME-14).
      * keep: Reihen, deren Anfrage fehlschlug -> alte Reihe an ihrer Stelle behalten (Teil-Fehler, M2) */
     buildRows: function (data) {
       var libs = data.libs || [], kinds = H.libKinds(data.alibs || libs), rows = [], keep = data.keep || {}, i;
@@ -114,9 +116,49 @@
           items = M.normList(data.pl || [], kinds);
           if (items.length) row = { id: id, kind: 'poster', tk: 'home.row.playlists', tp: null, title: data.plTitle || '', items: items };
         } else if (p.group === 'ext') row = H.extRow(id);
+        /* Erweiterungs-Reihen setzen ihr Ziel selbst ({t: 'x'}, Karte per withAll; views/library.js holt die Liste ueber 'lib:list') */
+        if (row && !row.ext) { row.all = H.allTarget(row, p, data, p.group === 'hub' ? h : null); H.withAll(row); }
         if (row) rows.push(row);
       }
       return rows;
+    },
+    /* HOME-14 "Alle anzeigen": wohin fuehrt die Karte am Ende einer Reihe? null = keine Karte (die Reihe zeigt schon alles).
+     *   {t:'lib', lib, sort:'added'}  Bibliothek, nur fuer diesen Besuch nach "Zuletzt hinzugefuegt" (Neu in …, Hub "zuletzt hinzugefuegt")
+     *   {t:'list', src:'hub', key, lib}  ganze Liste eines Server-Hubs (h.more bzw. mehr als gezeigt)
+     *   {t:'list', src:'cw'|'deck', n}  Weiterschauen / Naechste Folgen, nur wenn der Server mehr hat als die geholten 20
+     * n = Gesamtzahl, soweit bekannt (Server: totalSize). Rein (Tests). */
+    allTarget: function (row, p, data, h) {
+      var tot;
+      if (p.group === 'new') return { t: 'lib', lib: p.lib, sort: 'added' };
+      if (p.group === 'hub' && h) {
+        var fam = HR.hubType(h, p.lib).fam;
+        if (/recent(ly)?\.?added$/.test(fam)) return { t: 'lib', lib: p.lib, sort: 'added' };
+        if (h.key && (h.more === true || h.more === 1 || h.more === '1' || row.items.length < H.rawCount(h))) return { t: 'list', src: 'hub', key: String(h.key), lib: p.lib };
+        return null;
+      }
+      if (row.id === 'cw' || row.id === 'deck') {
+        tot = data && data.tot && data.tot[row.id];
+        if (!tot || !(tot.total > tot.got || tot.got >= H.CW_MAX)) return null;
+        return { t: 'list', src: row.id, n: tot.total > tot.got ? tot.total : 0 };
+      }
+      return null;
+    },
+    CW_MAX: 20,
+    rawCount: function (h) { return (h.Metadata || h.Directory || []).length; },
+    /* Karte "Alle anzeigen" als letztes Element anhaengen (idempotent; Reihen aus dem Cache – dort ohne Karte – bekommen sie so wieder) */
+    withAll: function (row) {
+      var l = row && row.items;
+      if (!l || !row.all || (l.length && l[l.length - 1].all)) return row;
+      l.push({ rk: 'all:' + row.id, type: 'all', all: true, cls: 'is-all', title: '', alln: row.all.n || 0 });
+      return row;
+    },
+    /* Zahl der echten Karten (ohne "Alle anzeigen") */
+    realCount: function (row) { var l = row && row.items || []; return l.length && l[l.length - 1].all ? l.length - 1 : l.length; },
+    /* Titel der ganzen Liste (HOME-14) wie in der Reihe: Naechste Folgen nur Folgen, ohne Doppelte und – wenn Weiterschauen an ist –
+     * ohne Angefangene und ohne Serien aus Weiterschauen (list.cw: [{rk, showRk}]). items: normalisiert */
+    listItems: function (list, items) {
+      if (list.src !== 'deck') return items;
+      return H.dedupe(list.cwOn ? list.cw || [] : [], H.nextEpisodes(items, !!list.cwOn));
     },
     /* Reihen nach neuer Auswahl/Reihenfolge (sofort nach "Startseite anpassen", vor dem Netz-Refresh) */
     pick: function (rows, ids) {
@@ -124,7 +166,7 @@
       for (i = 0; i < rows.length; i++) by[rows[i].id] = rows[i];
       for (i = 0; i < ids.length; i++) {
         x = by[ids[i]] || (HR.parse(ids[i]).group === 'ext' ? H.extRow(ids[i]) : null);   // Erweiterungs-Reihe: nie im Cache, gleich ihr Stand
-        if (x) out.push(x);
+        if (x) out.push(H.withAll(x));
       }
       return out;
     },
@@ -143,6 +185,7 @@
     /* gleiche Reihe? (Reihenfolge, Keys, Fortschritt, Gesehen-Status) -> keine DOM-Arbeit beim Hintergrund-Refresh */
     sameRow: function (a, b) {
       if (!a || !b || a.id !== b.id || a.items.length !== b.items.length || (a.title || '') !== (b.title || '') || (a.note || '') !== (b.note || '')) return false;
+      if (JSON.stringify(a.all || null) !== JSON.stringify(b.all || null)) return false;
       for (var i = 0; i < a.items.length; i++) {
         var x = a.items[i], y = b.items[i];
         if (x.rk !== y.rk || x.off !== y.off || x.vc !== y.vc || x.vleaf !== y.vleaf || x.leaf !== y.leaf || x.nNew !== y.nNew) return false;
@@ -164,6 +207,31 @@
       }
       return true;
     },
+    /* Bibliothek geaendert (N.libwatch): welche eingeschalteten Reihen koennen sich dadurch aendern? "Neu in" und Server-Hubs dieser
+     * Bibliotheken, dazu "Naechste Folgen" (neue Folge einer angefangenen Serie). Weiterschauen, Playlists und Erweiterungs-Reihen
+     * nicht. libIds: ['2', …] (Strings oder Zahlen), ids: H.order(…) -> Teilmenge von ids */
+    affected: function (libIds, ids) {
+      var libs = {}, out = [], i;
+      for (i = 0; libIds && i < libIds.length; i++) libs[String(libIds[i])] = 1;
+      for (i = 0; ids && i < ids.length; i++) {
+        var p = HR.parse(ids[i]);
+        if (ids[i] === 'deck' || ((p.group === 'new' || p.group === 'hub') && libs[String(p.lib)])) out.push(ids[i]);
+      }
+      return out;
+    },
+    /* Fokus in einer Reihe, die sich im Hintergrund geaendert hat (HOME-3): dieselbe Karte bleibt fokussiert (gleicher ratingKey),
+     * fehlt sie, die an ihrer Stelle (bzw. die letzte); die Karte bleibt an derselben Bildschirm-Spalte, soweit die Reihe das
+     * zulaesst. olds/news: Karten, f/sc: Fokus/erste sichtbare Karte vorher, full: ganz sichtbare Karten -> {f, sc} */
+    keepFocus: function (olds, news, f, sc, full) {
+      var n = news ? news.length : 0, rk = olds && olds[f] ? olds[f].rk : null, nf = -1, i;
+      if (!n) return { f: 0, sc: 0 };
+      for (i = 0; rk != null && i < n; i++) if (news[i].rk === rk) { nf = i; break; }
+      if (nf < 0) nf = Math.max(0, Math.min(f, n - 1));
+      var col = Math.max(0, f - sc), nsc = nf - col, max = Math.max(0, n - full);
+      nsc = Math.max(0, Math.min(nsc, max));
+      if (nf < nsc) nsc = nf; else if (nf > nsc + full - 1) nsc = Math.max(0, nf - full + 1);
+      return { f: nf, sc: nsc };
+    },
     sameLayout: function (a, b) {
       if (!a || !b || a.length !== b.length) return false;
       for (var i = 0; i < a.length; i++) if (a[i].id !== b[i].id) return false;
@@ -174,7 +242,11 @@
       maxBytes = maxBytes || 60000;
       var keep = [], r, i;
       for (r = 0; r < rows.length; r++) if (!rows[r].ext) keep.push(rows[r]);   // Erweiterungs-Reihen: eigener Speicher, nie hier
-      var copy = JSON.parse(JSON.stringify(keep)), s = JSON.stringify(copy);
+      var copy = JSON.parse(JSON.stringify(keep)), s;
+      /* "Alle anzeigen" (HOME-14) nie in den Cache: andere Leser (Suche-Vorschlaege, Schoner) sehen nur echte Titel; row.all bleibt,
+       * H.pick haengt die Karte beim Lesen wieder an */
+      for (r = 0; r < copy.length; r++) copy[r].items.length = H.realCount(copy[r]);
+      s = JSON.stringify(copy);
       if (s.length <= maxBytes) return copy;
       for (r = 0; r < copy.length; r++) for (i = 0; i < copy[r].items.length; i++) copy[r].items[i].sum = U.trim(copy[r].items[i].sum, 160);
       s = JSON.stringify(copy);
@@ -235,11 +307,14 @@
      * cb(err, {libs (null = Sektionen fehlgeschlagen), alibs, rows, partial, hubCat:{lib:[Katalog]}}) */
     fetch: function (cb, prev) {
       prev = prev || {};
-      var P = N.plex, cfg = prev.cfg || null, out = { libs: null, alibs: null, cw: null, deck: null, recent: {}, hubs: {}, pl: null, hubCat: {} };
-      var done = false, tasks = [], keep = {}, errs = [], baseErrs = 0, pending = 0, phase2 = false;
+      var P = N.plex, cfg = prev.cfg || null, out = { libs: null, alibs: null, cw: null, deck: null, recent: {}, hubs: {}, pl: null, hubCat: {}, tot: {} };
+      var done = false, tasks = [], keep = {}, errs = [], baseErrs = 0, pending = 0, phase2 = false, only = prev.only || null;
+      function want(id) { return !only || only.indexOf(id) >= 0; }
       var old = {};
       for (var o = 0; prev.rows && o < prev.rows.length; o++) old[prev.rows[o].id] = prev.rows[o];
       function list(d) { return d && d.MediaContainer && d.MediaContainer.Metadata || []; }
+      /* HOME-14: Gesamtzahl laut Server (totalSize) und geholte Zahl -> "Alle anzeigen" nur, wenn es mehr gibt */
+      function tot(id, d) { var mc = d && d.MediaContainer || {}; out.tot[id] = { got: list(d).length, total: Number(mc.totalSize) || 0 }; }
       function finish(err, res) {
         if (done) return; done = true;
         if (err) for (var i = 0; i < tasks.length; i++) tasks[i].abort();
@@ -260,7 +335,7 @@
       function result() {
         return { libs: out.libs, alibs: out.alibs, partial: errs.length > 0, hubCat: out.hubCat,
           rows: H.buildRows({ libs: libsUsed(), alibs: alibsUsed(), order: order(), cw: out.cw, deck: out.deck, recent: out.recent,
-            hubs: out.hubs, pl: out.pl, ab: out.ab, plTitle: prev.plTitle, keep: keep }) };
+            hubs: out.hubs, pl: out.pl, ab: out.ab, tot: out.tot, plTitle: prev.plTitle, keep: keep }) };
       }
       function req(path, query, opts, ids, ok) {
         pending++;
@@ -278,13 +353,17 @@
         var ids = order(), hubLibs = [], i;
         for (i = 0; i < ids.length; i++) {
           var p = HR.parse(ids[i]);
-          if (p.group === 'hub' && hubLibs.indexOf(p.lib) < 0) hubLibs.push(p.lib);
+          if (p.group === 'hub' && want(ids[i]) && hubLibs.indexOf(p.lib) < 0) hubLibs.push(p.lib);
         }
         pending = 1;                                  // Waechter: erst nach dem Anstossen aller Anfragen fertig werden
         U.each(libsUsed(), function (lib) {
-          if (ids.indexOf('new-' + lib.id) < 0) return;
+          if (ids.indexOf('new-' + lib.id) < 0 || !want('new-' + lib.id)) return;
           req('/hubs/home/recentlyAdded', { type: lib.type === 'movie' ? 1 : 2, sectionID: lib.id,
-            'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 40, excludeElements: EXCL }, null, ['new-' + lib.id], function (d) { out.recent[lib.id] = list(d); });
+            'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 40, excludeElements: EXCL }, null, ['new-' + lib.id], function (d) {
+              out.recent[lib.id] = list(d);
+              // HOME-3/12-Diagnose (TV-Test 30.10.: "Neu: Serien" nach dem Start veraltet): erste Titel jeder Antwort, nicht nur der Teil-Antwort
+              if (N.log) N.log('home neu ' + lib.id + (only ? ' (teilweise)' : '') + ': ' + list(d).slice(0, 3).map(function (m) { return (m.grandparentTitle || m.parentTitle || m.title || '').substring(0, 20) + '@' + (m.addedAt || 0); }).join(' | '));
+            });
         });
         U.each(hubLibs, function (lib) {
           var mine = [];
@@ -293,20 +372,27 @@
             out.hubs[lib] = d; out.hubCat[lib] = HR.hubsOf(d, lib);
           });
         });
-        if (ids.indexOf('ab') >= 0) U.each(alibsUsed(), function (lib) {   // M4 Weiterhoeren: angefangene Hoerbuch-Tracks
+        if (ids.indexOf('ab') >= 0 && want('ab')) U.each(alibsUsed(), function (lib) {   // M4 Weiterhoeren: angefangene Hoerbuch-Tracks
           if (lib.kind !== 'audio') return;
           req('/library/sections/' + lib.id + '/all', { type: 10, 'viewOffset>': 1, sort: 'lastViewedAt:desc', 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 30,
             excludeElements: EXCL }, null, ['ab'], function (d) { var l = N.music.tracks(d), k; for (k = 0; k < l.length; k++) if (!l[k].lib) l[k].lib = lib.id; out.ab = (out.ab || []).concat(l); });
         });
-        if (ids.indexOf('pl') >= 0) req('/playlists/all', { type: 15, sort: 'lastViewedAt:desc', playlistType: 'video,audio',
+        if (ids.indexOf('pl') >= 0 && want('pl')) req('/playlists/all', { type: 15, sort: 'lastViewedAt:desc', playlistType: 'video,audio',
           'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': NEW_MAX }, null, ['pl'], function (d) { out.pl = list(d); });
         step();
       }
       var baseN = 1;
       pending = 1;                                    // Waechter (siehe oben)
-      req('/library/sections', null, null, null, function (d) { out.libs = H.libraries(d); out.alibs = H.allLibraries(d); });
-      if (HR.isOn(cfg, 'cw', true)) { baseN++; req('/hubs/continueWatching/items', { 'X-Plex-Container-Size': 20, excludeElements: EXCL }, { timeout: 12000 }, ['cw'], function (d) { out.cw = list(d); }); }
-      if (HR.isOn(cfg, 'deck', true)) { baseN++; req('/library/onDeck', { 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 20, excludeElements: EXCL }, null, ['deck'], function (d) { out.deck = list(d); }); }
+      req('/library/sections', null, null, null, function (d) { out.libs = H.libraries(d); out.alibs = H.allLibraries(d); if (N.libwatch) N.libwatch.note(d); });
+      if (only) {                                     // nur einzelne Reihen (Bibliothek geaendert): alle anderen bleiben, wie sie sind
+        for (var oid in old) if (only.indexOf(oid) < 0) keep[oid] = old[oid];
+        if (only.indexOf('cw') >= 0) { baseN++; req('/hubs/continueWatching/items', { 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': H.CW_MAX, excludeElements: EXCL }, { timeout: 12000 }, ['cw'], function (d) { out.cw = list(d); tot('cw', d); }); }
+        if (only.indexOf('deck') >= 0) { baseN++; req('/library/onDeck', { 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': H.CW_MAX, excludeElements: EXCL }, null, ['deck'], function (d) { out.deck = list(d); tot('deck', d); }); }
+        step();
+        return { abort: function () { if (done) return; done = true; for (var i = 0; i < tasks.length; i++) tasks[i].abort(); } };
+      }
+      if (HR.isOn(cfg, 'cw', true)) { baseN++; req('/hubs/continueWatching/items', { 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': H.CW_MAX, excludeElements: EXCL }, { timeout: 12000 }, ['cw'], function (d) { out.cw = list(d); tot('cw', d); }); }
+      if (HR.isOn(cfg, 'deck', true)) { baseN++; req('/library/onDeck', { 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': H.CW_MAX, excludeElements: EXCL }, null, ['deck'], function (d) { out.deck = list(d); tot('deck', d); }); }
       step();
       return { abort: function () { if (done) return; done = true; for (var i = 0; i < tasks.length; i++) tasks[i].abort(); } };
     }

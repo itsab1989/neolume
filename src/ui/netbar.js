@@ -28,5 +28,6 @@
       hideT = setTimeout(function () { hideT = 0; U.show(B.el, false); }, 3000);
     });
   };
+  B.on = function () { return !!B.el && B.el.style.display !== 'none'; };
   N.ui.netbar = B;
 })(N);

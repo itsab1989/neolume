@@ -11,7 +11,7 @@
   var U = N.util, HR = N.homeRows, X = 144, W = 736, TOP = 112, STEP = 64, VIS = 6, ANCHOR = 2, STALE = 600000;
   function editor(C) { return function () {
     var s = { rail: null, wheelKeys: ['UP', 'DOWN'], toastLow: true }, K = C.keys;   // Toast unter der Beschreibung (.hr-desc bis y 608, NAV-10)
-    var S = N.session, root, clip, list, desc, stat, els = [], items = [], f = 0, sc = 0, moving = false, cat = null, busy = null, dead = false;
+    var S = N.session, root, clip, list, desc, stat, els = [], items = [], f = 0, sc = 0, moving = false, cat = null, busy = null, dead = false, more = null;
     var MOD = C.model || HR;                            // Listen-Logik (view/store/move): Startseite/Inspiration N.homeRows, Seitenleiste N.railRows
     function locked(it) { return !it.reset && !!(C.locked && C.locked(it)); }   // immer an (z. B. Start in der Seitenleiste)
 
@@ -51,6 +51,7 @@
       U.txt('div', 'hr-how-x', how, N.t(K.how));
       stat = U.txt('div', 'hr-stat', how, '');
       desc = U.txt('div', 'set-desc hr-desc', root, '');
+      more = N.ui.more(root, 'left:498px;top:84px', 'left:498px;top:498px');   // Mehr-Hinweis (NAV-11) wie in den Einstellungen
       cat = S.hubCatalog();
       rebuild(null);
       if (!C.noCatalog) discover();                   // Seitenleiste: keine Server-Hubs noetig
@@ -103,6 +104,7 @@
         if (jump) { list.style.webkitTransition = 'none'; U.tf(list, 0, -sc * STEP); setTimeout(function () { list.style.webkitTransition = ''; }, 60); }
         else { N.fx.move(list); U.tf(list, 0, -sc * STEP); }
       }
+      more.set(sc > 0, sc + VIS < items.length);
       U.setText(desc, descText(items[f]));
     }
 

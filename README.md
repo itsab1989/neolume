@@ -69,7 +69,10 @@ program on your computer signs in **once**, and from then on the TV talks **only
 - Smooth navigation on the TV's modest hardware; works with the normal remote **and** the Smart Control touch pointer.
 - German and English interface (follows the TV's language, or choose in Settings).
 - Choose your accent colour per profile: seven colours, all checked for readability.
-- A screensaver that shows art from your whole libraries, with nine transitions (or Random) and six overlay styles to choose from.
+- A screensaver that shows art from your whole libraries, with nine transitions (or Random) and six overlay styles to choose from;
+  after a long time (2 hours by default) it shows only the clock on black, which is gentler on older TVs and the screen.
+- `RETURN` works the way you expect: at the top of a library, Search, Discover or Settings it takes you to Home – or, if
+  you prefer, back through the sections you opened, like Back in a web browser (*Back from a section* in Settings).
 - Make it calmer if you like: four styles for the home screen clock, and button hints that always show, fade out after a
   few seconds or stay hidden (every button is still explained under Settings → Help & info → Remote control keys).
 
@@ -78,6 +81,12 @@ program on your computer signs in **once**, and from then on the TV talks **only
   season strip that shows at a glance how far you are in a show; a show's page adds a bar for the whole series (both can
   be switched off).
 - *Customize Home* per profile: turn rows on/off, reorder them, add extra rows.
+- **Show all** at the end of a Home row, like in the Plex phone app: "New: Movies" opens the whole library sorted by
+  *Recently added* (just for this visit), other rows open their full list as a grid with the view sizes Large, Medium,
+  Small or List.
+- A short notice fades in when something new arrives on your server (for example "New episode" with the show, season and
+  episode) and fades out by itself – exact, general or off, and optionally also during a video. Home and the libraries
+  pick up new titles by themselves, without moving what you have highlighted.
 - Library grid with sort, filters, A–Z jump bar and several view sizes – remembered per library and profile.
 - Optional library background: a soft colour mood of the selected title (default), its picture, or a new random picture each
   time you open the library – kept dark so text stays readable, or plain if you prefer.
@@ -235,7 +244,11 @@ repository? It finds its rules in [CLAUDE.md](CLAUDE.md) and CONTRIBUTING.md; a 
 Neolume itself runs only on 2014 Samsung TVs. For a newer TV – Samsung Tizen, LG webOS, Android TV / Google TV, Fire TV,
 Apple TV … – an AI coding agent can build the same app for you. Everything it needs is in this repository and kept in step
 with the code. You need an AI coding agent that can use a folder and a terminal on your computer, your TV in its developer
-mode, and patience for several sessions; the agent does the programming, you do the steps on the TV.
+mode, a way for the agent to see the TV screen, and patience for several sessions; the agent does the programming, you do
+the steps on the TV. To see the screen, the agent uses the TV's own screenshot command where there is one (Android TV,
+Google TV and Fire TV have one) or a camera pointed at the TV – a webcam, an old phone with an IP-camera app or a network
+camera on a stand. Without either you describe the screen in words; that works, but it is much slower and small mistakes
+slip through.
 
 **1. Copy this prompt into your agent** and replace the part in angle brackets:
 

@@ -1,6 +1,7 @@
 /* Layout-Pruefung: Auswertung (Node) der Befunde von tools/layout_probe.js (laeuft je Szene im Browser von tools/visual.js).
  * Prueft keine Pixel, sondern das sichtbare DOM: ueberlappender Text, abgeschnittener Text, Text ueber fremden Bedienelementen,
- * Text ueber dem Bildschirm- oder Sicherheitsrand, teilweise ueberlappende Flaechen, Toast ueber Text (Arten siehe layout_probe.js).
+ * Text ueber dem Bildschirm- oder Sicherheitsrand, teilweise ueberlappende Flaechen, Toast ueber Text, Knopf/Text ragt ueber
+ * seinen Dialog/sein Panel hinaus (Arten siehe layout_probe.js).
  * Gewollte Faelle: tools/layout_allow.json ({scene, type, a, b, detail, reason}; scene/a/b/detail sind regulaere Ausdruecke, a/b gegen den
  * Elementpfad "div.v-home > div.row > div.cap > div.t1"; bei Paaren in beiden Reihenfolgen; detail gegen die Beschreibung, z. B.
  * "rechts") oder data-layout-ok am Element.
@@ -8,10 +9,10 @@
 'use strict';
 var fs = require('fs'), path = require('path');
 var ALLOW_FILE = path.join(__dirname, 'layout_allow.json');
-var TYPES = ['overlap', 'clip', 'button', 'offscreen', 'safe', 'panel', 'edge', 'notice'];
+var TYPES = ['overlap', 'clip', 'button', 'offscreen', 'safe', 'panel', 'edge', 'notice', 'spill'];
 var LABEL = { overlap: 'Text ueberlappt Text', clip: 'Text abgeschnitten', button: 'Text ueber fremdem Bedienelement', offscreen: 'Text ueber dem Bildschirmrand',
   safe: 'Text im Sicherheitsrand', panel: 'Flaechen ueberlappen', edge: 'Flaeche erreicht den Bildschirmrand nicht',
-  notice: 'Hinweis (Toast) verdeckt Text' };
+  notice: 'Hinweis (Toast) verdeckt Text', spill: 'Ragt ueber den Rand seiner Flaeche' };
 
 function loadAllow(file) {
   var j = JSON.parse(fs.readFileSync(file || ALLOW_FILE, 'utf8')), list = j.allow || [];

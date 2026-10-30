@@ -50,7 +50,8 @@
   Row.prototype.showCaptions = function () { return this.opts.captions ? this.opts.captions(this.g.kind) : true; };
 
   /* neues Modell (Reihe recycelt oder erstmals befuellt); f = gemerkte Spalte; mode: siehe render (Standard 0 = alles sofort) */
-  Row.prototype.setModel = function (model, f, mode) {
+  /* sc (optional): erste sichtbare Karte vorgeben (Startseite HOME-12: geaenderte Reihe, fokussierte Karte bleibt an ihrer Stelle) */
+  Row.prototype.setModel = function (model, f, mode, sc) {
     var i;
     this.model = model;
     this.g = R.geom(model ? model.kind : 'land');
@@ -61,6 +62,7 @@
     this.byIdx = {};
     this.f = model ? U.clamp(f || 0, 0, Math.max(0, model.items.length - 1)) : 0;
     this.sc = R.scroll(this.count(), this.f, this.g.full);
+    if (sc !== undefined && sc >= 0 && sc <= R.maxScroll(this.count(), this.g.full) && this.f >= sc && this.f < sc + this.g.full) this.sc = sc;
     this.relabel();
     this._jumpStrip();
     this.render(1, mode || 0);
@@ -73,7 +75,7 @@
     if (this.noteT) { U.setText(this.noteT, note); U.show(this.noteT.parentNode, !!note); }
     if (!this.model || this.opts.noHead) { U.setText(this.headT, ''); U.setText(this.cntT, ''); return; }
     U.setText(this.headT, N.hubs.rowTitle(this.model));
-    U.setText(this.cntT, this.model.kind === 'land' ? String(this.model.items.length) : '');
+    U.setText(this.cntT, this.model.kind === 'land' ? String(N.hubs.realCount(this.model)) : '');   // ohne "Alle anzeigen" (HOME-14)
   };
   Row.prototype._scrollX = function () { return -this.sc * this.g.step; };
   Row.prototype._jumpStrip = function () {
@@ -108,12 +110,13 @@
       e.card.className = e.foc ? e.base + ' is-focus' : e.base; e.cap.className = e.foc ? e.capBase + ' is-focus' : e.capBase;
     }
     if (e.x !== x) { e.x = x; e.card.style.left = x; e.cap.style.left = x; }
-    var src = land ? it.still : it.thumb;
-    U.setText(e.ph, it.title);
-    var phc = !src && g.kind !== 'cast' ? 'ph fb ' + N.ui.fbClass(it) : 'ph';   // ohne Bild: farbige Titelkarte (F28), nie grau
+    var all = !!it.all, src = all ? '' : land ? it.still : it.thumb;
+    /* HOME-14 "Alle anzeigen": ruhige Karte (Flaeche + Raster-Symbol im Abzeichen-Element + Text), Text erst hier (Sprache) */
+    U.setText(e.ph, all ? (it.alln ? N.t('home.row.allN', { n: it.alln }) : N.t('home.row.all')) : it.title);
+    var phc = all ? 'ph all' : !src && g.kind !== 'cast' ? 'ph fb ' + N.ui.fbClass(it) : 'ph';   // ohne Bild: farbige Titelkarte (F28), nie grau
     if (e.phc !== phc) { e.phc = phc; e.phEl.className = phc; }
     N.img.want(e.img, src ? N.img.url(src, tier) : '', prio);
-    var b = M.badge(it), bc = b.b ? 'bdg ' + b.b : 'bdg';
+    var b = all ? { b: 'all', n: '' } : M.badge(it), bc = b.b ? 'bdg ' + b.b : 'bdg';
     if (e.bc !== bc) { e.bc = bc; e.badge.className = bc; }
     U.setText(e.badgeT, b.n);
     var p = M.progress(it), pw = p > 0 ? Math.max(4, Math.round((g.w - 20) * p)) : -1;
@@ -123,7 +126,7 @@
       e.pw = pw;
     }
     if (this.showCaptions()) {
-      var c = this.opts.caption ? this.opts.caption(it) : it.type === 'person' ? [it.title, it.role] : land ? M.landCaption(it) : M.posterCaption(it);
+      var c = all ? ['', ''] : this.opts.caption ? this.opts.caption(it) : it.type === 'person' ? [it.title, it.role] : land ? M.landCaption(it) : M.posterCaption(it);
       U.setText(e.t1, c[0]); U.setText(e.t2, c[1]);
     }
     if (!e.on) { e.card.style.display = ''; e.on = true; }
@@ -229,6 +232,8 @@
   };
   /* Daten einer Karte geaendert (Gesehen-Status) */
   Row.prototype.refreshItem = function (i) { var e = this.byIdx[i]; if (e) this._fill(e, i, 0); };
+  /* alle Karten im Fenster neu befuellen (Marken einer Erweiterung koennen sich geaendert haben; nie im Fokusschritt) */
+  Row.prototype.refreshAll = function () { for (var k in this.byIdx) this._fill(this.byIdx[k], Number(k), 0); };
   /* Karte entfernen/einfuegen (Ausblenden, Gelb in Weiterschauen) -> Fokus nach SPEC 6.3.1 */
   Row.prototype.removeAt = function (i) {
     this.model.items.splice(i, 1);

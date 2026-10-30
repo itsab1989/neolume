@@ -1,6 +1,6 @@
 {
   "name": "neolume",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "private": true,
   "description": "Unofficial client for Plex Media Server on 2014 Samsung Smart TVs (Orsay), ES5",
   "scripts": {

@@ -18,6 +18,18 @@ test('ports.schema.json rejects bad entries; references to unknown requirement I
   ['too short', 'url', 'maintainer', 'lastVerified', 'A1: must be one of', 'unknown key "Z9"', 'unknown key "extra"'].forEach(function (w) {
     assert.ok(errs.some(function (e) { return e.indexOf(w) >= 0; }), 'expected an error about ' + w + ' in: ' + errs.join('; '));
   });
+  // optional fields: media servers and the collection mark (set by the maintainer after the review in PORTS.md)
+  errs = [];
+  spec.validate({ ports: [{ name: 'Jelly TV', brand: 'LG', models: 'C1', os: 'webOS 6', url: 'https://example.org/x', maintainer: 'someone',
+    licence: 'MIT', lastVerified: '2026-10-30', features: {}, mediaServers: ['jellyfin', 'kodi'], collection: 'self-tested' }] }, sch, 'ports.json', errs);
+  ['mediaServers[1]: must be one of', 'collection: must be one of'].forEach(function (w) {
+    assert.ok(errs.some(function (e) { return e.indexOf(w) >= 0; }), 'expected an error about ' + w + ' in: ' + errs.join('; '));
+  });
+  assert.strictEqual(spec.portTags({}), '');
+  assert.strictEqual(spec.portTags({ mediaServers: ['plex'] }), '');
+  assert.strictEqual(spec.portTags({ mediaServers: ['jellyfin', 'emby'], collection: 'community-tested' }),
+    '<br>*for Jellyfin, Emby · in the collection (community-tested)*');
+  assert.strictEqual(spec.portTags({ collection: 'maintainer-tested' }, true), ' <small>in the collection (maintainer-tested)</small>');
   var idx = spec.specIndex(fs.readFileSync(path.join(root, pub + 'docs/SPEC.md'), 'utf8'));
   assert.ok(idx.ids['PLAY-3'] && idx.sections.A9 && idx.anchors['a9-video-playback']);
   var p = spec.checkRefs('doc', 'see PLAY-999 and SPEC A99, [x](SPEC.md#missing); NAV-1 is fine', idx, false);

@@ -13,6 +13,8 @@
     tabs[0].appendChild(document.createTextNode(N.t('pl.tab.audio')));
     tabs[1].appendChild(document.createTextNode(N.t('pl.tab.subs')));
     var clip = U.el('div', 'tp-clip', p), list = U.el('div', 'tp-list', clip);
+    /* Mehr-Hinweis (NAV-11) wie im Panel "Sortieren & Filter" (ui/tabpanel.js): scrollt die Liste, 28 px tiefer und eine Zeile weniger */
+    var MT = TOP + 28, more = N.ui.more(p, 'top:' + TOP + 'px', 'top:' + (MT + (VIS - 1) * STEP + 4) + 'px'), vis = VIS, top = TOP;
     function entries() {
       var T = o.tracks, out = [], i;
       if (ov.tab === 'a') for (i = 0; i < T.audio.length; i++) out.push({ id: T.audio[i].id, t: T.audio[i].label, s: N.tracks.subline(T.audio[i], false), sel: T.audio[i].sel });
@@ -39,13 +41,16 @@
         ov.items.push(e);
         if (d.sel) ov.f = i;
       }
+      var v = ov.items.length > VIS ? VIS - 1 : VIS, tp = v < VIS ? MT : TOP;
+      if (v !== vis || tp !== top) { vis = v; top = tp; clip.style.top = top + 'px'; clip.style.height = vis * STEP + 'px'; }
       setF(ov.f, true);
     }
     function setF(i, force, still) {
       if (!ov.items.length) return;
       if (!force) U.cls(ov.items[ov.f], 'is-focus', false);
       ov.f = i; U.cls(ov.items[i], 'is-focus', true);
-      if (!still) { ov.off = Math.max(0, Math.min(i - 3, ov.items.length - VIS)); U.tf(list, 0, -ov.off * STEP); }
+      if (!still) { ov.off = Math.max(0, Math.min(i - 3, ov.items.length - vis)); U.tf(list, 0, -ov.off * STEP); }
+      more.set(vis < VIS && ov.off > 0, vis < VIS && ov.off + vis < ov.items.length);
     }
     function close() { if (!ov.closed) { ov.closed = true; N.router.closeOverlay(ov); } }
     function pick(i) { var d = ov.data[i]; close(); if (!d.sel && o.onPick) o.onPick(ov.tab, d.id); }
@@ -66,7 +71,7 @@
     ov.pointer = function (x, y, kind) {
       if (x < X) { if (kind === 'click') close(); return true; }
       if (y >= 112 && y < 152) { if (kind === 'click') tab(x < X + 176 ? 'a' : 's'); return true; }
-      var off = ov.off || 0, i = N.hit.list(TOP, STEP, H, Math.min(VIS, ov.items.length - off), y);
+      var off = ov.off || 0, i = N.hit.list(top, STEP, H, Math.min(vis, ov.items.length - off), y);
       if (i < 0) return false;
       i += off;
       if (i !== ov.f) setF(i, false, true);   // Zeiger: Liste scrollt nicht unter dem Punkt weg

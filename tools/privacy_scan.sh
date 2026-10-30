@@ -8,7 +8,7 @@
 #     (allowed: 192.0.2.x / 198.51.100.x / 203.0.113.x (RFC 5737), 192.168.1.x, 127.x, 0.0.0.0,
 #      and network-range literals such as 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
 #   - things that look like secrets (Plex tokens with a value, GitHub/AWS/private keys)
-#   - e-mail addresses other than noreply/example addresses
+#   - e-mail addresses other than noreply/example addresses (and the reserved, never-deliverable TLD .invalid)
 #   - Plex's brand yellow (the public accent is a brand setting) in any text file
 #   - icon sets other than loader-icons/original and brand profiles other than brand/public.json
 #   - every entry of the private denylist in $PRIVACY_DENYLIST_FILE (personal names, private project names,
@@ -60,7 +60,7 @@ SECRET_RE = [
     ('plex machine id', re.compile(r'machineIdentifier["\']?\s*[:=]\s*["\'][0-9a-f]{40}["\']', re.I)),
 ]
 MAIL_RE = re.compile(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9][A-Za-z0-9.-]*\.[A-Za-z]{2,}')
-MAIL_OK = re.compile(r'(noreply@|no-reply@|@example\.(com|org|net)|@users\.noreply\.github\.com|^git@github\.com)', re.I)
+MAIL_OK = re.compile(r'(noreply@|no-reply@|@example\.(com|org|net)|\.invalid$|@users\.noreply\.github\.com|^git@github\.com)', re.I)
 
 # Files whose synthetic test data may contain private-range IPs and fake tokens/ids (they test LAN/token logic).
 # The denylist (including the maintainer's real subnet) still applies to them.

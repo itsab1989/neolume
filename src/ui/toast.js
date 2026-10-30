@@ -14,6 +14,7 @@
     o = o || {};
     if (!T.el) return;
     if (T.timer) clearTimeout(T.timer);
+    if (N.ui.news && N.ui.news.visible && N.ui.news.visible()) N.ui.news.hide();   // HOME-13: nie zwei Hinweise zugleich – der Toast (Folge einer Taste) geht vor
     N.ui.setIcon(T.ic, o.icon || 'info');
     U.setText(T.txt, text);
     var top = N.router && N.router.top ? N.router.top() : null;
@@ -22,6 +23,7 @@
     U.cls(T.el, 'on', true);
     T.timer = setTimeout(T.hide, o.ms || (o.undo ? 6000 : 4000));
   };
+  T.on = function () { return !!T.timer; };
   T.hide = function () { if (T.timer) clearTimeout(T.timer); T.timer = 0; if (T.el) U.cls(T.el, 'on', false); };
   N.ui.toast = T;
 })(N);

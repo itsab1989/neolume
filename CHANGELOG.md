@@ -5,6 +5,106 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.7] - 2026-10-30
+
+### Added
+- **"Show all" at the end of a Home row – like in the Plex phone app.** Press ▶ past the last card of a row and a calm
+  card with a clear grid symbol appears: **Show all** (with the number, e.g. "Show all 312", when the server tells it).
+  In **"New: Movies"** (and every other "New: …" row of a library) it opens the whole library sorted by **Recently added**, newest
+  first – just for this visit: the line under the title says "Recently added · for this visit only", you may sort and
+  filter as usual there, and nothing of it is saved, so the library still opens with your usual sort from the sidebar.
+  Server rows you switched on (for example "Top rated" or "Recently released") show the card when the server has more than
+  the row shows and open the full list as a grid; Continue watching and Next episodes get it only when there are more
+  than the 20 titles on Home. Back takes you right back to the card on Home. Nothing extra is loaded until you open it.
+  These full-list grids have a **View** chip (or press Red) with the library's sizes **Large · Medium · Small · List** –
+  just for this visit, and switching does not load the list again.
+- **A short notice when something new arrives on your server.** When new movies, episodes, music or audiobooks show up,
+  a small notice fades in softly for a few seconds – on Home at the right under the clock, in libraries and on Now
+  playing at the top right – and fades out again by itself. It tells you exactly what arrived, for example
+  "New episode – “Show” · S2 · E5", "New season – “Show” · Season 3" or "New on your server – 2 movies, 3 episodes".
+  It never needs a button, never takes a key press away from you, waits while you are pressing buttons or a menu is
+  open, and never appears during the screensaver. You only hear about what your profile is allowed to see, and starting
+  the app never announces old titles – but what arrived while the TV was off is shown once after the start.
+  New settings under Settings → Display, right under the clock: **New content notice** (**Exact** = default, **General**
+  = just "New content on your server", or **Off**), **How long the notice stays** (3, 5, 8 or 12 seconds) and **Also
+  while a video plays** (off by default; when on, the notice appears small at the top left of the video, only while no
+  controls are on screen). INFO on each setting explains the details.
+- **New setting "Back from a section"** (Settings → Display, right below "Customize sidebar"): decides where Back
+  takes you once you are at the top of a library, Search, Discover or Settings. **To Home** (default) goes straight to
+  the Home screen. **To the previous section** works like Back in a web browser: it steps back through the sections you
+  opened from the sidebar – each one only once – and always ends on Home. INFO on the setting explains it. Each profile
+  has its own choice.
+- **New setting "Clock only after a long time"** (Settings → Screensaver): **1 hr**, **2 hrs**
+  (default), **4 hrs** or **Never**. Once the screensaver has been running that long, the last picture fades out gently and
+  only the clock keeps moving around on a black screen. Older TVs can run out of memory after many hours of constantly
+  changing pictures and then freeze completely – this stops that, protects the screen from burn-in and saves power. Any
+  key ends the screensaver as usual. INFO on the setting explains everything, including what "Never" means.
+
+### Changed
+- When a library on your server changes, the app now also checks for news away from Home, but at most about every
+  6 minutes (one tiny request) – and, only if you allow notices during videos, at most every 5 minutes while a video
+  plays.
+- **Settings are easier to find.** The screensaver options now have their own category, **Screensaver**, instead of
+  filling the end of Display. Inside every category, rows that belong together now sit together and the ones you change
+  most often come first – Playback starts with resuming, intro, credits and the next episode; quality, picture format and
+  skipping follow. "Pass through surround sound" and "Audio boost" moved to **Audio & subtitles**, next to everything else
+  about sound. Under Profile & account, "Start profile" now sits next to "Switch profile", and "Sign out" is always last.
+- "Theme music volume" is dimmed while the theme music is off, and "Wait before next episode" while "Autoplay next
+  episode" is off – both had no effect then. The dimmed row says which switch to turn on.
+- In the anime settings, "Same as above" is now called **"Same as audio language"**, so it is clear what it refers to.
+- In every selection list, **Off** now comes first (anime detection, button hints, anime subtitles), and the subtitle
+  background goes from "None" to "Dimmed" to "Black".
+- The explanation of the home row **Next episodes** now says that the row only appears when it has something to show,
+  and that with "Continue watching" on, the next episode usually shows up there already – Next episodes then only adds
+  the shows that are missing there.
+- The screensaver now frees more memory between pictures: after a Blinds or Tiles transition, the hidden parts no longer
+  keep the previous picture.
+- **Long lists show that more follows.** Wherever a list continues beyond what fits on the screen – Settings, the
+  selection panels on the right, Sort & filter, Audio & subtitles, Customize home screen / sidebar / Discover – a small
+  grey arrow above or below it shows that there is more to scroll to, and disappears at the end. Album and track lists show
+  the upward arrow next to their heading once you have scrolled down.
+- For troubleshooting, a running screensaver writes a short line to the app's log every 30 minutes, so if a TV ever stops
+  responding, the log shows when it happened.
+
+### Fixed
+- **Play after STOP continues where you stopped.** Back on a show's page right after stopping an episode, Play (or OK on
+  the episode) could start it again at 0:01 without asking, because the page still showed the position from before you
+  started it. The page now loads the episodes fresh after a video, and the app remembers where you stopped for a few
+  minutes in case the server has not caught up yet – so you get the usual "Resume at …" question (or it resumes directly
+  with Play), as set under "Started videos".
+- **The screensaver no longer gets stuck on one picture.** On the test TV a picture once stayed for almost an hour because the
+  TV never reported that the next picture was ready. If the next picture or a transition does not finish within two
+  minutes, the screensaver now notes it in the log and simply carries on with the next picture. With very short picture
+  intervals, the title of the previous picture could also briefly reappear over the new one – fixed as well.
+- **Home now notices new titles on the server by itself.** When a library gets new content, the server raises a change
+  counter; Home compares it whenever it loads anyway and, while Home is on screen, checks it every two minutes (one tiny
+  request, never during a video or the screensaver). Then only the affected rows – "New: …" of that library and Next
+  episodes – are fetched again and updated in place: no reload, no grey placeholders, the big picture and your highlight
+  stay where they are. The row you are in never changes under the highlight; its new version appears once you move to
+  another row or come back to Home, with the same card still highlighted. The server only lists a brand-new show under
+  "recently added" once it has recognised it – often a minute or two after the change – so Home quietly looks again a
+  few times over the next minutes; the new title then appears without you having to leave Home.
+- **"New: Shows" no longer stays out of date after a visit to a library.** An answer that arrived while another screen
+  was open counted as fresh, so Home did not ask again when you came back. Now it counts as old as its request.
+- **Libraries are up to date when you come back to them** – for example from a title's details – if the server has new
+  content in that library: the grid loads once, right away, and the title you came from stays highlighted. While you are
+  in a library, nothing moves or reorders under the highlight.
+- **Smart Touch pointer: clicking "Settings" in the sidebar now closes the sidebar**, just like clicking a library.
+  Before, the pointer still rested on the sidebar's icons after the click, and the smallest movement opened it again.
+  Now the sidebar stays closed until you move the pointer away from the icons.
+- **Back now works the same everywhere – and never opens the sidebar.** The sidebar only opens with the left arrow key
+  (or the pointer); Back in the open sidebar just closes it. On Home, Back first jumps to the first card and then asks
+  whether you want to exit. In a library, Search, Discover or Settings, Back first takes you to the top (first row,
+  keyboard, category list) and the next Back leaves the section – before, it opened the sidebar in between, and in
+  Settings Back ended in the sidebar without a way out.
+- **The player now always returns when a video has really ended.** After the last episode of a show, the card "That
+  was the last episode" used to stay on the finished video until you pressed a button. Now it stays briefly with a
+  visible countdown ("Back in 10 sec", with the same shrinking bar as the next-episode card; it uses your "Wait before
+  next episode" time) and then takes you back to the screen you started from, with the same item selected. OK or Back on
+  the card returns right away. Movies and episodes without autoplay return as soon as they end, as before.
+
+If a screen that quietly keeps itself up to date makes your evening a little calmer, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.6] - 2026-10-29
 
 ### Added

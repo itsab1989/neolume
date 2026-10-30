@@ -34,7 +34,7 @@ Dark theme. Contrast numbers are measured against `bg`. Rules: body text never b
 | `@c.panel@` | `#121316` | Opaque side panels: expanded navigation, selection/help panel. Every accent colour is checked to reach 4.5:1 on it |
 | `@c.surface-1@` | `#17191C` | Dialogs, Up Next card, settings description, pointer arrow pills, list cards |
 | `@c.surface-2@` | `#1F2226` | Image placeholders, on-screen keys, chips, cover backgrounds |
-| `@c.surface-3@` | `#2A2E33` | Buttons at rest, toasts, focused settings row, current A-Z letter |
+| `@c.surface-3@` | `#2A2E33` | Buttons at rest, toasts and the new content notice, focused settings row, current A-Z letter |
 | `@c.line@` | `#3A3F45` | Lines, progress tracks, unwatched cell of the season strip, toggle track (off) |
 | `@c.line-soft@` | `#23262A` | Separator between settings rows (quieter than line) |
 | `@c.disabled-bg@` | `#1E2125` | Background of a locked player button (previous/next at the start/end of a queue), a little quieter than surface-3 |
@@ -177,7 +177,7 @@ Only -webkit-transform and opacity on small elements; 150 ms or less; ease-out. 
 |---|---|---|
 | `@mo.fast@` | `120ms` | Buttons, text swap (opacity) |
 | `@mo.base@` | `150ms` | Cards, focus ring, rows/pages scrolling, navigation panel, toast |
-| `@mo.slow@` | `400ms` | Ambient background cross-fade (opacity of a full-screen layer, the one exception) |
+| `@mo.slow@` | `400ms` | Soft fades: ambient background cross-fade (opacity of a full-screen layer, the one exception) and the new content notice |
 | `@mo.spin@` | `900ms` | One turn of the spinner (linear, endless) |
 | `@mo.ease@` | `cubic-bezier(0,0,0.2,1)` | ease-out: the standard curve |
 | `@mo.ease-std@` | `cubic-bezier(0.4,0,0.2,1)` | standard ease-in-out (ambient cross-fade) |
@@ -261,3 +261,4 @@ Sources: `design/icons/<name>.svg`. Column order: `design/icons/order.json` (app
 | 27 | `compass` | <img src="icons/compass.svg" width="28" height="28" alt="compass"> | `-864px` |
 | 28 | `ff` | <img src="icons/ff.svg" width="28" height="28" alt="ff"> | `-896px` |
 | 29 | `rw` | <img src="icons/rw.svg" width="28" height="28" alt="rw"> | `-928px` |
+| 30 | `grid` | <img src="icons/grid.svg" width="28" height="28" alt="grid"> | `-960px` |

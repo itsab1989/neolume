@@ -461,6 +461,15 @@ function portsData(specText) {
   });
   return { errs: errs, ports: ports, cur: cur, areas: areas };
 }
+/* optional marks after the port name: media servers other than Plex only, and "in the collection" (reviewed, see PORTS.md) */
+var SERVER_NAME = { plex: 'Plex', jellyfin: 'Jellyfin', emby: 'Emby' };
+function portTags(p, html) {
+  var t = [], sv = p.mediaServers || [];
+  if (sv.length && !(sv.length === 1 && sv[0] === 'plex')) t.push('for ' + sv.map(function (x) { return SERVER_NAME[x] || x; }).join(', '));
+  if (p.collection) t.push('in the collection (' + p.collection + ')');
+  if (!t.length) return '';
+  return html ? ' <small>' + ht(t.join(' · ')) + '</small>' : '<br>*' + esc(t.join(' · ')) + '*';
+}
 function genPorts(specText) {
   var d = portsData(specText), o = [];
   if (!d.ports.length) return { text: '*No ports listed yet.*', ids: [], errs: d.errs };
@@ -468,7 +477,7 @@ function genPorts(specText) {
     '|---|---|---|---|---|---|---|---|');
   d.ports.forEach(function (x) {
     var p = x.p, sv = x.old ? '⚠️ ' + esc(x.sv) + ' – built against an older spec, may miss newer features' : esc(x.sv) + (p.reference ? ' (reference)' : '');
-    o.push('| [' + esc(p.name) + '](' + p.url + ') | ' + esc(p.brand + ' – ' + p.models) + ' | ' + esc(p.os) + ' | ' + sv + ' | ' + x.done + ' / ' + x.total +
+    o.push('| [' + esc(p.name) + '](' + p.url + ')' + portTags(p) + ' | ' + esc(p.brand + ' – ' + p.models) + ' | ' + esc(p.os) + ' | ' + sv + ' | ' + x.done + ' / ' + x.total +
       ' | [@' + p.maintainer + '](https://github.com/' + p.maintainer + ') | ' + esc(p.licence) + ' | ' + esc(p.lastVerified) + ' |');
   });
   o.push('', '<details><summary>Feature checklist per port (Part A sections of SPEC.md)</summary>', '', '| Port | ' + d.areas.join(' | ') + ' |',
@@ -483,7 +492,7 @@ function genPortsHtml(specText) {
   var o = ['    <div class="table-wrap"><table>', '      <thead><tr><th>Port</th><th>TV</th><th>OS</th><th>Spec version</th><th>Maintainer</th></tr></thead>', '      <tbody>'];
   d.ports.forEach(function (x) {
     var p = x.p;
-    o.push('        <tr><td><a href="' + ht(p.url) + '">' + ht(p.name) + '</a></td><td>' + ht(p.brand + ' – ' + p.models) + '</td><td>' + ht(p.os) + '</td><td>' +
+    o.push('        <tr><td><a href="' + ht(p.url) + '">' + ht(p.name) + '</a>' + portTags(p, true) + '</td><td>' + ht(p.brand + ' – ' + p.models) + '</td><td>' + ht(p.os) + '</td><td>' +
       ht(x.sv) + (x.old ? ' (older spec)' : '') + '</td><td><a href="https://github.com/' + ht(p.maintainer) + '">@' + ht(p.maintainer) + '</a></td></tr>');
   });
   o.push('      </tbody>', '    </table></div>');
@@ -851,18 +860,22 @@ var VERSION_FILES = [
   ['package-lock.json', /^    "": \{\n[^}]*?"version": "([^"]+)"/m],
   ['src/core/config.js', /\bversion: '([^']+)'/],
   ['loader/config.xml', /<ver itemtype="string">([^<]+)<\/ver>/],
-  ['installer/neosetup/__init__.py', /^VERSION = '([^']+)'/m]
+  ['installer/neosetup/__init__.py', /^VERSION = '([^']+)'/m],
+  // statisches Versions-Abzeichen im README der privaten Fassung (ein privates Repo kann kein dynamisches Release-Abzeichen
+  // zeigen); optional: das oeffentliche README hat ein dynamisches Abzeichen und dieses Muster nicht
+  ['README.md', /badge\/version-([0-9][^-"]*)-/, true]
 ];
 function versionProblems() {
   var v = appVersion(), bad = [], probs = [];
   VERSION_FILES.forEach(function (x) {
     if (!fs.existsSync(path.join(ROOT, x[0]))) return;
     var m = x[1].exec(rd(x[0]));
+    if (!m && x[2]) return;
     if (!m) probs.push(x[0] + ': version not found (tools/spec_gen.js VERSION_FILES expects ' + x[1] + ') – update the pattern there.');
     else if (m[1] !== v && !bad.some(function (b) { return b.indexOf(x[0] + ' ') === 0; })) bad.push(x[0] + ' (' + m[1] + ')');
   });
   if (bad.length) probs.push('Version differs from package.json (' + v + '): ' + bad.join(', ') + '. Set the same version in package.json, package-lock.json ' +
-    '(both entries), src/core/config.js, loader/config.xml and installer/neosetup/__init__.py, then run `npm run spec`.');
+    '(both entries), src/core/config.js, loader/config.xml, installer/neosetup/__init__.py (and the version badge in README.md, if it has one), then run `npm run spec`.');
   return probs;
 }
 
@@ -943,7 +956,7 @@ function check() {
 }
 module.exports = { generate: generate, generateAll: generateAll, check: check, settingsData: settingsData, routesData: routesData,
   validate: validate, specIndex: specIndex, checkRefs: checkRefs, specReqs: specReqs, testPlanData: testPlanData, genReuse: genReuse,
-  genReview: genReview, reqHash: reqHash, versionProblems: versionProblems, firstDiff: firstDiff };
+  genReview: genReview, reqHash: reqHash, versionProblems: versionProblems, firstDiff: firstDiff, portTags: portTags };
 
 /* npm run spec [-- --ack ID[,ID…]|all]   ·   npm run spec:check */
 function main(argv) {

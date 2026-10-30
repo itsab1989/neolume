@@ -15,7 +15,7 @@
 (function (N) {
   var U = N.util, MU = N.music, F = N.fmt, X0 = 600, BY = 488, BAR_X = 600, BAR_W = 536, BAR_Y = 404;
   N.router.define('nowplaying', function () {
-    var s = { rail: N.ui.rail && N.ui.rail.cur || 'home', wheelKeys: ['LEFT', 'RIGHT'] };   // Seitenleiste sichtbar (Feedback-Regel 3)
+    var s = { rail: N.ui.rail && N.ui.rail.cur || 'home', wheelKeys: ['LEFT', 'RIGHT'], news: 'top' };   // HOME-13: Hinweis oben rechts (frei)   // Seitenleiste sichtbar (Feedback-Regel 3)
     var root, bg, cover, cfb, cfbT, ovT, tiT, arT, alT, chT, nxT, stT, tm0, tm1, barI, lbl, lblT, btnEl = {}, ids = [], fb = 'pp', ppIc, repIc, dots = {}, timer = 0;
     var shown = { art: null, rk: null }, lastSec = -1, hs = [], numB = null, numF = null, acc = null;
     var hv, hvOn = false, lp = null, lpv = null, lpPend = null, lpRaf = false, NP_BAND = { top: BAR_Y - 32, bottom: 548, side: BAR_Y + 16 };   // Schutzzone bis unter die Knopfreihe (Treffer 476–548)
@@ -44,7 +44,7 @@
       arT = U.txt('div', 'np-ar t-h2 c2 ell', root, '');
       alT = U.txt('div', 'np-al t-body c2 ell', root, '');
       chT = U.txt('div', 'np-ch t-body ell', root, '');
-      var tr = U.el('div', 'np-bar', root); barI = U.el('i', '', tr);
+      var tr = U.el('div', 'np-bar', root); barI = U.el('i', '', tr);   // Runde 8 (Huelle .np-barw) am TV schlechter -> wie Runde 7
       tm0 = U.txt('div', 'np-tm0', root, ''); tm1 = U.txt('div', 'np-tm1', root, '');
       stT = U.txt('div', 'np-st t-small c2 ell', root, '');
       nxT = U.txt('div', 'np-nx t-small c2 ell', root, '');

@@ -321,7 +321,7 @@ Ab jetzt spricht Neolume **nur mit deinem Server**. Dein Computer kann aus bleib
 | Taste | Was sie tut |
 |---|---|
 | Pfeiltasten, `OK` | Bewegen, auswählen |
-| `RETURN` | Zurück (auf der Startseite: Seitenleiste öffnen, dann *Beenden*) |
+| `RETURN` | Zurück. In einer Bibliothek, der Suche, Entdecken oder den Einstellungen erst nach oben, dann zur Startseite (oder zum Bereich davor – *Zurück aus einem Bereich* unter **Einstellungen → Oberfläche**). Auf der Startseite: zur ersten Karte, dann *Beenden*. Die Seitenleiste öffnet ◀ |
 | `PLAY` / `PAUSE` / `STOP` | Wiedergabe |
 | `◄◄` / `►►` | Zurück / vor springen (in Listen: mehrere Einträge springen) |
 | `TOOLS` | Optionen zum markierten Eintrag (im Player das Menü „Mehr“) |

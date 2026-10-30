@@ -9,7 +9,8 @@ body:
         Thanks for building the app for another TV! Please read the **policy** in [PORTS.md](https://github.com/itsab1989/neolume/blob/main/PORTS.md) first:
         we only link (no binaries here), the port is your responsibility, no "Plex" in the name or icon, and the privacy and
         security rules of [SPEC.md](https://github.com/itsab1989/neolume/blob/main/docs/SPEC.md) (section A18) apply. A pull request that adds your entry to
-        `ports.json` is even faster – see "Add your port" in PORTS.md.
+        `ports.json` is even faster – see "Add your port" in PORTS.md. Built it for Jellyfin or Emby? Say so under "Notes".
+        Want your finished app reviewed and offered as a download here as well? Use the **Collection submission** form.
   - type: input
     id: name
     attributes:
@@ -72,6 +73,11 @@ body:
     attributes:
       label: How can users verify the download?
       description: Where are the source code and the checksums of your releases?
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes (optional)
+      description: For example the media server if it is not Plex (Jellyfin, Emby), or known gaps.
   - type: checkboxes
     id: policy
     attributes:

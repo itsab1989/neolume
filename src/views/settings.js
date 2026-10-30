@@ -1,13 +1,14 @@
 /* Ansicht 'settings' – Einstellungen (SPEC 5.18, 7.13, 10.4; Mockup settings.html):
  * Zeilen immer 64 hoch, Fokus = surface-3 + 3-px-Amber-Rahmen, feste Beschreibungsflaeche (nodeValue, ohne Animation).
- * Kategorien: Wiedergabe (M3, alle Player-Optionen, auch fuer Kinderprofile), Oberflaeche, Profil & Konto (Konto-Aktionen nur
- * Hauptkonto, SPEC 7.15.1), Diagnose, Hilfe & Info. Mehr als 6 Zeilen: EIN Listen-Container scrollt per translate3d (Anker 3. Zeile). ◀ von jeder Zeile -> Kategorie; RETURN: Zeile -> Kategorie -> Seitenleiste.
+ * Kategorien (Reihenfolge docs/research/settings-order-2026-10-29.md): Wiedergabe, Ton & Untertitel, Anime, Oberflaeche,
+ * [Erweiterung], Bildschirmschoner, Profil & Konto (Konto-Aktionen nur Hauptkonto, SPEC 7.15.1), Diagnose, Hilfe & Info – je Kategorie
+ * EINE geordnete Liste. Mehr als 6 Zeilen: EIN Listen-Container scrollt per translate3d (Anker 3. Zeile). ◀ von jeder Zeile -> Kategorie; RETURN: Zeile -> Kategorie -> Start bzw. vorheriger Bereich (NAV-5).
  * Listen oeffnen das Auswahl-Panel (keine Wertaenderung per ◀▶). Speichern entprellt ueber N.store. */
 (function (N) {
   var U = N.util, CAT_Y = 112, CAT_STEP = 56, ROW_Y = 112, ROW_STEP = 64, MAXROWS = 6;
-  N.router.define('settings', function () {
+  N.router.define('settings', function (params) {
     var s = { rail: 'settings', wheelKeys: ['UP', 'DOWN'] };
-    var cats = [], catEls = [], rowEls = [], desc, zone = 'cat', c = 0, r = 0, list = null, off = 0;
+    var cats = [], catEls = [], rowEls = [], desc, zone = 'cat', c = 0, r = 0, list = null, off = 0, more = null;
     function st() { return N.session; }
     /* Zahl der eingeschalteten Reihen (aus Einstellung + bekannten Bibliotheken/Katalog) */
     function homeCount() {
@@ -40,13 +41,23 @@
     function secBF(v) { var st = N.osd.steps(v, 10); return [[v, N.t('set.v.secBF', { b: st.b, f: st.f })]]; }
     function stills() { var o = []; N.osd.STILL.forEach(function (n) { o.push([n, n ? N.tn('set.v.afterEp', n) : v('off')]); }); return o; }
     function quals() { var o = [], q = N.decision.QUAL; ['20', '12', '8', '4'].forEach(function (k) { o.push([k, N.t('set.v.q', { n: k, r: q[k][1] === '1920x1080' ? '1080p' : '720p' })]); }); return o; }
+    /* Wiedergabe (Reihenfolge docs/research/settings-order-2026-10-29.md 2.2): Fortsetzen, Serien-Abend (Intro … Sleep-Timer),
+     * Qualitaet + Bildformat, Spulen. Ton-Ausgabe (Durchreichen, Verstaerkung) steht unter "Ton & Untertitel". */
     function playRows() {
-      return [choice('resume', vals(['ask', 'resume', 'start'])), choice('resumeRewind', rewinds()), choice('quality', quals()), toggle('directPlay'),
-        toggle('passthrough'), boostRow(), toggle('thumbs'),
-        choice('skipIntro', vals(['off', 'button', 'auto'])), choice('skipCredits', vals(['off', 'button', 'auto'])), toggle('autoNext'),
-        choice('countdown', secs([5, 8, 10, 15, 20, 30])), choice('stillWatching', stills()), choice('stillTime', hours()), choice('sleepDefault', sleeps()),
-        toggle('lowerOffer'), choice('seekArrows', secs([5, 10, 15, 30]).concat(secBF('10/30'))), ffrwRow(), choice('seekFf', secs([10, 30, 60]).concat(secBF('15/30'))),
-        loupeRow(), loupeStyleRow(), choice('aspect', [['auto', v('auto')], ['orig', v('orig')], ['fill', v('fill')], ['43', v('a43')], ['zoom', v('zoom')]])];
+      return [choice('resume', vals(['ask', 'resume', 'start'])), choice('resumeRewind', rewinds()),
+        choice('skipIntro', vals(['off', 'button', 'auto'])), choice('skipCredits', vals(['off', 'button', 'auto'])), toggle('autoNext'), countdownRow(),
+        choice('stillWatching', stills()), choice('stillTime', hours()), choice('sleepDefault', sleeps()),
+        choice('quality', quals()), toggle('directPlay'), toggle('lowerOffer'),
+        choice('aspect', [['auto', v('auto')], ['orig', v('orig')], ['fill', v('fill')], ['43', v('a43')], ['zoom', v('zoom')]]),
+        choice('seekArrows', secs([5, 10, 15, 30]).concat(secBF('10/30'))), ffrwRow(), choice('seekFf', secs([10, 30, 60]).concat(secBF('15/30'))),
+        toggle('thumbs'), loupeRow(), loupeStyleRow()];
+    }
+    /* Wartezeit vor naechster Folge: wirkt nur mit "Naechste Folge automatisch" (player/markers.js: cd nur bei autoNext) -> sonst gedimmt */
+    function countdownRow() {
+      var r = choice('countdown', secs([5, 8, 10, 15, 20, 30]));
+      r.disabled = function () { var S = st(); return !!(S.settings && S.settings.autoNext === false); };
+      r.ddesc = 'set.countdown.off.desc';
+      return r;
     }
     /* Vor-/Rueckspultasten im Video (SPEC PLAY-32): Springen (Standard: gleiches Verhalten bei jedem Video, bis der Trick-Modus am
      * TV erprobt ist) oder Schnell spulen (SEF-Trick-Modus 2x…16x, ohne Ton, nur direkte Wiedergabe); INFO erklaert beides */
@@ -84,10 +95,12 @@
       return r;
     }
     function delays() { var o = []; N.osd.DELAYS.forEach(function (ms) { o.push([ms, N.osd.delayText(ms)]); }); return o; }
+    /* Ton & Untertitel: erst die drei Grundwahlen, dann Darstellung der Untertitel, zuletzt Technik (ASS, Ton-Ausgabe) */
     function subsRows() {
-      return [toggle('rememberTracks'), choice('audioLang', vals(['de', 'en', 'ja', 'server'])), choice('subs', vals(['off', 'forced', 'foreign', 'always', 'server'])),
-        choice('subLang', vals(['de', 'en'])), choice('ass', vals(['burn', 'text'])), choice('subSize', vals(['small', 'medium', 'large', 'xl'])),
-        choice('subColor', vals(['white', 'yellow'])), choice('subBg', vals(['dim', 'solid', 'none'])), choice('subPos', vals(['low', 'high'])), choice('subDelay', delays())];
+      return [choice('audioLang', vals(['de', 'en', 'ja', 'server'])), choice('subs', vals(['off', 'forced', 'foreign', 'always', 'server'])),
+        choice('subLang', vals(['de', 'en'])), toggle('rememberTracks'), choice('subSize', vals(['small', 'medium', 'large', 'xl'])),
+        choice('subColor', vals(['white', 'yellow'])), choice('subBg', vals(['none', 'dim', 'solid'])), choice('subPos', vals(['low', 'high'])), choice('subDelay', delays()),
+        choice('ass', vals(['burn', 'text'])), toggle('passthrough'), boostRow()];
     }
     /* Anime (docs/TODO.md "Anime-Erkennung"): Erkennung je Titel (normal/streng/aus) -> "als eigene Kategorie zeigen" (Ueberzeile, INFO)
      * und "Anime-Wiedergaberegeln" (Ton/UT) unabhaengig voneinander; Erkennung "aus" dimmt beide. Feinere Regeln gedimmt, solange die
@@ -101,8 +114,8 @@
         r.ddesc = function () { return off() ? 'set.animeDetect.off.desc' : 'set.anime.off.desc'; };
         return r;
       }
-      var det = choice('animeDetect', vals(['normal', 'strict', 'off'])), show = dimOff(toggle('animeShow')), rules = dimOff(toggle('anime'));
-      return [det, show, rules, dim(choice('animeAudio', vals(['ja', 'de', 'same']))), dim(choice('animeSubs', vals(['deen', 'de', 'off']))),
+      var det = choice('animeDetect', vals(['off', 'normal', 'strict'])), show = dimOff(toggle('animeShow')), rules = dimOff(toggle('anime'));
+      return [det, show, rules, dim(choice('animeAudio', vals(['ja', 'de', 'same']))), dim(choice('animeSubs', vals(['off', 'deen', 'de']))),
         dim(toggle('animeSigns'))];
     }
     /* Akzentfarbe (N.accent): Palette mit Farbfeld, Standardfarbe der Marke zuerst; wirkt sofort (settings:changed) */
@@ -111,13 +124,6 @@
       for (var i = 0; i < ids.length; i++) o.push([ids[i], v('ac_' + ids[i]), ids[i]]);
       for (i = 0; i < o.length; i++) if (o[i][0] === b) o.unshift(o.splice(i, 1)[0]);   // Standard zuerst
       return choice('accent', o);
-    }
-    function displayRows(S) {
-      var out = [toggle('backgrounds')].concat(libBgRows(), [toggle('spoiler'), toggle('clock'), clockStyleRow(), hintsRow(), recentRow()]);
-      if (!S.isKid()) out = out.concat(discRows());   // P4 Entdecken + Merkliste (Kinderprofile: nicht vorhanden)
-      if (!S.isKid()) out.push(choice('screensaver', [[0, v('off')]].concat(N.comfort.SAVER_MIN.slice(1).map(function (n) { return [n, N.t('set.v.min', { n: n })]; }))));
-      if (!S.isKid()) out = out.concat(saverRows());
-      return out;
     }
     /* Uhr auf der Startseite (ui/saver.js, N.comfort.CLOCK_STYLES): vier Stile mit Unterzeile, gedimmt bei "Uhrzeit anzeigen" aus */
     function clockStyleRow() {
@@ -129,9 +135,24 @@
       r.ddesc = 'set.clockStyle.off.desc'; r.help = 'help.clockStyle';
       return r;
     }
+    /* Hinweis bei neuen Inhalten (N.newsLogic, SPEC HOME-13): Elternzeile Aus/Allgemein/Genau, darunter Anzeigedauer und "Auch
+     * waehrend der Wiedergabe" (beide gedimmt bei Aus). Steht im Block "Hinweise" direkt vor den Tastenhinweisen. */
+    function newsRows() {
+      var S = st(), NL = N.newsLogic;
+      function off() { return NL.mode(S.settings) === 'off'; }
+      var m = choice('newsNote', [['off', v('off'), null, v('nnOff.s')], ['general', v('nnGeneral'), null, v('nnGeneral.s')], ['exact', v('nnExact'), null, v('nnExact.s')]]);
+      m.val = function () { return v({ off: 'off', general: 'nnGeneral', exact: 'nnExact' }[NL.mode(S.settings)]); };   // fehlend/unbekannt = Standard
+      m.help = 'help.newsNote';
+      var d = choice('newsSecs', secs(NL.SECS));
+      d.val = function () { return N.t('set.v.sec', { n: NL.ms(S.settings) / 1000 }); };
+      d.disabled = off; d.ddesc = 'set.newsNote.off.desc'; d.help = 'help.newsSecs';
+      var p = toggle('newsPlay');
+      p.disabled = off; p.ddesc = 'set.newsNote.off.desc'; p.help = 'help.newsPlay';
+      return [m, d, p];
+    }
     /* Tastenhinweise (N.ui.hints): Immer / Nur kurz / Aus; INFO erklaert, wo die Tasten sonst stehen (Tastenbelegung) */
     function hintsRow() {
-      var r = choice('hints', [['always', v('hAlways'), null, v('hAlways.s')], ['brief', v('hBrief'), null, v('hBrief.s')], ['off', v('hOff'), null, v('hOff.s')]]);
+      var r = choice('hints', [['off', v('hOff'), null, v('hOff.s')], ['brief', v('hBrief'), null, v('hBrief.s')], ['always', v('hAlways'), null, v('hAlways.s')]]);   // Aus zuerst (wie ueberall)
       r.help = 'help.hints';
       return r;
     }
@@ -142,8 +163,9 @@
       r.help = 'help.recentSearches';
       return r;
     }
-    /* Bildschirmschoner (ui/saver.js, core/saverlogic.js): Quelle, Bibliotheken, Ungesehenes, Takt, Uebergang, Einblendung, unscharf.
-     * Schoner aus -> alle gedimmt; Bibliotheken/Ungesehenes nur bei Quelle "Bibliotheken". */
+    /* Kategorie Bildschirmschoner (ui/saver.js, core/saverlogic.js; nur Erwachsene): "Bildschirmschoner nach", Einblendung, Uebergang,
+     * Takt, Bildart, unscharf, Quelle, Bibliotheken, Ungesehenes, Nachtruhe. Schoner aus -> alle gedimmt; Bibliotheken/Ungesehenes
+     * nur bei Quelle "Bibliotheken". */
     function saverRows() {
       var S = st(), SL = N.saverLogic;
       function off() { return !(S.settings && Number(S.settings.screensaver) > 0); }
@@ -158,8 +180,24 @@
       fx.help = 'help.saverFx'; info.help = 'help.saverInfo';      // INFO: jede Moeglichkeit erklaert (zu lang fuer die Beschreibungszeile)
       var pics = dim(choice('saverPics', opts(SL.PICS, 'pics_')));   // SAV-5: echte Hintergrundbilder / auch Standbilder / Poster
       pics.help = 'help.saverPics';
-      return [dim(choice('saverSrc', [['libs', v('src_libs')], ['home', v('src_home')]])), dimLib(saverLibsRow()), dimLib(toggle('saverUnwatched')),
-        dim(choice('saverInterval', secs(SL.SEC))), fx, info, dim(toggle('saverBlur')), pics];   // saverBlur (F21): weich (Standard) oder scharf
+      var on = choice('screensaver', [[0, v('off')]].concat(N.comfort.SAVER_MIN.slice(1).map(function (n) { return [n, N.t('set.v.min', { n: n })]; })));
+      // Elternzeile oben; dann was man sieht (Einblendung, Uebergang, Takt, Bildart, unscharf), Quelle, zuletzt die Langzeit-Regel
+      return [on, info, fx, dim(choice('saverInterval', secs(SL.SEC))), pics, dim(toggle('saverBlur')),   // saverBlur (F21): weich (Standard) oder scharf
+        dim(choice('saverSrc', [['libs', v('src_libs')], ['home', v('src_home')]])), dimLib(saverLibsRow()), dimLib(toggle('saverUnwatched')), dim(nightRow())];
+    }
+    /* "Nach langer Zeit nur noch die Uhr" (SAV-6): 1/2 (Standard)/4 Std./Nie; fehlend/unbekannt zeigt den Standard (wie N.saverLogic.night).
+     * INFO erklaert, warum (Speicher aelterer TVs, Einbrennen, Strom) und was "Nie" bedeutet */
+    function nightRow() {
+      var S = st(), SL = N.saverLogic, o = [];
+      SL.NIGHT.forEach(function (n) { o.push([n, n ? N.tn('set.v.hrs', n / 60) : v('never')]); });
+      var r = choice('saverNight', o);
+      r.val = function () {
+        var m = SL.night(S.settings ? S.settings.saverNight : null) / 60000;
+        for (var i = 0; i < o.length; i++) if (o[i][0] === m) return o[i][1];
+        return o[1][1];
+      };
+      r.help = 'help.saverNight';
+      return r;
     }
     /* Mehrfachauswahl der Bibliotheken (Panel mit Haken); keine Auswahl = Standard (alle Film- und Serien-Bibliotheken) */
     function saverLibsRow() {
@@ -254,82 +292,117 @@
         N.ui.panel.select({ title: N.t('set.scan'), selected: '', entries: e, onSelect: function (id) { N.scan.start(id === 'all' ? null : id); } });
       } };
     }
-    function defs() {
-      var S = st(), list = [{ id: 'play', rows: playRows() }];
-      list.push({ id: 'display', rows: [
-        { id: 'lang', type: 'list', label: 'set.language', desc: 'set.language.desc', val: function () { return N.t('lang.' + N.i18n.lang()); },
-          open: function () {
-            N.ui.panel.select({ title: N.t('set.language'), selected: N.i18n.lang(),
-              entries: [{ id: 'de', t: N.t('lang.de') }, { id: 'en', t: N.t('lang.en') }],
-              onSelect: function (l) { if (l !== N.i18n.lang()) N.app.setLang(l); } });
-          } },
+    /* Zeilen ohne die weggelassenen (null/false): jede Kategorie steht als EINE geordnete Liste da – neue Zeilen bewusst
+     * einsortieren statt hinten anhaengen (Reihenfolge docs/research/settings-order-2026-10-29.md) */
+    function only(list) { var o = []; for (var i = 0; i < list.length; i++) if (list[i]) o.push(list[i]); return o; }
+    function langRow() {
+      return { id: 'lang', type: 'list', label: 'set.language', desc: 'set.language.desc', val: function () { return N.t('lang.' + N.i18n.lang()); },
+        open: function () {
+          N.ui.panel.select({ title: N.t('set.language'), selected: N.i18n.lang(),
+            entries: [{ id: 'de', t: N.t('lang.de') }, { id: 'en', t: N.t('lang.en') }],
+            onSelect: function (l) { if (l !== N.i18n.lang()) N.app.setLang(l); } });
+        } };
+    }
+    /* Oberflaeche (2.5): Layout (Startseite, Seitenleiste, Zurueck aus einem Bereich, Ansicht) · Aussehen (Akzent, Hintergruende, Bewegung) · Kacheln
+     * (Fortschritt, Spoiler) · Uhr · Hinweise (neue Inhalte + Anzeigedauer + im Video, Tastenhinweise) · Bedienung (Zuletzt gesucht, Zeiger) ·
+     * Titelmelodie · Entdecken-Block (nur Erwachsene) */
+    function displayRows(S) {
+      var adult = !S.isKid();
+      return only([langRow(),
+        adult && { id: 'homerows', type: 'action', label: 'set.homeRows', desc: 'set.homeRows.desc',   // SPEC 7.3.1 – nicht in Kinderprofilen (7.13)
+          val: function () { return N.tn('set.homeRows.val', homeCount()); }, run: function () { N.router.push('homerows'); } },
+        // W1 "Seitenleiste anpassen": Eintraege umsortieren/ausblenden (Start + Einstellungen bleiben), gleiche Liste wie oben
+        adult && { id: 'railitems', type: 'action', label: 'set.railItems', desc: 'set.railItems.desc',
+          val: function () { return N.tn('set.railItems.val', N.ui.rail.order().length); }, run: function () { N.router.push('railitems'); } },
+        sectionBackRow(),
+        choice('libView', [['L', N.t('lib.view.L')], ['M', N.t('lib.view.M')], ['S', N.t('lib.view.S')], ['list', N.t('lib.view.list')]]),   // Bibliotheksansicht (Feedback-Regel 2)
+        accentRow(),
+        toggle('backgrounds')].concat(libBgRows(), [
+        { id: 'rm', type: 'toggle', label: 'set.reduceMotion', desc: 'set.reduceMotion.desc',
+          get: function () { return !!(S.settings && S.settings.reduceMotion); }, set: function (x) { S.setSetting('reduceMotion', x); N.fx.setReduced(x); } },
         { id: 'ep', type: 'toggle', label: 'set.episodeProgress', desc: 'set.episodeProgress.desc',
-          get: function () { return !!(S.settings && S.settings.episodeProgress); }, set: function (v) { S.setSetting('episodeProgress', v); } },
+          get: function () { return !!(S.settings && S.settings.episodeProgress); }, set: function (x) { S.setSetting('episodeProgress', x); } },
         // TV-Befund 28.10.: Serien-Balken einzeln abschaltbar (vorher an "Folgen-Fortschritt" gekoppelt)
         { id: 'sp', type: 'toggle', label: 'set.seriesProgress', desc: 'set.seriesProgress.desc',
-          get: function () { return !!(S.settings && S.settings.seriesProgress); }, set: function (v) { S.setSetting('seriesProgress', v); } },
-        choice('libView', [['L', N.t('lib.view.L')], ['M', N.t('lib.view.M')], ['S', N.t('lib.view.S')], ['list', N.t('lib.view.list')]]),   // Bibliotheksansicht (Feedback-Regel 2)
-        toggle('themeMusic'),                         // Titelmelodie (SPEC v2.2, M3b: Standard aus)
-        choice('themeVol', [[25, N.t('set.v.pct', { n: 25 })], [50, N.t('set.v.pct', { n: 50 })], [75, N.t('set.v.pct', { n: 75 })], [100, N.t('set.v.pct', { n: 100 })]]),
-        { id: 'rm', type: 'toggle', label: 'set.reduceMotion', desc: 'set.reduceMotion.desc',
-          get: function () { return !!(S.settings && S.settings.reduceMotion); }, set: function (v) { S.setSetting('reduceMotion', v); N.fx.setReduced(v); } },
+          get: function () { return !!(S.settings && S.settings.seriesProgress); }, set: function (x) { S.setSetting('seriesProgress', x); } },
+        toggle('spoiler'), toggle('clock'), clockStyleRow()].concat(newsRows(), [hintsRow(), recentRow(),
         { id: 'ptr', type: 'toggle', label: 'set.pointer', desc: 'set.pointer.desc',
-          get: function () { return S.state.pointer !== false; }, set: function (v) { S.state.pointer = v; S.save(); N.pointer.setEnabled(v); } },
+          get: function () { return S.state.pointer !== false; }, set: function (x) { S.state.pointer = x; S.save(); N.pointer.setEnabled(x); } },
         // TV-Befund 1.0.5: Weiterblaettern durch Verweilen am Rand (Randzonen, naechste Reihe der Startseite) abschaltbar
         { id: 'ptredge', type: 'toggle', label: 'set.ptrEdge', desc: 'set.ptrEdge.desc', ddesc: 'set.ptrEdge.off.desc', help: 'help.ptrEdge',
           disabled: function () { return S.state.pointer === false; },
-          get: function () { return S.state.ptrEdge !== false; }, set: function (v) { S.state.ptrEdge = v; S.save(); N.pointer.setEdge(v); } },
+          get: function () { return S.state.ptrEdge !== false; }, set: function (x) { S.state.ptrEdge = x; S.save(); N.pointer.setEdge(x); } },
         // TV-Befund 27.10. nachmittags: Randzonen-Rollen erst langsam, dann schneller; nur mit Zeiger-Steuerung (sonst ausgegraut)
         { id: 'ptracc', type: 'toggle', label: 'set.ptrAccel', desc: 'set.ptrAccel.desc',
           ddesc: function () { return S.state.pointer === false ? 'set.ptrAccel.off.desc' : 'set.ptrAccel.edge.desc'; },
           disabled: function () { return S.state.pointer === false || S.state.ptrEdge === false; },
-          get: function () { return S.state.ptrAccel !== false; }, set: function (v) { S.state.ptrAccel = v; S.save(); N.pointer.setAccel(v); } }
-      ] });
-      // "Startseite anpassen" (SPEC 7.3.1) – nicht in Kinderprofilen (7.13)
-      if (!S.isKid()) list[1].rows.splice(1, 0, { id: 'homerows', type: 'action', label: 'set.homeRows', desc: 'set.homeRows.desc',
-        val: function () { return N.tn('set.homeRows.val', homeCount()); }, run: function () { N.router.push('homerows'); } },
-        // W1 "Seitenleiste anpassen": Eintraege umsortieren/ausblenden (Start + Einstellungen bleiben), gleiche Liste wie oben
-        { id: 'railitems', type: 'action', label: 'set.railItems', desc: 'set.railItems.desc',
-          val: function () { return N.tn('set.railItems.val', N.ui.rail.order().length); }, run: function () { N.router.push('railitems'); } });
-      list[1].rows.splice(S.isKid() ? 1 : 3, 0, accentRow());   // Akzentfarbe hinter Sprache bzw. "Seitenleiste anpassen"
-      // P5: Oberflaeche ergaenzen, "Ton & Untertitel" und "Anime" als eigene Kategorien hinter "Wiedergabe" (SPEC 10.4)
-      list[1].rows = list[1].rows.concat(displayRows(S));
-      list.splice(1, 0, { id: 'subs', rows: subsRows() }, { id: 'anime', rows: animeRows() });
-      // Konto-Aktionen (PIN-Schalter, Server, Abmelden) nur im Hauptkonto-Profil; andere Erwachsene sehen nur "Profil wechseln"
-      var acc = [{ id: 'switch', type: 'action', label: 'set.switchProfile', desc: 'set.switchProfile.desc', run: function () { N.app.switchProfile(); } }];
-      if (S.pkg) N.pinSettings.rows(acc, paintAll);   // P2: eigene App-PIN je Profil (nur mit setup.json, views/pinsettings.js)
-      // Weitere Server (optional, setup.json): Anzahl + erreichbar; der Satz erklaert, wo man sie einrichtet
-      if (S.pkg) acc.push({ id: 'others', type: 'value', label: 'set.otherServers', desc: 'set.otherServers.desc', val: function () {
-        var l = N.srv.list(), ok = 0;
-        for (var i = 0; i < l.length; i++) if (l[i].state === 'ok') ok++;
-        return l.length ? N.t('set.otherServers.val', { ok: ok, n: l.length }) : v('notSetUp');
-      } });
-      if (S.isAdmin()) acc.push(
-        { id: 'pinsw', type: 'toggle', label: 'set.pinSwitch', desc: S.pkg ? 'set.pinSwitch.app.desc' : 'set.pinSwitch.desc', disabled: function () { return !S.pinSwitchAvailable() || !S.hasRestricted(); },
+          get: function () { return S.state.ptrAccel !== false; }, set: function (x) { S.state.ptrAccel = x; S.save(); N.pointer.setAccel(x); } },
+        toggle('themeMusic'),                         // Titelmelodie (SPEC v2.2, M3b: Standard aus)
+        themeVolRow()
+      ]), adult ? discRows() : []));                   // P4 Entdecken + Merkliste (Kinderprofile: nicht vorhanden)
+    }
+    /* Zurueck aus einem Bereich (NAV-5, N.sections): wohin RETURN oben in einem Bereich der Seitenleiste fuehrt; INFO erklaert die Kette */
+    function sectionBackRow() {
+      var r = choice('sectionBack', [['home', v('secHome'), null, v('secHome.s')], ['prev', v('secPrev'), null, v('secPrev.s')]]);
+      r.help = 'help.sectionBack';
+      return r;
+    }
+    /* Lautstaerke der Titelmelodie: gedimmt, solange die Titelmelodie aus ist (Standard) – sonst waere sie wirkungslos aktiv */
+    function themeVolRow() {
+      var r = choice('themeVol', [[25, N.t('set.v.pct', { n: 25 })], [50, N.t('set.v.pct', { n: 50 })], [75, N.t('set.v.pct', { n: 75 })], [100, N.t('set.v.pct', { n: 100 })]]);
+      r.disabled = function () { var S = st(); return !(S.settings && S.settings.themeMusic); };
+      r.ddesc = 'set.themeVol.off.desc';
+      return r;
+    }
+    /* Profil & Konto (2.8): Profil (wechseln, Startprofil, PINs, Profilwechsel nur mit PIN – steht UNTER "PIN fuer dieses Profil",
+     * dessen gedimmter Text sagt "oben") · Server (aktualisieren, Server, Weitere Server) · Einrichtung bzw. Abmelden zuletzt.
+     * Konto-Aktionen nur im Hauptkonto-Profil (SPEC 7.15.1); andere Erwachsene: Profil wechseln (+ PIN, Weitere Server mit setup.json) */
+    function accountRows(S) {
+      var admin = S.isAdmin(), pins = [];
+      if (S.pkg) N.pinSettings.rows(pins, paintAll);  // P2: eigene App-PIN je Profil (nur mit setup.json, views/pinsettings.js)
+      return only([
+        { id: 'switch', type: 'action', label: 'set.switchProfile', desc: 'set.switchProfile.desc', run: function () { N.app.switchProfile(); } },
+        admin && startRow()].concat(pins, [         // P5: Startprofil (Nutzer-Feedback-Regel 9), gilt fuer diesen Fernseher
+        admin && { id: 'pinsw', type: 'toggle', label: 'set.pinSwitch', desc: S.pkg ? 'set.pinSwitch.app.desc' : 'set.pinSwitch.desc', disabled: function () { return !S.pinSwitchAvailable() || !S.hasRestricted(); },
           ddesc: function () { if (S.pkg && !S.pinSwitchAvailable()) return 'set.pinSwitch.app.disabled'; return S.pinSwitchAvailable() ? 'set.pinSwitch.noKids.disabled' : 'set.pinSwitch.disabled'; },
-          get: function () { return S.pinSwitchOn(); }, set: function (v) { S.state.pinSwitch = v; S.save(); } },
-        scanRow(),
-        { id: 'server', type: 'value', label: 'set.server', desc: 'set.server.desc', val: function () { return S.state.server ? S.state.server.name : ''; } },
-        { id: 'out', type: 'action', label: 'set.signOut', desc: 'set.signOut.desc', run: function () {
+          get: function () { return S.pinSwitchOn(); }, set: function (x) { S.state.pinSwitch = x; S.save(); } },
+        admin && scanRow(),
+        admin && { id: 'server', type: 'value', label: 'set.server', desc: 'set.server.desc', val: function () { return S.state.server ? S.state.server.name : ''; } },
+        // Weitere Server (optional, setup.json): Anzahl + erreichbar; der Satz erklaert, wo man sie einrichtet
+        S.pkg && { id: 'others', type: 'value', label: 'set.otherServers', desc: 'set.otherServers.desc', val: function () {
+          var l = N.srv.list(), ok = 0;
+          for (var i = 0; i < l.length; i++) if (l[i].state === 'ok') ok++;
+          return l.length ? N.t('set.otherServers.val', { ok: ok, n: l.length }) : v('notSetUp');
+        } },
+        // P2 (setup.json): kein plex.tv-Konto zum Abmelden, statt dessen Hinweis zur Einrichtung; sonst Abmelden (zuletzt)
+        admin && S.pkg && N.pinSettings.setupRow(),
+        admin && !S.pkg && { id: 'out', type: 'action', label: 'set.signOut', desc: 'set.signOut.desc', run: function () {
           N.ui.dialog.open({ title: N.t('dlg.account.title'), text: N.t('dlg.account.text'),
             buttons: [{ id: 'cancel', t: N.t('dlg.account.cancel') }, { id: 'out', t: N.t('dlg.account.confirm') }], focus: 0,
             onSelect: function (id) { if (id === 'out') { N.session.signOut(); N.router.reset('login'); } } });
-        } });
-      if (S.pkg) {                                    // P2 (setup.json): kein plex.tv-Konto zum Abmelden; statt dessen Hinweis zur Einrichtung
-        for (var ai = acc.length - 1; ai >= 0; ai--) if (acc[ai].id === 'out') acc.splice(ai, 1);
-        if (S.isAdmin()) acc.push(N.pinSettings.setupRow());
-      }
-      if (!S.isKid()) list.push({ id: 'account', rows: acc, desc: S.pkg ? 'set.cat.account.app.desc' : null });
-      if (!S.isKid()) list.push({ id: 'diag', rows: [
+        } }
+      ]));
+    }
+    function diagRows() {
+      return [
         { id: 'logsend', type: 'action', label: 'set.diagSend', desc: 'set.diagSend.desc', run: function () {
           N.diag.send(function (ok) { N.ui.toast.show(N.t(ok ? 'toast.logSent' : 'toast.logFailed'), { icon: ok ? 'confirm' : 'info' }); });
         } },
         { id: 'logclear', type: 'action', label: 'set.diagClear', desc: 'set.diagClear.desc', run: function () {
           N.diag.clear(); N.ui.toast.show(N.t('toast.logCleared'), { icon: 'confirm' });
         } }
-      ] });
-      if (S.isAdmin() && !S.isKid()) acc.push(startRow());   // P5: Startprofil (Nutzer-Feedback-Regel 9), gilt fuer diesen Fernseher
-      list.push({ id: 'help', rows: helpRows() });
+      ];
+    }
+    /* Kategorien: Wiedergabe · Ton & Untertitel · Anime · Oberflaeche · [Erweiterung, z. B. Anfragen] · Bildschirmschoner ·
+     * Profil & Konto · Diagnose · Hilfe & Info. Kinder: ohne Bildschirmschoner, Profil & Konto und Diagnose. */
+    function defs() {
+      var S = st(), adult = !S.isKid();
+      var list = only([{ id: 'play', rows: playRows() }, { id: 'subs', rows: subsRows() }, { id: 'anime', rows: animeRows() },
+        { id: 'display', rows: displayRows(S) },
+        adult && { id: 'saver', rows: saverRows() },
+        adult && { id: 'account', rows: accountRows(S), desc: S.pkg ? 'set.cat.account.app.desc' : null },
+        adult && { id: 'diag', rows: diagRows() },
+        { id: 'help', rows: helpRows() }]);
       N.ext.call('settings:cats', list, S, paintAll);   // optionale Erweiterungen: eigene Kategorie (core/ext.js)
       return list;
     }
@@ -354,6 +427,9 @@
         rowEls.push(re);
       }
       desc = U.txt('div', 'set-desc', root, '');
+      /* Mehr-Hinweis (NAV-11, Nutzer-Befund 29.10.: unter "Bildübergang" ging die Liste ohne jeden Hinweis weiter): ▲ in der Luecke
+       * ueber der ersten Zeile, ▼ zwischen Liste (bis y 496) und Beschreibung (ab y 528), mittig ueber der Liste */
+      more = N.ui.more(root, 'left:818px;top:84px', 'left:818px;top:498px');
     };
     function rowsOf() { return cats[c].rows; }
     function maxRows() { var n = 0; for (var i = 0; i < cats.length; i++) n = Math.max(n, cats[i].rows.length); return n; }
@@ -362,6 +438,7 @@
     function scrollTo(i) {
       var o = Math.max(0, Math.min(i - 2, rowsOf().length - MAXROWS));
       if (o !== off) { off = o; N.fx.move(list); U.tf(list, 0, -off * ROW_STEP); }
+      more.set(off > 0, off + MAXROWS < rowsOf().length);
     }
     function paintRow(i) {
       var d = rowsOf()[i], re = rowEls[i];
@@ -428,7 +505,8 @@
       if (zone === 'cat') {
         if (k === 'UP' || k === 'DOWN') { n = N.nav.list(c, cats.length, k, true); if (n >= 0) focusCat(n); }
         else if (k === 'RIGHT' || k === 'ENTER') focusRow(0);
-        else if (k === 'LEFT' || k === 'RETURN') N.ui.rail.open();
+        else if (k === 'LEFT') N.ui.rail.open();
+        else if (k === 'RETURN') { if (params && params.sec) N.app.sectionBack(); else N.router.back(); }   // NAV-5: Kategorien -> Start bzw. vorheriger Bereich
         else if (k === 'INFO') N.ui.panel.help(N.t('set.cat.' + cats[c].id), N.t('set.cat.' + cats[c].id + '.desc'));
         return true;
       }

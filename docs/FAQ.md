@@ -175,21 +175,42 @@ times and buttons are so close together that the pointer could easily hit a butt
 you now automatically get *Panel above the bar*.
 
 ### How do I set up the screensaver?
-Under **Settings → Display**. *Screensaver after* (Off, 1, 2, 5, 10, 15 or 30 minutes; default 5) starts it when no key
-has been pressed; it never starts while a video plays. The other screensaver settings:
+It has its own category: **Settings → Screensaver** (main and other adult profiles). *Screensaver after* (Off, 1, 2, 5,
+10, 15 or 30 minutes; default 5) starts it when no key has been pressed; it never starts while a video plays. While it is
+Off, the other screensaver settings are dimmed. They are listed here in the same order as on the TV:
 
 | Setting | Choices (default first) | What it does |
 |---|---|---|
-| Screensaver pictures from | Libraries · Home screen | Libraries: random titles with background art from whole libraries, no repeats until all were shown. Home screen: only titles from there (no extra requests). |
-| Screensaver libraries | Movies & TV shows · your pick | Which libraries are used. Music libraries show artist pictures. |
-| Unwatched titles only | Off · On | Only movies and shows you haven't finished yet. |
-| Change picture every | 30 · 10 · 20 · 60 seconds | How long each picture stays. |
+| Screensaver overlay | Ambient · Classic · Movie poster · Lower third · Big clock · Small clock only · Off (pictures only) | How the time and title appear. Press INFO on the setting for a description of each. The position changes with every picture against burn-in. |
 | Picture transition | Crossfade · Cut · Fade through black · Slow zoom · Slow drift · Zoom through · Curtain · Blinds · Tiles · Random | How the next picture appears. With *Reduced motion*, moving ones become a crossfade. |
-| Screensaver overlay | Ambient · Classic · Movie poster · Lower third · Big clock · Small clock only · Off | How the time and title appear. Press INFO on the setting for a description of each. The position changes with every picture against burn-in. |
+| Change picture every | 30 · 10 · 20 · 60 seconds | How long each picture stays. |
+| Screensaver pictures | Real backgrounds only · Also video stills · Posters and covers | Which kind of picture is shown. Some titles have no background picture of their own, so Plex uses a random frame from the video – often dark or blurred; *Real backgrounds only* skips those. INFO explains each choice. |
 | Blur screensaver images | On · Off | Soft and calm, or sharp. |
+| Screensaver pictures from | Libraries · Home screen | Libraries: random titles with background art from whole libraries, no repeats until all were shown. Home screen: only titles from there (no extra requests). |
+| Screensaver libraries | Movies & TV shows · your pick | Which libraries are used (only with *Libraries* above). Music libraries show artist pictures. |
+| Unwatched titles only | Off · On | Only movies and shows you haven't finished yet (only with *Libraries* above). |
+| Clock only after a long time | 2 hrs · 1 hr · 4 hrs · Never | After this long, the last picture fades out and only the clock keeps moving on a black screen. Older TVs can run out of memory after many hours of constantly changing pictures and freeze; black also protects the screen from burn-in and saves power. Any key ends the screensaver as usual. |
 
 *Show clock* applies to the screensaver too: when it is off, no overlay style shows the time. Kids profiles use the
 defaults and only see pictures their own Plex account may see.
+
+### Where does RETURN take me?
+`RETURN` always goes back one step. In a section you opened from the sidebar – a library (music and audiobooks too),
+Search, Discover or Settings – it first takes you to the top (the first row, the keyboard, the categories). Press it once
+more and the setting **Settings → Display → Back from a section** decides: **To Home** (default) goes straight to the
+Home screen; **To the previous section** works like Back in a web browser and steps back through the sections you opened,
+each one only once, ending on Home. On Home, `RETURN` takes you to the first card, and from there it asks whether you want
+to exit. The sidebar opens with ◀. Each profile has its own choice.
+
+### What is the small notice about new content?
+When new movies, episodes, music or audiobooks arrive on your server, a small notice fades in for a few seconds and fades
+out by itself – on Home at the right under the clock, in libraries and on *Now playing* at the top right. It never needs a
+button and waits while you press buttons or a menu is open. You set it under **Settings → Display**:
+**New content notice** (**Exact** = default, what is new, for example "New episode" with show, season and episode;
+**General** = just "New content on your server"; or **Off**), **How long the notice stays** (3, 5, 8 or 12 seconds;
+default 5) and **Also while a video plays** (off by default; when on, it appears small at the top left of the video, only
+while no controls are on screen). Your profile only hears about what it is allowed to see. Home and the libraries also
+update the affected rows by themselves, without moving the card you have highlighted.
 
 ### What is the colourful background in my libraries? Can I turn it off?
 That is the **library background** (**Settings → Display → Library background**). *Colour mood* (the default) tints the

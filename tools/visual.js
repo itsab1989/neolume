@@ -7,7 +7,7 @@
  *                                    schnelles Nachsehen beim Arbeiten – die volle Suite bleibt Pflicht vor dem Release
  *   node tools/visual.js --list …    nur die ausgewaehlten Szenen auflisten, nichts rendern
  *   PN_VIS_JOBS=n   Szenen gleichzeitig (Standard min(8, Kerne/2)); jeder Worker hat eigenen Mock-Server und eigenes Profil
- *   PN_VIS_MAX=n    hoechstens n Firefox rechnerweit ueber alle gleichzeitigen Laeufe (Standard 10, 0 = ohne; Sperrordner
+ *   PN_VIS_MAX=n    hoechstens n Firefox rechnerweit ueber alle gleichzeitigen Laeufe (Standard 8 – Absturz 29.10. bei zwei vollen Laeufen mit zusammen 10; 0 = ohne; Sperrordner
  *                   $TMPDIR/pnvis-slots, verwaiste Eintraege werden selbst aufgeraeumt)
  *   PN_VIS_OUT=/pfad node tools/visual.js --only …   Ausgabe in eigenen Ordner (parallele Laeufe teilen sonst tests/visual/current)
  *   node tools/visual.js --readable   gegen app/app.js statt app/app.min.js (Standard: der minifizierte Release-Build, P7)
@@ -29,7 +29,7 @@ var ONLY = (function () { var i = args.indexOf('--only'); return i >= 0 ? String
 var MIN = args.indexOf('--readable') < 0, APPFILE = MIN ? 'app.min.js' : 'app.js';
 var LAYOUT_ONLY = args.indexOf('--layout') >= 0, LAYOUT = LAYOUT_ONLY || args.indexOf('--no-layout') < 0, layoutRes = {};
 var JOBS = Math.max(1, Number(process.env.PN_VIS_JOBS) || Math.min(8, Math.floor(os.cpus().length / 2)) || 1);   // gleichzeitige Firefox je Lauf
-var MAX_TOTAL = process.env.PN_VIS_MAX === undefined ? 10 : Number(process.env.PN_VIS_MAX);                    // rechnerweit (alle Laeufe zusammen), 0 = ohne Grenze
+var MAX_TOTAL = process.env.PN_VIS_MAX === undefined ? 8 : Number(process.env.PN_VIS_MAX);                    // rechnerweit (alle Laeufe zusammen), 0 = ohne Grenze
 var LOCKDIR = process.env.PN_VIS_LOCKDIR || path.join(os.tmpdir(), 'pnvis-slots');
 if (require.main === module && !fs.existsSync(path.join(ROOT, 'app', APPFILE))) { console.error('app/' + APPFILE + ' fehlt – zuerst "npm run build" (wird nicht eingecheckt).'); process.exit(1); }
 
@@ -425,6 +425,7 @@ function startServer(cb) {
       cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(solidPng(w, h, darken(colorFor(u.searchParams.get('url') || ''), u.searchParams)));
     }
     if (p === '/library/sections') return json(/^longLib/.test(curSeed) ? longSections() : syn('sections.json'));
+    if (p === '/hubs/continueWatching/items' && curSeed === 'cwMore') return json(page(cwMany(), u.searchParams));   // HOME-14: mehr als 20 -> "Alle 31 anzeigen"
     if (p === '/hubs/continueWatching/items') return json(noArt(withVersions(syn('continueWatching.json'))));
     if (p === '/library/onDeck') return json(syn('onDeck.json'));
     if (/^\/hubs\/sections\/[12]$/.test(p) && u.searchParams.get('count') === '20') return json(inspHubs(p.slice(-1)));   // Entdecken: Inspiration (count=20)
@@ -445,6 +446,7 @@ function startServer(cb) {
         pa.MediaContainer.Metadata = pa.MediaContainer.Metadata.map(function (m) { var c = JSON.parse(JSON.stringify(m)); delete c.librarySectionID; return c; });
         if (/^sv[A-Z].*Long/.test(curSeed)) pa.MediaContainer.Metadata.forEach(function (m) { m.title = 'Die unglaublich lange Reise des kleinen Leuchtturmwärters ' + m.title + ' bis ans Ende der Welt'; });
         if (/^svPic/.test(curSeed)) pa.MediaContainer.Metadata.forEach(function (m) { if (m.art) m.art = '/library/metadata/' + m.ratingKey + '/art/1'; });   // SAV-5: PMS-Pfade
+        if (q.get('addedAt>>') !== null) return json(newsItems(ls[1], q));   // HOME-13: neu seit dem gemerkten Stand
         return json(pa);
       }
       if (ls[2] === 'firstCharacter') return json(firstChars(libAll(ls[1], q)));
@@ -484,6 +486,16 @@ function startServer(cb) {
 
 /* Player: Metadaten aus den synthetischen Karten + Spuren aus meta-anime.json; Marker je Szene (rk 1001 Intro um die
  * Fortsetzen-Stelle -> Skip-Button, 1101 finaler Abspann -> Countdown), Film 2001 mit Vorschaubildern (indexes=sd) */
+/* HOME-14: 31 angefangene Titel (Seed cwMore) – die 4 synthetischen Karten, danach erfundene Folgen mit eigenem ratingKey */
+function cwMany() {
+  var base = noArt(syn('continueWatching.json')).MediaContainer.Metadata, out = base.slice();
+  for (var i = out.length; i < 31; i++) {
+    var c = JSON.parse(JSON.stringify(base[i % base.length]));
+    c.ratingKey = String(8000 + i); c.title = 'Folge ' + (i + 1); c.index = i + 1; c.viewOffset = 300000 + i * 20000;
+    out.push(c);
+  }
+  return out;
+}
 function cardMeta(rk) {
   var all = syn('continueWatching.json').MediaContainer.Metadata.concat(syn('onDeck.json').MediaContainer.Metadata);
   for (var i = 0; i < all.length; i++) if (all[i].ratingKey === rk) return JSON.parse(JSON.stringify(all[i]));
@@ -511,6 +523,17 @@ function metaFor(rk) {
     if (m.Chapter) m.Chapter[2].tag = 'The Storm on the Ridge Above the Valley of Endless Echoes';
   }
   return { MediaContainer: { size: 1, Metadata: [m] } };
+}
+/* HOME-13: neue Titel seit dem gemerkten Stand (nur news*-Seeds; sonst wie ein PMS ohne Neues) – Demo-Titel */
+function newsItems(lib, q) {
+  var l = [], at = Number(q.get('addedAt>>')) + 50;
+  function epi(rk, show, s, e) { return { ratingKey: String(rk), type: 'episode', title: 'Folge ' + e, grandparentTitle: show, grandparentRatingKey: show === 'Wolkenreiter' ? '901' : '902', parentIndex: s, index: e, addedAt: at++ }; }
+  if (!/^news/.test(curSeed)) return { MediaContainer: { size: 0, totalSize: 0 } };
+  if (lib === '2' && curSeed === 'newsMixed') l = [epi(9701, 'Wolkenreiter', 2, 5), epi(9702, 'Wolkenreiter', 2, 6), epi(9703, 'Sternenfahrer', 1, 4)];
+  else if (lib === '2') l = [epi(9701, 'Wolkenreiter', 2, 5)];
+  if (lib === '1' && curSeed === 'newsLongEn') l = [{ ratingKey: '9801', type: 'movie', title: 'The Extraordinarily Long Journey Across the Silent Mountain of Forgotten Kings', addedAt: at++ }];
+  else if (lib === '1') l = [{ ratingKey: '9801', type: 'movie', title: 'Abendrot im Winter', addedAt: at++ }, { ratingKey: '9802', type: 'movie', title: 'Der stille Berg', addedAt: at++ }];
+  return { MediaContainer: { size: l.length, totalSize: l.length, Metadata: l } };
 }
 /* TV-Befund 27.10. nachmittags: erster Titel (Hero) ohne Art (z. B. gerade hinzugefuegt) -> Seeds noart* */
 function noArt(j) {
@@ -554,6 +577,7 @@ function makeSeeds(port) {
   seeds.multi = seed({ users: multi, lastProfile: 'bbbb2222', pinSwitch: false });
   // Startseite angepasst: Server-Hub zuerst, Weiterschauen aus
   seeds.custom = seed({}, { 'settings-aaaa1111.json': { homeRows: [{ id: 'hub-1-movie.recentlyreleased', on: true }, { id: 'cw', on: false }] } });
+  seeds.cwMore = seed();                                  // HOME-14: Weiterschauen mit 31 Titeln (Mock liefert totalSize)
   // W1 Seitenleiste angepasst: Serien zuerst, Suche und Dokus ausgeblendet
   seeds.railCustom = seed({}, { 'settings-aaaa1111.json': { railItems: [{ id: 'lib-2', on: true }, { id: 'home', on: true }, { id: 'search', on: false }, { id: 'lib-6', on: false }] } });
   // Inspiration anpassen: Hub-Katalog (frisch) mit den Familien der Inspirations-Reihen -> volle Liste ohne Katalog-Abfrage
@@ -659,6 +683,19 @@ function makeSeeds(port) {
   var hintCfg = JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, hintMs: 1500 });
   seeds.hintsBrief = seed({}, { 'settings-aaaa1111.json': { hints: 'brief' } }, hintCfg);
   seeds.hintsOff = seed({}, { 'settings-aaaa1111.json': { hints: 'off' } });
+  // HOME-13 Hinweis bei neuen Inhalten: gemerkter Stand weicht vom Mock ab (Mock-Stand 'u0') -> eine Anfrage "neu seit 100" je Bibliothek
+  // (Antwort newsItems), Hinweis bleibt fuer den Screenshot stehen (newsShowMs); hold = fruehestens nach ms (Bibliothek/Player statt Startseite)
+  function newsSeed(libs, set, lang, extra) {
+    var c = { readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, newsShowMs: 600000 };
+    for (var k in extra || {}) c[k] = extra[k];
+    var l = {}; libs.forEach(function (id) { l[id] = { sig: 'u-1', at: 100 }; });
+    return seed(lang ? { lang: lang } : {}, { 'news-aaaa1111.json': { srv: 'mid', libs: l }, 'settings-aaaa1111.json': set || {} }, JSON.stringify(c));
+  }
+  seeds.newsExact = newsSeed(['2']); seeds.newsExactEn = newsSeed(['2'], null, 'en');
+  seeds.newsMixed = newsSeed(['1', '2']); seeds.newsGeneral = newsSeed(['2'], { newsNote: 'general' });
+  seeds.newsLongEn = newsSeed(['1'], null, 'en'); seeds.newsLib = newsSeed(['2'], null, null, { newsHoldMs: 4500 });
+  seeds.newsPlay = newsSeed(['2'], { newsPlay: true }, null, { sefFake: 'still', seekDelay: 600000, newsHoldMs: 4500, newsSettleMs: 0 });
+  seeds.newsPlayOff = newsSeed(['2'], null, null, { sefFake: 'still', seekDelay: 600000, newsHoldMs: 4500, newsSettleMs: 0 });
   // Bildschirmschoner: Einblendung je Stil auf hellem (lange Titel, de), dunklem (lange Titel, en) und unruhigem Bild (de); Quelle Filme
   var svCfg = JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, saverMs: 1500 });
   SAVER_STYLES.forEach(function (st) {
@@ -733,10 +770,10 @@ function rep(k, n) { var o = []; for (var i = 0; i < n; i++) o.push(k); return o
 var SCENES = [
   // P2: nur PMS (setup.json) + App-PIN je Profil
   { name: 'p2-profiles', seed: 'pkg' },
-  { name: 'p2-account', seed: 'pkg', keys: 'ENTER,wait800,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN' },
-  { name: 'p2-pin-new', seed: 'pkg', keys: 'ENTER,wait800,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,ENTER' },
-  { name: 'p2-pin-mismatch', seed: 'pkg', keys: 'ENTER,wait800,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,ENTER,1,2,3,4,wait600,5,6,7,8,wait600' },
-  { name: 'p2-pins-all', seed: 'pkg', keys: 'ENTER,wait800,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER' },
+  { name: 'p2-account', seed: 'pkg', keys: 'ENTER,wait800,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN' },
+  { name: 'p2-pin-new', seed: 'pkg', keys: 'ENTER,wait800,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER' },
+  { name: 'p2-pin-mismatch', seed: 'pkg', keys: 'ENTER,wait800,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER,1,2,3,4,wait600,5,6,7,8,wait600' },
+  { name: 'p2-pins-all', seed: 'pkg', keys: 'ENTER,wait800,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER' },
   { name: 'p2-pin-kid', seed: 'pkg', keys: 'RIGHT,ENTER,9,9,9,9,wait600' },
   { name: 'login', seed: 'login', mask: LOGIN_MASK },
   { name: 'profiles', seed: 'multi' },
@@ -760,10 +797,10 @@ var SCENES = [
   { name: 'home-noart-off', seed: 'noartOff' },          // Einstellung Hintergrundbilder aus -> einfarbig wie bisher
   { name: 'settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT' },
   // DET-3: "Serien-Fortschritt anzeigen" mit Erklaerung (DE/EN)
-  { name: 'settings-seriesprog', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-seriesprog-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-epprog-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-diag', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT' },
+  { name: 'settings-seriesprog', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-seriesprog-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-epprog-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-diag', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT' },
   { name: 'search', seed: 'home', keys: 'BLUE' },
   { name: 'search-123', seed: 'home', keys: 'BLUE,wait600,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
   { name: 'search-results', seed: 'home', keys: 'BLUE,wait600,ENTER,RIGHT,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN' },
@@ -786,9 +823,9 @@ var SCENES = [
   { name: 'search-recent-sugg-up', seed: 'recent8', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,UP' },
   { name: 'search-recent-ptr', seed: 'recentPtr', keys: 'BLUE,wait600', mwait: 3600, moves: '700:300,700:320,600:160,601:161' },   // Zeiger auf Zeile 2: Fokus ohne Rollen
   { name: 'search-recent-ptr-click', seed: 'recentPtr', keys: 'BLUE,wait600', mwait: 4600, moves: '700:300,700:320,818:116,819:117,click@819:117' },   // Klick auf einen Begriff = OK
-  { name: 'settings-recent', seed: 'recent8', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-recent-panel-en', seed: 'recent8En', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-recent-info', seed: 'recent8', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-recent', seed: 'recent8', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-recent-panel-en', seed: 'recent8En', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-recent-info', seed: 'recent8', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
   { name: 'p4-discover-recent', seed: 'recent8', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT' },
   { name: 'p4-discover', seed: 'home', keys: 'LEFT,UP,ENTER,wait800' },
   { name: 'p4-discover-rail', seed: 'home', keys: 'LEFT,UP' },
@@ -809,13 +846,13 @@ var SCENES = [
   { name: 'p4-insp-rows', seed: 'home', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,DOWN,wait800' },   // Inspiration: Fokus in der 4. Reihe
   { name: 'p4-insp-back', seed: 'home', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,RIGHT,ENTER,wait1200,RETURN,wait900' },   // Detailseite und zurueck: Fokus bleibt in der Reihe
   { name: 'p4-insp-cleared', seed: 'home', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RED,wait1500' },   // Eingabe geloescht -> Reihen wieder da
-  { name: 'p4-insprows', seed: 'insp', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait600' },   // Einstellungen > Inspiration anpassen
-  { name: 'p4-settings-watchlist', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p4-insprows', seed: 'insp', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait600' },   // Einstellungen > Inspiration anpassen
+  { name: 'p4-settings-watchlist', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   // "Nur Titel, die du noch nicht hast" (Entdecken, plex.tv-Reihen ueber den Helfer): Einstellung de/en, mit Weiteren Servern, Reihen mit Filter
-  { name: 'p4-settings-insphide', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 20) + ',wait600' },
-  { name: 'p4-settings-insphide-info', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 20) + ',wait600,INFO' },   // INFO: alles erklaert
-  { name: 'p4-settings-insphide-en', seed: 'inspNewEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 20) + ',wait600' },
-  { name: 'p4-settings-insphide-srv', seed: 'pkgSrvHelper', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 21) + ',wait600' },   // zweite Zeile: auch Weitere Server
+  { name: 'p4-settings-insphide', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600' },
+  { name: 'p4-settings-insphide-info', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600,INFO' },   // INFO: alles erklaert
+  { name: 'p4-settings-insphide-en', seed: 'inspNewEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600' },
+  { name: 'p4-settings-insphide-srv', seed: 'pkgSrvHelper', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600' },   // zweite Zeile: auch Weitere Server
   { name: 'p4-insp-new', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,wait800' },          // Filter an: nur fremde Titel + Hinweis-Reihe
   { name: 'p4-insp-new-en', seed: 'inspNewEn', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,wait800' },
   { name: 'p4-insp-new-skip', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,wait800' },   // DOWN springt ueber den Hinweis
@@ -823,6 +860,27 @@ var SCENES = [
   { name: 'settings-homerows', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,ENTER,DOWN' },
   { name: 'settings-homerows-move', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,ENTER,DOWN,DOWN,DOWN,YELLOW,UP' },
   { name: 'home-custom', seed: 'custom' },
+  /* HOME-14 "Alle anzeigen": Karte am Reihenende (Poster, Querformat mit Zahl, EN), Bibliothek nur fuer diesen Besuch nach Hinzugefuegt,
+   * ganze Liste eines Server-Hubs bzw. von Weiterschauen, RETURN zurueck auf die Karte */
+  { name: 'home-all-new', seed: 'home', keys: 'DOWN,DOWN,RIGHT,RIGHT,RIGHT', mask: [[320, 270, 600, 34]] },
+  { name: 'home-all-new-en', seed: 'en', keys: 'DOWN,DOWN,RIGHT,RIGHT,RIGHT', mask: [[320, 270, 600, 34]] },
+  { name: 'home-all-cw', seed: 'cwMore', keys: 'FF,FF,FF,FF' },
+  { name: 'lib-all-new', seed: 'home', keys: 'DOWN,DOWN,RIGHT,RIGHT,RIGHT,ENTER,wait800' },
+  { name: 'lib-all-hub', seed: 'custom', keys: 'RIGHT,RIGHT,ENTER,wait800' },
+  { name: 'lib-all-cw', seed: 'cwMore', keys: 'FF,FF,FF,FF,ENTER,wait800' },
+  /* HOME-14 Ansicht in den Listen: Chip "Ansicht", Panel (Rot), jede Groesse; nur fuer diesen Besuch */
+  { name: 'lib-all-hub-view', seed: 'custom', keys: 'RIGHT,RIGHT,ENTER,wait800,RED,wait600' },
+  { name: 'lib-all-hub-m', seed: 'custom', keys: 'RIGHT,RIGHT,ENTER,wait800,RED,wait600,DOWN,ENTER,wait900,RETURN,wait600' },
+  { name: 'lib-all-hub-s', seed: 'custom', keys: 'RIGHT,RIGHT,ENTER,wait800,RED,wait600,DOWN,DOWN,ENTER,wait900,RETURN,wait600' },
+  { name: 'lib-all-hub-list', seed: 'custom', keys: 'RIGHT,RIGHT,ENTER,wait800,RED,wait600,DOWN,DOWN,DOWN,ENTER,wait900,RETURN,wait600' },
+  { name: 'lib-all-cw-list', seed: 'cwMore', keys: 'FF,FF,FF,FF,ENTER,wait800,RED,wait600,DOWN,DOWN,DOWN,ENTER,wait900,RETURN,wait600' },
+  { name: 'lib-all-cw-chip', seed: 'cwMore', keys: 'FF,FF,FF,FF,ENTER,wait800,UP,wait400' },
+  { name: 'home-all-back', seed: 'home', keys: 'DOWN,DOWN,RIGHT,RIGHT,RIGHT,ENTER,wait800,RETURN,wait600', mask: [[320, 270, 600, 34]] },
+  { name: 'settings-secback', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN' },   // NAV-5: "Zurueck aus einem Bereich" unter "Seitenleiste anpassen"
+  { name: 'settings-secback-panel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-secback-panel-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-secback-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,INFO' },
+  { name: 'home-return-exit', seed: 'home', keys: 'DOWN,RIGHT,RETURN,RETURN' },   // NAV-5: erste Karte, dann gleich der Beenden-Dialog (ohne Seitenleiste)
   { name: 'settings-railitems', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER,DOWN' },   // W1: Seitenleiste anpassen
   { name: 'home-rail-custom', seed: 'railCustom', keys: 'LEFT' },                     // W1: Serien oben, Suche und Dokus aus
   { name: 'player-resume', seed: 'play', keys: 'ENTER' },
@@ -846,29 +904,29 @@ var SCENES = [
   { name: 'player-versions', seed: 'play', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,TOOLS,ENTER' },
   { name: 'home-version', seed: 'home', keys: 'RIGHT,RIGHT,TOOLS' },
   { name: 'player-last', seed: 'play', keys: 'DOWN,ENTER', mask: CLOCK },
-  { name: 'settings-still', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-still', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
   // P5 Einstellungen & Komfort
   { name: 'p5-settings-subs', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'p5-settings-anime', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,RIGHT,DOWN' },
-  { name: 'p5-settings-display', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-settings-display', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   // Zeiger-Scrollen beschleunigen (abhaengig von Zeiger-Steuerung): an, Zeiger-Steuerung selbst (Erklaerung mit "Aus: …"), Zeiger aus = grau, englisch
-  { name: 'settings-ptraccel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP' },
-  { name: 'settings-ptredge', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP' },   // Zeiger blaettert am Rand weiter (TV-Befund 1.0.5)
-  { name: 'settings-ptredge-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP,INFO' },
-  { name: 'settings-ptraccel-edgeoff', seed: 'ptrEdgeOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP' },   // ausgegraut: erst am Rand weiterblaettern einschalten
-  { name: 'settings-pointer', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP,UP' },
-  { name: 'settings-ptraccel-off', seed: 'ptrOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP' },
-  { name: 'settings-ptredge-off', seed: 'ptrOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP' },
-  { name: 'settings-ptraccel-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP' },
-  { name: 'settings-ptredge-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP' },
-  { name: 'settings-ptredge-info-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP,INFO' },
-  { name: 'settings-pointer-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,UP,UP,UP' },
-  { name: 'p5-settings-help', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN' },
-  { name: 'p5-settings-boost', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'p5-keys', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'p5-keys-trick', seed: 'keysTrick', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'p5-keys-trick-en', seed: 'keysTrickEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'p5-conntest', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER,wait1500', mask: [[872, 112, 376, 48]] },   // Antwortzeit (gemessen, 0/1 ms; bricht in die 2. Zeile um)
+  { name: 'settings-ptraccel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptredge', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // Zeiger blaettert am Rand weiter (TV-Befund 1.0.5)
+  { name: 'settings-ptredge-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-ptraccel-edgeoff', seed: 'ptrEdgeOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // ausgegraut: erst am Rand weiterblaettern einschalten
+  { name: 'settings-pointer', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptraccel-off', seed: 'ptrOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptredge-off', seed: 'ptrOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptraccel-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptredge-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptredge-info-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-pointer-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-settings-help', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN' },
+  { name: 'p5-settings-boost', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-keys', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-keys-trick', seed: 'keysTrick', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-keys-trick-en', seed: 'keysTrickEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-conntest', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER,wait1500', mask: [[872, 112, 376, 48]] },   // Antwortzeit (gemessen, 0/1 ms; bricht in die 2. Zeile um)
   // Anime je Titel (docs/TODO.md "Anime-Erkennung"): Ueberzeile, Grund im INFO-Panel, TOOLS-Eintraege, Kategorie ausgeblendet
   { name: 'p5-anime-details', seed: 'anime', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800' },
   { name: 'p5-anime-info', seed: 'anime', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,INFO' },
@@ -880,10 +938,11 @@ var SCENES = [
   { name: 'saver-off-busy', seed: 'svBusyOff', keys: 'wait6000' },
   { name: 'saver-fade-done', seed: 'svDarkFade', keys: 'wait7000' },                   // Standard (Ueberblenden) nach dem ersten Bild
   // Einstellungen: Schoner-Zeilen, Auswahl Uebergang/Einblendung, Mehrfachauswahl Bibliotheken
-  { name: 'saver-settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 22) },
-  { name: 'saver-fx-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 25) + ',ENTER' },
-  { name: 'saver-info-picker-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 26) + ',ENTER' },
-  { name: 'saver-libs-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 22) + ',ENTER,DOWN,DOWN,DOWN,ENTER' },   // Musik dazu
+  { name: 'saver-settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'saver-fx-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER' },   // +1: Zeile "Nach langer Zeit nur noch die Uhr" (SAV-6)
+  { name: 'saver-info-picker-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,ENTER' },
+  { name: 'saver-night-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600,INFO' },   // SAV-6: INFO erklaert die Nachtruhe
+  { name: 'saver-libs-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,ENTER' },   // Musik dazu
   { name: 'p5-spoiler', seed: 'spoiler', keys: 'DOWN' },
   // Uhr auf der Startseite: je Stil hell (de, Hero-Bild), dunkel (en, Hintergrundbilder aus), kraeftig gruen (de, Film-Reihe)
   { name: 'clock-box', seed: 'clock_box' }, { name: 'clock-free', seed: 'clock_free' }, { name: 'clock-date', seed: 'clock_date' }, { name: 'clock-small', seed: 'clock_small' },
@@ -895,14 +954,25 @@ var SCENES = [
   { name: 'hints-brief-faded', seed: 'hintsBrief', keys: 'wait3000' },
   { name: 'hints-brief-tools', seed: 'hintsBrief', keys: 'wait3000,TOOLS' },
   { name: 'hints-off', seed: 'hintsOff' },
-  { name: 'settings-clockstyle', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,' + rep('DOWN', 16) + ',ENTER' },
-  { name: 'settings-clockstyle-off', seed: 'spoiler', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,' + rep('DOWN', 16) },   // Uhr aus: Zeile gedimmt, Satz erklaert warum
-  { name: 'settings-hints-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,' + rep('DOWN', 17) + ',ENTER' },
-  { name: 'settings-hints-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,' + rep('DOWN', 17) + ',INFO' },
+  // HOME-13: Hinweis bei neuen Inhalten – Startseite (Genau DE/EN, gemischt, Allgemein, langer Titel), Bibliothek oben rechts, Player oben links
+  // (nur mit "Auch waehrend der Wiedergabe"; ohne: kein Hinweis im Video), Einstellungen (drei Zeilen unter der Uhr)
+  { name: 'news-exact', seed: 'newsExact', hold: 5000 }, { name: 'news-exact-en', seed: 'newsExactEn', hold: 5000 },
+  { name: 'news-mixed', seed: 'newsMixed', hold: 5000 }, { name: 'news-general', seed: 'newsGeneral', hold: 5000 },
+  { name: 'news-long-en', seed: 'newsLongEn', hold: 5000 },
+  { name: 'news-library', seed: 'newsLib', keys: 'LEFT,DOWN,ENTER,wait3500' },
+  { name: 'news-player', seed: 'newsPlay', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait8000', mask: CLOCK },
+  { name: 'news-player-off', seed: 'newsPlayOff', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait8000', mask: CLOCK },
+  { name: 'news-settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'news-settings-secs-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'news-settings-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-clockstyle', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-clockstyle-off', seed: 'spoiler', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // Uhr aus: Zeile gedimmt, Satz erklaert warum
+  { name: 'settings-hints-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-hints-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
   // Akzentfarbe: Einstellung (Farbfeld), Auswahl mit Farbfeldern, Wechsel wirkt sofort; Startseite/Seitenleiste in anderen Farben
-  { name: 'accent-setting', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN' },
-  { name: 'accent-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN' },
-  { name: 'accent-live', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'accent-setting', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'accent-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN' },
+  { name: 'accent-live', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,ENTER' },
   { name: 'accent-home-violet', seed: 'violet', keys: 'DOWN' },
   { name: 'accent-rail-coral', seed: 'coral', keys: 'LEFT,DOWN' },
   { name: 'accent-player-coral', seed: 'coralPlay', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,RIGHT,RIGHT,RIGHT', mask: CLOCK },
@@ -995,11 +1065,11 @@ var SCENES = [
   { name: 'player-trick-normal', seed: 'playTrick', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,FF,FF,PLAY', mask: CLOCK },   // PLAY: Pille weg, Pause-Symbol
   { name: 'player-trick-hls', seed: 'trickHls', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait1500,FF', mask: CLOCK },
   { name: 'player-trick-hls-en', seed: 'trickHlsEn', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait1500,FF', mask: CLOCK },
-  { name: 'settings-ffrw', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-ffrw-panel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-ffrw-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-ffrw-panel-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-ffrw-help-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-ffrw', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ffrw-panel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-ffrw-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ffrw-panel-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-ffrw-help-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
   { name: 'player-asym', seed: 'playAsym', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,RIGHT', mask: CLOCK },                    // -10 / +30
   { name: 'player-ep-pn', seed: 'play', keys: 'ENTER,ENTER,wait800,UP,DOWN,LEFT,LEFT', mask: CLOCK },     // Folge: erste der Queue -> ⏮ gedimmt, Fokus bleibt auf -10; Skip-Knopf sichtbar
   { name: 'player-hover', seed: 'ptrHoldPlay', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,700:486', mask: CLOCK },   // Zeiger ueber dem Balken: Zeit + Vorschaubild
@@ -1070,12 +1140,12 @@ var SCENES = [
   { name: 'amb-off', seed: 'ambOff', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,wait1800' },
   { name: 'amb-rm', seed: 'ambRm', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,wait1000' },          // Reduzierte Bewegung: sofortiger Tausch
   { name: 'amb-music', seed: 'ambStrong', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,RIGHT,wait1800' },
-  { name: 'amb-settings', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'amb-settings-panel', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'amb-settings-strength', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'amb-settings-off', seed: 'ambOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'amb-settings-en', seed: 'ambEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'amb-settings-panel-en', seed: 'ambEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'amb-settings', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'amb-settings-panel', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'amb-settings-strength', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'amb-settings-off', seed: 'ambOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'amb-settings-en', seed: 'ambEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'amb-settings-panel-en', seed: 'ambEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
   { name: 'rail-long', seed: 'longLib', keys: 'LEFT' },
   // Weitere Server: Seitenleiste mit Bibliotheken eines freigegebenen Servers (Herkunft), Bibliothek/Details mit Herkunft,
   // Seitenleiste anpassen, Einstellungszeile, nicht erreichbarer Server (Meldung nur fuer ihn)
@@ -1083,7 +1153,7 @@ var SCENES = [
   { name: 'srv-library', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait1000' },
   { name: 'srv-details', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait1000,RIGHT,ENTER,wait2500', mask: [[992, 624, 288, 32]] },   // letzte Besetzungsbilder laden mal spaeter
   { name: 'srv-railitems', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'srv-settings', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN' },
+  { name: 'srv-settings', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'srv-details-error', seed: 'pkgSrvMetaFail', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait1000,RIGHT,ENTER,wait2600', hold: 16000 },   // Meldung deckt Titel/Metazeile ab
   { name: 'srv-down', seed: 'pkgSrvDown', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait1500' },
   { name: 'rail-long-en', seed: 'longLibEn', keys: 'LEFT' }
@@ -1098,7 +1168,7 @@ SAVER_STYLES.forEach(function (st) {
     { name: 'saver-' + st + '-pos3', seed: 'svBusyPos' + cap + '3', keys: 'wait6000' });
 });
 /* SAV-5: Einstellung (Zeile, Auswahl en, INFO-Erklaerung), Standard ueberspringt Standbilder, Auch Standbilder, Poster je Einblendung */
-var SV_SET = 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,' + rep('DOWN', 28);
+var SV_SET = 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN';   // Einstellungen › Bildschirmschoner › "Bilder im Bildschirmschoner" (Zeile 5)
 SCENES.push({ name: 'saver-pics-setting', seed: 'home', keys: SV_SET }, { name: 'saver-pics-picker-en', seed: 'en', keys: SV_SET + ',ENTER' },
   { name: 'saver-pics-info', seed: 'home', keys: SV_SET + ',wait600,INFO' }, { name: 'saver-pics-art', seed: 'svPicArt', keys: 'wait6000' },
   { name: 'saver-pics-stills', seed: 'svPicStills', keys: 'wait6000' });
@@ -1138,7 +1208,7 @@ function shot(port, sc, done) {
 }
 
 /* Selbsttest der Layout-Pruefung (tools/layout_selftest.html): genau diese Befunde muessen kommen, sonst ist sie blind */
-var LAYOUT_EXPECT = ['button x-btn x-btn-hint', 'clip x-clip', 'edge x-edge', 'notice x-note x-note-under', 'offscreen x-off', 'overlap x-ov-a x-ov-b', 'panel x-pa x-pb', 'safe x-safe'];
+var LAYOUT_EXPECT = ['button x-btn x-btn-hint', 'clip x-clip', 'edge x-edge', 'notice x-note x-note-under', 'offscreen x-off', 'overlap x-ov-a x-ov-b', 'panel x-pa x-pb', 'safe x-safe', 'spill x-spill-btn x-spill-dlg'];
 function layoutSelftest(port, done) {
   var prof = fs.mkdtempSync(path.join(os.tmpdir(), 'pnvis-')), out = path.join(CUR, 'layout-selftest.png');
   var url = 'file://' + path.join(ROOT, 'tools', 'layout_selftest.html') + '?probe=' + encodeURIComponent('http://127.0.0.1:' + port + '/layout?scene=_selftest');
@@ -1382,4 +1452,4 @@ function layoutReport(results) {
 
 if (require.main === module) main();
 module.exports = { compare: compare, readPng: readPng, writePng: writePng, solidPng: solidPng, startServer: startServer, makeSeeds: makeSeeds, SCENES: SCENES,
-  slotAcquire: slotAcquire, matchAny: matchAny, seedsFor: seedsFor, runPool: runPool, JOBS: JOBS, MAX_TOTAL: MAX_TOTAL };
+  slotAcquire: slotAcquire, matchAny: matchAny, seedsFor: seedsFor, runPool: runPool, JOBS: JOBS, MAX_TOTAL: MAX_TOTAL, LIB: LIB };

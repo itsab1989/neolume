@@ -74,7 +74,8 @@
         if (kind === 'move') rail.close();           // Punkt verlaesst das Panel -> einklappen, Fokus zurueck
       } else if (x < 112 && !(P.arrowsOn && arrowHit(x, y))) {
         return rail.pointer(x, y, kind);             // Punkt auf der Rail -> ausklappen
-      }
+      } else if (rail.rest) rail.away();             // Punkt hat die Icon-Spalte verlassen: Darueberfahren klappt wieder auf
+
     }
     if (N.ui.mini && N.ui.mini.pointer(x, y, kind)) return true;   // M4: Mini-Player (Klick = Jetzt laeuft)
     if (P.arrowsOn && kind === 'click') {

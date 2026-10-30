@@ -7,7 +7,7 @@
   function open(o) {
     var ov = { el: U.el('div', 'layer'), btns: [], f: o.focus || 0, rects: null, closed: false };
     U.el('div', 'backdrop', ov.el);
-    var box = U.el('div', o.vertical ? 'dlg' : 'dlg c', ov.el);   // Bestaetigung (Buttons nebeneinander): kompakt + zentriert
+    var box = U.el('div', o.vertical ? 'dlg' : o.buttons.length > 2 ? 'dlg c c3' : 'dlg c', ov.el);   // Bestaetigung (Buttons nebeneinander): kompakt + zentriert; 3 Knoepfe: breiter
     if (o.top) box.style.top = o.top + 'px';
     if (o.title) U.txt('div', 'dt', box, o.title);
     if (o.text) U.txt('div', 'dx', box, o.text);

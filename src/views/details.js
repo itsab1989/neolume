@@ -91,6 +91,8 @@
         if (cur && cur.virtual && seasons[ni] && !seasons[ni].virtual) loadSeason(ni, fe);
         return true;
       },
+      /* Zeile unter der Beschreibung neu (Daten der Erweiterung kamen): blendet nur diese Zeile ein, der Info-Block bleibt stehen */
+      note: function () { if (!dead && infoFor && infoFor.type === 'show') hero.note(noteFor(infoFor), true); },
       away: function () { return away; },
       hints: function () { N.idle.add(updateHints, 'det-hints'); }
     };
@@ -143,8 +145,10 @@
       // Spoilerschutz (P5): ungesehene Folge -> Hinweis statt Beschreibung (INFO zeigt den Text)
       hero.paint(ovl(ep ? D.overline(x) : D.overline(x, d)), ep ? N.t('det.epTitle', { e: x.e, title: x.epTitle }) : x.title,
         !ep && xt && xt.meta && xt.meta() ? N.fmt.join([D.meta(x, d), xt.meta()]) : D.meta(x, ep ? epMeta.get(x.rk) || null : d), ep ? N.comfort.summary(x) : d ? d.sum : x.sum,
-        { small: ep, chips: media ? D.chips(media, vIndex(x.rk, media)) : [] });
+        { small: ep, chips: media ? D.chips(media, vIndex(x.rk, media)) : [], note: noteFor(x) });
     }
+    /* Zeile der Erweiterung unter der Beschreibung (xt.note, z. B. wann die naechste Folge kommt): nur fuer die Serie selbst */
+    function noteFor(x) { return x && x.type === 'show' && xt && xt.note ? xt.note() || '' : ''; }
     /* gewaehlte bzw. automatisch passende Datei (SPEC 7.6, N.versions) */
     function vIndex(rk0, media) {
       if (!media || media.length < 2) return 0;
@@ -219,6 +223,11 @@
     function kinds() { var hc = N.session.homeCache(), k = N.hubs.libKinds(srv ? srvLibs() : hc && (hc.alibs || hc.libs) || []); return k; }
     function load() {
       gen++; var g = gen;
+      /* Neu laden nach dem Player/Gesehen-Wechsel (dirty): s.enter setzt dirty gleich nach diesem Aufruf zurueck – die Antworten
+       * kommen spaeter. TV-Test 30.10.: deshalb nahm loadSeason die Folgen aus dem 5-Min.-Zwischenspeicher (Stand VOR dem
+       * Abspielen, Position 0) und "Abspielen" nach STOP begann bei 0:01 ohne Fortsetzen-Frage. re gilt fuer diesen Ladevorgang. */
+      var re = dirty;
+      if (re) seasonCache.clear();
       /* Erweiterung schon vor den Antworten: sie weiss so frueh wie moeglich, ob sie Staffeln ergaenzt (pending, s. tabHold) */
       if (!xt && N.ext.has('details:open')) xt = N.ext.call('details:open', X) || null;
       var mrk = isShow ? showRk : it0.rk;
@@ -251,7 +260,7 @@
         applySeasons();
         buildTabs();
         if (!seasons.length) return;
-        var keep = seasons[sIdx] && dirty ? sIdx : D.pickSeason(seasons, wishS, d && d.ondeck);
+        var keep = seasons[sIdx] && re ? sIdx : D.pickSeason(seasons, wishS, d && d.ondeck);
         selectSeason(keep, true);
       }));
     }

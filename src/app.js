@@ -70,6 +70,7 @@
       N.img.decoder(chrome);                           // Vorab-Dekodieren (Runde 5): 1x1-Ebene fuer Bilder ausserhalb des Bildschirms
       N.ui.hints.init(chrome);
       N.ui.toast.init(chrome);
+      N.ui.news.init(chrome);                          // HOME-13: Hinweis bei neuen Inhalten (eine dauerhafte, leere Huellen-Ebene)
       N.ui.mini.init(chrome);                          // M4: Mini-Player (Musik/Hoerbuch beim Stoebern)
       N.ui.rail.init(chrome);
       N.router.init(screens, over);
@@ -121,16 +122,27 @@
       var R = N.router;
       if (id === 'profile') { A.switchProfile(); return true; }
       if (id === 'home') {
+        N.sections.visit('home');                    // Start = Wurzel: Verlauf der Bereiche leeren
         if (R.topName() === 'home') return false;
         while (R.topName() !== 'home' && R.depth() > 1) R.back();
         if (R.topName() !== 'home') R.reset('home');
         return true;
       }
       var name = id === 'settings' || id === 'search' || id === 'discover' ? id : 'library';   // P4: Entdecken
-      var params = name !== 'library' ? {} : { lib: lib }, tp = R.topParams();
+      // sec: Bereich aus der Seitenleiste (NAV-5) – oben angekommen fuehrt RETURN ueber N.app.sectionBack weiter, nicht per Router zurueck
+      var params = name !== 'library' ? { sec: 1 } : { lib: lib, sec: 1 }, tp = R.topParams();
       if (R.topName() === name && (name !== 'library' || (tp && tp.lib && lib && tp.lib.id === lib.id && (tp.lib.srv || '') === (lib.srv || '') && !tp.coll && !tp.actor))) return false;
+      N.sections.visit(id);
       if (R.topName() === 'home') R.push(name, params); else R.replace(name, params);
       return true;
+    },
+    /* RETURN oben in einem Bereich aus der Seitenleiste (NAV-5): je nach "Zurueck aus einem Bereich" zur Startseite oder zum
+     * vorherigen Bereich (N.sections); ein Bereich, der nicht mehr in der Seitenleiste steht, wird uebersprungen */
+    sectionBack: function () {
+      var scr = N.router.top(), rail = N.ui.rail, S = N.session;
+      var to = N.sections.target(scr && scr.rail, S && S.settings, function (x) { return !!rail.entry(x); });
+      var e = to !== 'home' ? rail.entry(to) : null;
+      if (e) A.navigate(e.id, e.lib || null); else A.navigate('home');
     },
     /* 401 mit dem Profil-Token in einer Ansicht (Pentest P6 / Audit M8): Token verwerfen; Kinderprofil mit "Profilwechsel nur
      * mit PIN" nicht in die offene Profilwahl, sondern zur Startseite (dort fuehrt nur die Hauptkonto-PIN weiter, wie home.js) */

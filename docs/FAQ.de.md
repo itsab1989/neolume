@@ -111,19 +111,27 @@ Balken liegen Zeiten und Knöpfe so dicht, dass der Zeiger beim Feinjustieren le
 bekommt jetzt automatisch *Panel über dem Balken*.
 
 ### Wie stelle ich den Bildschirmschoner ein?
-Unter **Einstellungen → Oberfläche**. *Bildschirmschoner nach* (Aus, 1, 2, 5, 10, 15 oder 30 Minuten; Standard 5) startet ihn, wenn keine Taste gedrückt wurde – nie während ein Video läuft. Dazu:
+Er hat eine eigene Kategorie: **Einstellungen → Bildschirmschoner** (Hauptprofil und andere Erwachsenen-Profile). *Bildschirmschoner nach* (Aus, 1, 2, 5, 10, 15 oder 30 Minuten; Standard 5) startet ihn, wenn keine Taste gedrückt wurde – nie während ein Video läuft. Steht er auf Aus, sind die übrigen Schoner-Einstellungen gedimmt. Sie stehen hier in derselben Reihenfolge wie auf dem Fernseher:
 
 | Einstellung | Auswahl (Standard zuerst) | Wirkung |
 |---|---|---|
-| Schoner-Bilder aus | Bibliotheken · Startseite | Bibliotheken: zufällige Titel mit Hintergrundbild aus ganzen Bibliotheken, keiner doppelt, bis alle dran waren. Startseite: nur Titel von dort (keine zusätzlichen Anfragen). |
-| Bibliotheken im Schoner | Filme & Serien · eigene Auswahl | Welche Bibliotheken genutzt werden. Musik zeigt Künstlerbilder. |
-| Nur Ungesehenes zeigen | Aus · An | Nur Filme und Serien, die du noch nicht zu Ende gesehen hast. |
-| Bildwechsel alle | 30 · 10 · 20 · 60 Sekunden | Wie lange jedes Bild bleibt. |
+| Einblendung im Schoner | Ambient · Klassisch · Filmplakat · Untertitel-Leiste · Große Uhr · Nur kleine Uhr · Aus (nur Bilder) | Wie Uhr und Titel erscheinen; INFO auf der Einstellung erklärt jeden Stil. Die Lage wechselt mit jedem Bild (gegen Einbrennen). |
 | Bildübergang | Überblenden · Schnitt · Über Schwarz · Langsamer Zoom · Langsames Gleiten · Zoom-Durchflug · Vorhang · Jalousie · Kacheln · Zufällig | Wie das nächste Bild erscheint. Bei *Reduzierte Bewegung* wird aus Bewegung ein Überblenden. |
-| Einblendung im Schoner | Ambient · Klassisch · Filmplakat · Untertitel-Leiste · Große Uhr · Nur kleine Uhr · Aus | Wie Uhr und Titel erscheinen; INFO auf der Einstellung erklärt jeden Stil. Die Lage wechselt mit jedem Bild (gegen Einbrennen). |
+| Bildwechsel alle | 30 · 10 · 20 · 60 Sekunden | Wie lange jedes Bild bleibt. |
+| Bilder im Bildschirmschoner | Nur echte Hintergrundbilder · Auch Standbilder aus dem Video · Poster und Cover | Welche Art Bild gezeigt wird. Manche Titel haben kein eigenes Hintergrundbild; dann nimmt Plex ein zufälliges Standbild aus dem Video – oft dunkel oder verwischt. *Nur echte Hintergrundbilder* überspringt diese. INFO erklärt jede Möglichkeit. |
 | Schoner-Bilder unscharf | An · Aus | Weich und ruhig oder scharf. |
+| Schoner-Bilder aus | Bibliotheken · Startseite | Bibliotheken: zufällige Titel mit Hintergrundbild aus ganzen Bibliotheken, keiner doppelt, bis alle dran waren. Startseite: nur Titel von dort (keine zusätzlichen Anfragen). |
+| Bibliotheken im Schoner | Filme & Serien · eigene Auswahl | Welche Bibliotheken genutzt werden (nur bei *Bibliotheken* darüber). Musik zeigt Künstlerbilder. |
+| Nur Ungesehenes zeigen | Aus · An | Nur Filme und Serien, die du noch nicht zu Ende gesehen hast (nur bei *Bibliotheken* darüber). |
+| Nach langer Zeit nur noch die Uhr | 2 Std. · 1 Std. · 4 Std. · Nie | Nach dieser Zeit blendet das letzte Bild sanft aus, und nur noch die Uhr wandert über den schwarzen Bildschirm. Ältere Fernseher können nach vielen Stunden ständig neuer Bilder den Speicher füllen und dann gar nicht mehr reagieren; Schwarz schützt außerdem vor Einbrennen und spart Strom. Jede Taste beendet den Schoner wie gewohnt. |
 
 *Uhrzeit anzeigen* gilt auch im Schoner: Ist sie aus, zeigt kein Stil die Uhr. Kinderprofile nutzen die Standardwerte und sehen nur Bilder, die ihr eigenes Plex-Konto sehen darf.
+
+### Wohin führt RETURN?
+`RETURN` geht immer einen Schritt zurück. In einem Bereich, den du aus der Seitenleiste geöffnet hast – einer Bibliothek (auch Musik und Hörbücher), der Suche, Entdecken oder den Einstellungen –, führt es zuerst nach oben (erste Reihe, Tastatur, Kategorien). Drückst du noch einmal, entscheidet die Einstellung **Einstellungen → Oberfläche → Zurück aus einem Bereich**: **Zur Startseite** (Standard) führt direkt zur Startseite; **Zum vorherigen Bereich** funktioniert wie „Zurück“ im Browser und geht die geöffneten Bereiche rückwärts durch, jeden nur einmal, bis zur Startseite. Auf der Startseite führt `RETURN` zur ersten Karte und fragt von dort, ob du die App beenden möchtest. Die Seitenleiste öffnest du mit ◀. Jedes Profil hat seine eigene Wahl.
+
+### Was ist der kleine Hinweis auf neue Inhalte?
+Kommen neue Filme, Folgen, Musik oder Hörbücher auf deinen Server, blendet sich ein paar Sekunden lang ein kleiner Hinweis ein und von selbst wieder aus – auf der Startseite rechts unter der Uhr, in Bibliotheken und bei *Jetzt läuft* oben rechts. Er braucht keine Taste und wartet, solange du Tasten drückst oder ein Menü offen ist. Einstellen kannst du ihn unter **Einstellungen → Oberfläche**: **Hinweis bei neuen Inhalten** (**Genau** = Standard, was neu ist, z. B. „Neue Folge“ mit Serie, Staffel und Folge; **Allgemein** = nur „Neue Inhalte auf deinem Server“; oder **Aus**), **Anzeigedauer des Hinweises** (3, 5, 8 oder 12 Sekunden; Standard 5) und **Auch während der Wiedergabe** (Standard aus; an erscheint er klein oben links im Video, nur solange keine Bedienleiste zu sehen ist). Dein Profil erfährt nur von dem, was es sehen darf. Startseite und Bibliotheken aktualisieren die betroffenen Reihen außerdem von selbst, ohne die markierte Karte zu verschieben.
 
 ### Was ist der farbige Hintergrund in den Bibliotheken? Kann ich ihn abschalten?
 Das ist der **Hintergrund in Bibliotheken** (**Einstellungen → Oberfläche → Hintergrund in Bibliotheken**). *Farbstimmung* (Standard) färbt den Hintergrund sanft in den Farben des gewählten Titels – die liefert dein Plex-Server ohnehin mit, es wird nichts zusätzlich geladen. *Titelbild* zeigt das Bild des Titels, vom Server weichgezeichnet und abgedunkelt; *Zufallsbild* wählt bei jedem Öffnen der Bibliothek ein Bild daraus. *Aus* lässt den schlichten dunklen Hintergrund. **Stärke des Hintergrunds** wählt zwischen *Dezent* (Standard, am dunkelsten, Texte am besten lesbar) und *Kräftiger*. Der Hintergrund wechselt erst, wenn du kurz auf einem Titel stehen bleibst, nie beim Scrollen – so bleibt das Blättern flüssig. Sind **Hintergrundbilder** aus, zeigen *Titelbild* und *Zufallsbild* stattdessen die Farbstimmung; mit **Reduzierte Bewegung** wechselt er ohne Überblenden.

@@ -2,7 +2,7 @@
  * Netz-Standards sind im Repo leer: tools/build.js setzt die lokalen Werte aus local.json (git-ignoriert) ins gebaute app.js. */
 (function (N) {
   var C = {
-    version: '1.0.6',
+    version: '1.0.7',
     product: N.brand.name,
     platform: 'Samsung',
     platformVersion: 'Orsay 2014',
@@ -34,6 +34,7 @@
       if (o.cursor === 'A' || o.cursor === 'B' || o.cursor === 'system') C.cursorMode = o.cursor;
       if (o.sefFake === 'still') C.sefFake = 'still';                 // Vorschau/visuelle Tests: stehendes Bild
       if (Number(o.seekDelay) > 0) C.seekDelay = Number(o.seekDelay);  // nur Tests: Sammel-Sprung haelt an
+      if (Number(o.fakeEndMs) > 0) C.fakeEndMs = Number(o.fakeEndMs);   // nur Bildtests (ohne SEF): Video endet ms nach dem Start (Karte am Ende mit Rueckzaehler)
       if (Number(o.ptrEdgeDwell) > 0) C.ptrEdgeDwell = Number(o.ptrEdgeDwell);   // nur Tests: Zeiger-Randzone zeigt nur die Pille
       if (/^#[0-9A-Fa-f]{6}$/.test(o.fakeBg || '')) C.fakeBg = o.fakeBg;   // nur Bildtests: Farbe des Video-Platzhalters (helles Bild, Feinauswahl)
       if (typeof o.fakeSub === 'string' && o.fakeSub.length < 120) C.fakeSub = o.fakeSub;   // nur Bildtests (stehendes Bild): feste Untertitel-Zeile
@@ -49,7 +50,11 @@
       if (Number(o.hintMs) > 0) C.hintMs = Number(o.hintMs);         // nur Tests: Tastenhinweise "Nur kurz" blenden nach ms aus
       if (o.welcome === false) C.welcome = false;                     // nur Tests: keine Willkommenskarte
       if (Number(o.saverMs) > 0) C.saverMs = Number(o.saverMs);
+      if (Number(o.newsHoldMs) > 0) C.newsHoldMs = Number(o.newsHoldMs);       // nur Bildtests: Hinweis bei neuen Inhalten fruehestens nach ms
+      if (Number(o.newsShowMs) > 0) C.newsShowMs = Number(o.newsShowMs);       // nur Bildtests: Hinweis bleibt ms stehen
+      if (o.newsSettleMs !== undefined && Number(o.newsSettleMs) >= 0) C.newsSettleMs = Number(o.newsSettleMs);   // nur Bildtests: Ruhe im Video vor dem Hinweis
       if (Number(o.saverIvMs) > 0) C.saverIvMs = Number(o.saverIvMs);   // nur Bildtests: Bildwechsel/Wandern der Einblendung nach ms
+      if (Number(o.saverNightMs) > 0) C.saverNightMs = Number(o.saverNightMs);   // nur Tests/TV-Langlauf (P7 C2): Nachtruhe des Schoners nach ms statt Stunden
       if (o.saverPos >= 0 && o.saverPos <= 3) C.saverPos = Math.floor(o.saverPos);   // nur Bildtests: Lage der Schoner-Einblendung (0..3)       // nur visuelle Tests: Schoner nach ms statt Minuten
       // Schnellspulen (PLAY-32): Stufen fuer den TV-Test, z. B. [2,4,8,16,32]; N.trick.speeds prueft (Vielfache von 2, 2…64), Standard 2/4/8/16
       if (Object.prototype.toString.call(o.trickSpeeds) === '[object Array]' && o.trickSpeeds.length) C.trickSpeeds = o.trickSpeeds.slice(0, 8);   // nur eine Liste (kein Text "2,4")

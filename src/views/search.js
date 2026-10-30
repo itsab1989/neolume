@@ -20,7 +20,7 @@
    * ueber 656 px; ein Begriff hoechstens 300 px breit (CSS max-width, sonst "…") */
   var REC_TOP = 52, REC_STEP = 44, REC_H = 32, REC_GAP = 12, REC_W = 656, REC_LINES = 2;
 
-  function view(kind) { return function () {   // kind: 'search' | 'discover' (nicht "mode": so heisst unten die Tastatur-Ebene)
+  function view(kind) { return function (params) {   // kind: 'search' | 'discover' (nicht "mode": so heisst unten die Tastatur-Ebene)
     var D = kind === 'discover', PFX = D ? 'disc' : 'search', DELAY = D ? N.disc.DELAY : S.DELAY;
     var s = { rail: kind, wheelKeys: ['LEFT', 'RIGHT'] };
     var root, qT, candEl, candT, caret, bubble, bubbleEls = [], keys = [], keyEls = [], rows = [], mode = 'abc', pos = { r: 0, c: 0, col: 0 };
@@ -489,7 +489,8 @@
     };
     s.railBlur = function () { ring.hide(); if (zone === 'kbd') U.cls(keys[pos.r][pos.c], 'is-focus', false); };
     s.railFocus = function () { if (zone === 'kbd') U.cls(keys[pos.r][pos.c], 'is-focus', true); };
-    s.railReturnHome = true;
+    /* RETURN auf der Tastatur (NAV-5): Bereich aus der Seitenleiste -> N.app.sectionBack, sonst (z. B. Blau) eine Ebene zurueck */
+    function up() { if (params && params.sec) N.app.sectionBack(); else N.router.back(); }
 
     s.onKey = function (k) {
       if (N.keys.isDigit(k)) { digit(k); return true; }
@@ -502,7 +503,7 @@
           case 'UP': case 'DOWN': p = S.move(rows, pos, k); if (p) setKey(p); return true;
           case 'ENTER': keyAct(rows[pos.r][pos.c]); return true;
           case 'TOOLS': clearAll(); return true;
-          case 'RETURN': N.ui.rail.open(); return true;
+          case 'RETURN': up(); return true;
         }
         return true;
       }

@@ -120,7 +120,7 @@
       if (eps[guess] && eps[guess].ph) return guess;     // Seite noch nicht geladen -> Position schaetzen (laedt dann gezielt)
       return best >= 0 ? best : guess;
     },
-    /* Beschriftung der Folgenkarte (SPEC 7.7): "F5 · Tote Magier" / "24 Min. · noch 9 Min." bzw. "· Gesehen" */
+    /* Beschriftung der Folgenkarte (SPEC 7.7): "F5 · Alte Schwüre" / "24 Min. · noch 9 Min." bzw. "· Gesehen" */
     epCaption: function (ep) {
       if (ep && ep.cap) return ep.cap;                 // fertige Beschriftung (Erweiterungen, z. B. Karte ohne Datei)
       if (!ep || ep.ph) return ['', ''];

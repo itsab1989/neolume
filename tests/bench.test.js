@@ -28,10 +28,11 @@ test('Meter: fps, lange Frames, schlimmster Frame, Bild-Haenger', function () {
 });
 
 test('Szenario-Auswahl: all ohne leak, Praefix, leak:n', function () {
-  var BM = H.load().N.benchMath, names = ['home', 'home-hero', 'lib-L', 'lib-M', 'search', 'leak', 'saver-fade', 'saver-zoom', 'amb-off-M', 'amb-fade-mood', 'hvar-cue0'];
+  var BM = H.load().N.benchMath, names = ['home', 'home-hero', 'lib-L', 'lib-M', 'search', 'leak', 'saver-fade', 'saver-zoom', 'amb-off-M', 'amb-fade-mood', 'hvar-cue0', 'rvar-op0', 'rvar-none'];
   H.eq(BM.pick('saver', names), ['saver-fade', 'saver-zoom']);   // Bildschirmschoner nur auf Wunsch (Ziffern 9,8,4)
   H.eq(BM.pick('amb', names), ['amb-off-M', 'amb-fade-mood']);   // Hintergrund in Bibliotheken nur auf Wunsch (Ziffern 9,8,3)
   H.eq(BM.pick('hvar', names), ['hvar-cue0']);                   // Runde 6: Startseiten-Gegenproben nur auf Wunsch (Ziffern 9,8,0)
+  H.eq(BM.pick('rvar-op0,rvar-none', names), ['rvar-op0', 'rvar-none']);   // Runde 8: Ring-Gegenproben nur auf Wunsch (Ziffern 9,8,8)
   H.eq(BM.pick('all', names), ['home', 'home-hero', 'lib-L', 'lib-M', 'search']);
   H.eq(BM.pick('lib', names), ['lib-L', 'lib-M']);
   H.eq(BM.pick('home', names), ['home', 'home-hero']);

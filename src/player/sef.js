@@ -1,7 +1,8 @@
 /* N.sef – Huelle um das SEF-Plugin "Player" (docs/research/player.md 1; Orca: Open('Player','1.000','Player'), K7).
  * create(onEvent) -> {exec(name, …), close()}. Ohne Plugin (Desktop-Vorschau, Tests) eine Faelschung, die Wiedergabe nur
  * nachspielt: laedt NIE die URL (keine Transcode-Sitzung), meldet Stream-Info, Puffer und Zeit-Ereignisse.
- * config.json {"sefFake":"still"}: Zeit laeuft nur um 1 ms je Tick (stehendes Bild fuer die visuelle Regression). */
+ * config.json {"sefFake":"still"}: Zeit laeuft nur um 1 ms je Tick (stehendes Bild fuer die visuelle Regression);
+ * {"fakeEndMs":ms}: Dateiende (Ereignis 8) ms nach dem Start (Bildtests der Karte am Ende). */
 (function (N) {
   var cur = null, opened = false;
   function real(el, onEvent) {
@@ -43,6 +44,7 @@
           case 'StartPlayback':
             t = (Number(a) || 0) * 1000; paused = false; on = true;
             setTimeout(function () { if (!on) return; onEvent(11); onEvent(9); onEvent(12); onEvent(14, t); loop(); }, 50);
+            if (N.config.fakeEndMs > 0) setTimeout(function () { if (on) { stop(); onEvent(8); } }, N.config.fakeEndMs);   // nur Bildtests: Dateiende
             return 1;
           case 'Pause': paused = true; return 1;
           case 'Resume': paused = false; return 1;

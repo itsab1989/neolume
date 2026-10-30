@@ -140,6 +140,20 @@ test('Countdown: ab finalem Abspann, N Sekunden nach Wiedergabezeit, Abbruch, Fa
   assert.strictEqual(run(mk, 3140000, 3150000, c).cd, -1, 'ohne naechste Folge kein Countdown');
 });
 
+test('Echtes Dateiende (PLAY-18, TV-Befund 1.0.6): naechste Folge, kurz die Karte mit Rueckzaehler oder zurueck – nie stehen bleiben', function () {
+  var E = N.Markers.endAction, base = { sleepEnd: false, autoNext: true, hasNext: false, last: false, cancelled: false };
+  function ea(o) { var x = {}, k; for (k in base) x[k] = base[k]; for (k in o) x[k] = o[k]; return E(x); }
+  assert.strictEqual(ea({ hasNext: true }), 'next');
+  assert.strictEqual(ea({ last: true }), 'card', 'letzte Folge: Karte, danach zurueck');
+  assert.strictEqual(ea({ last: true, cancelled: true }), 'close', 'Karte vorher weggedrueckt (Abspann ansehen): gleich zurueck');
+  assert.strictEqual(ea({ last: true, autoNext: false }), 'close');
+  assert.strictEqual(ea({}), 'close', 'Film: zurueck');
+  assert.strictEqual(ea({ hasNext: true, sleepEnd: true }), 'sleep');
+  assert.strictEqual(N.Markers.endWait(15), 15, 'Wartezeit vor naechster Folge');
+  assert.strictEqual(N.Markers.endWait(0), 10, 'aus/leer -> 10 s');
+  assert.strictEqual(N.Markers.endWait(undefined), 10);
+});
+
 /* ---------- Sammel-Sprung ---------- */
 test('Sprung-Sammelfenster: Ziel sofort, ein Sprung 600 ms nach dem letzten Druck, Grenzen', function () {
   var done = [], acc = new N.SeekAcc(function (tg, d) { done.push([tg, d]); }, { now: T.now, set: T.setTimeout, clear: T.clearTimeout });

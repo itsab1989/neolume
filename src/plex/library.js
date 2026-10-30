@@ -74,6 +74,13 @@
       q.excludeElements = N.hubs.EXCL; q.excludeFields = 'summary,tagline';
       return { path: '/library/sections/' + lib.id + '/all', q: q };
     },
+    /* HOME-14 "Alle anzeigen" aus "Neu in …": gemerkte Werte (Ansicht) + Sortierung nur fuer diesen Besuch in ihrer Standardrichtung,
+     * ohne Filter, Reiter mit den Titeln der Reihe (Musik: Alben = 'alt', Hoerbuecher: Buecher = 'lib'). Die gemerkten Werte selbst
+     * bleiben unveraendert (die Ansicht speichert in diesem Besuch nichts). */
+    oncePrefs: function (saved, sort, music, book) {
+      var tab = music && !book ? 'alt' : 'lib', t = music ? 'album' : null;
+      return { tab: tab, sort: sortDef(sort).id, desc: L.defDesc(sort, t ? { type: t } : null), view: saved && saved.view || '', f: { status: '' } };
+    },
     hasFilter: function (prefs) {
       var f = prefs.f || {};
       if (f.status || f.actor) return true;

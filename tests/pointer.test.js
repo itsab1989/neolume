@@ -353,3 +353,34 @@ test('Reiter-Panel per Taste: ▲ vom ersten Eintrag auf die Reiterzeile, ◀▶
   assert.strictEqual(step({ zone: 'list', tab: 1, n: 3, f: 3, m: 5 }, 'ENTER').pick, true);
   assert.strictEqual(step({ zone: 'list', tab: 1, n: 3, f: 3, m: 5 }, 'RETURN'), null, 'RETURN schliesst (Router)');
 });
+
+/* Nutzer-Befund 29.10.: Klick auf "Einstellungen" in der offenen Seitenleiste liess sie offen (Bibliothek schloss sie). Ursache: der
+ * Punkt steht nach dem Klick weiter ueber der Icon-Spalte; die naechste kleine Bewegung klappte die Leiste sofort wieder auf.
+ * Jetzt ruht sie nach einem Klick, bis der Punkt die Spalte verlassen hat – fuer jeden Eintrag gleich. */
+test('Seitenleiste: nach Klick auf einen Eintrag bleibt sie zu, auch wenn der Punkt noch ueber der Icon-Spalte wackelt', function () {
+  var ctx = H.load({ fakeTimers: true }), N = ctx.N, T = ctx.timers, R = N.ui.rail, nav = [];
+  N.router._reset(T.now);
+  N.ui.hints = { el: null, set: function () {}, refresh: function () {}, hit: function () { return null; } };
+  function el() { return { className: '', style: {} }; }
+  R.el = el(); R.panel = el(); R.dim = el(); R.att = 'home'; R.cur = 'home'; R.f = 0;
+  R.entries = [{ id: 'profile', y: 28, ni: el() }, { id: 'home', y: 112, ni: el() }, { id: 'lib-1', y: 168, ni: el() }, { id: 'settings', y: 636, ni: el() }];
+  N.app = { navigate: function (id) { nav.push(id); return true; } };
+  N.router.define('x', function () { return { rail: 'home', create: function () {}, onKey: function () { return true }, pointer: function () { return true; } }; });
+  N.router.reset('x');
+  var P = N.pointer;
+  function hover(x, y) { T.tick(100); P.move(x, y); T.tick(100); }
+  [['settings', 60, 660], ['lib-1', 60, 190]].forEach(function (c) {
+    hover(400, 300); hover(60, 120);
+    assert.strictEqual(R.isOpen(), true, 'Darueberfahren klappt auf');
+    hover(60, c[2] - 10);
+    P.click(c[1], c[2], null);
+    assert.strictEqual(nav[nav.length - 1], c[0]);
+    assert.strictEqual(R.isOpen(), false, c[0] + ': Klick schliesst');
+    hover(c[1] + 6, c[2] + 5); hover(c[1] - 4, c[2] - 6);
+    assert.strictEqual(R.isOpen(), false, c[0] + ': Wackeln ueber der Spalte klappt nicht wieder auf');
+    hover(400, c[2]);                                         // Punkt verlaesst die Spalte
+    hover(60, c[2]);
+    assert.strictEqual(R.isOpen(), true, c[0] + ': danach klappt Darueberfahren wieder auf');
+    hover(400, 300);
+  });
+});

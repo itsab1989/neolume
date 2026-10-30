@@ -11,7 +11,10 @@
  * aber mit tests/showcase/data.js (erfundene Titel, Personen, Profile) und generiertem SVG-Artwork (tests/showcase/art.js).
  * Keine Medien oder Namen des echten Servers. Braucht den Release-Build (npm run build).
  * "Weitere Server" (Szene sidebar): ein zweiter Mock auf eigenem Port spielt den freigegebenen Server eines Freundes (D.FRIEND);
- * diese Szene laeuft wie ein Paket mit setup.json (window.PN_SETUP), Profilbilder dann als https-Adressen ueber /photo/:/transcode. */
+ * diese Szene laeuft wie ein Paket mit setup.json (window.PN_SETUP), Profilbilder dann als https-Adressen ueber /photo/:/transcode.
+ * Parallel wie npm run visual (Job-Pool runPool aus tools/visual.js): PN_VIS_JOBS Szenen gleichzeitig (Standard wie dort,
+ * min(4, Kerne/4)), rechnerweit hoechstens PN_VIS_MAX Firefox (Standard 4, gemeinsame Sperre mit visual.js); jeder Worker-Prozess hat eigenen Mock (eigene Ports) und jede Szene ein frisches
+ * Firefox-Profil -> gleiche Bilder wie nacheinander. Verkleinern danach einmal ueber alle Bilder. */
 'use strict';
 var fs = require('fs'), path = require('path'), http = require('http'), cp = require('child_process'), os = require('os');
 var ROOT = path.join(__dirname, '..');
@@ -20,7 +23,7 @@ var FIREFOX = process.env.FIREFOX || '/Applications/Firefox.app/Contents/MacOS/f
 var args = process.argv.slice(2);
 function arg(n, def) { var i = args.indexOf(n); return i >= 0 ? args[i + 1] : def; }
 var LANG = arg('--lang', 'en'), ONLY = arg('--only', null), SERVE = args.indexOf('--serve') >= 0;
-var BRAND = arg('--brand', 'public'), NOBUILD = args.indexOf('--no-build') >= 0, OPTIMIZE = args.indexOf('--no-optimize') < 0;
+var WORKER = args.indexOf('--worker') >= 0, BRAND = arg('--brand', 'public'), NOBUILD = args.indexOf('--no-build') >= 0, OPTIMIZE = args.indexOf('--no-optimize') < 0;
 var SHOTDIR = BRAND === 'public' ? 'public/docs/screenshots' : 'docs/screenshots';
 var OUT = path.resolve(ROOT, arg('--out', LANG === 'en' ? SHOTDIR : SHOTDIR + '/' + LANG));
 ONLY = ONLY ? ONLY.split(',') : null;
@@ -286,13 +289,14 @@ var SCENES = [
   { name: 'player', seed: 'home', keys: 'ENTER,ENTER,wait900,PAUSE' },
   { name: 'tracks', seed: 'home', keys: 'ENTER,ENTER,wait900,GREEN' },
   { name: 'settings', seed: 'home', keys: 'LEFT,' + down(8) + ',ENTER,DOWN,DOWN,DOWN,RIGHT' },
-  { name: 'music', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,ENTER,wait900,UP,LEFT,ENTER,wait1200,DOWN,RIGHT' },              // Alben
+  { name: 'music', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,ENTER,wait900,UP,RIGHT,ENTER,wait1200,DOWN,RIGHT' },              // Alben
   { name: 'artist', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,ENTER,wait900,RIGHT,RIGHT,RIGHT,RIGHT,ENTER,wait1500,DOWN,DOWN' },   // Kuenstlerin mit Gruppen
-  { name: 'accent', seed: 'coral', keys: 'LEFT,' + down(8) + ',ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER' },                  // Akzentfarbe: Auswahl
+  { name: 'accent', seed: 'coral', keys: 'LEFT,' + down(8) + ',ENTER,DOWN,DOWN,DOWN,RIGHT,' + down(5) + ',ENTER' },                // Akzentfarbe: Auswahl
   { name: 'screensaver', seed: 'saver', keys: 'wait6000' },                                                                    // Einblendung Ambient
   { name: 'audiobooks', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait900,RIGHT,ENTER,wait1200,DOWN' }               // Buch mit Kapiteln
 ];
 
+var running = null;                                  // laufender Firefox (der Worker beendet ihn beim Abbruch)
 function shot(port, sc, done) {
   var prof = fs.mkdtempSync(path.join(os.tmpdir(), 'pnshow-'));
   var keys = sc.keys ? '&keys=' + sc.keys + '&wait=2000' : '';
@@ -301,7 +305,8 @@ function shot(port, sc, done) {
     '&hold=' + hold + '&holdurl=' + encodeURIComponent('http://127.0.0.1:' + port + '/sleep') + keys;
   var out = path.join(OUT, sc.name + '.png');
   try { fs.unlinkSync(out); } catch (e) {}
-  cp.execFile(FIREFOX, ['--headless', '-no-remote', '-profile', prof, '--window-size=1280,720', '--screenshot', out, url], { timeout: 90000 }, function () {
+  running = cp.execFile(FIREFOX, ['--headless', '-no-remote', '-profile', prof, '--window-size=1280,720', '--screenshot', out, url], { timeout: 90000 }, function () {
+    running = null;
     try { fs.rmSync(prof, { recursive: true, force: true }); } catch (e) {}
     done(fs.existsSync(out));
   });
@@ -320,28 +325,49 @@ function optimize(files) {
   console.log('verkleinert: ' + Math.round(before / 1024) + ' KB -> ' + Math.round(after / 1024) + ' KB');
 }
 
+/* Worker-Prozess (Job-Pool aus tools/visual.js): eigener Mock-Server (Seeds mit seinem Port), eine Szene nach der anderen */
+function worker() {
+  startServer(function (srv, port) {
+    makeSeeds(port);
+    process.on('message', function (m) {
+      var sc = SCENES.filter(function (s) { return s.name === m.name; })[0];
+      if (!sc) return process.send({ i: m.i, ok: false });
+      shot(port, sc, function (ok) { process.send({ i: m.i, ok: ok }); });
+    });
+    process.on('disconnect', function () { if (running) try { running.kill('SIGKILL'); } catch (e) {} srv.close(); process.exit(0); });
+    process.send({ ready: true });
+  });
+}
+
 function main() {
+  if (WORKER) return worker();
   if (!NOBUILD && !SERVE) {                      // Release-Build mit der gewaehlten Marke (Name, Wortmarke, Texte)
     var r = cp.spawnSync(process.execPath, [path.join(ROOT, 'tools', 'build.js'), '--brand', BRAND, '--no-test'], { stdio: 'inherit' });
     if (r.status !== 0) process.exit(1);
   }
   if (!fs.existsSync(path.join(ROOT, 'app', 'app.min.js'))) { console.error('app/app.min.js fehlt – zuerst "npm run build".'); process.exit(1); }
-  startServer(function (srv, port) {
+  if (SERVE) return startServer(function (srv, port) {
     makeSeeds(port);
-    if (SERVE) {
-      console.log('Mock auf Port ' + port + '. Vorschau: file://' + path.join(ROOT, 'tools', 'preview.html') + '?clear=1&min=1&seed=' + encodeURIComponent('http://127.0.0.1:' + port + '/seed/home.js'));
-      return;
-    }
-    if (!fs.existsSync(FIREFOX)) { console.error('Firefox nicht gefunden (' + FIREFOX + '), FIREFOX=… setzen.'); process.exit(2); }
-    fs.mkdirSync(OUT, { recursive: true });
-    var scenes = SCENES.filter(function (s) { return !ONLY || ONLY.indexOf(s.name) >= 0; }), i = 0, bad = 0, done = [];
-    (function next() {
-      if (i >= scenes.length) { srv.close(); optimize(done); console.log(scenes.length - bad + ' Bilder in ' + path.relative(ROOT, OUT) + '/' + (bad ? ', ' + bad + ' fehlgeschlagen' : '')); process.exit(bad ? 1 : 0); }
-      var sc = scenes[i++];
-      process.stdout.write(sc.name + ' … ');
-      shot(port, sc, function (ok) { if (!ok) bad++; else done.push(path.join(OUT, sc.name + '.png')); console.log(ok ? 'ok' : 'FEHLT'); next(); });
-    })();
+    console.log('Mock auf Port ' + port + '. Vorschau: file://' + path.join(ROOT, 'tools', 'preview.html') + '?clear=1&min=1&seed=' + encodeURIComponent('http://127.0.0.1:' + port + '/seed/home.js'));
   });
+  if (!fs.existsSync(FIREFOX)) { console.error('Firefox nicht gefunden (' + FIREFOX + '), FIREFOX=… setzen.'); process.exit(2); }
+  fs.mkdirSync(OUT, { recursive: true });
+  var V = require('./visual.js');
+  var scenes = SCENES.filter(function (s) { return !ONLY || ONLY.indexOf(s.name) >= 0; });
+  if (!scenes.length) { console.error('Keine Szene passt zu --only ' + ONLY.join(',') + '.'); process.exit(2); }
+  var jobs = Math.min(V.JOBS, scenes.length), t0 = Date.now(), W = String(scenes.length).length;
+  console.log(scenes.length + ' Szene(n) · ' + jobs + ' parallel (PN_VIS_JOBS)' + (V.MAX_TOTAL > 0 ? ' · rechnerweit hoechstens ' + V.MAX_TOTAL + ' Firefox (PN_VIS_MAX)' : ''));
+  process.on('SIGINT', function () { process.exit(130); });
+  process.on('SIGTERM', function () { process.exit(143); });
+  V.runPool({ script: __filename, args: args.filter(function (a) { return a !== '--worker'; }), jobs: jobs, names: scenes.map(function (s) { return s.name; }),
+    onResult: function (m, n, secs) { console.log('[' + ('    ' + n).slice(-W) + '/' + scenes.length + '] ' + scenes[m.i].name + ' ' + (m.ok ? 'ok' : 'FEHLT') + ' (' + secs.toFixed(1) + ' s)'); },
+    done: function (rs) {
+      var ok = scenes.filter(function (s, i) { return rs[i].ok; }), bad = scenes.length - ok.length;
+      console.log('Gerendert in ' + Math.round((Date.now() - t0) / 1000) + ' s.');
+      optimize(ok.map(function (s) { return path.join(OUT, s.name + '.png'); }));           // einmal ueber alle Bilder, feste Reihenfolge
+      console.log(ok.length + ' Bilder in ' + path.relative(ROOT, OUT) + '/' + (bad ? ', ' + bad + ' fehlgeschlagen' : ''));
+      process.exit(bad ? 1 : 0);
+    } });
 }
 if (require.main === module) main();
 module.exports = { startServer: startServer, makeSeeds: makeSeeds, SCENES: SCENES };

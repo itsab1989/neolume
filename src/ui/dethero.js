@@ -32,9 +32,23 @@
     var n = o && o.chips || 0, ch = n || o && o.line ? U.el('div', 'd-chips', info) : null;
     for (var i = 0; i < n; i++) { var c = U.el('span', 'chip-tech', ch, 'display:none'); c.appendChild(document.createTextNode('')); this.chipEls.push(c); }
     if (o && o.line) this.lineT = U.txt('span', 'd-chl t-small c2 ell', ch, '');
+    this.chRow = ch;
     return info;
   };
-  /* o: {small: Titel kleiner (Folge), chips: [Text], line: Text (nur mit makeInfo o.line)} */
+  /* Zeile einer Erweiterung unter der Beschreibung (details.js X/xt.note, z. B. wann die naechste Folge kommt): eigenes Element hinter den
+   * Chips, erst beim ersten Text angelegt (ohne Text: kein Element, Seite wie ohne Erweiterung). Kommt der Text spaeter (Daten der
+   * Erweiterung), blendet nur diese Zeile ruhig ein – nichts verschiebt sich (der Platz der Chip-Zeile ist fest). */
+  P.note = function (t, fade) {
+    t = t || '';
+    if (!this.chRow || (!this.noteEl && !t) || t === this.noteV) return;
+    if (!this.noteEl) { this.noteEl = U.el('span', 'd-note t-small c2 ell', this.chRow); this.noteEl.appendChild(document.createTextNode('')); }
+    var el = this.noteEl, fx = fade && !this.noteV && t && !N.fx.reduced();
+    this.noteV = t;
+    if (fx) U.cls(el, 'out', true);
+    U.setText(el.firstChild, t); U.show(el, !!t);
+    if (fx) U.raf(function () { U.raf(function () { U.cls(el, 'out', false); }); });
+  };
+  /* o: {small: Titel kleiner (Folge), chips: [Text], line: Text (nur mit makeInfo o.line), note: Zeile einer Erweiterung (P.note)} */
   P.paint = function (ov, ti, me, de, o) {
     var info = this.info, fx = !N.fx.reduced(), small = !!(o && o.small), cs = o && o.chips || [];
     if (fx) U.cls(info, 'out', true);
@@ -42,6 +56,7 @@
     U.setText(this.ovT, ov || ''); U.setText(this.tiT, ti || ''); U.setText(this.meT, me || ''); U.clampText(this.deT, de || '');
     for (var i = 0; i < this.chipEls.length; i++) { U.show(this.chipEls[i], !!cs[i]); U.setText(this.chipEls[i].firstChild, cs[i] || ''); }
     if (this.lineT) U.setText(this.lineT, o && o.line || '');
+    this.note(o && o.note);
     if (fx) U.raf(function () { U.cls(info, 'out', false); });
   };
   /* Hintergrund: Art scharf, sonst Cover unscharf (vom Server vorgerechnet). title = fuer die Farbflaeche, wenn Bilder aus sind */

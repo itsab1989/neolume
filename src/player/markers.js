@@ -64,5 +64,17 @@
   P.watchStart = function () { var w = this.watch; this.watch = null; this.cnt = 0; return w ? w.m.start : -1; };
   P.cancelCountdown = function () { this.cancelled = true; this.cdStart = -1; };
   P.seeked = function () { this.cnt = 0; this.cdStart = -1; };
+  /* Echtes Dateiende (PLAY-18): was jetzt passiert. o: {sleepEnd, autoNext, hasNext, last, cancelled} ->
+   * 'sleep' (Sleep-Timer "Ende der Folge"), 'next' (naechster Eintrag), 'card' (Karte "Das war die letzte Folge" kurz mit
+   * Rueckzaehler, danach zurueck) oder 'close' (sofort zurueck: Film, Autoplay aus, Karte vorher weggedrueckt).
+   * Nie bleibt der Player auf dem fertigen Video stehen (TV-Befund 1.0.6). */
+  Markers.endAction = function (o) {
+    if (o.sleepEnd) return 'sleep';
+    if (o.autoNext && o.hasNext) return 'next';
+    if (o.autoNext && o.last && !o.cancelled) return 'card';
+    return 'close';
+  };
+  /* Wartezeit der Karte am echten Ende in Sekunden: die Einstellung "Wartezeit vor naechster Folge", sonst 10 s */
+  Markers.endWait = function (cd) { var n = Number(cd); return n > 0 ? Math.round(n) : 10; };
   N.Markers = Markers;
 })(N);

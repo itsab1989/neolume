@@ -77,6 +77,13 @@
      * Bild darunter): sofort. */
     infoIn: function (fx, d, first) { return first || fx === 'cut' || !(d > 0) ? 0 : d; },
     interval: function (sec) { var n = Number(sec); return (L.SEC.indexOf(n) >= 0 ? n : 30) * 1000; },
+    /* "Nach langer Zeit nur noch die Uhr" (SAV-6, Nutzer-Befund 29.10.: TV nach ~8 h Schoner eingefroren): Minuten im Schoner, nach
+     * denen er keine Bilder mehr wechselt (0 = Nie). Nur Werte aus NIGHT, sonst 120 (Standard). -> ms (0 = nie) */
+    NIGHT: [60, 120, 240, 0],
+    night: function (min) {
+      var n = typeof min === 'number' || (typeof min === 'string' && min !== '') ? Number(min) : NaN;   // null/''/false sind nicht "Nie"
+      return (L.NIGHT.indexOf(n) >= 0 ? n : 120) * 60000;
+    },
     corner: function (i) { return CORNERS[((i % 4) + 4) % 4]; },
     INFO: INFO, INFOS: ['ambient', 'classic', 'poster', 'lower', 'bigclock', 'minimal', 'off'],
     /* Stil (unbekannt -> ambient) und Lage Nr. i -> {style, w, h, scr, x, y, r, t, ty, edge} */
@@ -86,9 +93,10 @@
         edge: typeof d.edge === 'function' ? d.edge(p) : d.edge || [] };
     },
     /* Was zeigt der Stil? "Uhrzeit anzeigen" aus blendet die Uhr in JEDEM Stil aus; reine Uhr-Stile zeigen dann nichts */
-    infoParts: function (style, clock) {
+    /* night: Nachtruhe (SAV-6) – nur noch die Uhr, kein Titel/keine Zeile (ohne Uhr: ganz schwarz) */
+    infoParts: function (style, clock, night) {
       var st = Object.prototype.hasOwnProperty.call(INFO, style) ? style : 'ambient';
-      var text = st !== 'off' && st !== 'bigclock' && st !== 'minimal';
+      var text = !night && st !== 'off' && st !== 'bigclock' && st !== 'minimal';
       return { clock: st !== 'off' && !!clock, title: text, any: text || (st !== 'off' && !!clock) };
     },
     /* Pose v (0..3) fuer zoom/drift -> {from, to} als -webkit-transform-Text, raw = Zahlen (Tests) */

@@ -64,3 +64,41 @@ test('Panel "laedt": RETURN -> onCancel, close() ohne onCancel', function () {
   w = N.ui.panel.wait({ title: 'T', onCancel: function () { c++; } });
   w.close(); assert.strictEqual(c, 1); assert.strictEqual(s.ov.length, 0);
 });
+
+/* NAV-15: jede scrollende Liste zeigt "geht weiter" (kleines ›, nur visibility ueber die Klasse on) */
+function on(e) { return has(e, 'on'); }
+test('Mehr-Hinweis: Panel mit mehr als 8 Eintraegen zeigt ihn ohne Option (7 Zeilen), oben erst nach dem Rollen; more:false schaltet ab', function () {
+  var s = setup(), N = s.N, e = [];
+  for (var i = 0; i < 12; i++) e.push({ id: 'e' + i, t: 'E' + i });
+  var p = N.ui.panel.select({ title: 'T', entries: e, selected: 'e0' });
+  assert.ok(p.up && p.dn, 'Hinweise angelegt');
+  assert.ok(!on(p.up) && on(p.dn), 'oben nichts verdeckt, unten schon');
+  for (i = 0; i < 6; i++) p.onKey('DOWN');
+  assert.ok(on(p.up) && on(p.dn), 'mitten in der Liste: beide');
+  for (i = 0; i < 6; i++) p.onKey('DOWN');
+  assert.ok(on(p.up) && !on(p.dn), 'am Ende: nur oben');
+  var q = N.ui.panel.select({ title: 'T', entries: e, selected: 'e0', more: false });
+  assert.ok(!q.up, 'more:false: kein Hinweis (8 Zeilen)');
+  var r = N.ui.panel.select({ title: 'T', entries: e.slice(0, 8), selected: 'e0' });
+  assert.ok(!r.up, 'passt alles hinein: kein Hinweis');
+});
+test('Mehr-Hinweis: N.ui.more schaltet nur bei Aenderung um; Titelliste zeigt oben den Hinweis, sobald Zeilen verdeckt sind', function () {
+  var s = setup(), N = s.N;
+  var root = document0(N), m = N.ui.more(root, 'top:1px', 'top:2px'), writes = 0, cls = N.util.cls;
+  N.util.cls = function (e, c, v) { writes++; return cls(e, c, v); };
+  m.set(true, false); m.set(true, false); m.set(true, false);
+  assert.strictEqual(writes, 1, 'gleicher Zustand: kein DOM-Zugriff');
+  assert.ok(on(m.up) && !on(m.dn));
+  N.util.cls = cls;
+  N.ui.icon = function (p) { return N.util.el('i', 'ic', p); };
+  var items = []; for (var i = 0; i < 20; i++) items.push({ rk: String(i) });
+  var tl = new N.ui.TrackList(root, { x: 144, y: 300, w: 992, vis: 7, full: 6, row: function () { return { t: 'x' }; } });
+  tl.setItems(items, 0);
+  assert.ok(!on(tl.more.up), 'Anfang: kein Hinweis oben');
+  tl.focusTo(10);
+  assert.ok(on(tl.more.up), 'gerollt: Hinweis oben');
+  assert.strictEqual(tl.more.up.style.cssText, 'left:1108px;top:264px', 'rechts in der Kopfzeile der Liste');
+  tl.focusTo(0);
+  assert.ok(!on(tl.more.up));
+});
+function document0(N) { return N.util.el('div', ''); }

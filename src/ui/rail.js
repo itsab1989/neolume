@@ -113,13 +113,15 @@
     if (cur && cur !== R.cur) { R.cur = cur; R.markCur(); }
   };
   R.attached = function () { return !!R.att; };
+  /* Eintrag der Seitenleiste zu einer ID (oder null, z. B. ausgeblendet oder Bibliothek verschwunden) */
+  R.entry = function (id) { for (var i = 0; i < R.entries.length; i++) if (R.entries[i].id === id) return R.entries[i]; return null; };
   R.isOpen = function () { return R.open_; };
   function idx(id) { for (var i = 0; i < R.entries.length; i++) if (R.entries[i].id === id) return i; return id === 'home' ? 0 : idx('home'); }   // ausgeblendeter Eintrag (W1): Fokus auf Start
   function setF(i) { U.cls(R.entries[R.f].ni, 'is-focus', false); R.f = i; U.cls(R.entries[i].ni, 'is-focus', true); }
   /* ◀ von der Inhaltskante: ausklappen, Fokus auf dem aktuellen Eintrag */
   R.open = function (at) {
     if (R.open_ || !R.att) return;
-    R.open_ = true;
+    R.open_ = true; R.rest = false;
     var scr = N.router.top();
     if (scr && scr.railBlur) scr.railBlur();
     setF(at === undefined ? idx(R.cur) : at);
@@ -150,24 +152,25 @@
     if (k === 'UP' || k === 'DOWN') { var n = N.nav.list(R.f, R.entries.length, k, true); if (n >= 0) setF(n); return true; }
     if (k === 'ENTER') { R.activate(R.f); return true; }
     if (k === 'RIGHT') { R.close(); return true; }
-    if (k === 'RETURN') {
-      var scr = N.router.top();
-      if (scr && scr.railReturnExits) { R.close(); N.ui.dialog.exitApp(); }   // Start: Fokus war schon in der Leiste (SPEC 6.2)
-      else if (scr && scr.railReturnHome) { R.close(true); N.app.navigate('home'); }   // Bibliothek/Suche: (3) -> Start
-      else R.close();
-      return true;
-    }
+    if (k === 'RETURN') { R.close(); return true; }   // NAV-5 (Nutzerentscheid 29.10.): nur einklappen – die Leiste gehoert zu keiner RETURN-Kette
     return true;
   };
-  /* Zeiger: Eintrag ueber die y-Liste (Hoehe 48) finden */
+  /* Zeiger: Eintrag ueber die y-Liste (Hoehe 48) finden.
+   * Nach einem Klick auf einen Eintrag ruht die Leiste (R.rest): Der Punkt steht danach noch ueber der Icon-Spalte, und schon das
+   * kleinste Weiterbewegen haette sie sofort wieder aufgeklappt (Nutzer-Befund 29.10.: "Einstellungen" unten links blieb offen,
+   * Bibliotheken nicht – dort zieht man den Punkt meist gleich nach rechts). Erst wenn der Punkt die Spalte verlassen hat
+   * (N.pointer meldet R.away), klappt Darueberfahren sie wieder auf; ein Klick und ◀ wirken immer. */
+  R.rest = false;
   R.pointer = function (x, y, kind) {
     var hit = -1;
     for (var i = 0; i < R.entries.length; i++) if (y >= R.entries[i].y && y < R.entries[i].y + 48) { hit = i; break; }
     if (hit < 0) return false;
+    if (!R.open_ && R.rest && kind !== 'click') return true;
     if (!R.open_) R.open(hit); else if (hit !== R.f) setF(hit);
-    if (kind === 'click') R.activate(hit);
+    if (kind === 'click') { R.activate(hit); R.rest = true; }
     return true;
   };
+  R.away = function () { R.rest = false; };
   /* Schalter "Entdecken in der Seitenleiste" wirkt sofort */
   N.evt.on('settings:changed', function (e) { if (e && (e.key === 'discover' || e.key === 'railItems') && R.el) R.build(); });
   /* Weitere Server: Bibliotheken kamen/gingen -> neu aufbauen (nur bei geaenderter Liste; bei offener Leiste erst nach dem Schliessen) */

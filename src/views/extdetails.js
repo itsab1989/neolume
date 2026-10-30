@@ -79,7 +79,7 @@
       var o = xt && xt.paint ? xt.paint() : null;              // Erweiterung: eigener Zustand in Ueberzeile/Metazeile
       var xm = x && (holdCr || (o && o.noStatus)) ? U.extend(U.extend({}, x), holdCr ? { cr: '' } : {}) : x;   // Freigabe erst, wenn alle Quellen da sind
       if (xm && o && o.noStatus) xm.status = '';                // Erweiterung sagt selbst, ob die Serie laeuft (kein doppelter Stand)
-      hero.paint(o && o.ov || D.overline(it), it.title, D.extMeta(it, xm, o && o.meta || undefined), sumText(), { chips: D.extChips(x), line: D.extLine(it, x) });
+      hero.paint(o && o.ov || D.overline(it), it.title, D.extMeta(it, xm, o && o.meta || undefined), sumText(), { chips: D.extChips(x), line: (xt && xt.line && xt.line(x)) || D.extLine(it, x) });   // Erweiterung: eigene Zeile (z. B. naechste Folge) statt Sender/Idee
     }
     function buildRow() {
       var items = D.extCast(x);

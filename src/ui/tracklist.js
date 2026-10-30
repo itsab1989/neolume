@@ -2,13 +2,17 @@
  * EIN translate3d an der Liste; Fokus-Anker: ab der 3. sichtbaren Zeile bleibt der Fokus stehen und die Liste rollt.
  * Pro Fokusschritt nur alte + neue Zeile umklassen, kein innerHTML, keine Geometrie-Abfragen.
  * Zeile: Nummer (bzw. Ton-Symbol beim laufenden Titel) · Titel · Unterzeile · Dauer rechts · optional Fortschritt (Hoerbuch).
- * opts: {x, y, w, vis (sichtbare Zeilen), row(it, i) -> {n, t, s, d, p (0..1), done}}; setRoom(k): k Zeilen unten frei (Mini-Player) */
+ * opts: {x, y, w, vis (sichtbare Zeilen), row(it, i) -> {n, t, s, d, p (0..1), done}}; setRoom(k): k Zeilen unten frei (Mini-Player)
+ * Mehr-Hinweis (NAV-11): nach unten zeigt die angeschnittene, ausgeblendete letzte Zeile, dass es weitergeht (unter der Liste ist bis
+ * zur Hinweisleiste kein Platz fuer einen Pfeil); nach oben rechts in der Kopfzeile der Liste (opts.y - 36) das gedrehte ›, sobald
+ * oben Zeilen verdeckt sind (opts.noMore: ohne). */
 (function (N) {
   var U = N.util, H = 56;
   function TrackList(parent, opts) {
     this.o = opts; this.vis = opts.vis || 6; this.full = opts.full || this.vis; this.poolN = this.vis + 4;
     this.clip = U.el('div', 'tl-clip', parent, 'left:' + opts.x + 'px;top:' + opts.y + 'px;width:' + opts.w + 'px;height:' + (this.vis * H) + 'px');
     this.list = U.el('div', 'tl-list', this.clip);
+    this.more = opts.noMore ? null : N.ui.more(parent, 'left:' + (opts.x + opts.w - 28) + 'px;top:' + (opts.y - 36) + 'px', 'display:none');
     this.pool = []; this.items = []; this.f = 0; this.sc = 0; this.byIdx = {}; this.focused = false; this.cur = ''; this.room = 0;
     for (var i = 0; i < this.poolN; i++) {
       var e = { r: U.el('div', 'tl-row', this.list, 'display:none;width:' + opts.w + 'px') };
@@ -64,7 +68,9 @@
     var foc = this.focused && i === this.f;
     if (foc !== e.foc) { e.r.className = 'tl-row' + (v.s ? ' two' : '') + (v.done ? ' done' : '') + (foc ? ' is-focus' : ''); e.foc = foc; }
   };
+  T._hint = function () { if (this.more) this.more.set(this.sc > 0, false); };
   T.render = function () {
+    this._hint();
     var n = this.items.length, first = Math.max(0, this.sc - 2), last = Math.min(n - 1, first + this.poolN - 1), free = [], i, e;
     for (i = 0; i < this.poolN; i++) { e = this.pool[i]; if (e.idx < first || e.idx > last) { if (e.idx >= 0 || e.on) this._free(e); free.push(e); } }
     for (i = first; i <= last; i++) { if (this.byIdx[i]) continue; e = free.shift(); if (!e) break; this._fill(e, i); }

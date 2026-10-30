@@ -9,7 +9,7 @@ page. The same overview with pictures: the **[website](https://itsab1989.github.
 | Document | What it is for |
 |---|---|
 | [Installation guide](INSTALL.md) · [Installationsanleitung](INSTALL.de.md) | Every step from download to the first start on the TV, with drawings of the TV menus and troubleshooting |
-| [FAQ](FAQ.md) · [Häufige Fragen](FAQ.de.md) | Which TVs work, Plex Pass, the optional helper, privacy, updating and removing the app |
+| [FAQ](FAQ.md) · [Häufige Fragen](FAQ.de.md) | Which TVs work, Plex Pass, the optional helper, screensaver, where RETURN takes you, the new-content notice, privacy, updating and removing the app |
 | [Changelog](../CHANGELOG.md) | What changed in each version |
 | [Latest release](https://github.com/itsab1989/neolume/releases/latest) | The setup program for Windows, macOS and Linux (the TV app is inside) |
 
@@ -26,7 +26,7 @@ the agent reads the rest by itself.
 | [Acceptance test plan](TEST-PLAN.md) | One test per requirement for a person with a remote, a 10-minute smoke test, performance and privacy checks |
 | [Design system](../design/README.md) | Colours, type, spacing, motion and layout values ([`tokens.json`](../design/tokens.json)) and the [icons](../design/icons/) |
 | [Screenshots](screenshots/) | Reference pictures of every main screen (English; German ones in [`de/`](screenshots/de/)) |
-| [Community ports](../PORTS.md) | Apps others built for their TVs, and how to add yours |
+| [Community ports](../PORTS.md) | Apps others built for their TVs, how to add yours and how to submit it for the collection |
 
 ## Develop and contribute
 

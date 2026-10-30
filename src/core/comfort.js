@@ -98,11 +98,13 @@
   C.DEFAULTS = { screensaver: 5, saverBlur: true, clock: true, backgrounds: true, spoiler: false, resumeRewind: 0, passthrough: true, audioBoost: 100,
     stillTime: 2, sleepDefault: 'off', lowerOffer: true, subColor: 'white', subDelay: 0,
     animeDetect: 'normal', animeShow: true, animeAudio: 'ja', animeSubs: 'deen', animeSigns: false,
-    saverFx: 'fade', saverInterval: 30, saverSrc: 'libs', saverLibs: null, saverUnwatched: false, saverInfo: 'ambient', saverPics: 'art',   // Schoner (N.saverLogic)
+    saverFx: 'fade', saverInterval: 30, saverSrc: 'libs', saverLibs: null, saverUnwatched: false, saverInfo: 'ambient', saverPics: 'art', saverNight: 120,   // Schoner (N.saverLogic); saverNight: Min. bis nur noch Uhr (SAV-6)
     clockStyle: 'box', hints: 'always',   // Uhr auf der Startseite (C.CLOCK_STYLES), Tastenhinweise (N.ui.hints.MODES)
     accent: N.brand.accent,   // Akzentfarbe (N.accent): Standard = Farbe der Marke
     libBg: 'mood', libBgStrength: 'soft',   // Hintergrund in Bibliotheken (N.amb): Farbstimmung, dezent
-    recentSearches: 8 };   // Zuletzt gesucht (N.srch.limit): 0 = Aus, 4, 8
+    recentSearches: 8,   // Zuletzt gesucht (N.srch.limit): 0 = Aus, 4, 8
+    sectionBack: 'home',   // Zurueck aus einem Bereich (N.sections, NAV-5): 'home' | 'prev'
+    newsNote: 'exact', newsSecs: 5, newsPlay: false };   // Hinweis bei neuen Inhalten (N.newsLogic, HOME-13): Aus/Allgemein/Genau, Anzeigedauer, auch im Video
   C.applyDefaults = function (st, kid) {
     if (!st) return st;
     for (var k in C.DEFAULTS) if (Object.prototype.hasOwnProperty.call(C.DEFAULTS, k) && st[k] === undefined) st[k] = k === 'stillTime' && kid ? 1 : C.DEFAULTS[k];

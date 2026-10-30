@@ -10,6 +10,9 @@
  *            anderen; Overlays mit eigenem z-index wie Dialog/Panel/Leiste liegen bewusst ueber dem Inhalt)
  *   edge     eine Flaeche mit data-layout-edge="l,r,t,b" (z. B. Abdunklung des Bildschirmschoners) reicht nicht bis an diese
  *            Bildschirmraender (Luecke zwischen Abdunklung und Rand; nach allen Transformationen gemessen)
+ *   spill    Bedienelement oder Text ragt sichtbar ueber den Rand seiner Flaeche hinaus (naechster Vorfahre mit deckender
+ *            Hintergrundfarbe, kleiner als der Bildschirm: Dialog, Panel, Karte, Knopf) – z. B. drei Knoepfe nebeneinander, die
+ *            breiter als der Dialog sind; was ein abschneidender Vorfahre verbirgt, zaehlt nicht (das meldet clip)
  *   notice   ein sichtbarer Hinweis, der nichts verdecken darf (Toast #pn-toast, sonst data-layout-notice), liegt ueber Text,
  *            der ohne ihn zu sehen waere (Toasts liegen ueber allem, gehoeren aber an eine freie Stelle)
  * Ergebnis: JSON per synchronem POST an &probe (tools/visual.js sammelt es ein und wertet es mit tools/layoutcheck.js aus).
@@ -218,6 +221,53 @@
           if (!hit || !shownIn(it.o, hit) || !shownIn(e, hit)) return;
           out.push({ t: 'button', a: info(it), b: elInfo(e), r: box(hit) });
         });
+      });
+      /* spill: Bedienelement/Text ragt ueber seine Flaeche (Dialog, Panel, Knopf) hinaus */
+      var spilled = [];
+      function surfaceOf(e) {                            // naechste deckende Flaeche ab e (einschliesslich), kleiner als der Bildschirm
+        for (var a = e; a && a.id !== 'root' && a !== document.body; a = a.parentElement) {
+          var sa = cs(a);
+          if (alpha(sa.backgroundColor) < 0.5 || opacity(a) < 0.5) continue;
+          var ab = rr(a.getBoundingClientRect());
+          if (w(ab) < 24 || h(ab) < 16 || (w(ab) >= W - TOL && h(ab) >= H - TOL)) continue;
+          return { e: a, b: ab };
+        }
+        return null;
+      }
+      function sticksOut(v, b) {
+        var d = [];
+        if (v.l < b.l - TOL) d.push('links ' + Math.round(b.l - v.l) + ' px');
+        if (v.r > b.r + TOL) d.push('rechts ' + Math.round(v.r - b.r) + ' px');
+        if (v.t < b.t - TOL) d.push('oben ' + Math.round(b.t - v.t) + ' px');
+        if (v.b > b.b + TOL) d.push('unten ' + Math.round(v.b - b.b) + ' px');
+        return d;
+      }
+      ia.forEach(function (e) {
+        if (okAttr(e, 'spill')) return;
+        var sf = surfaceOf(e.parentElement);
+        if (!sf) return;
+        var v = isect(isect(rr(e.getBoundingClientRect()), clipOf(e).r), scr);
+        if (empty(v)) return;
+        var d = sticksOut(v, sf.b);
+        if (!d.length || !shownIn(e, v)) return;
+        spilled.push(e);
+        out.push({ t: 'spill', a: elInfo(e), b: elInfo(sf.e), r: box(v), d: 'ragt hinaus: ' + d.join(', ') });
+      });
+      function turned(e, stop) {                         // gedreht (z. B. Zeiger-Pfeil .pedge um 90°): Tinten-Kuerzung (inkH) gilt dann der falschen Achse
+        for (var a = e; a && a !== stop.parentElement; a = a.parentElement) {
+          var m = /matrix\(([^)]+)\)/.exec(cs(a).transform || '');
+          if (m) { var v = m[1].split(',').map(parseFloat); if (Math.abs(v[1]) > 0.01 || Math.abs(v[2]) > 0.01) return true; }
+        }
+        return false;
+      }
+      items.forEach(function (it) {
+        if (okAttr(it.o, 'spill')) return;
+        var sf = surfaceOf(it.o);
+        if (!sf || turned(it.o, sf.e)) return;
+        for (var a = it.o; a && a !== sf.e.parentElement; a = a.parentElement) if (spilled.indexOf(a) >= 0) return;   // schon als Bedienelement gemeldet
+        var v = it.vis.reduce(function (x, y) { return unionR(x, y); }, null), d = sticksOut(v, sf.b);
+        if (!d.length || !shownIn(it.o, v)) return;
+        out.push({ t: 'spill', a: info(it), b: elInfo(sf.e), r: box(v), d: 'ragt hinaus: ' + d.join(', ') });
       });
       /* offscreen + safe */
       function crosses(e, side) {

@@ -36,6 +36,9 @@
       tabs.push(te);
     }
     var clip = U.el('div', 'tp-clip', p), list = U.el('div', 'tp-list', clip);
+    /* Mehr-Hinweis (NAV-11): scrollt die Liste dieses Reiters, liegt sie 28 px tiefer und zeigt eine Zeile weniger – oben (unter den
+     * Reitern) und unten bleibt Platz fuer die Pfeile. Lage nur beim Aufbau eines Reiters (render), im Tastenpfad nur visibility */
+    var MT = TOP + 28, more = N.ui.more(p, 'top:' + TOP + 'px', 'top:' + (MT + (VIS - 1) * STEP + 4) + 'px'), vis = VIS, top = TOP;
     function render(keepF) {
       while (list.firstChild) list.removeChild(list.firstChild);
       var f = keepF ? ov.f : -1;
@@ -49,6 +52,8 @@
         if (d.sel && f < 0) ov.f = i;
       }
       if (f >= 0) ov.f = Math.min(f, ov.items.length - 1);
+      var v = ov.items.length > VIS ? VIS - 1 : VIS, tp = v < VIS ? MT : TOP;
+      if (v !== vis || tp !== top) { vis = v; top = tp; clip.style.top = top + 'px'; clip.style.height = vis * STEP + 'px'; }
       if (!ov.items.length) ov.zone = 'tabs';
       paintTabs();
       setF(ov.f, true);
@@ -73,7 +78,8 @@
       if (!ov.items.length) return;
       if (!force) U.cls(ov.items[ov.f], 'is-focus', false);
       ov.f = i; U.cls(ov.items[i], 'is-focus', ov.zone === 'list');
-      if (!still) { var off = Math.max(0, Math.min(i - 3, ov.items.length - VIS)); if (off !== ov.off || force) { ov.off = off; U.tf(list, 0, -off * STEP); } }
+      if (!still) { var off = Math.max(0, Math.min(i - 3, ov.items.length - vis)); if (off !== ov.off || force) { ov.off = off; U.tf(list, 0, -off * STEP); } }
+      more.set(vis < VIS && ov.off > 0, vis < VIS && ov.off + vis < ov.items.length);
     }
     function close() { if (!ov.closed) { ov.closed = true; N.router.closeOverlay(ov); } }
     function pick(i) {
@@ -107,7 +113,7 @@
         setZone('tabs'); tab(t);                         // Zeigen waehlt den Reiter (die Liste darunter wechselt, nichts rollt)
         return true;
       }
-      var i = N.hit.list(TOP, STEP, H, Math.min(VIS, ov.items.length - ov.off), y);
+      var i = N.hit.list(top, STEP, H, Math.min(vis, ov.items.length - ov.off), y);
       if (i < 0) return false;
       i += ov.off;
       setZone('list');

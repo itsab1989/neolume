@@ -6,13 +6,24 @@
    * multi: Mehrfachauswahl (Haken je Eintrag, entries[i].on); OK schaltet um und das Panel bleibt offen, RETURN schliesst ->
    * onDone([ids mit Haken]) (z. B. Bibliotheken des Bildschirmschoners).
    * Mehr als 8 Eintraege: Liste scrollt per translate3d (Anker 4. Zeile); Zeiger scrollt nicht unter dem Punkt weg.
-   * more: dezenter Mehr-Hinweis (kleines ›, nach oben/unten gedreht, text-2 wie der Staffel-Pfeil .d-tmore), nur wenn oberhalb
+   * more (Standard an, NAV-11): dezenter Mehr-Hinweis (kleines ›, nach oben/unten gedreht, text-2 wie der Staffel-Pfeil .d-tmore), nur wenn oberhalb
    * bzw. unterhalb wirklich Eintraege liegen; dann 7 sichtbare Zeilen, der untere Pfeil steht in der Luecke darunter.
    * entries[i].head: Zwischenueberschrift (nicht waehlbar, der Fokus springt darueber; z. B. Gruppen einer Liste).
    * multi + done {t(n), s(n), min}: eigener letzter Eintrag "Anfragen (2) ›" (Zahl der Haken) – NUR er schliesst mit onDone(ids);
    * unter min Haken gedimmt, die Unterzeile sagt warum. RETURN/Klick daneben = onCancel() (nichts uebernommen). Ohne done wie bisher.
    * hint: kurze Zeile unter dem Titel (die Hinweisleiste liegt hinter dem Panel), z. B. "OK: an/aus · Zurück: abbrechen". */
   var VIS = 8;
+  /* Mehr-Hinweis (SPEC NAV-11) fuer jede scrollende senkrechte Liste: zwei dauerhafte Elemente (oben/unten), Lage per css-Text;
+   * set(oben, unten) schaltet nur bei Aenderung die Klasse on (visibility) – keine neuen Ebenen im Tastenpfad */
+  N.ui.more = function (parent, upCss, dnCss) {
+    var m = { up: U.txt('div', 'pmore up', parent, '›', upCss).parentNode, dn: U.txt('div', 'pmore dn', parent, '›', dnCss).parentNode, u: false, d: false };
+    m.set = function (u, d) {
+      u = !!u; d = !!d;
+      if (u !== m.u) { m.u = u; U.cls(m.up, 'on', u); }
+      if (d !== m.d) { m.d = d; U.cls(m.dn, 'on', d); }
+    };
+    return m;
+  };
   function select(o) {
     var ov = { el: U.el('div', 'layer'), items: [], f: 0, closed: false, off: 0 };
     U.el('div', 'dim', ov.el);                       // Hintergrund leicht abdunkeln: zeigt, was gerade im Fokus ist
@@ -20,7 +31,7 @@
     U.txt('div', 'pt t-h2', p, o.title);
     if (o.hint) U.txt('div', 'phint', p, o.hint);
     var act = o.multi && o.done ? o.done : null, ents = act ? o.entries.concat([{ id: '', act: true, t: '' }]) : o.entries;
-    var vis = o.more && ents.length > VIS ? VIS - 1 : VIS;
+    var vis = o.more !== false && ents.length > VIS ? VIS - 1 : VIS;   // NAV-11: Mehr-Hinweis immer, wenn die Liste scrollt (more:false schaltet ab)
     var clip = U.el('div', 'tp-clip', p, 'top:' + TOP + 'px;height:' + (vis * STEP) + 'px'), list = U.el('div', 'tp-list', clip);
     if (vis < VIS) { ov.up = U.txt('div', 'pmore up', p, '›').parentNode; ov.dn = U.txt('div', 'pmore dn', p, '›', 'top:' + (TOP + vis * STEP + 4) + 'px').parentNode; }
     for (var i = 0; i < ents.length; i++) {

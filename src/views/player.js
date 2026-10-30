@@ -29,7 +29,7 @@
   var status = null;                                     // P5: Zustand fuer den Bildschirmschoner (N.player.status)
 
   N.router.define('player', function (params) {
-    var s = { rail: null, wheelKeys: ['LEFT', 'RIGHT'], toastHigh: true };   // Toasts oben links (NAV-10), nie ueber der Bedien-Insel
+    var s = { rail: null, wheelKeys: ['LEFT', 'RIGHT'], toastHigh: true, news: 'player' };   // news: HOME-13 an der Stelle der Toasts, nur mit newsPlay und ruhigem Bild   // Toasts oben links (NAV-10), nie ueber der Bedien-Insel
     var root, vbg, top, t1, t2, clk, bot, played, head, segs, cgs, tm0, tm1, skl, chn, spin, spinT, thumb, thImg, thT, skip, skipT, up, upImg, upTi, upIn, upBar, upBtns = [], sub, subT, sb, sbBg;
     var btnEl = {}, ppIc = null, numB = null, numF = null, lbl, lblT, mh, mhItems = [], mhRects = null;
     var pb = null, sef = null, mk = null, acc = null, item = null, osd = false, osdT = 0, lastSec = -1, queue = null, qTask = null, upF = 0, cdOn = false, skipM = null, btnKind = null;
@@ -41,6 +41,10 @@
     var sess = {}, pcfg = null, sleep = { mode: 'off', at: 0, t: 0, w: 0 };
     // Karte "Das war die letzte Folge" (lastOn, Knopf-Fokus lastF), "Schaust du noch?" (still, stillOn)
     var last, lastBtns = [], lastOn = false, lastF = 0, still = null, stillOn = false;
+    // Karte am echten Dateiende (PLAY-18): Rueckzaehler endN (s), Zeitgeber endT, Balken lastBar; endHold = Erweiterung hat einen
+    // Dialog offen (Zaehler steht); lastCustom = Erweiterung hat Knopf 0 belegt (dann Knopf 1 = "Zurueck in n Sek.")
+    var calmAt = 0;                                       // HOME-13: seit wann laeuft das Video ruhig (0 = nicht)
+    var lastEnd = false, endN = 0, endT = 0, endHold = false, lastCustom = false, lastBar = null, lastB1 = null;
     // P5: "Geringere Qualitaet?" beim Puffern (bw, lowT, offerT), Zurueckspulen nach langer Pause (pausedAt),
     // "Verbindung unterbrochen" (lost = {at}, Insel lostEl mit 2 Knoepfen, lostT = Wiederholungs-Takt)
     var bw = null, lowT = 0, offerT = 0, pausedAt = 0, prevSt = '', lost = null, lostEl, lostBtns = [], lostF = 0, lostT = 0, onOff = null, onOn = null;
@@ -55,14 +59,27 @@
     var PX = {
       item: function () { return item; }, queue: function () { return queue; }, hasNext: function () { return hasNext(); }, dur: function () { return dur(); },
       offer: function (text, ms) {
-        if (btnKind || closed) return false;
+        if (btnKind || closed || cdOn || lastOn || stillOn) return false;   // nie zusammen mit einer anderen Insel oder Karte
         btnKind = 'ext'; skipM = null; U.setText(skipT, text); U.show(skip, true);
         if (offerTm) clearTimeout(offerTm);
         offerTm = setTimeout(function () { offerTm = 0; if (btnKind === 'ext') hideSkip(); }, ms || 15000);
         return true;
       },
       hideOffer: function () { if (btnKind === 'ext') hideSkip(); },
-      setLast: function (title, text, b0) { U.setText(lastTi, title || N.t('pl.last.title')); U.setText(lastTx, text || N.t('pl.last.text')); U.setText(lastB0, b0 || N.t('pl.last.toShow')); },
+      setLast: function (title, text, b0) {
+        lastCustom = !!b0;
+        U.setText(lastTi, title || N.t('pl.last.title')); U.setText(lastTx, text || N.t('pl.last.text')); U.setText(lastB0, b0 || N.t('pl.last.toShow'));
+        if (lastEnd) endPaint();
+      },
+      /* Erweiterung oeffnet/schliesst einen Dialog: der Rueckzaehler am Ende steht so lange; danach (am Ende) gleich weiter */
+      hold: function (on) {
+        endHold = !!on;
+        if (lastBar) U.show(lastBar.parentNode, !endHold && lastEnd);
+        if (!endHold && lastEnd) endLeave();
+      },
+      /* naechste Folge ist (am Ende) gerade in die Play-Queue gekommen (Erweiterung meldet es) -> abspielen statt zurueck */
+      arrived: function () { if (lastEnd && !endHold) endLeave(); },
+      ended: function () { return lastEnd; },
       setUpOver: function (text) { if (upOv) U.setText(upOv, text || N.t('pl.next.over')); },
       /* rk ans Ende der aktuellen Folge der Play-Queue (PMS PUT /playQueues/<id>?uri=…&next=1); cb(ok) */
       addNext: function (rk, cb) {
@@ -89,7 +106,7 @@
       t1 = U.txt('div', 'pl-t1 ell', ti, ''); t2 = U.txt('div', 'pl-t2 ell', ti, '');
       clk = U.txt('div', 'pl-isl pl-clk', top, '');
       bot = U.el('div', 'pl-isl pl-bot', root, 'display:none');
-      var tr = U.el('div', 'pl-tr', bot);
+      var tr = U.el('div', 'pl-tr', bot);                                // Runde 8 (Huellen) am TV schlechter -> wie Runde 7
       segs = U.el('div', 'pl-segs', tr);
       played = U.el('div', 'pl-pl', tr);
       cgs = U.el('div', 'pl-cg', tr);
@@ -140,7 +157,8 @@
       last = U.el('div', 'pl-up pl-last', root, 'display:none');
       lastTi = U.txt('div', 'pl-lastti', last, N.t('pl.last.title'));
       lastTx = U.txt('div', 'pl-lastx', last, N.t('pl.last.text'));
-      for (i = 0; i < 2; i++) { var lb = U.el('div', 'btn pl-upb', last, 'left:' + (16 + i * 192) + 'px'), lt = document.createTextNode(N.t(i ? 'pl.next.watchCredits' : 'pl.last.toShow')); lb.appendChild(lt); lastBtns.push(lb); if (!i) lastB0 = lt; }
+      for (i = 0; i < 2; i++) { var lb = U.el('div', 'btn pl-upb', last, 'left:' + (16 + i * 192) + 'px'), lt = document.createTextNode(N.t(i ? 'pl.next.watchCredits' : 'pl.last.toShow')); lb.appendChild(lt); lastBtns.push(lb); if (!i) lastB0 = lt; else lastB1 = lt; }
+      lastBar = U.el('i', '', U.el('div', 'pl-upbar pl-lastbar', last, 'display:none'));
       if (N.ext.has('player:open')) xt = N.ext.call('player:open', PX) || null;
       lostEl = U.el('div', 'pl-isl pl-lost', root, 'display:none');
       U.txt('div', 'pl-lostti', lostEl, N.t('err.connLost.title'));
@@ -156,7 +174,8 @@
       onOff = function () { if (pb && !closed && !isrv() && !errOn && (pb.state === 'playing' || pb.state === 'paused' || pb.state === 'buffering')) connLost(); };
       onOn = function () { if (lost) resumeLost(); };
       N.evt.on('net:offline', onOff); N.evt.on('net:online', onOn);
-      status = function () { return { active: !!pb && !closed && !errOn, paused: !!lost || !!(pb && pb.state === 'paused'), item: item }; };
+      // calm/since (HOME-13): nur Bild – kein OSD, keine Insel/Karte, kein Laden, kein Spulen, kein Menue; since = ms seit ruhigem Laufen (Start/Sprung)
+      status = function () { return { active: !!pb && !closed && !errOn, paused: !!lost || !!(pb && pb.state === 'paused'), item: item, calm: calm(), since: calmAt ? U.now() - calmAt : 0 }; };
     };
 
     /* ---------- Lebenszyklus ---------- */
@@ -187,12 +206,15 @@
     function shutdown() {
       closed = true;
       if (offerTm) { clearTimeout(offerTm); offerTm = 0; }
+      if (endT) { clearTimeout(endT); endT = 0; }
       if (hintT) { clearTimeout(hintT); hintT = 0; }
       if (xt && xt.close) xt.close();
       acc.cancel(); lp.leave(); lpEnd();
       setSleep('off', true);
       // Startseite: bis zur Schwelle gesehen/zu Ende -> Titel verlaesst Weiterschauen zu Recht (kein Warten auf ihn, home.js)
       var fin = !!pb && (pb.state === 'ended' || (pb.dur() > 0 && pb.t / pb.dur() >= (N.config.watchedThreshold || 0.9)));
+      // Stelle des Stopps merken (N.player.play): kommt die Seite schneller zurueck als der Server die Position verarbeitet hat
+      lastStop = item && item.rk && pb && !N.config.readOnly ? { rk: String(item.rk), srv: item.srv || '', off: fin ? 0 : Math.floor(pb.t || 0), at: U.now() } : null;
       if (pb) { pb.stop('user'); pb = null; }
       if (qTask) { qTask.abort(); qTask = null; }
       if (osdT) clearTimeout(osdT);
@@ -297,10 +319,15 @@
       for (i = 1; i < chs.length; i++) U.el('i', '', cgs, 'left:' + (Math.round(BAR_W * chs[i].start / m.dur) - 1) + 'px');   // Kapitelgrenzen = 3-px-Luecken
     }
     /* F23: Spruenge und (Wieder-)Start melden -> Nachladen kurz danach zaehlt nicht fuer "Geringere Qualitaet?" */
-    function seekPb(ms) { if (bw) bw.mark(U.now()); pb.seek(ms); }
+    function seekPb(ms) { if (bw) bw.mark(U.now()); if (calmAt) calmAt = U.now(); pb.seek(ms); }
+    function calm() {
+      return !!pb && !closed && !errOn && !lost && pb.state === 'playing' && !trickOn() && !osd && !btnKind && !cdOn && !lastOn && !lastEnd && !stillOn &&
+        up.style.display === 'none' && spin.style.display === 'none' && !(lp && lp.isOpen()) && !N.router.hasOverlay();
+    }
     function onState(st) {
       var was = prevSt; prevSt = st;
       pauseClock(st === 'paused');
+      if (st !== 'playing') calmAt = 0; else if (was !== 'playing') calmAt = U.now();   // HOME-13: Ruhe seit Start/Fortsetzen/Nachladen
       if (st === 'playing') {
         hideSpin(); N.tv.saver(false);
         if (was !== 'playing' && was !== 'buffering' && bw) bw.mark(U.now());   // Start, Fortsetzen nach Pause
@@ -382,6 +409,7 @@
       U.setText(clk, cfg().clock === false ? ends : N.comfort.clock(now, N.config.fixedClock) + (ends ? ' · ' + ends : ''));   // P5 set.clock
     }
     function markerTick(ms) {
+      if (lastEnd) return;                           // Karte am echten Ende: spaete Zeit-Ereignisse aendern nichts mehr
       var o = mk.tick(ms, { dur: dur(), playing: pb.state === 'playing', hasNext: hasNext() && sleep.mode !== 'end', last: isLast() && sleep.mode !== 'end', resume: pb.resume });
       if (o.skipTo >= 0) {                           // Automatik: springen, Toast
         seekPb(o.skipTo);
@@ -679,7 +707,7 @@
       var g = lp.open(Lp.geom({ x: x, barX: BAR_X, barW: BAR_W, dur: dur(), w: Lp.width(lpS, 480, BAR_W), h: h }), chs, 0);
       lpTab = Lp.tab(lpS, g, O.ISL_Y);
       lpBand = Lp.band(lpS, g, { barY: BAR_Y, islY: O.ISL_Y, bottom: LP_BOT, side: BAR_Y + 16 });   // seitlich raus nur bis zur Balken-Trefferzone
-      U.cls(bot, 'lp', true); U.cls(bot, 'lp-' + lpS, true);
+      lpBar(true);
       if (lpS === 'film' || (!thumbOn && lpS !== 'stretch')) U.show(thumb, false);   // Zielzeit steht an der Feinleiste bzw. im Bild
       U.cls(thumb, 'lp-panel', lpS === 'panel');                 // A: Vorschaubild ueber der Lasche
       var txt = lpText(h);
@@ -688,6 +716,11 @@
       if (lpTab) { U.show(lbl, false); U.cls(sub, 'lp-' + lpS, true); lpCover(); } else lpLabel(txt);
       var p = lp.move(N.pointer.x, N.pointer.y, lpBand);
       if (p && !p.exit) lpMove(p);
+    }
+    /* Balken, Kopf und Sprungziel waehrend der Feinauswahl (A/D gedimmt, B verborgen) – Klassen an der Bedien-Insel wie in Runde 7.
+     * Runde 8 (Klassen an leeren Huellen-Ebenen .pl-trw/.pl-hdw) war am TV schlechter (9,8,1 Lasche/Stretch/Film 3/5/5 statt 2/3/3) */
+    function lpBar(on) {
+      U.cls(bot, 'lp', on); U.cls(bot, 'lp-stretch', on && lpS === 'stretch');
     }
     /* Hinweis/Titel: die ersten 3 Male (Zaehler je TV) der Hinweis zum Verlassen, danach "Feinauswahl · ±4:48 Min." */
     function lpText(h) {
@@ -735,7 +768,7 @@
       if (lp.isOpen()) lp.close();
       lpPend = null;
       if (!lpv.on) return;
-      lpv.hide(); U.cls(bot, 'lp', false); U.cls(bot, 'lp-' + lpS, false);
+      lpv.hide(); lpBar(false);
       if (lpTab) { lpTab = null; U.cls(sub, 'lp-' + lpS, false); U.cls(skip, 'lp-off', false); U.cls(up, 'lp-off', false); U.cls(last, 'lp-off', false); }
       U.cls(thumb, 'lp-panel', false);
       if (zone === 'btn' && osd) setLabel(); else U.show(lbl, false);
@@ -816,6 +849,7 @@
     function isLast() { return !!(queue && item && item.type === 'episode' && queue.idx >= queue.items.length - 1); }
     function showUp(left) {
       if (!cdOn) {
+        if (btnKind === 'ext') hideSkip();           // Hinweis-Insel einer Erweiterung nie zusammen mit einer Karte (PX.offer)
         cdOn = true; upF = 0; setUpF(0);
         var nx = queue.items[queue.idx + 1];
         U.setText(upTi, N.t('pl.epTitle', { s: nx.s, e: nx.e, t: nx.epTitle }));
@@ -849,11 +883,45 @@
       queue.idx--;
       play(pv, 0, pv);
     }
+    /* Echtes Dateiende (PLAY-18): naechster Eintrag, kurz die Karte "Das war die letzte Folge" mit Rueckzaehler oder gleich zurueck.
+     * Nie bleibt der Player auf dem fertigen Video stehen (TV-Befund 1.0.6: Karte blieb mit "Anfragen" fuer immer offen). */
     function onEnded() {
       hideSkip(); hideUp();
-      if (sleep.mode === 'end') { sleepDone(); return; }
-      if (eff('autoNext') && hasNext()) { autoNext(); return; }
-      if (eff('autoNext') && isLast() && !(mk && mk.cancelled)) { showLast(); U.show(lastBtns[1], false); setLastF(0); N.tv.saver(true); return; }   // Karte bleibt stehen
+      var a = N.Markers.endAction({ sleepEnd: sleep.mode === 'end', autoNext: !!eff('autoNext'), hasNext: hasNext(), last: isLast(), cancelled: !!(mk && mk.cancelled) });
+      if (a === 'sleep') { sleepDone(); return; }
+      if (a === 'next') { autoNext(); return; }
+      if (a === 'card') { endCard(); return; }
+      close();
+    }
+    function endCard() {
+      showLast();
+      lastEnd = true; endN = N.Markers.endWait(eff('countdown'));
+      endPaint();
+      lastBarOn(true); U.show(lastBar.parentNode, !endHold);
+      lastBar.style.webkitTransition = 'none'; lastBar.style.webkitTransform = 'scaleX(1)';
+      var n = endN;
+      setTimeout(function () { lastBar.style.webkitTransition = '-webkit-transform ' + n + 's linear'; lastBar.style.webkitTransform = 'scaleX(0)'; }, 30);
+      N.tv.saver(true);
+      if (endT) clearTimeout(endT);
+      endT = setTimeout(endStep, 1000);
+      if (xt && xt.ended) xt.ended();                // Erweiterung: noch einmal nachsehen, ob die naechste Folge inzwischen da ist
+    }
+    function endStep() {
+      endT = 0;
+      if (closed || !lastEnd) return;
+      if (!endHold) { endN--; if (endN <= 0) { endLeave(); return; } endPaint(); }
+      endT = setTimeout(endStep, 1000);
+    }
+    /* Knoepfe am Ende: belegt die Erweiterung Knopf 0 ("Anfragen"), ist Knopf 1 "Zurueck in n Sek."; sonst Knopf 0 */
+    function endPaint() {
+      var t = N.tn('pl.last.backIn', endN);
+      if (lastCustom) { U.setText(lastB1, t); U.show(lastBtns[1], true); }
+      else { U.setText(lastB0, t); U.show(lastBtns[1], false); if (lastF) setLastF(0); }
+    }
+    /* zurueck zum aufrufenden Bildschirm (alter Fokus, NAV-6) – oder, falls die naechste Folge inzwischen eingereiht ist, abspielen */
+    function endLeave() {
+      if (closed) return;
+      if (hasNext() && pb) { hideLast(); autoNext(); return; }
       close();
     }
     /* automatischer Wechsel (Countdown bei 0 / Ende): nach N Folgen ohne Eingabe erst nachfragen (SPEC 7.10) */
@@ -871,14 +939,23 @@
     /* Karte "Das war die letzte Folge": Zur Serie (bis es Details gibt: zurueck zur Startseite) · Abspann ansehen */
     function showLast() {
       if (lastOn) return;
-      lastOn = true; U.show(lastBtns[1], true); setLastF(0); U.show(last, true); lpCover();
+      if (btnKind === 'ext') hideSkip();             // z. B. Fortsetzen im Abspann: Insel "Naechste Folge fehlt" und Karte nie zugleich
+      lastOn = true; U.setText(lastB1, N.t('pl.next.watchCredits')); U.show(lastBtns[1], true); setLastF(0); U.show(last, true); lpCover();
       if (xt && xt.last) xt.last();
     }
-    function hideLast() { if (!lastOn) return; lastOn = false; U.show(last, false); }
+    /* Rueckzaehl-Balken der Karte am Ende; .cd macht die Karte dafuer 12 px hoeher – nur am Dateiende bzw. beim Schliessen, nie im
+     * Tastenpfad (haelt eine Erweiterung den Rueckzaehler an, wird nur der Balken verborgen, die Karte behaelt ihre Hoehe) */
+    function lastBarOn(on) { U.show(lastBar.parentNode, on); U.cls(last, 'cd', on); }
+    function hideLast() {
+      if (endT) { clearTimeout(endT); endT = 0; }
+      lastEnd = false; lastBarOn(false);
+      if (!lastOn) return;
+      lastOn = false; U.show(last, false);
+    }
     function setLastF(i) { U.cls(lastBtns[lastF], 'is-focus', false); lastF = i; U.cls(lastBtns[i], 'is-focus', true); }
     function lastAct(i) {
       if (i === 0 && xt && xt.lastAct && xt.lastAct()) return;
-      if (i === 0 || (pb && pb.state === 'ended')) { close(); return; }
+      if (lastEnd || i === 0 || (pb && pb.state === 'ended')) { close(); return; }
       if (mk) mk.cancelCountdown();
       hideLast();
     }
@@ -1304,15 +1381,28 @@
   });
 
   /* ---------- Einstieg ---------- */
-  var lastOpen = 0;
+  var lastOpen = 0, lastStop = null, STOP_KEEP = 600000;
+  /* TV-Test 30.10.: nach STOP bei 10:57 begann "Abspielen" bei 0:01 ohne Frage – die Seite hatte noch die Position von vor dem
+   * Abspielen (0). Position fuer den zuletzt gestoppten Titel: die eigene vom Stopp, solange der Server (noch) eine kleinere nennt
+   * (hoechstens 10 Min.; gesehen/zu Ende oder Gelb "gesehen/ungesehen" verwirft sie). Rein (Tests): (it, stop, now) -> ms */
+  function resumeAt(it, st, now) {
+    var off = N.model.progress(it) > 0 ? it.off : 0;
+    if (!st || String(it.rk) !== st.rk || (it.srv || '') !== st.srv || now - st.at > STOP_KEEP || st.off <= off) return off;
+    if (it.dur > 0 && st.off / it.dur >= (N.config.watchedThreshold || 0.9)) return off;
+    return st.off;
+  }
+  N.evt.on('watched:changed', function () { lastStop = null; });
   N.player = {
+    resumeAt: resumeAt,
+    _setStop: function (st) { lastStop = st; },
     /* how: 'ask' (OK auf Karte, Einstellung entscheidet) | 'resume' (PLAY) | 'start' */
     play: function (it, how) {
       if (!it || !N.model.isLeaf(it)) return false;
       var now = U.now();
       if (now - lastOpen < 600) return true;          // Doppelstart-Schutz (SPEC 14.10)
       lastOpen = now;
-      var off = N.model.progress(it) > 0 ? it.off : 0, mode = how === 'ask' ? (cfg().resume || 'ask') : how, rw = N.comfort.rewind(off, cfg().resumeRewind);
+      var srvOff = N.model.progress(it) > 0 ? it.off : 0, off = resumeAt(it, lastStop, now), mode = how === 'ask' ? (cfg().resume || 'ask') : how, rw = N.comfort.rewind(off, cfg().resumeRewind);
+      if (off !== srvOff) N.log('player fortsetzen: eigene Stopp-Stelle ' + Math.round(off / 1000) + ' s (Server ' + Math.round(srvOff / 1000) + ' s)');
       if (!off || mode === 'resume') { N.player.open(it, rw); return true; }
       if (mode === 'start') { N.player.open(it, 0); return true; }
       N.ui.dialog.open({ title: it.type === 'episode' ? N.t('pl.epTitle', { s: it.s, e: it.e, t: it.epTitle }) : it.title,

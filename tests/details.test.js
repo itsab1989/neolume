@@ -5,8 +5,8 @@ var H = require('./helpers/load');
 var N = H.load().N, D = N.det;
 N.i18n.set('de');
 
-var MOVIE = { ratingKey: '18681', type: 'movie', title: '2 Fast 2 Furious', year: 2003, duration: 6468704, contentRating: 'de/16', audienceRating: 5.0,
-  librarySectionID: 1, summary: 'Brian ...', tagline: 'Wie schnell?', studio: 'Ardustry', originallyAvailableAt: '2003-06-05',
+var MOVIE = { ratingKey: '18681', type: 'movie', title: 'Turbo Nacht', year: 2003, duration: 6468704, contentRating: 'de/16', audienceRating: 5.0,
+  librarySectionID: 1, summary: 'Ein Fahrer ...', tagline: 'Wie schnell?', studio: 'Ardustry', originallyAvailableAt: '2003-06-05',
   Genre: [{ id: 143, tag: 'Action' }, { id: 144, tag: 'Krimi' }], Director: [{ id: 146, tag: 'John Singleton' }],
   Role: [{ id: 150, tag: 'Paul Walker', role: "Brian O'Conner", thumb: 'https://metadata-static.plex.tv/x.jpg' }, { id: 151, tag: 'Tyrese Gibson', role: 'Roman' }],
   Media: [{ videoResolution: '1080', videoCodec: 'h264', audioCodec: 'dca', Part: [{ id: 1, Stream: [{ streamType: 1 }, { streamType: 2, languageCode: 'deu', selected: true }, { streamType: 2, languageCode: 'eng' },
@@ -32,10 +32,10 @@ test('Metazeile Film (mit Fortschritt: noch … · Ende um), Folge (Erstausstrah
   it.off = 6468704 - 62 * 60000;
   var now = new Date(2026, 9, 26, 22, 12).getTime();
   assert.strictEqual(D.meta(it, d, now), '2003 · 1 Std. 48 Min. · FSK 16 · 5,0/10 · noch 1 Std. 2 Min. · Ende um 23:14');
-  var ep = N.model.norm({ ratingKey: '5', type: 'episode', title: 'Tote Magier', grandparentTitle: 'Nordlicht', index: 5, parentIndex: 1, duration: 1440000 });
+  var ep = N.model.norm({ ratingKey: '5', type: 'episode', title: 'Alte Schwüre', grandparentTitle: 'Nordlicht', index: 5, parentIndex: 1, duration: 1440000 });
   assert.strictEqual(D.meta(ep, { date: '2023-10-06' }), '24 Min. · Erstausstrahlung 06.10.2023');
   var show = D.parse({ ratingKey: '7', type: 'show', title: 'Nordlicht', year: 2023, childCount: 2, leafCount: 40, viewedLeafCount: 4,
-    OnDeck: { Metadata: { ratingKey: '5', type: 'episode', title: 'Tote Magier', index: 5, parentIndex: 1, duration: 1440000, viewOffset: 900000 } } }, {});
+    OnDeck: { Metadata: { ratingKey: '5', type: 'episode', title: 'Alte Schwüre', index: 5, parentIndex: 1, duration: 1440000, viewOffset: 900000 } } }, {});
   assert.strictEqual(D.meta(show.it, show), '2023 · 2 Staffeln · Weiter mit S1 · F5 · noch 9 Min.');
   N.i18n.set('en');
   assert.strictEqual(D.date('2023-10-06'), '10/06/2023');
