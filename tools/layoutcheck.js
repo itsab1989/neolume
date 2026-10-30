@@ -9,10 +9,11 @@
 'use strict';
 var fs = require('fs'), path = require('path');
 var ALLOW_FILE = path.join(__dirname, 'layout_allow.json');
-var TYPES = ['overlap', 'clip', 'button', 'offscreen', 'safe', 'panel', 'edge', 'notice', 'spill'];
+var TYPES = ['overlap', 'clip', 'button', 'offscreen', 'safe', 'panel', 'edge', 'notice', 'spill', 'ring'];
 var LABEL = { overlap: 'Text ueberlappt Text', clip: 'Text abgeschnitten', button: 'Text ueber fremdem Bedienelement', offscreen: 'Text ueber dem Bildschirmrand',
   safe: 'Text im Sicherheitsrand', panel: 'Flaechen ueberlappen', edge: 'Flaeche erreicht den Bildschirmrand nicht',
-  notice: 'Hinweis (Toast) verdeckt Text', spill: 'Ragt ueber den Rand seiner Flaeche' };
+  notice: 'Hinweis (Toast) verdeckt Text', spill: 'Ragt ueber den Rand seiner Flaeche',
+  ring: 'Fokus-Ring ueber der Hinweisleiste' };
 
 function loadAllow(file) {
   var j = JSON.parse(fs.readFileSync(file || ALLOW_FILE, 'utf8')), list = j.allow || [];

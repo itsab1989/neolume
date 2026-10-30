@@ -5,6 +5,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.8] - 2026-10-30
+
+### Fixed
+- **The focus ring no longer covers the key hints on detail pages.** In the poster row at the bottom of a movie or show
+  page ("More like this"), the focused card and its ring reached into the key hints at the bottom of the screen. That row
+  now moves up a little when you go to it, so the hints stay readable.
+- **No screensaver right after a video.** When an episode or movie had played to the end without a key press, the
+  screensaver could start a second after the app went back to the show page, because the waiting time was counted from
+  your last key press before the video. It now counts from the end of playback or the last change of screen.
+- **Screensaver pictures and titles belong together again.** After the screensaver had been running for a while, some TVs
+  briefly showed a black screen right after a picture change and then the next picture under the previous title. The two
+  picture layers are now stacked in a way every TV respects.
+- **Screensaver pictures from your libraries are nicely mixed.** With "Screensaver pictures from" set to "Libraries", the
+  pictures used to come in alphabetical runs ("A…, B…, B…") and mostly from your biggest library. Now your libraries take
+  turns – movies and shows alternate even if you have far fewer shows – and the titles of each library come in random
+  order. A title is only shown again once its whole library has been shown.
+- **Back on a show's page after an episode, the episode you watched stays selected.** When you had watched an episode to
+  the end, the page used to jump to another episode (for the newest episode of a show even back to episode 1). Now the
+  episode you just watched is selected, with its season tab – after autoplay the last one that played.
+
+If a calmer screensaver with the right title under every picture makes your evening a little nicer, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.7] - 2026-10-30
 
 ### Added

@@ -19,7 +19,7 @@
 (function (N) {
   var U = N.util, C = N.comfort, SL = N.saverLogic, TICK = 1000, SAVER_BLUR = 8, SAVER_Q = 95;   // weicher Schoner (s. url)
   var ID = 'translate3d(0,0,0)', OV_FADE = 400, SETTLE = 150, TILE_SETTLE = 400, INFO_SETTLE = 100, CLEAN_MS = 400, PREP_MS = 1500;
-  var S = { on: false }, root = null, timer = 0, lastAct = 0, lastMin = '', homeT0 = 0;
+  var S = { on: false }, root = null, timer = 0, lastAct = 0, lastMin = '', homeT0 = 0, evOn = false;
   var blk, hc, hcT, hcS, hcD, hcSt = '', hcDay = '', el, ov, scr, ck, ti, sb, tilesEl = null, tiles = [], Ls = [], f = 0;
   var kind = '', gen = 0, cyc = 0, nextAt = 0, ready = null, busy = false, loading = false, fails = 0, lastFx = '', lastDur = 0, hadPic = false;   // hadPic: schon ein Bild gezeigt (erstes kommt aus Schwarz)
   var homeItems = [], bag = null, noArt = false, force = null, onGo = null;
@@ -35,6 +35,17 @@
    * Ladeauftrag OHNE Rueckruf) -> so lange kein prepare (TV-Test 30.10., 3-s-Takt: due lud schon in die Ebene, die Aufraeum-Stufe
    * verwarf den Auftrag, loading blieb fuer immer stehen = "saver stuck img"). */
   var cleaning = false;
+  /* upper: die Bild-Ebene, die im DOM hinten steht (= oben). Nutzerbefund 30.10. (1.0.7, Kamera): der TV wertet die Aenderung von
+   * z-index an den beiden Ebenen nicht aus – es zaehlt die DOM-Reihenfolge. Dann lag nach jedem zweiten Tausch die ALTE Ebene oben:
+   * die Aufraeum-Stufe machte sie schwarz (rest0), das naechste Bild lud in sie und erschien sofort unter dem alten Titel (Bild des einen Films
+   * unter dem Titel des vorigen). Die vordere Ebene steht deshalb immer auch im DOM oben (onTop), z-index bleibt fuer Browser, die ihn beachten. */
+  var upper = null;
+  function onTop(l) {
+    if (upper === l || N.config.saverZOnly) return;      // saverZOnly: nur TV-Gegenprobe (Verhalten bis 1.0.7)
+    var o = Ls[0] === l ? Ls[1] : Ls[0];
+    el.insertBefore(o.w, l.w);                            // andere Ebene direkt VOR l -> l liegt oben
+    upper = l;
+  }
   function mark(st) { step = st; stepAt = now(); }
   function stuckMs() { return Math.max(120000, interval() * 2 + 15000); }
 
@@ -111,6 +122,10 @@
       root.addEventListener('mousemove', onPointer, true); root.addEventListener('mousewheel', onPointer, true);
     }
     lastAct = now();
+    /* SAV-1: Ruhe zaehlt ab der letzten Taste ODER der letzten Aenderung am Bildschirm. Nutzerbefund 30.10.: nach einer Folge ohne
+     * Taste (Ende, Karte, zurueck zur Serienseite) startete der Schoner 1 s spaeter – die Ruhe lief seit der letzten Taste vor dem
+     * Abspielen. Jetzt: Wiedergabe, Bildschirmwechsel (auch Player zu) und Wiedergabe-Ende setzen die Ruhe zurueck. */
+    if (!evOn && N.evt) { evOn = true; N.evt.on('router:top', act); N.evt.on('playback:stopped', act); }
     if (!timer) timer = setInterval(tick, TICK);
   };
   /* App.onKey: true = Taste geschluckt (Schoner war an) */
@@ -128,6 +143,7 @@
       U.show(hc, !S.on && top === 'home' && !!(N.session && N.session.profile) && clockOn());
       if (S.on) { beat(); due(); return; }
       var ps = playerState();
+      if (ps.playing) act();                             // laufende Wiedergabe = Aktivitaet (Ruhe beginnt erst danach)
       var d = N.config.saverMs ? !ps.playing && rest() >= N.config.saverMs : C.saverDue(rest(), minutes(), ps);   // saverMs: nur visuelle Tests
       if (d && minutes() > 0) { S.start(ps); return; }
       welcomeCheck(top);
@@ -151,9 +167,9 @@
   }
   function pics() { return SL.pics(setting('saverPics', 'art')); }
   /* naechster Titel der Quelle: cb({art, thumb, sq, title, sub}|null) */
-  function srcNext(cb) {
+  function srcNext(cb, same) {
     if (setting('saverSrc', 'libs') === 'libs' && N.saverLib) {
-      N.saverLib.next(function (it) { cb(it ? { art: it.art, thumb: it.thumb || '', sq: SL.square(it), title: it.title || '', sub: SL.meta(it) } : homeNext()); });
+      N.saverLib.next(function (it) { cb(it ? { art: it.art, thumb: it.thumb || '', sq: SL.square(it), title: it.title || '', sub: SL.meta(it) } : homeNext()); }, same);
       return;
     }
     cb(homeNext());
@@ -180,7 +196,7 @@
           if (++skipped >= MAX_SKIP) { cb(asPoster(first)); return; }
           one();
         });
-      });
+      }, skipped > 0);                                     // Ersatz fuer ein Standbild aus derselben Bibliothek (reihum, SAV-2)
     })();
   }
   /* Pause-Schoner: der pausierte Titel nach "Bilder im Bildschirmschoner" (SL.pausedPic; Standbild-Pruefung wie im Schoner, eine
@@ -313,7 +329,7 @@
     curtain: {                                            // Vorhang: Huelle faehrt herein, Inhalt gegenlaeufig -> Bild steht, Kante wandert
       stage: function (F, B) {
         var x = cyc % 2 ? -1280 : 1280;
-        B.w.style.zIndex = 3; tf(B.w, 'translate3d(' + x + 'px,0,0)'); tf(B.inn, 'translate3d(' + (-x) + 'px,0,0)');
+        B.w.style.zIndex = 3; onTop(B); tf(B.w, 'translate3d(' + x + 'px,0,0)'); tf(B.inn, 'translate3d(' + (-x) + 'px,0,0)');
       },
       go: function (F, B, d) {
         var t = '-webkit-transform ' + d + 'ms ease-in-out';
@@ -424,6 +440,7 @@
     });
     function go() {
       mark('fx');
+      N.log('saver zeigt "' + (r.x.title || '') + '" ' + String(r.x.pm ? r.x.thumb : r.x.art).replace(/\/\d{6,}$/, '') + ' | Ebene ' + Ls.indexOf(B) + (upper === B ? ' oben' : upper ? ' UNTEN' : '') + ' (' + fx + ')');
       var d = D.go(F, B, ms(fx));
       lastDur = d;
       if (hard) { pmSet(r); place(); setInfo(r.x); }
@@ -441,12 +458,13 @@
     var old = front();
     f = 1 - f;
     var nw = front();
-    nw.w.style.zIndex = 2; tr(nw.w, 'none'); tf(nw.w, ID);
+    nw.w.style.zIndex = 2; onTop(nw); tr(nw.w, 'none'); tf(nw.w, ID);
     old.w.style.zIndex = 1;
     busy = false; cleaning = true; mark('swap');
     later(CLEAN_MS, function () {
       cleaning = false;
       if (old === front()) return;                         // inzwischen erneut getauscht (sehr kurzer Takt)
+      N.log('saver aufraeumen: Ebene ' + Ls.indexOf(old) + (upper === old ? ' OBEN (wird schwarz ueber dem Bild)' : ' unten'));
       rest0(old); N.img.drop(old.img); N.img.drop(old.pst); hideTiles();
       if (kind !== 'paused') later(PREP_MS, prepare);
     });
@@ -513,6 +531,7 @@
     if (N.saverLib) N.saverLib.abort();
     if (N.saverArt) N.saverArt.abort();
     if (busy && step === 'fx') { f = 1 - f; front().w.style.zIndex = 2; back().w.style.zIndex = 1; }
+    onTop(front());
     var B = back();
     B.w.style.zIndex = 1; N.img.drop(B.img); N.img.drop(B.pst); rest0(B); hideTiles();
     busy = false; loading = false; cleaning = false; ready = null; fails = 0; mvTok++;
@@ -553,7 +572,7 @@
       homeItems = pausedList(ps.item);
     }
     S.on = true; f = 0; cyc = N.config.saverPos !== undefined ? N.config.saverPos - 1 : N.config.fixedClock ? -1 : Math.floor(Math.random() * 4);   // run() zaehlt vor dem 1. Bild hoch (Tests: Ecke 0 bzw. saverPos)
-    rest0(Ls[0]); rest0(Ls[1]); Ls[0].w.style.zIndex = 2; Ls[1].w.style.zIndex = 1;
+    rest0(Ls[0]); rest0(Ls[1]); Ls[0].w.style.zIndex = 2; Ls[1].w.style.zIndex = 1; upper = N.config.saverZOnly ? Ls[1] : null; onTop(Ls[0]);   // Gegenprobe: DOM bleibt [0, 1] -> oben liegt Ebene 1
     ovSig = ''; pmNow = false; pmCk = null; tr(ov, 'none'); op(ov, 1); place();
     U.show(hc, false);
     U.setText(ti, ''); U.setText(sb, ''); setInfo(null);
@@ -578,6 +597,7 @@
   };
   S._tick = tick; S._pointer = onPointer; S._nextItem = nextItem;   // Tests
   S._state = function () { return { busy: busy, loading: loading, step: step, stucks: stucks }; };   // Tests (Waechter)
+  S._front = function () { return Ls[f]; };                          // Tests (Bild und Titel gehoeren zusammen)
   S._night = function () { return night; }; S._tiles = function () { return tiles; };   // Tests (SAV-6)
   S._pausedNext = function (it, cb) { kind = 'paused'; homeItems = pausedList(it); nextItem(cb); };   // Tests (Schoner aus)
   /* Messlauf (dev/bench.js 'saver-<fx>'): Schoner mit festem Uebergang starten; cb(go) sobald das 2. Bild bereit liegt,

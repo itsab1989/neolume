@@ -161,3 +161,29 @@ test('Fortsetzen: eigene Stopp-Stelle gilt, solange der Server noch eine kleiner
   assert.strictEqual(R(it, { rk: '203', srv: '', off: 1450000, at: now }, now), 0, 'fast zu Ende (gesehen) -> keine Stelle');
   assert.strictEqual(R(it, null, now), 0);
 });
+test('NAV-3.2 Rueckkehr aus dem Player: Fokus auf der gespielten Folge, auch wenn sie jetzt gesehen ist und davor eine ungesehene liegt (TV-Test 30.10.)', function () {
+  var eps2 = [ep(2, 1, true), ep(2, 2), ep(2, 3)];
+  var o = open({ rk: '203', type: 'episode', s: 2, e: 3, showRk: '9', title: 'Demo-Serie', lib: 2 }, eps2);
+  o.answer(/\/902\/children$/, { MediaContainer: { totalSize: 3, Metadata: eps2 } });
+  o.T.tick(2000);
+  assert.strictEqual(o.X().focusedEp().e, 3);
+  var now = [ep(2, 1, true), ep(2, 2), ep(2, 3, true)];
+  function back(ev) {
+    o.scr.leave();
+    o.N.evt.emit('playback:stopped', ev);
+    o.scr.enter({});
+    o.answer(/^\/library\/metadata\/9$/, { MediaContainer: { librarySectionID: 2, Metadata: [{ ratingKey: '9', type: 'show', title: 'Demo-Serie', leafCount: 6, viewedLeafCount: 5, childCount: 2 }] } });
+    o.answer(/^\/library\/metadata\/9\/children$/, { MediaContainer: { Metadata: [
+      { ratingKey: '901', type: 'season', index: 1, title: 'Staffel 1', leafCount: 3, viewedLeafCount: 3 },
+      { ratingKey: '902', type: 'season', index: 2, title: 'Staffel 2', leafCount: 3, viewedLeafCount: 2 }] } });
+    o.T.tick(10);
+    o.answer(/\/902\/children$/, { MediaContainer: { totalSize: 3, Metadata: now } });
+    o.T.tick(2000);
+  }
+  back({ rk: '203', video: true, done: true, ep: { s: 2, e: 3, show: '9' } });
+  assert.strictEqual(o.X().focusedEp().e, 3, 'gespielte Folge 3 (nicht die erste ungesehene, Folge 2)');
+  back({ rk: '203', video: true, done: true, ep: { s: 2, e: 3, show: '77' } });
+  assert.strictEqual(o.X().focusedEp().e, 2, 'Folge einer anderen Serie: wie bisher die erste ungesehene');
+  back({ rk: 'x', video: true, done: true, ep: null });
+  assert.strictEqual(o.X().focusedEp().e, 2, 'ohne gespielte Folge (z. B. Trailer): erste ungesehene');
+});

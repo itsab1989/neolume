@@ -50,7 +50,8 @@
   }
   function show() {
     var m = next();
-    if (!m) { arm(); return; }
+    if (!m) { if (N.log) N.log('news: nichts zu zeigen (gefiltert)'); arm(); return; }
+    if (N.log) N.log('news zeigt (' + env().screen + '): ' + (m.head ? m.head + ' | ' : '') + (m.line || ''));
     where = env().screen;
     // unsichtbar vorbereiten (Huelle steht auf Deckkraft 0): Lage, Symbol, Text; erst im uebernaechsten Frame einblenden
     U.cls(B.el, 'at-top', where === 'top'); U.cls(B.el, 'at-pl', where === 'player');

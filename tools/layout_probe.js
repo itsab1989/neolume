@@ -13,6 +13,8 @@
  *   spill    Bedienelement oder Text ragt sichtbar ueber den Rand seiner Flaeche hinaus (naechster Vorfahre mit deckender
  *            Hintergrundfarbe, kleiner als der Bildschirm: Dialog, Panel, Karte, Knopf) – z. B. drei Knoepfe nebeneinander, die
  *            breiter als der Dialog sind; was ein abschneidender Vorfahre verbirgt, zaehlt nicht (das meldet clip)
+ *   ring     ein sichtbarer Fokus-Ring (samt Fokus-Vergroesserung) ragt in das Band der Hinweisleiste mit Text (#pn-hints bzw.
+ *            data-layout-hintbar, ganze Breite der Leiste) – die fokussierte Karte muss ganz ueber der Leiste bleiben
  *   notice   ein sichtbarer Hinweis, der nichts verdecken darf (Toast #pn-toast, sonst data-layout-notice), liegt ueber Text,
  *            der ohne ihn zu sehen waere (Toasts liegen ueber allem, gehoeren aber an eine freie Stelle)
  * Ergebnis: JSON per synchronem POST an &probe (tools/visual.js sammelt es ein und wertet es mit tools/layoutcheck.js aus).
@@ -22,6 +24,7 @@
   'use strict';
   var TOL = 2, W = 1280, H = 720, SX = 64, SY = 36;
   var NOTICE = '#pn-toast, [data-layout-notice]';
+  var HINTBAR = '#pn-hints, [data-layout-hintbar]', RING = '.focus-ring';
   var INTERACTIVE = '.btn,.card,.card-list,.card-list-sq,.chip,.key,.pkey,.ni,.np-b,.pe,.pl-b,.pl-skip,.prof,.set-cat,.set-row,.tab,.tl-row,.del,.ib';
   var csCache = [], opCache = [];
 
@@ -315,6 +318,21 @@
         out.push({ t: 'panel', a: elInfo(P.e), b: elInfo(Q.e), r: box(x2) });
       }
       /* notice: Toast/Hinweis ueber Text, der ohne ihn sichtbar waere */
+      /* ring: ein sichtbarer Fokus-Ring (mit Fokus-Vergroesserung, nach allen Transformationen gemessen) liegt ueber dem Text der
+       * Hinweisleiste unten (Nutzerbefund 30.10.: letzte Reihe der Detailseite, Ring ueber "Als gesehen · Suche · Details") */
+      var bars = Array.prototype.slice.call(document.querySelectorAll(HINTBAR)), rgs = document.querySelectorAll(RING);
+      for (i = 0; bars.length && i < rgs.length; i++) {
+        var rg = rgs[i];
+        if (cs(rg).display === 'none' || opacity(rg) < 0.5 || okAttr(rg, 'ring')) continue;
+        var rb = isect(rr(rg.getBoundingClientRect()), scr);
+        if (empty(rb)) continue;
+        /* das Band der Leiste zaehlt (ganze Breite, nicht nur die Woerter): die Leiste ist rechtsbuendig und ihr Text wechselt */
+        bars.forEach(function (bar) {
+          if (okAttr(bar, 'ring') || !items.some(function (it) { return bar.contains(it.o); })) return;   // nur eine sichtbare Leiste mit Text
+          var x = isect(rb, rr(bar.getBoundingClientRect()));
+          if (w(x) > TOL && h(x) > TOL) out.push({ t: 'ring', a: elInfo(bar), b: elInfo(rg), r: box(x) });
+        });
+      }
       var nts = document.querySelectorAll(NOTICE);
       for (i = 0; i < nts.length; i++) {
         var nt = nts[i], ns = cs(nt);

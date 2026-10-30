@@ -11,6 +11,11 @@
 (function (N) {
   var U = N.util, M = N.model, D = N.det, REST = 300, ANCHOR = 340, TMORE = 44, SEC = 248, PEEK = 580, HOLD = 2500;
   var PITCH = { land: 288, poster: 360, cast: 248 };
+  /* Poster-Reihen (Aehnliche Titel, Sammlung) stehen beim Fokus LIFT px hoeher: Karte 264 px ab Anker + 52 endet bei 656, der Ring
+   * (Karte + 8 px, Fokus-Vergroesserung 1.08) bei ~675 – ueber dem Text der Hinweisleiste (y 656). Nutzerbefund 30.10. Mit 28 px
+   * endet der Ring bei ~647. Querformat (162) und Besetzung (120) passen am Anker. */
+  var LIFT = 28;
+  function anchorOf(kind) { return kind === 'poster' ? ANCHOR - LIFT : ANCHOR; }
 
   N.router.define('details', function (params) {
     var it0 = params.it || {}, isShow = it0.type === 'show' || it0.type === 'season' || it0.type === 'episode';
@@ -28,6 +33,10 @@
     var tclip, tstrip, tabEls = [], tabX = [], tabV = null, tmore = [], arrowH = -1, strip, stripT, sbar, sbarT, segs = [], epRow = null, rows = [], ring, sb, bubble, bubbleT;
     var d = null, seasons = [], sIdx = 0, tabF = 0, eps = [], epsTotal = 0, epPages = {}, epWait = {}, seasonCache = new N.LRU(10), gen = 0, tasks = [];
     var zone = 'btn', bf = 0, rk = 0, off = 0, infoFor = null, infoT = 0, seasonT = 0, dead = false, away = false, dirty = false;
+    /* NAV-3.2 Rueckkehr aus dem Player: gespielte Folge {s, e} (nach Autoplay die zuletzt gespielte) – Fokus und Staffel-Reiter dorthin,
+     * auch wenn sie jetzt gesehen ist (TV-Test 30.10.: nach dem Ende der neuesten Folge stand der Fokus auf F1, weil keine ungesehene
+     * Folge mehr da war) */
+    var played = null;
     var wishS = it0.type === 'season' ? it0.s : it0.type === 'episode' ? it0.s : null, wishE = it0.type === 'episode' ? it0.e : 0;
     var jump = { digits: '', t: 0 }, bubbleTm = 0, onPlayed = null, onWatched = null, onAnime = null, epMeta = new N.LRU(30);
     var xt = null, baseSeasons = [], pmsEps = null, btnDirty = false;   // optionale Erweiterung (core/ext.js 'details:open'): Steuerobjekt
@@ -93,6 +102,11 @@
       },
       /* Zeile unter der Beschreibung neu (Daten der Erweiterung kamen): blendet nur diese Zeile ein, der Info-Block bleibt stehen */
       note: function () { if (!dead && infoFor && infoFor.type === 'show') hero.note(noteFor(infoFor), true); },
+      /* Reihe "Aehnliche Titel": die Erweiterung hat an die Liste aus xt.similar() hinten Karten angehaengt -> nur das Fenster
+       * nachziehen (Fokus und Stelle bleiben); fehlt die Reihe noch, entsteht sie als letzte (darueber verschiebt sich nichts) */
+      simGrown: function () { if (!dead && d) simGrow(); },
+      /* eine Karte der Reihe geaendert/ersetzt (Marke, Titel jetzt auf dem Server) bzw. ohne i alle sichtbaren -> nur diese neu */
+      simRefresh: function (i) { var r = simRow(); if (dead || !r) return; if (i === undefined) r.row.refreshAll(); else r.row.refreshItem(i); if (zone === 'row' && rows[rk] === r) N.idle.add(updateHints, 'det-hints'); },
       away: function () { return away; },
       hints: function () { N.idle.add(updateHints, 'det-hints'); }
     };
@@ -125,7 +139,7 @@
       bubble = U.el('div', 'jump', root, 'display:none'); bubbleT = document.createTextNode(''); bubble.appendChild(bubbleT);
       ring = new N.ui.Ring(root);
       sb = new N.ui.StateBlock(root);
-      onPlayed = function () { dirty = true; };
+      onPlayed = function (ev) { dirty = true; if (isShow && ev && ev.ep && ev.ep.e && (!ev.ep.show || ev.ep.show === String(showRk))) played = ev.ep; };
       N.evt.on('playback:stopped', onPlayed);           // Rueckkehr aus dem Player: Fortschritt neu laden
       onWatched = function () { if (away) dirty = true; };
       N.evt.on('watched:changed', onWatched);
@@ -260,8 +274,9 @@
         applySeasons();
         buildTabs();
         if (!seasons.length) return;
-        var keep = seasons[sIdx] && re ? sIdx : D.pickSeason(seasons, wishS, d && d.ondeck);
-        selectSeason(keep, true);
+        var pl = re ? played : null; played = null;
+        var keep = pl ? D.pickSeason(seasons, pl.s, null) : seasons[sIdx] && re ? sIdx : D.pickSeason(seasons, wishS, d && d.ondeck);
+        selectSeason(keep, true, pl && seasons[keep] && seasons[keep].index === pl.s ? pl.e : undefined);
       }));
     }
     function onError(err) {
@@ -475,14 +490,25 @@
       var defs = [];
       if (d.cast.length) defs.push({ id: 'cast', kind: 'cast', tk: 'det.row.cast', items: d.cast });
       if (d.extras.length) defs.push({ id: 'extras', kind: 'land', tk: 'det.row.extras', items: d.extras });
-      if (d.related.length) defs.push({ id: 'similar', kind: 'poster', tk: 'det.row.similar', items: d.related[0].items });
-      var y = isShow ? SEC + ANCHOR + PITCH.land : PEEK;
-      for (i = 0; i < defs.length; i++) {
-        var r = new N.ui.Row(pg, { captions: function () { return true; } });
-        r.setModel(defs[i], 0); r.setTop(y);
-        rows.push({ row: r, top: y, id: defs[i].id });
-        y += PITCH[defs[i].kind];
-      }
+      /* optionale Erweiterung (xt.similar): darf hinten weitere Karten anhaengen, z. B. Titel ausserhalb des Servers (it.ext) */
+      var sim = d.related.length ? d.related[0].items : [];
+      if (xt && xt.similar) sim = xt.similar(sim) || sim;
+      if (sim.length) defs.push({ id: 'similar', kind: 'poster', tk: 'det.row.similar', items: sim });
+      for (i = 0; i < defs.length; i++) addRow(defs[i]);
+    }
+    function addRow(def) {
+      var y = rows.length ? rows[rows.length - 1].top + PITCH[rows[rows.length - 1].row.model.kind] : isShow ? SEC + ANCHOR + PITCH.land : PEEK;
+      var r = new N.ui.Row(pg, { captions: function () { return true; } });
+      r.setModel(def, 0); r.setTop(y);
+      rows.push({ row: r, top: y, id: def.id });
+    }
+    function simRow() { for (var i = 0; i < rows.length; i++) if (rows[i].id === 'similar') return rows[i]; return null; }
+    function simGrow() {
+      var r = simRow(), sim = xt && xt.similarList ? xt.similarList() : null;
+      if (r) { r.row.render(2, 2); r.row.relabel(); return; }
+      if (!sim || !sim.length) return;
+      addRow({ id: 'similar', kind: 'poster', tk: 'det.row.similar', items: sim });
+      hideAbove();
     }
 
     /* ---------- Zonen & Fokus ---------- */
@@ -490,11 +516,12 @@
     function epRing(p) { if (p) p.y += SEC; return p; }   // Folgenreihe liegt im Abschnitt (SEC tiefer)
     /* Info-Block: erster Bildschirm unten (Hero), in den Abschnitten oben (folgt dann der Folge) */
     function heroInfo(on) { hero.hero(on); }
+    function rowOff(i) { return rows[i].top - anchorOf(rows[i].row.model.kind); }
     function setOff(o) { if (o !== off) { off = o; N.fx.move(pg); U.tf(pg, 0, -o); } hideAbove(); }
     /* Abschnitte, die nach oben unter den Kopf geschoben sind, ausblenden (nach der Bewegung): das Kopfband laeuft nach rechts
      * aus (TV-Befund 28.10.: Bild rechts sonst unnoetig dunkel), dort darf nichts Altes durchscheinen. Keine Messung (feste Positionen). */
     /* Abschnitt (Seiten-y seiner Oberkante) liegt beim aktuellen Versatz unter dem Kopf -> ausgeblendet, fuer den Zeiger nicht da */
-    function above(top) { return top - off < ANCHOR - 24; }
+    function above(top) { return top - off < ANCHOR - LIFT - 24; }
     function hideAbove() {
       var b = [], i, show = [], hide = [];                // Knoepfe: dimButtons; display, weil Kinder (Pfeile) visibility setzen
       if (isShow) b.push([sec, SEC + 332]);
@@ -538,7 +565,7 @@
     function toRow(i) {
       if (!rows[i]) return;
       leaveZone(); zone = 'row'; rk = i; dimButtons(true);
-      setOff(rows[i].top - ANCHOR); heroInfo(false);
+      setOff(rowOff(i)); heroInfo(false);
       rows[i].row.setFocused(true); rows[i].row.boost(); placeRing(rows[i].row.ringPos());
       if (d && infoFor !== d.it && !isShow) infoLater(d.it);
       N.router.refreshHints();
@@ -692,6 +719,7 @@
       var r = rows[rk];
       if (r.id === 'cast') { N.theme.stop(); N.router.push('library', { lib: libOf(d.lib || x.lib), actor: { id: x.id, t: x.title } }); return; }
       if (r.id === 'extras') { playExtra(x); return; }
+      if (x.ext) { if (!how) { N.theme.stop(); N.router.push('extdetails', { it: x, rail: s.rail }); } return; }   // Titel ausserhalb des Servers (Erweiterung): kein Abspielen
       if (how) { play(x, how); return; }
       N.details.open(x);
     }
@@ -713,6 +741,7 @@
       /* Rot/Gruen nur, wo sie etwas tun: Knoepfe und echte Folgen (TV-Test 29.10.: auf dem Reiter einer ganz fehlenden Staffel stand
        * "Von vorne / Ton & UT"; in der Reiter-Zeile tun beide nichts) */
       var x = focusedItem(), list = zone === 'btn' || (zone === 'eps' && x) ? [{ k: 'red', t: 'hint.fromStart' }, { k: 'green', t: 'hint.tracks' }] : [];
+      if (zone === 'row' && x && x.ext) return [{ k: 'OK', t: 'hint.details' }, { k: 'blue', t: 'hint.search' }];   // Karte ausserhalb des Servers: nur Details
       if (x && M.isVideo(x)) list.push({ k: 'yellow', t: M.watched(x) ? 'hint.markUnwatched' : 'hint.markWatched' });
       list.push({ k: 'blue', t: 'hint.search' });
       if (list.length < 5) list.push({ k: 'INFO', t: 'hint.details' });
@@ -728,6 +757,8 @@
       if (zone === 'btn') { U.cls(btns[bf], 'is-focus', true); paintLabel(); }
       else if (zone === 'eps') { epRow.setFocused(true); placeRing(epRing(epRow.ringPos())); }
       else if (zone === 'row' && rows[rk]) { rows[rk].row.setFocused(true); placeRing(rows[rk].row.ringPos()); }
+      var sr = simRow();
+      if (sr && xt && xt.similarList) sr.row.refreshAll();   // Marken von Erweiterungs-Karten koennen sich geaendert haben (Anfrage auf deren Seite)
       if (d && isShow) N.theme.play(d.theme);
       N.router.refreshHints();
     };
@@ -812,11 +843,11 @@
       if (zone === 'row') {
         var R = rows[rk].row, x = R.item(R.f);
         switch (k) {
-          case 'LEFT': if (R.f > 0) placeRing(R.focusCol(R.f - 1)); else N.ui.rail.open(); return true;
-          case 'RIGHT': if (R.f < R.count() - 1) placeRing(R.focusCol(R.f + 1)); return true;
+          case 'LEFT': if (R.f > 0) { placeRing(R.focusCol(R.f - 1)); N.idle.add(updateHints, 'det-hints'); } else N.ui.rail.open(); return true;
+          case 'RIGHT': if (R.f < R.count() - 1) { placeRing(R.focusCol(R.f + 1)); N.idle.add(updateHints, 'det-hints'); } return true;
           case 'ENTER': rowOpen(x); return true;
-          case 'PLAY': if (rows[rk].id === 'similar' && x) play(x, 'resume'); else rowOpen(x); return true;
-          case 'YELLOW': if (rows[rk].id === 'similar') toggleWatched(x); return true;
+          case 'PLAY': if (x && x.ext) return true; if (rows[rk].id === 'similar' && x) play(x, 'resume'); else rowOpen(x); return true;
+          case 'YELLOW': if (rows[rk].id === 'similar' && x && !x.ext) toggleWatched(x); return true;
         }
         return true;
       }
@@ -830,12 +861,12 @@
      * >= 40 % sichtbarer (die Staffel-Reiter unter den Knoepfen) kommt erst nach 250 ms Verweilen bzw. per Klick herein, danach
      * Zeiger-Sperre; sonst Randzonen (ein Abschnitt je Schritt, Fokus kommt mit) oder Rad. Treffer in Seitenkoordinaten
      * (y + off); ausgeblendete Abschnitte (above) sind keine Ziele. */
-    var RM = N.RowMath, TOP_CLIP = ANCHOR - 24;
+    var RM = N.RowMath, TOP_CLIP = ANCHOR - LIFT - 24;
     /* Stopps der Seite: Knoepfe 0, Staffeln/Folgen SEC, je Reihe ihr Versatz (aufsteigend) */
     function secStops() {
       var a = [{ o: 0, z: 'btn' }];
       if (isShow && (seasons.length || (epRow && epRow.count()))) a.push({ o: SEC, z: 'sec' });
-      for (var i = 0; i < rows.length; i++) a.push({ o: rows[i].top - ANCHOR, z: 'row', i: i });
+      for (var i = 0; i < rows.length; i++) a.push({ o: rowOff(i), z: 'row', i: i });
       return a;
     }
     function stopOffs(a) { for (var o = [], i = 0; i < a.length; i++) o.push(a[i].o); return o; }
@@ -845,7 +876,7 @@
       function add(z, k, blockTop, py, h, stop) { if (!above(blockTop)) out.push({ z: z, i: k, cy: py - off, h: h, v: RM.secVis(py - off, h, stop === off, top) }); }
       if (isShow && tabX.length) add('tabs', 0, SEC + 332, SEC + 332, 40, SEC);
       if (isShow && epRow.count()) add('eps', 0, SEC + 332, SEC + 392, 162, SEC);
-      for (i = 0; i < rows.length; i++) add('row', i, rows[i].top, rows[i].top + 52, rows[i].row.g.h, rows[i].top - ANCHOR);
+      for (i = 0; i < rows.length; i++) add('row', i, rows[i].top, rows[i].top + 52, rows[i].row.g.h, rowOff(i));
       return out;
     }
     function ptrAt(x, y) {
@@ -892,7 +923,7 @@
       var r = rows[t.i].row, h = r.hit(x);
       if (h < 0) return false;
       if (zone !== 'row' || rk !== t.i) toRow(t.i);
-      if (h !== r.f) placeRing(r.hoverCol(h));
+      if (h !== r.f) { placeRing(r.hoverCol(h)); N.idle.add(updateHints, 'det-hints'); }
       if (kind === 'click') rowOpen(r.item(h));
       return true;
     }

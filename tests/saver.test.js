@@ -94,21 +94,28 @@ function items(lib, from, n, noArt) {
   for (var i = from; i < from + n; i++) o.push({ rk: lib + '-' + i, art: noArt && noArt(i) ? '' : '/a/' + lib + '/' + i, title: 'T' + i, type: 'movie' });
   return o;
 }
-test('Pool: Seiten zufaellig ueber alle Bibliotheken, keine Wiederholung bis alles gezeigt, dann neue Runde', function () {
+test('Pool: je Bibliothek eigene Seiten, keine Wiederholung in einer Bibliothek bis sie ganz gezeigt ist, dann ihre eigene neue Runde', function () {
   var p = new L.Pool(Math.random), A = { id: 1, type: 'movie' }, B = { id: 2, type: 'show' };
   p.setTotals([{ lib: A, n: 65 }, { lib: B, n: 30 }]);
-  assert.strictEqual(p.pages.length, 4);            // 3 Seiten Filme (0, 30, 60) + 1 Seite Serien
+  assert.strictEqual(p.libs[0].pages.length, 3); assert.strictEqual(p.libs[1].pages.length, 1);   // Filme 0, 30, 60 – Serien 0
   assert.strictEqual(p.size(), 95);
-  var shown = {}, n = 0, pg, it;
-  while ((pg = p.nextPage())) {
-    p.add(items(pg.lib.id, pg.start, Math.min(30, (pg.lib.id === 1 ? 65 : 30) - pg.start)));
-    while ((it = p.take())) { assert.ok(!shown[it.rk], 'doppelt: ' + it.rk); shown[it.rk] = 1; n++; }
+  var seen = { 1: {}, 2: {} }, n = { 1: 0, 2: 0 }, pg, it, k, prev = '';
+  function load() { pg = p.nextPage(); if (pg) p.add(items(pg.lib.id, pg.start, Math.min(30, (pg.lib.id === 1 ? 65 : 30) - pg.start))); }
+  load();
+  for (k = 0; k < 120; k++) {
+    it = p.take();
+    if (!it) { load(); k--; continue; }
+    var lib = it.rk.charAt(0);
+    assert.notStrictEqual(it.rk, prev, 'nie zweimal hintereinander');
+    prev = it.rk;
+    if (n[lib] % (lib === '1' ? 65 : 30) === 0) seen[lib] = {};   // neue Runde dieser Bibliothek
+    assert.ok(!seen[lib][it.rk], 'doppelt in einer Runde: ' + it.rk); seen[lib][it.rk] = 1; n[lib]++;
+    if (p.low()) load();
   }
-  assert.strictEqual(n, 95); assert.ok(p.done());
-  var last = p.last; p.newRound();
-  assert.strictEqual(p.round, 2); assert.strictEqual(p.pages.length, 4);
-  pg = p.nextPage(); p.add(items(pg.lib.id, pg.start, 30));
-  assert.notStrictEqual(p.take().rk, last, 'erstes Bild der neuen Runde ist nicht das letzte der alten');
+  assert.ok(n[2] >= 50, 'Serien trotz kleiner Bibliothek etwa jedes zweite Bild: ' + n[2] + '/120');
+  assert.ok(p.libs[1].round >= 2, 'Serien haben eine eigene neue Runde begonnen');
+  assert.strictEqual(p.libs[0].round, 1, 'Filme noch in ihrer ersten Runde');
+  assert.ok(!p.done());
 });
 test('Pool: nur Titel mit Hintergrundbild; doppelt gelieferte Titel (verschobene Seiten) nur einmal; low() fordert Nachschub', function () {
   var p = new L.Pool(), A = { id: 1, type: 'movie' };
@@ -116,9 +123,101 @@ test('Pool: nur Titel mit Hintergrundbild; doppelt gelieferte Titel (verschobene
   function no(i) { return i % 3 === 0; }
   assert.strictEqual(p.add(items(1, 0, 30, no)), 20);
   assert.strictEqual(p.add(items(1, 25, 10, no)), 3, 'Ueberlappung 25..29 schon im Vorrat; 30 und 33 ohne Art');
-  var c = 0; while (p.q.length > 2) { p.take(); c++; }
-  assert.strictEqual(c, 21); assert.ok(p.low(), 'Vorrat < 3 und Seiten uebrig -> nachladen');
+  var c = 0; while (p.count() > 2) { p.take(); c++; }
+  assert.strictEqual(c, 21); assert.ok(p.low(), 'Vorrat < 2 Seiten und Seiten uebrig -> nachladen');
   assert.strictEqual(p.add([{ rk: 'x' }, null]), 0);
+});
+test('Pool: Bibliothek ganz ohne Bilder wird nach einer Runde nicht mehr angefragt (Anfrage-Budget)', function () {
+  var p = new L.Pool(lcg(5)), loads = { 1: 0, 2: 0 }, it, k;
+  p.setTotals([{ lib: { id: 1, type: 'movie' }, n: 300 }, { lib: { id: 2, type: 'show' }, n: 40 }]);
+  function load() {
+    var pg = p.nextPage(); if (!pg) return;
+    loads[pg.lib.id]++;
+    p.add(items(pg.lib.id, pg.start, 30, function () { return pg.lib.id === 2; }));   // Serien: kein einziges Hintergrundbild
+  }
+  load(); load();
+  for (k = 0; k < 200; k++) { it = p.take(); assert.ok(it && it.rk.charAt(0) === '1'); if (p.low()) load(); }
+  assert.ok(loads[2] <= 3, 'Serien-Seiten: ' + loads[2]);
+});
+/* Ablauf wie N.saverLib: erste Seite, dann je Bild nachladen, solange low(); Titel alphabetisch je Bibliothek (wie sort=titleSort) */
+function lcg(seed) { var s = seed; return function () { s = (s * 1103515245 + 12345) % 2147483648; return s / 2147483648; }; }
+function runPool(rnd, sizes, count) {
+  var p = new L.Pool(rnd), totals = [], out = [], pg, it, guard = 0;
+  Object.keys(sizes).forEach(function (id) { totals.push({ lib: { id: Number(id), type: id === '1' ? 'movie' : 'show' }, n: sizes[id] }); });
+  p.setTotals(totals);
+  function load() {
+    pg = p.nextPage(); if (!pg) return;
+    var o = [];
+    for (var i = pg.start; i < Math.min(sizes[pg.lib.id], pg.start + 30); i++) o.push({ rk: pg.lib.id + '-' + (1000 + i), art: '/a', title: String(1000 + i) });
+    p.add(o);
+  }
+  load();
+  while (out.length < count && guard++ < count * 3) {
+    it = p.take();
+    if (!it) { load(); continue; }
+    out.push(it.rk);
+    if (p.low()) load();
+  }
+  return { out: out, pool: p };
+}
+/* keine Wiederholung innerhalb einer Runde je Bibliothek (Runde = so viele Bilder dieser Bibliothek, wie sie Titel hat) */
+function noRepeatPerLib(out, sizes) {
+  var cnt = {}, seen = {};
+  out.forEach(function (rk) {
+    var lib = rk.charAt(0);
+    cnt[lib] = cnt[lib] || 0;
+    if (cnt[lib] % sizes[lib] === 0) seen[lib] = {};
+    assert.ok(!seen[lib][rk], 'doppelt in einer Runde: ' + rk); seen[lib][rk] = 1; cnt[lib]++;
+  });
+  return cnt;
+}
+test('Pool: Bibliotheken reihum (Filme UND Serien gemischt, auch bei 540 zu 64), nicht alphabetisch, fester Zufall = feste Folge', function () {
+  var S = { 1: 540, 2: 64 }, r = runPool(lcg(7), S, 300), out = r.out, i, switches = 0, asc = 0;
+  assert.strictEqual(out.length, 300);
+  for (i = 1; i < out.length; i++) {
+    assert.notStrictEqual(out[i], out[i - 1], 'nie zweimal hintereinander');
+    if (out[i].charAt(0) !== out[i - 1].charAt(0)) switches++;
+    if (out[i].charAt(0) === out[i - 1].charAt(0) && out[i] > out[i - 1]) asc++;
+  }
+  var cnt = noRepeatPerLib(out, S);
+  assert.ok(cnt[2] >= 130 && cnt[2] <= 170, 'Serien etwa jedes zweite Bild, nicht nach Groesse gewichtet: ' + cnt[2] + '/300');
+  assert.ok(switches > 250, 'Bibliotheken wechseln sich ab: ' + switches);
+  assert.ok(asc < 30, 'nicht alphabetisch aufsteigend: ' + asc);
+  // Erste 10 Bilder: beide Bibliotheken; Filme aus mehreren Buchstaben-Bereichen (Seiten)
+  var first = out.slice(0, 20), libs = {}, pages = {};
+  first.forEach(function (rk) { libs[rk.charAt(0)] = 1; if (rk.charAt(0) === '1') pages[Math.floor((Number(rk.slice(2)) - 1000) / 30)] = 1; });
+  assert.strictEqual(Object.keys(libs).length, 2, 'Filme und Serien gleich zu Beginn gemischt: ' + first.join(' '));
+  assert.ok(Object.keys(pages).length >= 2, 'mehrere Seiten gemischt: ' + first.join(' '));
+  // drei Bibliotheken: jede etwa ein Drittel
+  var c3 = noRepeatPerLib(runPool(lcg(11), { 1: 540, 2: 64, 3: 12 }, 300).out, { 1: 540, 2: 64, 3: 12 });
+  assert.ok(c3[3] >= 80 && c3[1] >= 80 && c3[2] >= 80, 'drei Bibliotheken reihum: ' + JSON.stringify(c3));
+  // gleicher Zufall -> gleiche Folge (Bildtests); fixedClock-Zufall (immer 0) laeuft ebenfalls ohne Doppel je Runde
+  eq(runPool(lcg(7), S, 300).out, out);
+  var z = runPool(function () { return 0; }, { 1: 70, 2: 40 }, 200).out;
+  assert.strictEqual(z.length, 200);
+  noRepeatPerLib(z, { 1: 70, 2: 40 });
+});
+test('Pool: Ersatz fuer ein verworfenes Bild (Standbild) kommt aus derselben Bibliothek – die Reihenfolge der Bibliotheken bleibt', function () {
+  var p = new L.Pool(lcg(9));
+  p.setTotals([{ lib: { id: 1, type: 'movie' }, n: 30 }, { lib: { id: 2, type: 'show' }, n: 30 }]);
+  var pg = p.nextPage(); p.add(items(pg.lib.id, 0, 30));
+  pg = p.nextPage(); p.add(items(pg.lib.id, 0, 30));
+  var libs = [], k, a, b;
+  for (k = 0; k < 20; k++) {
+    a = p.take(); b = p.take(true); b = p.take(true);    // zweimal verworfen -> Ersatz aus derselben Bibliothek
+    assert.strictEqual(b.rk.charAt(0), a.rk.charAt(0), 'Ersatz aus derselben Bibliothek: ' + a.rk + ' / ' + b.rk);
+    libs.push(a.rk.charAt(0));
+  }
+  for (k = 1; k < libs.length; k++) assert.notStrictEqual(libs[k], libs[k - 1], 'Bibliotheken weiter abwechselnd: ' + libs.join(''));
+});
+test('Pool: Vorrat haelt bis zu MIX Seiten, danach eine Seite je PAGE Bilder (Anfrage-Budget)', function () {
+  var p = new L.Pool(lcg(3)), loads = 0, shown = 0, it;
+  p.setTotals([{ lib: { id: 1, type: 'movie' }, n: 30 * 20 }]);
+  function load() { var pg = p.nextPage(), o = []; loads++; for (var i = pg.start; i < pg.start + 30; i++) o.push({ rk: String(i), art: '/a' }); p.add(o); }
+  load();
+  for (var k = 0; k < 300; k++) { it = p.take(); assert.ok(it); shown++; if (p.low()) load(); }
+  assert.ok(p.count() <= L.MIX * L.PAGE, 'Vorrat begrenzt');
+  assert.strictEqual(loads, Math.ceil(shown / L.PAGE) + L.MIX - 1, 'nach dem Anlauf eine Seite je 30 Bilder: ' + loads);
 });
 test('Bibliotheken: Standard = alle Film-/Serien-Bibliotheken; Auswahl gilt, Musik nur gewaehlt, fremde ids nie', function () {
   var libs = [{ id: 1, type: 'movie' }, { id: 2, type: 'show' }, { id: 3, type: 'artist' }, { id: 9, type: 'photo' }];
@@ -194,12 +293,19 @@ test('Bibliotheks-Quelle: 1 Zaehl-Anfrage je Bibliothek, dann 1 Seite je 30 Bild
   assert.match(urls[2], /X-Plex-Container-Size=30/); assert.match(urls[2], /excludeElements=/);
   x.log.opened.forEach(function (o) { assert.strictEqual(o.headers['X-Plex-Token'], 'KIDTOKEN', 'Token des aktiven Profils'); });
   got.push(first.rk);
-  for (i = 1; i < 45; i++) { var it = take(); assert.ok(it, 'Bild ' + i); assert.ok(got.indexOf(it.rk) < 0 || got.length >= 45, 'doppelt ' + it.rk); got.push(it.rk); }
-  // 50 Titel, jeder 10. ohne Art -> 45 Bilder je Runde; 3 Seiten (0, 30 Filme; 0 Serien) = 3 Seiten-Anfragen
-  assert.strictEqual(x.log.opened.length, 2 + 3, 'je 30 Titel nur eine Anfrage');
-  var it46 = take();
-  assert.ok(it46 && got.indexOf(it46.rk) >= 0, 'neue Runde nach allen 45');
-  assert.strictEqual(x.log.opened.length, 2 + 4, 'neue Runde ohne neue Zaehl-Anfrage');
+  // Filme 40 (36 mit Art, Seiten 0 und 30), Serien 10 (9 mit Art, eine Seite): reihum -> nach 18 Bildern je 9 von beiden, ohne Doppel
+  for (i = 1; i < 18; i++) { var it = take(); assert.ok(it, 'Bild ' + i); assert.ok(got.indexOf(it.rk) < 0, 'doppelt ' + it.rk); got.push(it.rk); }
+  var shows = got.filter(function (rk) { return Number(rk) >= 2000; }).length;
+  assert.ok(shows >= 8 && shows <= 9, 'Filme und Serien reihum: ' + got.join(' '));
+  assert.strictEqual(x.log.opened.length, 2 + 3, 'je Seite nur eine Anfrage (Filme 0 + 30, Serien 0)');
+  // weiter: die Serien sind durch -> neue Runde nur fuer sie (eine Seiten-Anfrage, keine neue Zaehl-Anfrage); Filme ohne Doppel
+  var more = [];
+  for (i = 0; i < 20; i++) more.push(take().rk);
+  var mv = got.concat(more).filter(function (rk) { return Number(rk) < 2000; });
+  mv.forEach(function (rk, k) { assert.strictEqual(mv.indexOf(rk), k, 'Film doppelt: ' + rk); });
+  assert.ok(more.some(function (rk) { return Number(rk) >= 2000 && got.indexOf(rk) >= 0; }), 'Serien: neue eigene Runde');
+  var counts = x.log.opened.filter(function (o) { return /Size=0/.test(o.url); }).length;
+  assert.strictEqual(counts, 2, 'neue Runde ohne neue Zaehl-Anfrage');
   // Auswahl geaendert -> neu zaehlen
   M.session.settings.saverLibs = [2];
   take();
@@ -347,7 +453,7 @@ test('Poster-Modus: Pool und Startseite sammeln Titel mit Poster/Cover (auch ohn
   var p = new L.Pool(seq([0.3])), items = [{ rk: '1', art: '/a/1', thumb: '/t/1' }, { rk: '2', art: '', thumb: '/t/2' }, { rk: '3', art: '/a/3', thumb: '' }];
   p.setTotals([{ lib: { id: 1 }, n: 3 }]);
   assert.strictEqual(p.add(items, 'thumb'), 2);
-  eq(p.q.map(function (x) { return x.rk; }).sort(), ['1', '2']);
+  eq(p.libs[0].q.map(function (x) { return x.rk; }).sort(), ['1', '2']);
   var p2 = new L.Pool(seq([0.3])); p2.setTotals([{ lib: { id: 1 }, n: 3 }]);
   assert.strictEqual(p2.add(items), 2, 'Standard: nur mit Hintergrundbild');
   var cache = { rows: [{ id: 'cw', items: [{ title: 'Ohne Art', type: 'movie', art: '', thumb: '/t/9' }, { title: 'Musik', type: 'artist', art: '/a/m', thumb: '/t/m' }] }] };
@@ -556,6 +662,10 @@ function saverEnv(set, cfg) {
   var c = H.load({ fakeTimers: true }), M = c.N, T = c.timers;
   function El(tag) { this.tagName = tag; this.style = {}; this.childNodes = []; this.className = ''; this.attrs = {}; }
   El.prototype.appendChild = function (x) { this.childNodes.push(x); x.parentNode = this; return x; };
+  El.prototype.insertBefore = function (x, ref) {
+    var i = this.childNodes.indexOf(x); if (i >= 0) this.childNodes.splice(i, 1);
+    var j = this.childNodes.indexOf(ref); this.childNodes.splice(j < 0 ? this.childNodes.length : j, 0, x); x.parentNode = this; return x;
+  };
   El.prototype.setAttribute = function (k, v) { this.attrs[k] = String(v); if (k === 'src') this.src = String(v); };
   El.prototype.getAttribute = function (k) { return k === 'src' ? this.src : this.attrs[k]; };
   c.document = { createElement: function (t) { return new El(t); }, createTextNode: function (t) { return { nodeValue: t }; } };
@@ -745,4 +855,76 @@ test('Waechter: ein Rueckruf kommt nie an (Bild-Ereignis bzw. Frame) -> nach 2 M
   assert.ok(eaten);
   assert.ok(e2.warns.some(function (w) { return /^saver stuck (stage|info|fx) \d+s busy/.test(w); }), e2.warns.join('\n'));
   var w0 = e2.wants(); e2.run(30000); assert.ok(e2.wants() > w0 + 3, 'danach wieder Bilder');
+});
+/* Nutzerbefund 30.10. (1.0.7, echte Takte): Bild und Titel passten teils nicht zusammen. Bei jedem sichtbaren Titel (kein Uebergang,
+ * Einblendung sichtbar) muss das vordere Bild zum selben Titel gehoeren: "Demo i" <-> /library/metadata/(200+i)/art/1 */
+function pairCheck(set, cfg, loadMs, minutes, stillEvery, failEvery) {
+  var e = saverEnv(set, cfg), M = e.N, T = e.T, n = 0, jobs = {}, bad = [], checks = 0, k = 0;
+  if (stillEvery) M.saverArt = { kind: function (art, cb) { k++; var r = k % stillEvery === 0 ? 'still' : 'real'; T.setTimeout(function () { cb(r); }, 50 + (k * 37) % 400); }, abort: function () {} };
+  M.img.want = function (img, u, prio, done) {
+    n++;
+    if (img._pnUrl === u && !jobs[img.__id]) { if (done) done(true); return; }
+    var id = {}; jobs[img.__id = img.__id || Math.random()] = id;
+    var fail = failEvery && n % failEvery === 0;
+    T.setTimeout(function () { if (jobs[img.__id] !== id) return; delete jobs[img.__id]; if (fail) { if (done) done(false); return; } img._pnUrl = u; img.src = u; if (done) done(true); }, loadMs(n));
+  };
+  M.img.drop = function (img) { if (img.__id) delete jobs[img.__id]; img._pnUrl = null; img.src = M.img.BLANK; };
+  e.S.start({});
+  var ti = e.all('scs-ti')[0], ov = e.all('scs-ov')[0];
+  for (var t = 0; t < minutes * 60000; t += 100) {
+    T.tick(100); if (t % 1000 === 0) e.S._tick();
+    var st = e.S._state(), title = ti.childNodes[0].nodeValue, m = /Demo (\d+)/.exec(title || '');
+    if (st.busy || !m || String(ov.style.opacity) !== '1') continue;
+    /* wie der TV (Kamera 30.10.): z-index wird nicht beachtet, oben liegt die Ebene, die im DOM spaeter steht; ist sie durchsichtig
+     * (Deckkraft 0), sieht man die darunter. Ebene = .scs-l, Bild darin .scs-img bzw. Plakat .scs-pst */
+    var ls = e.all('scs-l'), parent = ls[0].parentNode, order = ls.slice().sort(function (a, b) { return parent.childNodes.indexOf(b) - parent.childNodes.indexOf(a); });
+    var vis = String(order[0].childNodes[0].style.opacity) === '0' ? order[1] : order[0], vin = vis.childNodes[0];
+    var src = (set.saverPics === 'poster' ? vin.childNodes[3].src : vin.childNodes[0].src) || '', want = '/library/metadata/' + (200 + Number(m[1])) + '/';
+    checks++;
+    if (src.indexOf(want) < 0 && bad.length < 5) bad.push(Math.round(t / 1000) + ' s: Titel "' + title + '", Bild ' + src);
+  }
+  return { checks: checks, bad: bad, wants: n };
+}
+test('Bild und Titel gehoeren zusammen (Nutzerbefund 1.0.7): echte Takte, langsame und schnelle Bilder, alle Uebergaenge', function () {
+  [[10, 'random'], [30, 'random'], [10, 'fade'], [10, 'tiles'], [10, 'cut']].forEach(function (c) {
+    [function () { return 30; }, function (n) { return 400 + (n * 1300) % 4000; }].forEach(function (lm, k) {
+      var r = pairCheck({ saverNight: 0, saverInterval: c[0], saverFx: c[1] }, {}, lm, 20);
+      assert.ok(r.checks > 100, 'geprueft: ' + r.checks);
+      assert.deepStrictEqual(r.bad, [], c[0] + ' s, ' + c[1] + (k ? ', langsame Bilder' : '') + ': ' + r.bad.join(' | '));
+    });
+  });
+  /* Nutzerbefund 30.10. (Bild des einen Titels, Titel des anderen, danach richtig): ein Bild laedt nicht (Ladefehler) -> der Neuversuch
+   * 2 s spaeter darf nie in die Ebene laden, die gerade im Uebergang ist */
+  [10, 30].forEach(function (iv) {
+    ['fade', 'random'].forEach(function (fx) {
+      var r = pairCheck({ saverNight: 0, saverInterval: iv, saverFx: fx }, {}, function (n) { return 300 + (n * 700) % 2500; }, 30, 0, 4);
+      assert.ok(r.checks > 100, 'geprueft: ' + r.checks);
+      assert.deepStrictEqual(r.bad, [], 'Ladefehler, ' + iv + ' s, ' + fx + ': ' + r.bad.join(' | '));
+    });
+  });
+  /* "Nur echte Hintergrundbilder": jedes 3. Bild ein Standbild (uebersprungen), Pruefung asynchron; Poster-Modus: Plakat-Ebene */
+  [{ saverPics: 'art' }, { saverPics: 'poster' }].forEach(function (pv) {
+    [10, 30].forEach(function (iv) {
+      var r = pairCheck(Object.assign({ saverNight: 0, saverInterval: iv, saverFx: 'random' }, pv), {}, function (n) { return 400 + (n * 1300) % 4000; }, 20, 3);
+      assert.ok(r.checks > 100, 'geprueft: ' + r.checks);
+      assert.deepStrictEqual(r.bad, [], pv.saverPics + ', ' + iv + ' s: ' + r.bad.join(' | '));
+    });
+  });
+});
+test('SAV-1: Ruhe zaehlt erst nach der Wiedergabe bzw. dem letzten Bildschirmwechsel (Nutzerbefund 30.10.: Schoner 1 s nach dem Folgenende)', function () {
+  var e = saverEnv({ screensaver: 5 }), M = e.N, S = e.S, top = 'player', st = { active: true, paused: false, item: { title: 'Demo' } };
+  M.router.topName = function () { return top; };
+  M.player = { status: function () { return st; } };
+  e.run(25 * 60000);                                  // 25 Min. Wiedergabe ohne Taste
+  assert.strictEqual(S.on, false, 'nie waehrend der Wiedergabe');
+  st = { active: false, paused: false, item: null };  // Folge zu Ende, Karte am Ende
+  e.run(20000);
+  top = 'details'; M.evt.emit('playback:stopped', { video: true, done: true }); M.evt.emit('router:top', 'details');   // zurueck zur Serienseite
+  e.run(60000);
+  assert.strictEqual(S.on, false, 'nicht gleich nach der Rueckkehr');
+  e.run(4 * 60000 + 5000);
+  assert.strictEqual(S.on, true, 'nach 5 Min. Ruhe ab der Rueckkehr');
+  // Bildschirmwechsel ohne Taste (z. B. Fortschritt neu geladen, Dialog zu) zaehlt ebenso
+  S.stop(); e.run(4 * 60000); M.evt.emit('router:top', 'home'); e.run(2 * 60000);
+  assert.strictEqual(S.on, false, 'Wechsel des Bildschirms setzt die Ruhe zurueck');
 });

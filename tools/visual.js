@@ -1006,6 +1006,9 @@ var SCENES = [
   { name: 'library-ptr-band', seed: 'ptrHold', keys: 'LEFT,DOWN,ENTER,wait800,DOWN', mwait: 5000, moves: '600:300,600:320,600:630,600:634' },
   { name: 'details-movie', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER' },
   { name: 'details-movie-cast', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN' },
+  // Nutzerbefund 30.10.: Fokus in der letzten Reihe (Poster "Aehnliche Titel") – Ring frei ueber der Hinweisleiste (Layout-Art ring)
+  { name: 'details-movie-last', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,DOWN,DOWN,DOWN,DOWN,wait800' },
+  { name: 'details-show-last', seed: 'home', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait800', mask: [[144, 124, 1000, 26]] },
   { name: 'details-show', seed: 'home', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER' },
   { name: 'details-show-eps', seed: 'home', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,DOWN', mask: [[144, 124, 1000, 26]] },
   { name: 'details-show-noart', seed: 'home', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,9,9,9,9,wait1500,ENTER,wait800' },
@@ -1208,7 +1211,7 @@ function shot(port, sc, done) {
 }
 
 /* Selbsttest der Layout-Pruefung (tools/layout_selftest.html): genau diese Befunde muessen kommen, sonst ist sie blind */
-var LAYOUT_EXPECT = ['button x-btn x-btn-hint', 'clip x-clip', 'edge x-edge', 'notice x-note x-note-under', 'offscreen x-off', 'overlap x-ov-a x-ov-b', 'panel x-pa x-pb', 'safe x-safe', 'spill x-spill-btn x-spill-dlg'];
+var LAYOUT_EXPECT = ['button x-btn x-btn-hint', 'clip x-clip', 'edge x-edge', 'notice x-note x-note-under', 'offscreen x-off', 'overlap x-ov-a x-ov-b', 'panel x-pa x-pb', 'ring x-hints x-ring', 'safe x-safe', 'spill x-spill-btn x-spill-dlg'];
 function layoutSelftest(port, done) {
   var prof = fs.mkdtempSync(path.join(os.tmpdir(), 'pnvis-')), out = path.join(CUR, 'layout-selftest.png');
   var url = 'file://' + path.join(ROOT, 'tools', 'layout_selftest.html') + '?probe=' + encodeURIComponent('http://127.0.0.1:' + port + '/layout?scene=_selftest');

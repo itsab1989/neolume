@@ -224,7 +224,7 @@
       transparent(false);
       U.cls(document.body, 'in-player', false);
       N.tv.saver(true);
-      N.evt.emit('playback:stopped', { rk: item ? item.rk : '', video: true, done: fin, srv: item && item.srv || '' });
+      N.evt.emit('playback:stopped', { rk: item ? item.rk : '', video: true, done: fin, srv: item && item.srv || '', ep: item && item.type === 'episode' ? { s: item.s, e: item.e, show: item.showRk || '' } : null });
     }
     function close() { if (closed) return; shutdown(); N.router.back(); }
     /* EXIT/onunload: Abschluss-Anfragen synchron (async XHR wuerde mit der App sterben) */

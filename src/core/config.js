@@ -2,7 +2,7 @@
  * Netz-Standards sind im Repo leer: tools/build.js setzt die lokalen Werte aus local.json (git-ignoriert) ins gebaute app.js. */
 (function (N) {
   var C = {
-    version: '1.0.7',
+    version: '1.0.8',
     product: N.brand.name,
     platform: 'Samsung',
     platformVersion: 'Orsay 2014',
@@ -54,7 +54,8 @@
       if (Number(o.newsShowMs) > 0) C.newsShowMs = Number(o.newsShowMs);       // nur Bildtests: Hinweis bleibt ms stehen
       if (o.newsSettleMs !== undefined && Number(o.newsSettleMs) >= 0) C.newsSettleMs = Number(o.newsSettleMs);   // nur Bildtests: Ruhe im Video vor dem Hinweis
       if (Number(o.saverIvMs) > 0) C.saverIvMs = Number(o.saverIvMs);   // nur Bildtests: Bildwechsel/Wandern der Einblendung nach ms
-      if (Number(o.saverNightMs) > 0) C.saverNightMs = Number(o.saverNightMs);   // nur Tests/TV-Langlauf (P7 C2): Nachtruhe des Schoners nach ms statt Stunden
+      if (Number(o.saverNightMs) > 0) C.saverNightMs = Number(o.saverNightMs);
+      if (o.saverZOnly === true) C.saverZOnly = true;   // nur TV-Gegenprobe: Schoner-Ebenen nur per z-index stapeln (wie bis 1.0.7)   // nur Tests/TV-Langlauf (P7 C2): Nachtruhe des Schoners nach ms statt Stunden
       if (o.saverPos >= 0 && o.saverPos <= 3) C.saverPos = Math.floor(o.saverPos);   // nur Bildtests: Lage der Schoner-Einblendung (0..3)       // nur visuelle Tests: Schoner nach ms statt Minuten
       // Schnellspulen (PLAY-32): Stufen fuer den TV-Test, z. B. [2,4,8,16,32]; N.trick.speeds prueft (Vielfache von 2, 2…64), Standard 2/4/8/16
       if (Object.prototype.toString.call(o.trickSpeeds) === '[object Array]' && o.trickSpeeds.length) C.trickSpeeds = o.trickSpeeds.slice(0, 8);   // nur eine Liste (kein Text "2,4")

@@ -3,7 +3,9 @@
  *   1. je gewaehlter Bibliothek EINE Zaehl-Anfrage /library/sections/<id>/all?type=…&X-Plex-Container-Size=0 (nur totalSize)
  *   2. dann je 30 Bilder EINE Seite …/all?type=…&sort=titleSort&X-Plex-Container-Start=<zufaellige Seite>&X-Plex-Container-Size=30
  *      mit excludeElements/excludeFields; "Nur Ungesehenes": unwatched=1 (Filme) bzw. unwatchedLeaves=1 (Serien).
- *   Bei 30 s Takt also hoechstens eine Anfrage je ~15 Minuten. Nur im Speicher (Profilwechsel/Aenderung der Auswahl = neu).
+ *   Die Bibliotheken kommen reihum dran (SL.Pool, je Bibliothek ein eigener Vorrat aus bis zu SL.MIX Seiten verschiedener
+ *   Buchstaben-Bereiche): zu Beginn bis zu SL.MIX Seiten je Bibliothek (eine je Bildwechsel), danach je 30 Bilder einer
+ *   Bibliothek eine Anfrage. Nur im Speicher (Profilwechsel/Aenderung der Auswahl = neu).
  * Nur Hintergrundbilder von Filmen, Serien und Kuenstlern – keine Folgenbilder, daher nichts fuer den Spoilerschutz.
  * next(cb): cb(item|null) – null = keine Bilder (Fehler, leere Auswahl) -> der Schoner nimmt die Startseiten-Bilder. */
 (function (N) {
@@ -49,27 +51,27 @@
     get('/library/sections/' + pg.lib.id + '/all', SL.query(pg.lib, pg.start, SL.PAGE, unw), function (err, d) {
       if (err) { cb(false, err.type === 'aborted'); return; }
       var mc = d && d.MediaContainer || {};
-      pool.add(M.normList(mc.Metadata || [], null, pg.lib.id), need());
-      if (pool.q.length || (tries || 0) >= 2) cb(!!pool.q.length);
+      pool.add(M.normList(mc.Metadata || [], null, pg.lib.id), need(), pg.lib);
+      if (pool.count() || (tries || 0) >= 2) cb(!!pool.count());
       else fill(unw, cb, (tries || 0) + 1);
     });
   }
   function rnd() { return N.config && N.config.fixedClock ? 0 : Math.random(); }   // Tests: feste Reihenfolge
 
   var SLB = {
-    /* naechstes Bild {rk, art, title, type, year, …} oder null */
-    next: function (cb) {
+    /* naechstes Bild {rk, art, title, type, year, …} oder null; same: Ersatz fuer ein verworfenes Bild aus derselben Bibliothek */
+    next: function (cb, same) {
       var libs = chosen(), unw = !!settings().saverUnwatched, k = keyOf(libs);
       if (!libs.length) { cb(null); return; }
       if (k !== key) { SLB.reset(); key = k; }
-      if (pool && pool.q.length) {
-        var it = pool.take();
+      if (pool && pool.count()) {
+        var it = pool.take(same);
         cb(it);
         // Vorrat im Hintergrund auffuellen. Kam inzwischen ein next() mit leerem Vorrat (wartet, weil filling): jetzt bedienen,
         // sonst haengt der Schoner auf einem Bild (Review 1.0.5: langsamer Server, Nachschub dauert laenger als zwei Bilder)
         if (pool.low() && !filling) {
           filling = true;
-          fill(unw, function (ok, aborted) { filling = false; if (!aborted && waiting.length) flush(ok && pool && pool.q.length ? pool.take() : null); });
+          fill(unw, function (ok, aborted) { filling = false; if (!aborted && waiting.length) flush(ok && pool && pool.count() ? pool.take() : null); });
         }
         return;
       }

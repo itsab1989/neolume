@@ -30,6 +30,7 @@
       if (!err && k === key()) {
         var res = L.done(f, d), st = load();
         st.libs[f.id] = res.entry; N.store.set(file(), st);
+        if (N.log) N.log('news ' + f.id + ': ' + res.items.length + ' neu');   // TV-Diagnose (wie libwatch)
         if (res.items.length && on()) N.ui.news.add(res.items);
       }
       pump();

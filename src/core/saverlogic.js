@@ -4,11 +4,11 @@
  *   GPU-Ebenen, Bild vorher fertig geladen und gezeichnet (Begruendung und Ebenen-Budget: docs/ARCHITEKTUR.md "Bildschirmschoner").
  *   "Reduzierte Bewegung": alles mit Bewegung (Zoom, Gleiten, Durchflug, Vorhang, Jalousie, Kacheln) -> Ueberblenden.
  * - Ken-Burns-Posen (Langsamer Zoom/Gleiten): nie ueber den Bildrand hinaus (Pruefung in den Tests).
- * - Zufallsbeutel ohne Wiederholung (Startseiten-Bilder) und Bibliotheks-Pool (Seiten in zufaelliger Reihenfolge, je Titel
- *   einmal, bis alle gezeigt sind; dann neue Runde).
+ * - Zufallsbeutel ohne Wiederholung (Startseiten-Bilder) und Bibliotheks-Pool (Seiten in zufaelliger Reihenfolge, Titel
+ *   mehrerer Seiten/Bibliotheken gemischt, je Titel einmal, bis alle gezeigt sind; dann neue Runde).
  * - Ecken des Info-Blocks (Uhr, Titel, Zeile): wechseln nur zusammen mit dem Bild (gegen Einbrennen). */
 (function (N) {
-  var PAGE = 30, OV_W = 1000, OV_H = 460;
+  var PAGE = 30, MIX = 3, OV_W = 1000, OV_H = 460;
   /* Dauer je Uebergang (ms); cut = harter Schnitt. Reihenfolge = Reihenfolge in der Einstellung */
   var FX_MS = { cut: 0, fade: 1500, dip: 1600, zoom: 1500, drift: 1500, fly: 1400, curtain: 1600, blinds: 1500, tiles: 1600 };
   var CALM = { cut: 1, fade: 1, dip: 1 };            // ohne Bewegung: bleiben bei "Reduzierte Bewegung"
@@ -55,7 +55,7 @@
   function tf(s, x, y) { return 'translate3d(' + x + 'px,' + y + 'px,0)' + (s !== 1 ? ' scale(' + s + ')' : ''); }
 
   var L = {
-    PAGE: PAGE, OV_W: OV_W, OV_H: OV_H, FX: FX, FX_MS: FX_MS, CALM: CALM, CORNERS: CORNERS, KB: KB,
+    PAGE: PAGE, MIX: MIX, OV_W: OV_W, OV_H: OV_H, FX: FX, FX_MS: FX_MS, CALM: CALM, CORNERS: CORNERS, KB: KB,
     SEC: [10, 20, 30, 60],
     TYPE: { movie: 1, show: 2, artist: 8 },
     /* Einstellung -> tatsaechlicher Uebergang. reduced: "Reduzierte Bewegung"; rnd: Zahl 0..1 oder Funktion; last: letzter (Zufall
@@ -261,39 +261,96 @@
     return this.last;
   };
 
-  /* Bibliotheks-Pool: totals = [{lib, n}] (Anzahl je Bibliothek, aus einer Anfrage mit Size=0). Seiten zu PAGE Titeln in
-   * zufaelliger Reihenfolge ueber alle Bibliotheken (Gewicht = Groesse), Titel einer Seite gemischt. Gezeigt = gemerkt (rk), bis
-   * alle Seiten durch sind -> neue Runde. So gibt es keine Wiederholung, bis alles gezeigt ist, und je PAGE Bilder nur EINE
-   * Anfrage (sort=random kann das nicht: jede Seite waere neu gewuerfelt und Wiederholungen nicht ausgeschlossen). */
-  function Pool(rnd) { this.rnd = rnd; this.totals = []; this.pages = []; this.q = []; this.seen = {}; this.round = 0; this.last = ''; }
+  /* Bibliotheks-Pool: totals = [{lib, n}] (Anzahl je Bibliothek, aus einer Anfrage mit Size=0). Jede Bibliothek hat ihren eigenen
+   * Vorrat: Seiten zu PAGE Titeln in zufaelliger Reihenfolge, gezeigt = gemerkt (rk), bis alle Seiten DIESER Bibliothek durch sind ->
+   * neue Runde nur fuer sie. So gibt es keine Wiederholung innerhalb einer Bibliothek, bis sie ganz gezeigt ist, und je PAGE Bilder
+   * nur EINE Anfrage (sort=random kann das nicht: jede Seite waere neu gewuerfelt und Wiederholungen nicht ausgeschlossen).
+   * Mischen (Nutzerwunsch 30.10.: Filme UND Serien bunt gemischt, nicht alphabetisch): die Bibliotheken kommen reihum dran, je
+   * Durchgang in zufaelliger Reihenfolge (Bag: nie dieselbe zweimal hintereinander) – unabhaengig von ihrer Groesse (540 Filme
+   * neben 64 Serien: trotzdem jedes zweite Bild eine Serie; die kleine Bibliothek beginnt eben frueher eine neue Runde). Innerhalb
+   * einer Bibliothek haelt der Vorrat Titel aus bis zu MIX Seiten; jede neue Seite wird gemischt und zufaellig zwischen den Vorrat
+   * gestreut (eine Seite allein waeren 30 alphabetisch benachbarte Titel). Kosten: zu Beginn bis zu MIX Seiten je Bibliothek
+   * (nacheinander, je Bildwechsel eine), danach eine je PAGE Bilder einer Bibliothek. */
+  function Pool(rnd) { this.rnd = rnd; this.totals = []; this.libs = []; this.bag = null; this.pend = null; this.lastB = null; this.round = 0; this.last = ''; }
   Pool.prototype.setTotals = function (totals) { this.totals = totals || []; this.newRound(); };
   Pool.prototype.size = function () { var n = 0; for (var i = 0; i < this.totals.length; i++) n += this.totals[i].n; return n; };
+  /* neue Runde fuer alle Bibliotheken (Auswahl neu) */
   Pool.prototype.newRound = function () {
-    var p = [], i, s;
-    for (i = 0; i < this.totals.length; i++) for (s = 0; s < this.totals[i].n; s += PAGE) p.push({ lib: this.totals[i].lib, start: s });
-    this.pages = shuffle(p, this.rnd); this.q = []; this.seen = {}; this.round++;
+    this.libs = [];
+    for (var i = 0; i < this.totals.length; i++) {
+      var b = { lib: this.totals[i].lib, n: this.totals[i].n, q: [], seen: {}, pages: [], round: 0 };
+      this.renew(b); this.libs.push(b);
+    }
+    this.bag = new Bag(this.libs.length, this.rnd); this.pend = null; this.lastB = null; this.round++;
   };
-  /* naechste zu ladende Seite oder null (Runde zu Ende) */
-  Pool.prototype.nextPage = function () { return this.pages.length ? this.pages.shift() : null; };
-  /* geladene Titel (N.model-Objekte) aufnehmen: nur mit Bild (need 'art' = Hintergrund, Standard; 'thumb' = Poster/Cover), je
-   * Titel einmal je Runde */
-  Pool.prototype.add = function (items, need) {
+  /* neue Runde fuer EINE Bibliothek: alle ihre Seiten neu gemischt, Gemerktes vergessen */
+  Pool.prototype.renew = function (b) {
+    var p = [];
+    for (var s = 0; s < b.n; s += PAGE) p.push(s);
+    if (b.round && !b.got) b.dead = true;                  // eine ganze Runde ohne ein Bild: nie wieder anfragen (Anfrage-Budget)
+    b.pages = shuffle(p, this.rnd); b.seen = {}; b.round++; b.got = 0;
+  };
+  function wants(b) { return !b.dead && b.q.length < (MIX - 1) * PAGE && (b.pages.length > 0 || !b.q.length); }
+  /* naechste zu ladende Seite {lib, start} oder null: die Bibliothek mit dem kleinsten Vorrat, die Nachschub braucht; ist sie ganz
+   * gezeigt (Vorrat leer, keine Seite mehr), beginnt sie eine neue eigene Runde */
+  Pool.prototype.nextPage = function () {
+    var best = null, i, b;
+    for (i = 0; i < this.libs.length; i++) { b = this.libs[i]; if (wants(b) && (!best || b.q.length < best.q.length)) best = b; }
+    if (!best) return null;
+    if (!best.pages.length) this.renew(best);
+    if (!best.pages.length) return null;
+    this.pend = best;
+    return { lib: best.lib, start: best.pages.shift() };
+  };
+  function libOf(P, lib) {
+    for (var i = 0; i < P.libs.length; i++) if (P.libs[i].lib === lib || (P.libs[i].lib && P.libs[i].lib.id === lib.id)) return P.libs[i];
+    return null;
+  }
+  /* geladene Titel (N.model-Objekte) der zuletzt angefragten Seite (oder der Bibliothek lib) aufnehmen: nur mit Bild (need 'art' =
+   * Hintergrund, Standard; 'thumb' = Poster/Cover), je Titel einmal je Runde der Bibliothek; gemischt in deren Vorrat gestreut
+   * (take() nimmt vom Ende) */
+  Pool.prototype.add = function (items, need, lib) {
+    var b = (lib && libOf(this, lib)) || this.pend || this.libs[0];
+    if (!b) return 0;
     var add = [], i, k = need || 'art';
     for (i = 0; items && i < items.length; i++) {
       var it = items[i];
-      if (!it || !it[k] || this.seen[it.rk]) continue;
-      this.seen[it.rk] = 1;
+      if (!it || !it[k] || b.seen[it.rk]) continue;
+      b.seen[it.rk] = 1;
       add.push(it);
     }
     shuffle(add, this.rnd);
-    if (add.length > 1 && add[add.length - 1].rk === this.last) add.unshift(add.pop());
-    this.q = add.concat(this.q);
+    var old = b.q, out = [], a = 0, c = 0;
+    while (a < old.length || c < add.length) {
+      var na = old.length - a, nb = add.length - c;
+      if (!nb || (na && rnd0(this.rnd) * (na + nb) < na)) out.push(old[a++]); else out.push(add[c++]);
+    }
+    var n = out.length;
+    if (n > 1 && out[n - 1].rk === this.last) { var t = out[n - 1]; out[n - 1] = out[0]; out[0] = t; }   // nie zweimal hintereinander (Rundenwechsel)
+    b.q = out; b.got += add.length;
     return add.length;
   };
-  /* naechster Titel (oder null: nachladen bzw. neue Runde) */
-  Pool.prototype.take = function () { var it = this.q.pop() || null; if (it) this.last = it.rk; return it; };
-  Pool.prototype.low = function () { return this.q.length < 3 && this.pages.length > 0; };
-  Pool.prototype.done = function () { return !this.q.length && !this.pages.length; };
+  /* Titel im Vorrat (alle Bibliotheken) */
+  Pool.prototype.count = function () { var n = 0; for (var i = 0; i < this.libs.length; i++) n += this.libs[i].q.length; return n; };
+  /* naechster Titel (oder null: nachladen): reihum, je Durchgang zufaellige Reihenfolge; eine Bibliothek ohne Vorrat (Nachschub
+   * laeuft noch) wird diesmal uebersprungen. same: Ersatz fuer einen verworfenen Titel (Standbild, "Nur echte Hintergrundbilder")
+   * aus DERSELBEN Bibliothek – sonst bekaeme die andere Bibliothek den Platz (TV-Test 30.10.: viele Filme mit Standbild -> 7 Serien
+   * hintereinander) */
+  Pool.prototype.take = function (same) {
+    if (!this.count()) return null;
+    var b = same && this.lastB && this.lastB.q.length ? this.lastB : null;
+    for (var k = 0; !b && k < this.libs.length * 2 + 1; k++) {
+      b = this.libs[this.bag.next()];
+      if (b && !b.q.length) b = null;
+    }
+    if (!b) return null;
+    var it = b.q.pop(); this.last = it.rk; this.lastB = b;
+    return it;
+  };
+  /* Nachschub, solange eine Bibliothek weniger als MIX - 1 Seiten haelt (und Seiten uebrig hat) oder ganz gezeigt ist */
+  Pool.prototype.low = function () { for (var i = 0; i < this.libs.length; i++) if (wants(this.libs[i])) return true; return false; };
+  /* nichts da und nichts zu laden: nur ohne Titel (sonst beginnt jede Bibliothek selbst eine neue Runde) */
+  Pool.prototype.done = function () { return !this.count() && !this.size(); };
 
   N.saverLogic = L;
 })(N);
