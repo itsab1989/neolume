@@ -45,7 +45,7 @@ function bidi(port) {
     return new Promise(function (res, rej) {
       ws = new WebSocket('ws://127.0.0.1:' + port + '/session');
       ws.onopen = function () { res(); };
-      ws.onerror = function () { if (tries > 0) setTimeout(function () { connect(tries - 1).then(res, rej); }, 300); else rej(new Error('no BiDi')); };
+      ws.onerror = function () { if (tries > 0) setTimeout(function () { connect(tries - 1).then(res, rej); }, 300); else rej(new Error('no BiDi: Firefox did not open its WebDriver BiDi port within 60 s')); };
       ws.onmessage = function (ev) {
         var m = JSON.parse(ev.data);
         if (m.id && pending[m.id]) { var p = pending[m.id]; delete pending[m.id]; if (m.type === 'error') p.rej(new Error(m.error + ': ' + m.message)); else p.res(m.result); }
@@ -56,7 +56,8 @@ function bidi(port) {
   function send(method, params) {
     return new Promise(function (res, rej) { id++; pending[id] = { res: res, rej: rej }; ws.send(JSON.stringify({ id: id, method: method, params: params || {} })); });
   }
-  return { connect: function () { return connect(50); }, send: send, on: function (f) { listeners.push(f); }, close: function () { try { ws.close(); } catch (e) {} } };
+  // up to 60 s (200 x 300 ms): the first start of the Firefox snap on a fresh CI runner can take longer than 15 s
+  return { connect: function () { return connect(200); }, send: send, on: function (f) { listeners.push(f); }, close: function () { try { ws.close(); } catch (e) {} } };
 }
 
 async function main() {

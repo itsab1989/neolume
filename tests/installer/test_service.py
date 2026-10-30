@@ -109,7 +109,10 @@ class Base(unittest.TestCase):
         shutil.rmtree(self.dir, ignore_errors=True)
 
     def make_ctx(self, **kw):
-        env = {'APPDATA': os.path.join(self.home, 'AppData', 'Roaming'), 'LOCALAPPDATA': os.path.join(self.home, 'AppData', 'Local')}
+        # names and texts follow the system language (Windows display language, LANG, locale) – pin English so a German
+        # machine gives the same results as CI; the language tests pass lang= themselves
+        kw.setdefault('lang', 'en')
+        env = {'APPDATA': posixpath.join(self.home, 'AppData', 'Roaming'), 'LOCALAPPDATA': posixpath.join(self.home, 'AppData', 'Local')}
         c = service.Ctx(platform=kw.pop('platform', self.os_), home=self.home, env=env, run=self.sys.run, reg=FakeReg(self.sys.reg), spawn=self.sys.spawn,
                         kill=self.sys.kill, alive=lambda p: p in self.sys.alive, is_helper=lambda p, e: True, probe=self.sys.probe,
                         uid=501, user='alex', program={'kind': 'exe', 'src': self.src, 'python': None}, sleep=lambda s: None,
@@ -122,6 +125,13 @@ class Base(unittest.TestCase):
         ctx = ctx or self.ctx
         s = HP.Store(KEY); s.add('u-owner', OWNER_TOK, 'Owner', 'owner'); s.add('u-kid', KID_TOK, 'Kid', 'home')
         return s.save(ctx.file('helper.json'))
+
+    def assertMode(self, path, mode):
+        """POSIX permission bits (0o600 secrets, 0o755 programs). Windows has no such bits – os.chmod only toggles
+        read-only and st_mode always shows 0o666/0o444; there the per-user ACL of %APPDATA%/%LOCALAPPDATA% protects the
+        files. So the bits are checked only where they exist; every other assertion of a test runs everywhere."""
+        if os.name == 'nt': return
+        self.assertEqual(os.stat(path).st_mode & 0o777, mode, path)
 
     def read(self, p):
         with open(p) as f: return f.read()
@@ -139,7 +149,7 @@ class Files(Base):
         args = service.command(self.ctx)
         d = plistlib.loads(service.launchd_plist(self.ctx, args))
         self.assertEqual(d['Label'], 'io.github.itsab1989.neolume.helper')
-        app_exe = os.path.join(self.ctx.bin_dir(), 'Neolume Helper.app', 'Contents', 'MacOS', 'Neolume Helper')
+        app_exe = posixpath.join(self.ctx.bin_dir(), 'Neolume Helper.app', 'Contents', 'MacOS', 'Neolume Helper')
         self.assertEqual(d['ProgramArguments'], [app_exe, '--helper', '--background'])
         self.assertEqual(d['AssociatedBundleIdentifiers'], ['io.github.itsab1989.neolume.helper'])
         self.assertTrue(d['RunAtLoad'])
@@ -169,7 +179,7 @@ class Files(Base):
     def test_windows_command_and_paths(self):
         c = service.Ctx(platform='win32', home='C:\\Users\\Alex', env={'APPDATA': 'C:\\Users\\Alex\\AppData\\Roaming',
                         'LOCALAPPDATA': 'C:\\Users\\Alex\\AppData\\Local'}, reg=FakeReg({}),
-                        program={'kind': 'exe', 'src': 'C:\\Users\\Alex\\Downloads\\neolume-setup-windows-x64.exe', 'python': None})
+                        program={'kind': 'exe', 'src': 'C:\\Users\\Alex\\Downloads\\neolume-setup-windows-x64.exe', 'python': None}, lang='en')
         self.assertEqual(c.bin_dir(), 'C:\\Users\\Alex\\AppData\\Local\\NeolumeSetup\\bin')
         self.assertEqual(c.settings_dir(), 'C:\\Users\\Alex\\AppData\\Roaming\\NeolumeSetup')
         args = service.command(c)
@@ -196,10 +206,10 @@ class Files(Base):
         c.program = {'kind': 'pyz', 'src': '/dl/neolume-setup.pyz', 'python': '/usr/bin/python3'}
         self.assertEqual(service.command(c, 32500, '/x/h.json', tray=False)[:1], [service.bundle_exe(c)])   # Mac: through the app
         self.assertEqual(service.command(c, 32500, '/x/h.json', tray=False)[1:], ['--helper', '--background', '--no-tray', '--helper-file', '/x/h.json', '--update-port', '32500'])
-        self.assertIn("exec '/usr/bin/python3' '%s' \"$@\"" % os.path.join(c.bin_dir(), 'neolume-setup.pyz'), service.bundle_launcher(c))
+        self.assertIn("exec '/usr/bin/python3' '%s' \"$@\"" % posixpath.join(c.bin_dir(), 'neolume-setup.pyz'), service.bundle_launcher(c))
         lin = self.make_ctx(platform='linux')
         lin.program = c.program
-        self.assertEqual(service.command(lin)[:2], ['/usr/bin/python3', os.path.join(lin.bin_dir(), 'neolume-setup.pyz')])
+        self.assertEqual(service.command(lin)[:2], ['/usr/bin/python3', posixpath.join(lin.bin_dir(), 'neolume-setup.pyz')])
         c.program = {'kind': 'source', 'src': '/repo/installer/plexneo_setup.py', 'python': '/usr/bin/python3'}
         self.assertIn("'/repo/installer/plexneo_setup.py'", service.bundle_launcher(c))
         self.assertIsNone(service.installed_program(c))
@@ -232,21 +242,21 @@ class MacInstall(Base):
             r = service.install(self.ctx)
             self.assertTrue(r.ok, r.text())
             self.assertEqual(self.codes(r)[-5:], ['bundle', 'agent', 'login_item', 'tray_on', 'started'])
-            dst = os.path.join(self.ctx.bin_dir(), 'neolume-setup')
+            dst = posixpath.join(self.ctx.bin_dir(), 'neolume-setup')
             with open(dst, 'rb') as f: self.assertEqual(f.read(), b'#!binary v1')
-            self.assertEqual(os.stat(dst).st_mode & 0o777, 0o755)
-            app_dir = os.path.join(self.ctx.bin_dir(), 'Neolume Helper.app')
-            app_exe = os.path.join(app_dir, 'Contents', 'MacOS', 'Neolume Helper')
+            self.assertMode(dst, 0o755)
+            app_dir = posixpath.join(self.ctx.bin_dir(), 'Neolume Helper.app')
+            app_exe = posixpath.join(app_dir, 'Contents', 'MacOS', 'Neolume Helper')
             with open(app_exe, 'rb') as f: self.assertEqual(f.read(), b'#!binary v1')      # the program itself runs in the app
-            self.assertEqual(os.stat(app_exe).st_mode & 0o777, 0o755)
-            info = plistlib.loads(open(os.path.join(app_dir, 'Contents', 'Info.plist'), 'rb').read())
+            self.assertMode(app_exe, 0o755)
+            info = plistlib.loads(open(posixpath.join(app_dir, 'Contents', 'Info.plist'), 'rb').read())
             self.assertEqual((info['CFBundleName'], info['CFBundleExecutable'], info['CFBundleIdentifier']),
                              ('Neolume Helper', 'Neolume Helper', 'io.github.itsab1989.neolume.helper'))
             self.assertTrue(info['LSUIElement'])
-            with open(os.path.join(app_dir, 'Contents', 'Resources', 'icon.icns'), 'rb') as f: self.assertEqual(f.read(4), b'icns')
+            with open(posixpath.join(app_dir, 'Contents', 'Resources', 'icon.icns'), 'rb') as f: self.assertEqual(f.read(4), b'icns')
             # nur die Installationssprache (hier en): die Anmeldeobjekte zeigen sonst einen anderen Namen als die Texte
-            self.assertIn('"Neolume Helper"', self.read(os.path.join(app_dir, 'Contents', 'Resources', 'en.lproj', 'InfoPlist.strings')))
-            self.assertFalse(os.path.exists(os.path.join(app_dir, 'Contents', 'Resources', 'de.lproj')))
+            self.assertIn('"Neolume Helper"', self.read(posixpath.join(app_dir, 'Contents', 'Resources', 'en.lproj', 'InfoPlist.strings')))
+            self.assertFalse(os.path.exists(posixpath.join(app_dir, 'Contents', 'Resources', 'de.lproj')))
             self.assertEqual(info['CFBundleLocalizations'], ['en'])
             self.assertIn(['codesign', '--force', '--sign', '-', '--identifier', 'io.github.itsab1989.neolume.helper', app_dir], self.sys.calls)
             d = self.plist()
@@ -257,7 +267,7 @@ class MacInstall(Base):
             prefs = service.load_prefs(self.ctx)
             self.assertTrue(prefs['tray'] and prefs['autostart'])
             self.assertEqual(prefs['mode'], 'agent')
-            self.assertEqual(os.stat(self.ctx.file('helper-service.json')).st_mode & 0o777, 0o600)
+            self.assertMode(self.ctx.file('helper-service.json'), 0o600)
         self.assertEqual(os.listdir(os.path.dirname(self.ctx.agent_plist())), [self.ctx.label() + '.plist'])
         st = service.status(self.ctx)
         self.assertTrue(st['installed'] and st['autostart'] and st['running'] and st['background'])
@@ -265,7 +275,7 @@ class MacInstall(Base):
         r = service.uninstall(self.ctx)
         self.assertTrue(r.ok)
         self.assertEqual(self.codes(r), ['autostart_removed', 'program_removed', 'bundle_removed', 'prefs_removed', 'device_none', 'access_removed', 'folder_removed'])
-        self.assertIn([service.LSREGISTER, '-u', os.path.join(self.ctx.bin_dir(), 'Neolume Helper.app')], self.sys.calls)
+        self.assertIn([service.LSREGISTER, '-u', posixpath.join(self.ctx.bin_dir(), 'Neolume Helper.app')], self.sys.calls)
         self.assertIn(['launchctl', 'bootout', 'gui/501/' + self.ctx.label()], self.sys.calls)
         for p in (self.ctx.agent_plist(), self.ctx.bin_dir(), self.ctx.settings_dir()): self.assertFalse(os.path.exists(p), p)
         self.assertTrue(os.path.isfile(self.src))                    # the downloaded original is not ours to delete
@@ -364,10 +374,10 @@ class WinInstall(Base):
         r = service.install(self.ctx)
         self.assertTrue(r.ok, r.text())
         self.assertIn('startup', self.codes(r))
-        dst = os.path.join(self.home, 'AppData', 'Local', 'NeolumeSetup', 'bin', 'neolume-setup.exe')
+        dst = posixpath.join(self.home, 'AppData', 'Local', 'NeolumeSetup', 'bin', 'neolume-setup.exe')
         self.assertTrue(os.path.isfile(dst))
-        link = os.path.join(self.home, 'AppData', 'Roaming', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', 'Neolume Helper.lnk')
-        helper = os.path.join(os.path.dirname(dst), 'neolume-helper.exe')
+        link = posixpath.join(self.home, 'AppData', 'Roaming', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', 'Neolume Helper.lnk')
+        helper = posixpath.join(posixpath.dirname(dst), 'neolume-helper.exe')
         with open(dst, 'rb') as f: self.assertEqual(service.pe_subsystem(f.read()), service.PE_CONSOLE)   # command line
         with open(helper, 'rb') as f: self.assertEqual(service.pe_subsystem(f.read()), service.PE_GUI)    # autostart
         # windowed: nothing to hide, so no second start (--detached); prefs keep the plain command (schtasks start)
@@ -740,12 +750,12 @@ class NamesAndLanguage(Base):
         r = service.install(de)
         self.assertIn('Helfer-App „Neolume Helfer“ angelegt', r.text('de'))
         self.assertIn('Anmeldeobjekte & Erweiterungen als „Neolume Helfer“', r.text('de'))
-        self.assertTrue(os.path.isdir(os.path.join(de.bin_dir(), 'Neolume Helfer.app')))
+        self.assertTrue(os.path.isdir(posixpath.join(de.bin_dir(), 'Neolume Helfer.app')))
         self.assertEqual(service.status(de)['name'], 'Neolume Helfer')
         en = self.make_ctx(lang='en')
         service.install(en)
         self.assertEqual(sorted(os.listdir(en.bin_dir())), ['Neolume Helper.app', 'neolume-setup'])
-        self.assertIn([service.LSREGISTER, '-u', os.path.join(en.bin_dir(), 'Neolume Helfer.app')], self.sys.calls)
+        self.assertIn([service.LSREGISTER, '-u', posixpath.join(en.bin_dir(), 'Neolume Helfer.app')], self.sys.calls)
         r = service.uninstall(de)                                         # removal finds it in any language
         self.assertIn('Helfer-App „Neolume Helper“ gelöscht.', r.text('de'))
         self.assertFalse(os.path.exists(en.bin_dir()))
@@ -786,22 +796,45 @@ class NamesAndLanguage(Base):
         self.assertIn('Name im System:', out.getvalue())
         self.assertIn('Läuft:', out.getvalue())
 
+    def _console(self, enc, tty):
+        """Captured stdout with the given code page; tty=True is a console window or SSH with a terminal, False a pipe."""
+        class Stream(io.TextIOWrapper):
+            def isatty(self): return tty
+        raw = io.BytesIO()
+        return raw, Stream(raw, encoding=enc, errors='strict')
+
+    def _print_all_texts(self):
+        for lang, t in service.TEXTS.items():
+            for k, v in sorted(t.items()): print(v.replace('%s', 'x'))
+            for v in BG.texts(lang).values(): print(v.replace('%s', 'x'))
+        print(app._icon_state({'trayPossible': True, 'tray': True, 'running': True, 'trayShown': False}, True))
+
     def test_every_cli_text_survives_old_code_pages(self):
         """Windows console over SSH (cp1252/cp850): no UnicodeEncodeError, readable ASCII for arrows and quotes."""
         for enc in ('cp1252', 'cp850', 'ascii'):
-            raw = io.BytesIO()
-            st = io.TextIOWrapper(raw, encoding=enc, errors='strict')
+            raw, st = self._console(enc, tty=True)         # a terminal keeps its code page on every OS
             with mock.patch.object(app.sys, 'stdout', st):
                 app.safe_console(['stdout'])
-                for lang, t in service.TEXTS.items():
-                    for k, v in sorted(t.items()): print(v.replace('%s', 'x'))
-                    for v in BG.texts(lang).values(): print(v.replace('%s', 'x'))
-                print(app._icon_state({'trayPossible': True, 'tray': True, 'running': True, 'trayShown': False}, True))
+                self._print_all_texts()
                 st.flush()
             text = raw.getvalue().decode(enc)
             self.assertIn('Systemeinstellungen -> Allgemein -> Anmeldeobjekte & Erweiterungen', text)
             self.assertTrue('"Allow in the Background"' in text or '“Allow in the Background”' in text, enc)   # cp1252 has “”
             if enc != 'ascii': self.assertIn('gelöscht', text)
+
+    def test_windows_pipe_output_becomes_utf8(self):
+        """Windows, output into a pipe (ssh without a terminal, autostart log): UTF-8 instead of the old code page, so
+        umlauts and quotes arrive intact. Elsewhere a pipe keeps its encoding (and still never crashes)."""
+        for os_name, want in (('nt', 'utf-8'), ('posix', 'cp1252')):
+            raw, st = self._console('cp1252', tty=False)
+            with mock.patch.object(app.sys, 'stdout', st), mock.patch.object(app.os, 'name', os_name):
+                app.safe_console(['stdout'])
+                self.assertEqual(st.encoding.replace('-', '').lower(), want.replace('-', ''))
+                self._print_all_texts()
+                st.flush()
+            text = raw.getvalue().decode(want)
+            self.assertIn('gelöscht', text)
+            if want == 'utf-8': self.assertIn('Systemeinstellungen → Allgemein', text)
 
 
 class TakeOver(Base):
@@ -918,7 +951,7 @@ class Hardening(Base):
         self.assertEqual(self.read(target), 'keep')
         self.assertEqual(self.read(path), '{"pid": 1}')
         self.assertFalse(os.path.islink(path))
-        self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
+        self.assertMode(path, 0o600)
 
     def test_token_file_never_written_through_planted_temp_file(self):
         target = os.path.join(self.dir, 'victim.txt')
@@ -929,7 +962,7 @@ class Hardening(Base):
         s = HP.Store(KEY); s.add('u-owner', OWNER_TOK, 'Owner', 'owner'); s.save(path)
         self.assertEqual(self.read(target), 'keep')
         self.assertNotIn(OWNER_TOK, self.read(target))
-        self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
+        self.assertMode(path, 0o600)
 
     def test_uninstall_keeps_a_wrong_helper_file(self):
         other = os.path.join(self.dir, 'notes.txt')
