@@ -463,11 +463,17 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .pl-sub.sz-xl span { font-size: 46px; line-height: 62px; }
 .pl-sub.yel span { color: @c.sub-yellow@; }
 
-/* ---------- Player & OSD (SPEC 7.10): Inseln ueber dem Video, ohne Ein-/Ausblend-Animation ---------- */
+/* ---------- Player & OSD (SPEC 7.10): Inseln ueber dem Video ---------- */
+/* Weiche Blende (PLAY-23, 30.10.): nur die leere, dauerhafte Huelle .pl-osdw wechselt die Deckkraft (Regel Runde 8, wie #pn-news);
+ * Titel- und Bedien-Insel sind eigene Ebenen. Ein schnell (Bedienung sofort da), aus etwas weicher. */
+.pl-osdw { position: absolute; left: 0; top: 0; width: 0; height: 0; opacity: 0; -webkit-transform: translate3d(0,0,0);
+  -webkit-transition: opacity @mo.out@ @mo.ease-std@; }
+.pl-osdw.on { opacity: 1; -webkit-transition: opacity @mo.fast@ @mo.ease@; }
+.rm .pl-osdw, .rm .pl-osdw.on { -webkit-transition: none; }
 .scr.pl { background: transparent; }
 .pl-vbg { position: absolute; left: 0; top: 0; width: @l.screen-w@; height: @l.screen-h@; background: @c.video-bg@; }
 .pl-isl { position: absolute; background: @c.osd@; border-radius: @r.xl@; }
-.pl-top { position: absolute; left: @l.safe-x@; top: @l.safe-y@; width: 1152px; height: 72px; }
+.pl-top { position: absolute; left: @l.safe-x@; top: @l.safe-y@; width: 1152px; height: 72px; -webkit-transform: translate3d(0,0,0); }
 /* Titel- und Uhr-Insel (TV-Befund 28.10.: Text in zu breiten festen Kaesten wirkte unausgewogen): Breite folgt dem Inhalt, gleicher
  * Innenrand links/rechts (32 = Innenrand der Bedien-Insel, Texte fluchten); Titel hoechstens 640 breit (dann "…"), Uhr rechts am Sicherheitsrand, Ziffern gleich breit (kein Springen) */
 .pl-ti { left: 0; top: 0; max-width: 640px; height: 72px; padding: @sp.2@ @sp.8@; white-space: nowrap; }
@@ -479,7 +485,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
   font-variant-numeric: tabular-nums; }
 /* Bedien-Insel (TV-Befund 27.10. nachmittags): Balken · Zeiten · Knopfreihe · Label unter dem Fokus-Knopf, Raster 32 px Innenrand;
  * Farbtasten-Hinweise als eigene Insel darunter (Lage der Hinweisleiste). Koordinaten muessen zu N.osd passen. */
-.pl-bot { left: @l.safe-x@; top: 458px; width: 1152px; height: 180px; }
+.pl-bot { left: @l.safe-x@; top: 458px; width: 1152px; height: 180px; -webkit-transform: translate3d(0,0,0); }
 /* Scrubber (SPEC 5.10): 6 px, fokussiert 10 px (nur Klasse), Marker-Segmente, Kapitelgrenzen als 3-px-Luecken */
 /* Runde 8 (Huellen .pl-trw/.pl-trl/.pl-hdw) am TV schlechter (9,8,1: Lasche/Stretch/Film 3/5/5 statt 2/3/3) -> zurueck auf Runde 7 */
 .pl-tr { position: absolute; left: 32px; top: 24px; width: 1088px; height: 6px; border-radius: 3px; background: @c.line@; overflow: hidden; }

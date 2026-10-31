@@ -1,0 +1,30 @@
+{
+  "$schema": "../platforms.schema.json",
+  "id": "samsung-orsay",
+  "name": "Samsung Smart TV 2014 (Orsay)",
+  "brand": "Samsung",
+  "modelFamilies": ["2014 H series (e.g. UE48H8000, UE40H6400)", "2014 HU series, 4K (e.g. UE55HU7500)"],
+  "de": {
+    "name": "Samsung Smart TV 2014 (Orsay)",
+    "modelFamilies": ["H-Serie 2014 (z. B. UE48H8000, UE40H6400)", "HU-Serie 2014, 4K (z. B. UE55HU7500)"]
+  },
+  "osVersions":["Orsay Smart Hub (2014)"],
+  "route": "web",
+  "installChannel": {
+    "type": "user-app-sync",
+    "needsAccount": "none – the TV signs in to Smart Hub with the built-in user 'develop' (no password)",
+    "computerNeededAfterInstall": false
+  },
+  "artifact": { "format": "setup-program", "name": "{slug}-setup-{os}-{arch}", "signing": "none" },
+  "mediaServers": ["plex"],
+  "status": "maintainer-tested",
+  "lastTested": { "version": "1.0.9", "date": "2026-10-31", "model": "UE48H8000", "testPlan": "release" },
+  "guide": { "en": "docs/INSTALL.md", "de": "docs/INSTALL.de.md" },
+  "maintainer": "itsab1989",
+  "features": {
+    "A1": "done", "A2": "done", "A3": "done", "A4": "done", "A5": "done", "A6": "done", "A7": "done", "A8": "done",
+    "A9": "done", "A10": "done", "A11": "done", "A12": "done", "A13": "done", "A14": "done", "A15": "done", "A16": "done",
+    "A17": "done", "A18": "done", "A19": "partial"
+  },
+  "notes": "The reference implementation. The TV app is inside the setup program, which installs it over the TV's User App Sync."
+}

@@ -1,5 +1,6 @@
 /* N.ui.StateBlock – Leer-/Fehlerzustand innerhalb eines Bildschirms (SPEC 9, Texte 10.5):
- * Icon, Titel, Erklaerung (max. 3 Zeilen), Buttons (erster fokussiert). Nie ein leerer Bildschirm. */
+ * Icon, Titel, Erklaerung (max. 3 Zeilen), Buttons (Hauptaktion links, "Zurueck" rechts; fokussiert: o.focus, sonst der erste).
+ * Nie ein leerer Bildschirm. */
 (function (N) {
   var U = N.util;
   function SB(parent) {
@@ -15,7 +16,7 @@
       this.btns.push(b);
     }
   }
-  /* o: {title, text, buttons:[{id, t}], onSelect(id)} */
+  /* o: {title, text, buttons:[{id, t}], focus, onSelect(id)} */
   SB.prototype.show = function (o) {
     U.setText(this.ti, o.title); U.setText(this.tx, o.text);
     this.ids = []; this.onSelect = o.onSelect || null;
@@ -25,8 +26,8 @@
       if (d) { U.setText(b.firstChild, d.t); this.ids.push(d.id); }
       U.cls(b, 'is-focus', false);
     }
-    this.f = 0;
-    if (this.ids.length) U.cls(this.btns[0], 'is-focus', true);
+    this.f = o.focus > 0 && o.focus < this.ids.length ? o.focus : 0;
+    if (this.ids.length) U.cls(this.btns[this.f], 'is-focus', true);
     U.show(this.el, true); this.on = true;
     N.router.refreshHints();
   };

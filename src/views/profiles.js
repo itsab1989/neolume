@@ -110,7 +110,7 @@
         return;
       }
       N.ui.dialog.open({ title: N.t('err.auth.title'), text: N.t('err.auth.text'),
-        buttons: [{ id: 'cancel', t: N.t('dlg.account.cancel') }, { id: 'in', t: N.t('err.btn.signIn') }], focus: 1,
+        buttons: [{ id: 'in', t: N.t('err.btn.signIn') }, { id: 'cancel', t: N.t('dlg.account.cancel') }], focus: 0,
         onSelect: function (id) { if (id === 'in') { N.session.signOut(); N.router.reset('login'); } } });
     }
     function go(u, tok) {
@@ -147,7 +147,7 @@
     };
     function askOther() {
       N.ui.dialog.open({ title: N.t('dlg.account.title'), text: N.t('dlg.account.text'),
-        buttons: [{ id: 'cancel', t: N.t('dlg.account.cancel') }, { id: 'out', t: N.t('dlg.account.confirm') }], focus: 0,
+        buttons: [{ id: 'out', t: N.t('dlg.account.confirm') }, { id: 'cancel', t: N.t('dlg.account.cancel') }], focus: 1,
         onSelect: function (id) { if (id === 'out') { N.session.signOut(); N.router.reset('login'); } } });
     }
     /* Zeiger: Kachel per Index-Mathe (Reihe y, Spalte x) */

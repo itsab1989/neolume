@@ -19,7 +19,9 @@ function FakeTimers() {
       }
       now = end;
     },
-    pending: function () { return list.length; }
+    pending: function () { return list.length; },
+    /* Wanduhr springt (TV stellt die Uhr nach): Date.now() aendert sich, laufende Timer feuern weiter nach ihrer Restzeit */
+    jump: function (ms) { now += ms; for (var i = 0; i < list.length; i++) list[i].at += ms; }
   };
   return T;
 }

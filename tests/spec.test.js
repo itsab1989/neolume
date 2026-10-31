@@ -129,3 +129,36 @@ test('Starter prompt: one source in the playbook, generated copies in the README
   r = run(function (t) { return t.replace('<!-- hand:prompt -->', ''); });
   assert.ok(/starter prompt block <!-- hand:prompt -->/.test(r.problems), r.problems);
 });
+
+test('Platforms: platform.json checked against schema, folder name, guide files, version and SPEC areas (multi-platform step 0)', function () {
+  var fs = require('fs'), path = require('path'), root = path.join(__dirname, '..');
+  var pub = fs.existsSync(path.join(root, 'public', 'platforms')) ? 'public/' : '';
+  var specText = fs.readFileSync(path.join(root, pub + 'docs/SPEC.md'), 'utf8');
+  // the reference system is described and valid
+  var d = spec.platformsData(specText);
+  assert.deepStrictEqual(d.errs, []);
+  assert.ok(d.list.some(function (p) { return p.id === 'samsung-orsay' && p.mediaServers.indexOf('plex') >= 0; }));
+  // schema: wrong values are named
+  var sch = JSON.parse(fs.readFileSync(path.join(root, pub + 'platforms/platforms.schema.json'), 'utf8')), errs = [];
+  spec.validate({ id: 'LG webOS', name: 'x', brand: 'LG', modelFamilies: [], osVersions: ['webOS 6'], route: 'hybrid',
+    installChannel: { type: 'usb', computerNeededAfterInstall: 'no' }, artifact: { format: 'ipk', name: 'app.ipk', signing: 'none' },
+    mediaServers: ['kodi'], editions: { public: true }, status: 'done', guide: { en: 'INSTALL.txt' }, maintainer: 'a b', features: { A1: 'yes' }, extra: 1 },
+    sch, 'platform.json', errs);
+  ['.id:', 'too short', 'modelFamilies: needs at least', 'route: must be one of', 'installChannel.type', 'computerNeededAfterInstall: must be boolean',
+    'artifact.name', 'mediaServers[0]', 'status: must be one of', 'guide.en', '.maintainer', 'A1: must be one of', 'unknown key "extra"'].forEach(function (w) {
+    assert.ok(errs.some(function (e) { return e.indexOf(w) >= 0; }), 'expected an error about ' + w + ' in: ' + errs.join('; '));
+  });
+  // a new system with a wrong folder name, a missing guide, a future version and an unknown SPEC area is reported clearly
+  var dir = path.join(root, pub + 'platforms', 'zz-selftest-' + process.pid);
+  fs.mkdirSync(dir);
+  try {
+    var p = JSON.parse(fs.readFileSync(path.join(root, pub + 'platforms/samsung-orsay/platform.json'), 'utf8'));
+    p.id = 'other-name'; p.guide = { en: 'docs/install/zz-missing.md' }; p.lastTested.version = '99.0.0'; p.features = { A99: 'done' };
+    fs.writeFileSync(path.join(dir, 'platform.json'), JSON.stringify(p));
+    var e = spec.platformsData(specText).errs.join('\n');
+    ['"id" is "other-name" but the folder is', 'docs/install/zz-missing.md (guide.en) does not exist', 'lastTested.version 99.0.0 is newer',
+      'feature area "A99"'].forEach(function (w) { assert.ok(e.indexOf(w) >= 0, 'expected ' + w + ' in:\n' + e); });
+    fs.writeFileSync(path.join(dir, 'platform.json'), '{ not json');
+    assert.ok(/not valid JSON/.test(spec.platformsData(specText).errs.join('\n')));
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

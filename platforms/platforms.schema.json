@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "platforms.schema.json",
+  "title": "TV systems with a ready-made download",
+  "description": "One platform.json per TV system the maintainer builds and offers a download for (platforms/<id>/platform.json). The table 'Which TVs work?' in README.md, README.de.md and on the website is generated from these files by tools/spec_gen.js (npm run spec). Apps that other people build for their TVs are listed in ports.json instead (links only). There is one app for all media servers: a new server type is added to the same app (field mediaServers), never as a separate variant.",
+  "type": "object",
+  "required": ["id", "name", "brand", "modelFamilies", "osVersions", "route", "installChannel", "artifact", "mediaServers", "status", "guide", "maintainer", "features"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "description": "Folder name under platforms/, e.g. 'samsung-orsay', 'lg-webos'." },
+    "name": { "type": "string", "minLength": 2, "maxLength": 60, "description": "Readable name of the TV system, e.g. 'Samsung Smart TV 2014 (Orsay)'. Must not contain 'Plex'." },
+    "brand": { "type": "string", "minLength": 2, "maxLength": 40, "description": "TV brand, e.g. 'Samsung', 'LG'." },
+    "modelFamilies": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 2, "maxLength": 80 }, "description": "Model families or years, with examples. Never serial numbers or anything personal." },
+    "de": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional German wording for the German README (README.de.md); missing = the English text is used.",
+      "properties": {
+        "name": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "modelFamilies": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 2, "maxLength": 80 } }
+      }
+    },
+    "osVersions": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 2, "maxLength": 60 }, "description": "TV operating system(s) and version(s), e.g. 'webOS 6.0'." },
+    "route": { "enum": ["web", "native"], "description": "web = the shared ES5 core in the TV's browser engine (src/ unchanged, thin adapter); native = own source tree that reuses the logic modules (PORTING-WITH-AI.md)." },
+    "installChannel": {
+      "type": "object",
+      "required": ["type", "computerNeededAfterInstall"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["user-app-sync", "developer-mode", "sideload", "store"], "description": "How the app gets onto the TV." },
+        "needsAccount": { "type": "string", "maxLength": 120, "description": "Account the TV or the developer tool needs, in plain words." },
+        "expires": { "type": "string", "maxLength": 160, "description": "Does the installation expire (e.g. developer mode sessions)? Plain words." },
+        "computerNeededAfterInstall": { "type": "boolean", "description": "Must a computer keep running after the installation?" }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["format", "name", "signing"],
+      "additionalProperties": false,
+      "properties": {
+        "format": { "enum": ["setup-program", "ipk", "wgt", "apk", "zip"], "description": "setup-program = a program for the computer that contains the TV app and installs it (2014 Samsung); otherwise the TV package format." },
+        "name": { "type": "string", "pattern": "^\\{slug\\}-[a-z0-9{}.-]+$", "description": "Download file name; {slug} is the brand slug (e.g. 'neolume'), {os}/{arch} the computer for a setup program. Names of existing downloads never change." },
+        "signing": { "enum": ["none", "developer-key", "store"], "description": "How the package is signed." }
+      }
+    },
+    "mediaServers": { "type": "array", "minItems": 1, "items": { "enum": ["plex", "jellyfin", "emby"] }, "description": "Media servers this one app works with on that TV." },
+    "editions": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional. Leave it out: the system is offered everywhere.",
+      "properties": {
+        "public": { "type": "boolean", "description": "false = not offered in the release (yet). Leave the field out to offer it." },
+        "private": { "type": "boolean", "description": "false = left out of other builds. Leave the field out normally." }
+      }
+    },
+    "status": { "enum": ["maintainer-tested", "community-tested", "experimental", "planned"], "description": "maintainer-tested = checked on a real TV by the maintainer; community-tested = test-plan results of a contributor, not checked by the maintainer; experimental = builds, not fully tested, no download in 'latest'; planned = not built yet." },
+    "lastTested": {
+      "type": "object",
+      "required": ["version", "date", "testPlan"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "description": "App version last tested on a real TV." },
+        "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "Date of that test (YYYY-MM-DD)." },
+        "model": { "type": "string", "maxLength": 60, "description": "Model used for the test (only as already named in the public docs)." },
+        "testPlan": { "enum": ["full", "release", "smoke"], "description": "full = the whole TEST-PLAN.md; release = the release test (sections 1 and 2, the areas the release touches, the benchmark); smoke = start, play, back." }
+      }
+    },
+    "guide": {
+      "type": "object",
+      "required": ["en"],
+      "additionalProperties": false,
+      "properties": {
+        "en": { "type": "string", "pattern": "^docs/[A-Za-z0-9_./-]+\\.md$", "description": "Installation guide in English (path in the public tree). Samsung 2014 keeps docs/INSTALL.md; new systems use docs/install/<id>.md." },
+        "de": { "type": "string", "pattern": "^docs/[A-Za-z0-9_./-]+\\.md$", "description": "Installation guide in German (optional)." }
+      }
+    },
+    "maintainer": { "type": "string", "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$", "description": "GitHub handle of whoever looks after this system, without @." },
+    "features": {
+      "type": "object",
+      "description": "Status per Part A section of SPEC.md (A1 … A19), like ports.json.",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^A\\d{1,2}$": { "enum": ["done", "partial", "planned", "n/a"] }
+      }
+    },
+    "notes": { "type": "string", "maxLength": 300, "description": "Optional short note (not shown in the table)." }
+  }
+}

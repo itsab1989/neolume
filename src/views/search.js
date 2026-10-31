@@ -222,7 +222,7 @@
     /* "Verlauf loeschen": nachfragen (wie "Standard wiederherstellen"), Abbrechen ist vorausgewaehlt */
     function askClear() {
       N.ui.dialog.open({ title: N.t('dlg.recentClear.title'), text: N.t('dlg.recentClear.text'),
-        buttons: [{ id: 'cancel', t: N.t('dlg.recentClear.cancel') }, { id: 'ok', t: N.t('dlg.recentClear.confirm') }], focus: 0,
+        buttons: [{ id: 'ok', t: N.t('dlg.recentClear.confirm') }, { id: 'cancel', t: N.t('dlg.recentClear.cancel') }], focus: 1,
         onSelect: function (id) {
           if (id !== 'ok' || dead) return;
           U.cls(chipEl(rf), 'is-focus', false);

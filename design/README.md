@@ -177,6 +177,7 @@ Only -webkit-transform and opacity on small elements; 150 ms or less; ease-out. 
 |---|---|---|
 | `@mo.fast@` | `120ms` | Buttons, text swap (opacity) |
 | `@mo.base@` | `150ms` | Cards, focus ring, rows/pages scrolling, navigation panel, toast |
+| `@mo.out@` | `250ms` | Player controls fading out (the empty wrapper layer); they fade in with fast |
 | `@mo.slow@` | `400ms` | Soft fades: ambient background cross-fade (opacity of a full-screen layer, the one exception) and the new content notice |
 | `@mo.spin@` | `900ms` | One turn of the spinner (linear, endless) |
 | `@mo.ease@` | `cubic-bezier(0,0,0.2,1)` | ease-out: the standard curve |

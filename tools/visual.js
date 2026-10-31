@@ -818,7 +818,7 @@ var SCENES = [
   { name: 'search-recent-removed', seed: 'recent8', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RED,wait300' },
   { name: 'search-recent-clear', seed: 'recent8', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT' },
   { name: 'search-recent-clear-dlg', seed: 'recent8', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,ENTER,wait300' },
-  { name: 'search-recent-cleared', seed: 'recent8', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,ENTER,wait300,RIGHT,ENTER,wait800' },
+  { name: 'search-recent-cleared', seed: 'recent8', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,ENTER,wait300,LEFT,ENTER,wait800' },   // Dialog: Leeren links, Abbrechen (Fokus) rechts
   { name: 'search-recent-long-en', seed: 'recentLongEn', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT' },
   { name: 'search-recent-sugg-up', seed: 'recent8', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,UP' },
   { name: 'search-recent-ptr', seed: 'recentPtr', keys: 'BLUE,wait600', mwait: 3600, moves: '700:300,700:320,600:160,601:161' },   // Zeiger auf Zeile 2: Fokus ohne Rollen

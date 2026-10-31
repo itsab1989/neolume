@@ -1,5 +1,6 @@
 /* N.ui.dialog – Dialog und Kontextmenue (SPEC 5.13, 7.12): Abdunklung statisch, Box 640 breit, Buttons mit Fuellungsfokus,
- * fokussiert ist immer die sichere Option (Aufrufer setzt focus). RETURN = Abbrechen. Fokus geht danach an den Aufrufer zurueck.
+ * Reihenfolge (NAV-11): Hauptaktion links bzw. oben, Abbrechen/Behalten/Zurueck/Spaeter rechts bzw. unten. Fokus (Aufrufer setzt
+ * focus): bei loeschenden/verlassenden Rueckfragen die sichere Option (rechts), bei harmlosen die Hauptaktion. RETURN = Abbrechen. Fokus geht danach an den Aufrufer zurueck.
  * Wird nur bei Bedarf erzeugt (nie im Fokusschritt). Zeiger: Button-Rechtecke werden EINMAL nach dem Oeffnen gemessen. */
 (function (N) {
   var U = N.util;
@@ -58,7 +59,7 @@
   /* Beenden-Dialog (SPEC 6.2) */
   function exitApp() {
     open({ title: N.t('dlg.exit.title'), text: N.t('dlg.exit.text'),
-      buttons: [{ id: 'cancel', t: N.t('dlg.exit.cancel') }, { id: 'exit', t: N.t('dlg.exit.confirm') }], focus: 0,
+      buttons: [{ id: 'exit', t: N.t('dlg.exit.confirm') }, { id: 'cancel', t: N.t('dlg.exit.cancel') }], focus: 1,
       onSelect: function (id) { if (id === 'exit') N.app.exit(); } });
   }
   N.ui.dialog = { open: open, exitApp: exitApp };

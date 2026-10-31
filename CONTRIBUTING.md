@@ -77,3 +77,9 @@ So they are part of every change:
   RFC 5737 examples (192.0.2.x) and invented demo titles.
 - Community ports: one entry in [`ports.json`](ports.json) (format [`ports.schema.json`](ports.schema.json)); please read
   the policy in [`PORTS.md`](PORTS.md) first.
+- TV systems with a download from this repository: one [`platforms/<id>/platform.json`](platforms/samsung-orsay/platform.json)
+  each (format [`platforms/platforms.schema.json`](platforms/platforms.schema.json)). The table "Which TVs work?" in the
+  READMEs and on the website is generated from these files by `npm run spec` – never edit it by hand. The folder name must
+  equal `id`, the installation guide must exist (new systems: `docs/install/<id>.md`, Samsung 2014 keeps `docs/INSTALL.md`),
+  and `lastTested` is only updated after a test on a real TV. One app for all media servers: support for another server
+  goes into the same app (`mediaServers`), never as a separate variant.

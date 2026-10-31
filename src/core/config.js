@@ -2,7 +2,7 @@
  * Netz-Standards sind im Repo leer: tools/build.js setzt die lokalen Werte aus local.json (git-ignoriert) ins gebaute app.js. */
 (function (N) {
   var C = {
-    version: '1.0.8',
+    version: '1.0.9',
     product: N.brand.name,
     platform: 'Samsung',
     platformVersion: 'Orsay 2014',

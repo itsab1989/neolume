@@ -146,10 +146,10 @@
       var own = false, i;
       for (i = 0; i < items.length; i++) if (removable(items[i])) own = true;
       if (own) {
-        N.ui.dialog.open({ title: N.t('dlg.hrReset.title'), text: N.t('dlg.hrResetOwn.text'), vertical: true, focus: 0,
-          buttons: [{ id: 'cancel', t: N.t('dlg.hrReset.cancel') }, { id: 'keep', t: N.t('dlg.hrResetOwn.keep') }, { id: 'all', t: N.t('dlg.hrResetOwn.all') }],
+        N.ui.dialog.open({ title: N.t('dlg.hrReset.title'), text: N.t('dlg.hrResetOwn.text'), vertical: true, focus: 2,
+          buttons: [{ id: 'own', t: N.t('dlg.hrResetOwn.keep') }, { id: 'all', t: N.t('dlg.hrResetOwn.all') }, { id: 'cancel', t: N.t('dlg.hrReset.cancel') }],
           onSelect: function (id) {
-            if (dead || (id !== 'keep' && id !== 'all')) return;
+            if (dead || (id !== 'own' && id !== 'all')) return;
             if (id === 'all') S.setSetting(C.setting, null);
             else { var av = avail(); S.setSetting(C.setting, MOD.store(null, av, MOD.view(null, av))); }   // Standard, eigene Reihen aus am Ende
             rebuild(null); hintsNow();
@@ -158,7 +158,7 @@
         return;
       }
       N.ui.dialog.open({ title: N.t('dlg.hrReset.title'), text: N.t(K.resetText),
-        buttons: [{ id: 'cancel', t: N.t('dlg.hrReset.cancel') }, { id: 'ok', t: N.t('dlg.hrReset.confirm') }], focus: 0,
+        buttons: [{ id: 'ok', t: N.t('dlg.hrReset.confirm') }, { id: 'cancel', t: N.t('dlg.hrReset.cancel') }], focus: 1,
         onSelect: function (id) {
           if (id !== 'ok') return;
           S.setSetting(C.setting, null);
@@ -187,7 +187,7 @@
       var it = items[f];
       if (!removable(it)) return;
       N.ui.dialog.open({ title: N.t('dlg.hrRemove.title'), text: N.t('dlg.hrRemove.text', { row: label(it) }),
-        buttons: [{ id: 'keep', t: N.t('dlg.hrRemove.keep') }, { id: 'ok', t: N.t('dlg.hrRemove.confirm') }], focus: 0,
+        buttons: [{ id: 'ok', t: N.t('dlg.hrRemove.confirm') }, { id: 'keep', t: N.t('dlg.hrRemove.keep') }], focus: 1,
         onSelect: function (id) {
           if (id !== 'ok' || dead) return;
           var out = [], l = saved() || MOD.view(null, avail()), i;

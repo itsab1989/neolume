@@ -26,6 +26,8 @@
  *   test-results  requirement ID – missing or unknown IDs fail the check) + the results template
  *   ports         ports.json (validated against ports.schema.json) -> PORTS.md table and docs/index.html section;
  *                 ports with an older specVersion are marked automatically
+ *   platforms     platforms/<id>/platform.json (validated against platforms/platforms.schema.json) -> table "Which TVs
+ *                 work?" in README.md, README.de.md, docs/index.html (private repo: also its own README.md)
  *   prompt        the starter prompt for an AI agent: written once in <!-- hand:prompt --> of PORTING-WITH-AI.md, copied into
  *                 README.md, README.de.md (gen:prompt) and the website docs/index.html, docs/port.html (gen:prompt-html)
  * Hand-written entries live between <!-- hand:NAME --> … <!-- /hand:NAME --> as table rows starting with "| `id` |".
@@ -499,6 +501,95 @@ function genPortsHtml(specText) {
   return { text: o.join('\n'), ids: [] };
 }
 
+/* ---------------------------------------------------------------- TV systems with a download (platforms/<id>/platform.json) */
+/* One platform.json per TV system the maintainer offers a download for (multi-platform plan, step 0). The table "Which TVs
+ * work?" in the READMEs and on the website is generated from them; ports.json stays the list of other people's apps. */
+var PLAT_STATUS = {
+  en: { 'maintainer-tested': '✅ tested on a real TV by the maintainer', 'community-tested': '🟡 tested by a contributor (not by the maintainer)',
+    experimental: '🧪 experimental – no download yet', planned: '⬜ planned' },
+  de: { 'maintainer-tested': '✅ vom Entwickler an einem echten Gerät getestet', 'community-tested': '🟡 von einem Mitwirkenden getestet (nicht vom Entwickler)',
+    experimental: '🧪 im Versuch – noch kein Download', planned: '⬜ geplant' }
+};
+function platformsData(specText) {
+  var dir = pub('platforms'), errs = [], list = [], schema;
+  try { schema = JSON.parse(rd(dir + '/platforms.schema.json')); } catch (e) { return { errs: [dir + '/platforms.schema.json: missing or not valid JSON – ' + e.message], list: [], ports: 0 }; }
+  var areas = Object.keys(specIndex(specText).sections).filter(function (k) { return /^A\d+$/.test(k); }), cur = appVersion();
+  fs.readdirSync(path.join(ROOT, dir)).sort().forEach(function (id) {
+    var file = dir + '/' + id + '/platform.json', p;
+    if (!fs.statSync(path.join(ROOT, dir, id)).isDirectory()) return;
+    if (!fs.existsSync(path.join(ROOT, file))) { errs.push(dir + '/' + id + '/: folder without platform.json. Add one (format: ' + dir + '/platforms.schema.json) or remove the folder.'); return; }
+    try { p = JSON.parse(rd(file)); } catch (e) { errs.push(file + ': not valid JSON – ' + e.message); return; }
+    var before = errs.length;
+    validate(p, schema, file, errs);
+    if (p.id !== id) errs.push(file + ': "id" is "' + p.id + '" but the folder is "' + id + '" – they must be the same.');
+    if (/plex/i.test(p.name || '')) errs.push(file + ': the name must not contain "Plex" (trademark – see the policy in PORTS.md).');
+    Object.keys(p.guide || {}).forEach(function (k) {
+      if (!fs.existsSync(path.join(ROOT, pub(p.guide[k])))) errs.push(file + ': installation guide ' + p.guide[k] + ' (guide.' + k + ') does not exist. Write it first (new systems: docs/install/' + id + '.md) or fix the path.');
+    });
+    Object.keys(p.features || {}).forEach(function (k) {
+      if (areas.indexOf(k) < 0) errs.push(file + ': feature area "' + k + '" is not a Part A section of SPEC.md (use ' + areas.join(', ') + ').');
+    });
+    if (p.lastTested && vnum(p.lastTested.version) > vnum(cur)) errs.push(file + ': lastTested.version ' + p.lastTested.version + ' is newer than the app version ' + cur + '.');
+    if (p.status === 'maintainer-tested' || p.status === 'community-tested') { if (!p.lastTested) errs.push(file + ': status "' + p.status + '" needs "lastTested" (version, date, testPlan).'); }
+    if (errs.length === before) list.push(p);
+  });
+  if (!list.length && !errs.length) errs.push(dir + '/: no platform.json found – at least the reference system must be described.');
+  var ports = 0;
+  try { ports = (JSON.parse(rd(pub('ports.json'))).ports || []).filter(function (x) { return !x.reference; }).length; } catch (e) {}
+  return { errs: errs, list: list, ports: ports };
+}
+/* lang 'en'|'de'; o.download (markdown link to the download), o.guide (path prefix or URL base for the guides) */
+function platRows(d, lang, o) {
+  var de = lang === 'de', st = PLAT_STATUS[lang];
+  return d.list.map(function (p) {
+    var name = de && p.de && p.de.name || p.name, models = de && p.de && p.de.modelFamilies || p.modelFamilies;
+    var dl = p.status === 'experimental' || p.status === 'planned' || (p.editions && p.editions[o.edition] === false) ? '–' : o.download(p);
+    var g = [];
+    if (p.guide.de && de) g.push('[Deutsch](' + o.guide + p.guide.de + ')');
+    g.push('[' + (de ? 'Englisch' : 'English') + '](' + o.guide + p.guide.en + ')');
+    if (p.guide.de && !de) g.push('[Deutsch](' + o.guide + p.guide.de + ')');
+    var lt = p.lastTested ? p.lastTested.version + ' (' + p.lastTested.date + (p.lastTested.model ? ', ' + p.lastTested.model : '') + ')' : '–';
+    return { name: name, models: models, dl: dl, guide: g.join(' · '), servers: p.mediaServers.map(function (x) { return SERVER_NAME[x] || x; }).join(', '), tested: lt, status: st[p.status] };
+  });
+}
+function platTable(rows, de) {
+  var o = [de ? '| Fernseher-System | Modelle | Download | Anleitung | Medienserver | Zuletzt am echten Gerät getestet | Stand |'
+    : '| TV system | Models | Download | Installation guide | Media servers | Last tested on a real TV | Status |', '|---|---|---|---|---|---|---|'];
+  rows.forEach(function (r) {
+    o.push('| **' + esc(r.name) + '** | ' + r.models.map(esc).join('<br>') + ' | ' + r.dl + ' | ' + r.guide + ' | ' + esc(r.servers) + ' | ' + esc(r.tested) + ' | ' + esc(r.status) + ' |');
+  });
+  return o;
+}
+function genPlatforms(specText, lang) {
+  var d = platformsData(specText), de = lang === 'de';
+  var rows = platRows(d, lang, { edition: 'public', guide: '', download: function (p) {
+    return p.artifact.format === 'setup-program' ? (de ? '[Einrichtungsprogramm](#download) für deinen Computer, enthält die TV-App' : '[Setup program](#download) for your computer – it contains the TV app')
+      : '[' + esc(p.artifact.name.replace('{slug}', JSON.parse(rd('brand/public.json')).slug)) + '](https://github.com/' + repoOf() + '/releases/latest)';
+  } });
+  var o = [de ? 'Für diese Fernseher gibt es einen fertigen Download:' : 'These TVs have a ready-made download:', ''].concat(platTable(rows, de));
+  o.push('', de ? (d.ports ? 'Apps, die andere für weitere Fernseher gebaut haben, stehen in den [Community-Portierungen](PORTS.md) (nur Links).'
+    : 'Für weitere Fernseher gibt es noch keine Community-Portierung – deine könnte die erste sein: [Community-Portierungen](PORTS.md).')
+    : (d.ports ? 'Apps that other people built for more TVs are listed under [community ports](PORTS.md) (links only).'
+      : 'No community port for other TVs yet – yours could be the first: [community ports](PORTS.md).'));
+  return { text: o.join('\n'), ids: [], errs: d.errs };
+}
+/* private README (German): same systems, download from the private release (brand/private.json exists only in the private repo) */
+function genPlatformsPrivate(specText) {
+  var d = platformsData(specText), repo = JSON.parse(rd('brand/private.json')).repo;
+  var rows = platRows(d, 'de', { edition: 'private', guide: PUB, download: function () { return '[neuestes Release](https://github.com/' + repo + '/releases/latest)'; } });
+  return { text: ['Fernseher-Systeme mit fertigem Download (aus `' + PUB + 'platforms/*/platform.json`):', ''].concat(platTable(rows, true)).join('\n'), ids: [] };
+}
+function genPlatformsHtml(specText) {
+  var d = platformsData(specText), base = 'https://github.com/' + repoOf() + '/blob/main/';
+  var o = ['    <div class="table-wrap"><table>', '      <thead><tr><th>TV system</th><th>Models</th><th>Guide</th><th>Media servers</th><th>Last tested on a real TV</th><th>Status</th></tr></thead>', '      <tbody>'];
+  platRows(d, 'en', { edition: 'public', guide: base, download: function () { return ''; } }).forEach(function (r) {
+    var g = r.guide.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (a, t, u) { return '<a href="' + ht(u) + '">' + ht(t) + '</a>'; });
+    o.push('        <tr><td><b>' + ht(r.name) + '</b></td><td>' + r.models.map(ht).join('<br>') + '</td><td>' + g + '</td><td>' + ht(r.servers) + '</td><td>' + ht(r.tested) + '</td><td>' + ht(r.status) + '</td></tr>');
+  });
+  o.push('      </tbody>', '    </table></div>');
+  return { text: o.join('\n'), ids: [] };
+}
+
 /* ---------------------------------------------------------------- starter prompt (one source, several copies) */
 /* The prompt a person pastes into their AI coding agent. Its only hand-written copy is the ```text block in
  * <!-- hand:prompt --> of PORTING-WITH-AI.md (the file the agent reads); the READMEs and the website get generated copies,
@@ -886,16 +977,18 @@ function files() {
     { rel: pub('docs/PORTING-WITH-AI.md'), gen: ['version', 'sources', 'reuse'], refs: 'other' },
     { rel: pub('docs/TEST-PLAN.md'), gen: ['version', 'test-cases', 'test-results'], refs: 'other' },
     { rel: pub('PORTS.md'), gen: ['ports'], refs: 'other' },
-    { rel: pub('docs/index.html'), gen: ['prompt-html', 'ports-html'] },
+    { rel: pub('docs/index.html'), gen: ['platforms-html', 'prompt-html', 'ports-html'] },
     { rel: pub('docs/port.html'), gen: ['prompt-html'] },
-    { rel: pub('README.md'), gen: ['prompt'] },
-    { rel: pub('README.de.md'), gen: ['prompt'] }
-  ];
+    { rel: pub('README.md'), gen: ['platforms', 'prompt'] },
+    { rel: pub('README.de.md'), gen: ['platforms-de', 'prompt'] }
+  ].concat(PUB ? [{ rel: 'README.md', gen: ['platforms-private'] }] : []);   // private repo: its own README (German) too
 }
 function generateAll(read, opts) {
   read = read || rd;
   var problems = [], res = {}, results = [], specRel = pub('docs/SPEC.md'), specText = read(specRel), outSpec = null;
   var gens = { version: genVersion, 'ports-html': function () { return genPortsHtml(specText); }, ports: function () { return genPorts(specText); },
+    platforms: function () { return genPlatforms(specText, 'en'); }, 'platforms-de': function () { return genPlatforms(specText, 'de'); },
+    'platforms-html': function () { return genPlatformsHtml(specText); }, 'platforms-private': function () { return genPlatformsPrivate(specText); },
     prompt: function () { return genPrompt(read); }, 'prompt-html': function () { return genPromptHtml(read); },
     sources: genSources, reuse: genReuse,
     'test-cases': function (t) { return genTestCases(t, specText); }, 'test-results': function (t) { return genTestResults(t, specText); } };
@@ -956,7 +1049,7 @@ function check() {
 }
 module.exports = { generate: generate, generateAll: generateAll, check: check, settingsData: settingsData, routesData: routesData,
   validate: validate, specIndex: specIndex, checkRefs: checkRefs, specReqs: specReqs, testPlanData: testPlanData, genReuse: genReuse,
-  genReview: genReview, reqHash: reqHash, versionProblems: versionProblems, firstDiff: firstDiff, portTags: portTags };
+  genReview: genReview, reqHash: reqHash, versionProblems: versionProblems, firstDiff: firstDiff, portTags: portTags, platformsData: platformsData };
 
 /* npm run spec [-- --ack ID[,ID…]|all]   ·   npm run spec:check */
 function main(argv) {

@@ -22,7 +22,7 @@
   }
   function remove(u, done) {
     N.ui.dialog.open({ title: N.t('dlg.pinRemove.title'), text: N.t('dlg.pinRemove.text', { name: u.name }),
-      buttons: [{ id: 'cancel', t: N.t('dlg.pinRemove.cancel') }, { id: 'rm', t: N.t('dlg.pinRemove.confirm') }], focus: 0,
+      buttons: [{ id: 'rm', t: N.t('dlg.pinRemove.confirm') }, { id: 'cancel', t: N.t('dlg.pinRemove.cancel') }], focus: 1,
       onSelect: function (id) {
         if (id !== 'rm') return;
         if (!N.appPin.remove(u.uuid)) { N.ui.toast.show(N.t('toast.actionFailed'), { icon: 'info' }); return; }

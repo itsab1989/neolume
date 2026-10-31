@@ -21,7 +21,10 @@
     saverPoster: [360, 540], saverSq: [460, 460],   // Schoner "Poster und Cover" (scharf, 1:1 gezeigt)
     backdrop: [640, 360], amb: [320, 180], upnext: [176, 99], chapter: [96, 54], avatar: [160, 160], avatarM: [96, 96], avatarS: [32, 32], cast: [120, 120]
   };
-  var MAX_ACTIVE = 4, PER_FRAME = 2, SHOW_PER_FRAME = 1, REST = 150, REST_FAST = 250;   // perf3: 1 Dekodierung je Frame (TV: 2 Poster = 82-ms-Frame)
+  /* Downloads gleichzeitig: 4, in laengerer Ruhe (>= 1 s ohne Taste/Zeiger, z. B. Kaltstart: Fernseher hat nach dem Beenden der App
+   * keine Bilder mehr im Speicher) 6 (Nutzerbefund 30.10.: erster Start nach dem Beenden laedt Cover/Hintergruende spuerbar langsam;
+   * PMS rechnet ein Poster in ~0,15 s, der Engpass ist die Warteschlange). Dekodier-Budget unveraendert (SHOW_PER_FRAME). */
+  var MAX_ACTIVE = 4, MAX_IDLE = 6, IDLE_REST = 1000, PER_FRAME = 2, SHOW_PER_FRAME = 1, REST = 150, REST_FAST = 250;   // perf3: 1 Dekodierung je Frame (TV: 2 Poster = 82-ms-Frame)
   var jobs = [], ready = [], active = 0, lru = new N.LRU(400), frameT = 0, paused = false, sets = 0, loads = 0;   // sets/loads: Zaehler fuer den Messlauf (P7)
   var dec = null, warmQ = [], warmed = new N.LRU(80), warms = 0, WARM_TTL = 30000;   // Vorab-Dekodieren (s. Kopf); warmed: URL -> Zeit
   /* losgeloestes Bild fuer den Download (Tests ohne DOM: null -> direkt ins <img> wie frueher) */
@@ -132,17 +135,17 @@
     frameT = 0;
     var r = rest(), need = restNeed();
     if (paused || r < need) { if (jobs.length || ready.length || warmNext() >= 0) frameT = setTimeout(pump, paused ? REST : need - r + 10); return; }
-    var n = 0, d = 0, i;
+    var n = 0, d = 0, i, max = r >= IDLE_REST ? MAX_IDLE : MAX_ACTIVE;
     if (ready.length > 1) ready.sort(byPrio);
     while (ready.length && n < SHOW_PER_FRAME) { show(ready.shift()); n++; }   // fertige Downloads zuerst sichtbar machen
     jobs.sort(byPrio);
     for (i = 0; i < jobs.length && n < SHOW_PER_FRAME && d < PER_FRAME;) {      // LRU-Treffer duerfen an wartenden Downloads vorbei
       if (lru.has(jobs[i].url)) { assign(jobs.splice(i, 1)[0]); n++; }
-      else if (active < MAX_ACTIVE) { assign(jobs.splice(i, 1)[0]); d++; }
+      else if (active < max) { assign(jobs.splice(i, 1)[0]); d++; }
       else i++;
     }
     if (n < SHOW_PER_FRAME && warmOne()) n++;                                     // Ruhe uebrig: ein Bild vorab dekodieren
-    if ((jobs.length || ready.length || warmNext() >= 0) && !frameT) frameT = setTimeout(function () { frameT = 0; U.raf(pump); }, ready.length || active < MAX_ACTIVE || !jobs.length ? 16 : 60);
+    if ((jobs.length || ready.length || warmNext() >= 0) && !frameT) frameT = setTimeout(function () { frameT = 0; U.raf(pump); }, ready.length || active < max || !jobs.length ? 16 : 60);
   }
   /* naechster Kandidat zum Vorab-Dekodieren: geladen (LRU) und nicht kuerzlich dekodiert; nicht geladene bleiben in der Liste */
   function warmNext() {

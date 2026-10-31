@@ -18,7 +18,7 @@
       if (it.type === 'show' || it.type === 'season') {
         var show = it.type === 'show', key = (w ? 'dlg.mark' : 'dlg.unmark') + (show ? 'Show' : 'Season');
         N.ui.dialog.open({ title: N.t(key + '.title'), text: N.t(key + '.text', { n: it.leaf, show: o.label || it.title, s: it.s }),
-          buttons: [{ id: 'cancel', t: N.t('dlg.mark.cancel') }, { id: 'ok', t: N.t('dlg.mark.confirm') }], focus: 0,
+          buttons: [{ id: 'ok', t: N.t('dlg.mark.confirm') }, { id: 'cancel', t: N.t('dlg.mark.cancel') }], focus: 1,
           onSelect: function (id) { if (id === 'ok') W.set(it, w, o); } });
         return true;
       }

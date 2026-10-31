@@ -14,7 +14,7 @@
  * - Gelb Kapitel, Blau Sleep-Timer, INFO Technik, Gruen/SUBTITLE Ton & UT. Zeiger: Bewegung zeigt das OSD, alles anklickbar.
  * N.player.play(item, how) ist der Einstieg (Fortsetzen-Frage nach Einstellung). */
 (function (N) {
-  var U = N.util, F = N.fmt, O = N.osd, BAR_X = 96, BAR_W = 1088, BAR_Y = O.BAR_Y, OSD_MS = 5000, START_MS = 3000, MH_Y = 648, MH_H = 36, SKIP_Y = 398;
+  var U = N.util, F = N.fmt, O = N.osd, BAR_X = 96, BAR_W = 1088, BAR_Y = O.BAR_Y, OSD_MS = 4000, START_MS = 3000, MH_Y = 648, MH_H = 36, SKIP_Y = 398;
   function hms(ms) {
     var s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60;
     return (h ? h + ':' + U.pad2(m) : m) + ':' + U.pad2(s % 60);
@@ -30,7 +30,7 @@
 
   N.router.define('player', function (params) {
     var s = { rail: null, wheelKeys: ['LEFT', 'RIGHT'], toastHigh: true, news: 'player' };   // news: HOME-13 an der Stelle der Toasts, nur mit newsPlay und ruhigem Bild   // Toasts oben links (NAV-10), nie ueber der Bedien-Insel
-    var root, vbg, top, t1, t2, clk, bot, played, head, segs, cgs, tm0, tm1, skl, chn, spin, spinT, thumb, thImg, thT, skip, skipT, up, upImg, upTi, upIn, upBar, upBtns = [], sub, subT, sb, sbBg;
+    var root, vbg, osdW, top, t1, t2, clk, bot, played, head, segs, cgs, tm0, tm1, skl, chn, spin, spinT, thumb, thImg, thT, skip, skipT, up, upImg, upTi, upIn, upBar, upBtns = [], sub, subT, sb, sbBg;
     var btnEl = {}, ppIc = null, numB = null, numF = null, lbl, lblT, mh, mhItems = [], mhRects = null;
     var pb = null, sef = null, mk = null, acc = null, item = null, osd = false, osdT = 0, lastSec = -1, queue = null, qTask = null, upF = 0, cdOn = false, skipM = null, btnKind = null;
     var closed = false, cues = null, cueI = -1, subClr = 0, thumbOn = false, thLast = -1, thT0 = 0, thFail = 0, bif = null, bifRaw = null, info = null, onFlush = null, trackMem = null, errOn = false, slow = 0;
@@ -101,11 +101,14 @@
       root = el; U.cls(root, 'pl', true);
       vbg = U.el('div', 'pl-vbg', root, 'display:none');               // nur Vorschau: Platzhalter fuer das Video
       sub = U.el('div', 'pl-sub', root, 'display:none'); subT = U.txt('span', '', sub, '');
-      top = U.el('div', 'pl-top', root, 'display:none');
+      // Weiche Blende (Nutzerwunsch 30.10.): leere, dauerhafte Huelle .pl-osdw blendet (Regel Runde 8 wie #pn-news), Titel- und
+      // Bedien-Insel darin sind eigene Ebenen und bleiben nach dem ersten Zeigen stehen (Regel Runde 6: kein display im Tastenpfad)
+      osdW = U.el('div', 'pl-osdw', root);
+      top = U.el('div', 'pl-top', osdW, 'display:none');
       var ti = U.el('div', 'pl-isl pl-ti', top);
       t1 = U.txt('div', 'pl-t1 ell', ti, ''); t2 = U.txt('div', 'pl-t2 ell', ti, '');
       clk = U.txt('div', 'pl-isl pl-clk', top, '');
-      bot = U.el('div', 'pl-isl pl-bot', root, 'display:none');
+      bot = U.el('div', 'pl-isl pl-bot', osdW, 'display:none');
       var tr = U.el('div', 'pl-tr', bot);                                // Runde 8 (Huellen) am TV schlechter -> wie Runde 7
       segs = U.el('div', 'pl-segs', tr);
       played = U.el('div', 'pl-pl', tr);
@@ -469,7 +472,9 @@
     function showOsd(ms) {
       if (errOn) return;
       if (!osd) {
-        osd = true; U.show(top, true); U.show(bot, true); U.cls(sub, 'up', true); U.cls(root, 'pl-osd', true);
+        osd = true; U.cls(sub, 'up', true); U.cls(root, 'pl-osd', true);
+        if (top.style.display === 'none') { U.show(top, true); U.show(bot, true); U.raf(function () { if (osd) U.cls(osdW, 'on', true); }); }   // erstes Mal: Ebenen anlegen, Blende ab dem naechsten Frame
+        else U.cls(osdW, 'on', true);
         if (pb) paint(pb.t);
         paused();
         setZone(zone, true);
@@ -489,7 +494,7 @@
       // waehrend Spulen oder offenem Panel (Ton & UT, Mehr, Kapitel …) bleibt das OSD stehen
       if (!osd || (force !== true && (acc.active() || trickOn() || N.router.hasOverlay()))) { if (osd) osdT = setTimeout(hideOsd, OSD_MS); return; }
       hov = false; hovMs = -1; U.cls(thumb, 'tonly', false);
-      osd = false; U.show(top, false); U.show(bot, false); U.show(thumb, false); U.show(lbl, false); U.cls(sub, 'up', false); U.cls(root, 'pl-osd', false);
+      osd = false; U.cls(osdW, 'on', false); U.show(thumb, false); U.show(lbl, false); U.cls(sub, 'up', false); U.cls(root, 'pl-osd', false);
       U.cls(skip, 'is-focus', false); U.cls(btnEl[fb], 'is-focus', false); U.cls(bot, 'foc', false);
       zone = 'btn'; fb = 'pp'; quick = false;                   // naechstes Einblenden: Fokus Play/Pause
       N.router.refreshHints();
@@ -1004,10 +1009,11 @@
       transparent(false); U.show(sbBg, true);
       var k = e.kind, kids = N.session.isKid(), txt = N.t('pl.err.' + k + '.text');
       if (kids && (k === 'fileMissing' || k === 'server' || k === 'playback')) txt += ' ' + N.t('kids.askAdult');
-      var btns = k === 'playback' || k === 'busy' ? [{ id: 'retry', t: N.t('err.btn.retry') }, { id: 'lower', t: N.t('err.btn.lower') }] : [{ id: 'back', t: N.t('err.btn.back') }, { id: 'retry', t: N.t('err.btn.retry') }];
+      var btns = k === 'playback' || k === 'busy' ? [{ id: 'retry', t: N.t('err.btn.retry') }, { id: 'lower', t: N.t('err.btn.lower') }] : [{ id: 'retry', t: N.t('err.btn.retry') }, { id: 'back', t: N.t('err.btn.back') }];
       info = e.r || info;
       s.errDetail = e.detail;
-      sb.show({ title: N.t('pl.err.' + k + '.title'), text: txt, buttons: btns, onSelect: function (id) {
+      /* Hauptaktion links, "Zurueck" rechts (NAV-11); Fokus auf "Zurueck", wo Nochmal nichts aendert (Datei fehlt, nicht freigegeben) */
+      sb.show({ title: N.t('pl.err.' + k + '.title'), text: txt, buttons: btns, focus: k === 'fileMissing' || k === 'notAllowed' ? 1 : 0, onSelect: function (id) {
         if (id === 'back') { close(); return; }
         if (id === 'lower') { var q = O.lower(eff('quality'), false); sess.quality = q; N.session.setSetting('quality', q); }
         var at = pb ? pb.t : 0; if (pb) pb.stop('user');
@@ -1207,7 +1213,7 @@
     }
     function subWarn(rk, r, back) {
       N.ui.dialog.open({ title: N.t('dlg.subDl.title'), text: N.t('dlg.subDl.text'), focus: 0, vertical: true,
-        buttons: [{ id: 'cancel', t: N.t('dlg.subDl.cancel') }, { id: 'ok', t: N.t('dlg.subDl.confirm') }], onCancel: back,
+        buttons: [{ id: 'ok', t: N.t('dlg.subDl.confirm') }, { id: 'cancel', t: N.t('dlg.subDl.cancel') }], onCancel: back,
         onSelect: function (id) {
           if (id !== 'ok') { back(); return; }
           N.subSearch.download(rk, r.key, true, function (err) {

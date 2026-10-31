@@ -5,6 +5,34 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.9] - 2026-10-31
+
+### Fixed
+- **Pictures no longer stay missing for a long time after a restart.** After the app was restarted, the start screen could
+  stay without any poster or background for about 15 seconds, although the server was ready at once. The app waits for a
+  short pause after each key press before it loads pictures, and it measured that pause with the TV's clock. If the TV
+  set its clock back right after the start, the app believed a key had just been pressed and waited for as long as the
+  clock had jumped. A clock jump no longer holds anything up.
+
+### Changed
+- **Player controls fade in and out softly.** The controls you get during a video (title, clock, progress bar and buttons)
+  used to pop up and vanish abruptly. They now appear with a very short fade, so they are still there at once when you
+  need them, and disappear with a slightly softer one.
+- **Player controls hide a little sooner.** Without a key press they now disappear after 4 seconds instead of 5. While
+  the video is paused, or while a menu is open, they still stay on screen.
+- **Pictures load faster on the first start.** When the app starts again after you closed it, the TV has forgotten all
+  pictures and fetches every poster and background anew. While you are not pressing any keys, the app now downloads up to
+  6 pictures at the same time instead of 4, so the start screen fills up sooner. As soon as you use the remote it goes
+  back to 4, so moving around stays smooth.
+- **Questions have the same button order everywhere.** In every question the main action (for example "Exit",
+  "Mark" or "Clear") is now on the left, and "Cancel", "Keep" or "Back" is on the right. Questions that delete something,
+  sign out or leave the app start on the safe button on the right, so a quick OK never does anything you did not want.
+  Back always cancels.
+- **New overview "Which TVs work?"** in the README and on the website: one table shows every TV system with a ready-made
+  download, its installation guide, the media servers and the app version last tested on a real TV.
+
+If controls that glide in softly and a start screen that fills up quickly make your evening a little nicer, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.8] - 2026-10-30
 
 ### Fixed
@@ -504,7 +532,7 @@ that the TV talks only to your own server at home.
 
 If Neolume gives your TV a second life and you'd like to say thanks, a coffee on [Ko-fi](https://ko-fi.com/itsab1989) is always appreciated – entirely optional. ☕
 
-[Unreleased]: https://github.com/itsab1989/neolume/compare/v1.0.6...HEAD
+[Unreleased]: https://github.com/itsab1989/neolume/compare/v1.0.9...HEAD
 [1.0.6]: https://github.com/itsab1989/neolume/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/itsab1989/neolume/compare/v1.0.4...v1.0.5
 [1.0.1]: https://github.com/itsab1989/neolume/compare/v1.0.0...v1.0.1

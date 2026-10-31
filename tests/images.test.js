@@ -69,6 +69,7 @@ test('Hintergrund: unscharfes Poster mittig auf 1280x720 beschnitten, nie verzer
 
 test('Lader: max. 4 gleichzeitig, max. 2 neue src pro Frame, LRU-Treffer sofort', function () {
   var s = setup(), N = s.N, T = s.T, imgs = [];
+  N.idle.touch();                                                    // kurz nach einer Taste: Grenze 4 (in langer Ruhe 6, s. u.)
   for (var i = 0; i < 10; i++) { imgs.push(new Img()); N.img.want(imgs[i], 'http://pms/' + i, 0); }
   T.tick(20);
   var started = imgs.filter(function (m) { return /pms\/\d/.test(m.src); }).length;
@@ -85,6 +86,32 @@ test('Lader: max. 4 gleichzeitig, max. 2 neue src pro Frame, LRU-Treffer sofort'
   var again = new Img(); N.img.want(again, 'http://pms/0', 0); T.tick(50);
   assert.strictEqual(again.src, 'http://pms/0');
   assert.strictEqual(N.img._stats().active, 4);
+});
+
+test('Lader: in laengerer Ruhe (>= 1 s, z. B. Kaltstart) bis zu 6 Downloads, nach einer Taste wieder 4', function () {
+  var s = setup(), N = s.N, T = s.T, imgs = [];
+  T.tick(1100);
+  for (var i = 0; i < 10; i++) { imgs.push(new Img()); N.img.want(imgs[i], 'http://pms/' + i, 0); }
+  T.tick(500);
+  assert.strictEqual(N.img._stats().active, 6);
+  N.idle.touch();                                                    // Taste: laufende Downloads bleiben, neue erst unter 4
+  imgs[0].onload(); imgs[1].onload(); imgs[2].onload();
+  T.tick(100);                                                       // unter 150 ms Ruhe: gar nichts Neues
+  assert.strictEqual(N.img._stats().active, 3);
+  T.tick(200);
+  assert.strictEqual(N.img._stats().active, 4);
+});
+
+test('Uhr springt zurueck (TV stellt die Uhr nach): Bildlader und Idle-Aufgaben warten nicht so lange wie der Sprung (30.10.)', function () {
+  var s = setup(), N = s.N, T = s.T, ran = false;
+  N.idle.touch();
+  T.jump(-15000);                                                    // Nutzerbefund: 15 s keine einzige Bildanfrage nach dem Start
+  var a = new Img(); N.img.want(a, 'http://pms/a', 0);
+  N.idle.add(function () { ran = true; }, 'probe');
+  assert.strictEqual(N.idle.restFor(), 0);                           // Ruhe zaehlt ab jetzt neu, nie negativ
+  T.tick(400);
+  assert.strictEqual(a.src, 'http://pms/a');
+  assert.ok(ran, 'Idle-Aufgabe lief');
 });
 
 test('Lader pausiert waehrend Tasten (150 ms Ruhe) und verwirft recycelte Auftraege', function () {

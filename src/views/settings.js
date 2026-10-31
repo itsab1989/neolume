@@ -378,7 +378,7 @@
         admin && S.pkg && N.pinSettings.setupRow(),
         admin && !S.pkg && { id: 'out', type: 'action', label: 'set.signOut', desc: 'set.signOut.desc', run: function () {
           N.ui.dialog.open({ title: N.t('dlg.account.title'), text: N.t('dlg.account.text'),
-            buttons: [{ id: 'cancel', t: N.t('dlg.account.cancel') }, { id: 'out', t: N.t('dlg.account.confirm') }], focus: 0,
+            buttons: [{ id: 'out', t: N.t('dlg.account.confirm') }, { id: 'cancel', t: N.t('dlg.account.cancel') }], focus: 1,
             onSelect: function (id) { if (id === 'out') { N.session.signOut(); N.router.reset('login'); } } });
         } }
       ]));

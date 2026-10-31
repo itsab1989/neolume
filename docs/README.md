@@ -26,6 +26,7 @@ the agent reads the rest by itself.
 | [Acceptance test plan](TEST-PLAN.md) | One test per requirement for a person with a remote, a 10-minute smoke test, performance and privacy checks |
 | [Design system](../design/README.md) | Colours, type, spacing, motion and layout values ([`tokens.json`](../design/tokens.json)) and the [icons](../design/icons/) |
 | [Screenshots](screenshots/) | Reference pictures of every main screen (English; German ones in [`de/`](screenshots/de/)) |
+| [TV systems](../platforms/platforms.schema.json) | One `platforms/<id>/platform.json` per TV system with a download from this repository; the table "Which TVs work?" in the README is generated from them |
 | [Community ports](../PORTS.md) | Apps others built for their TVs, how to add yours and how to submit it for the collection |
 
 ## Develop and contribute
