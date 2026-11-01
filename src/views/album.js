@@ -258,7 +258,7 @@
       var l = [];
       if (book) l.push({ k: 'yellow', t: res && res.state === 'done' ? 'mu.hint.unheard' : 'mu.hint.heard' });
       if (N.audio.active()) l.push({ k: 'green', t: 'mu.hint.nowPlaying' });
-      l.push({ k: 'blue', t: 'hint.search' }); l.push({ k: 'INFO', t: 'hint.details' }); l.push({ k: 'TOOLS', t: 'hint.options' });
+      l.push(N.disc.blueHint()); l.push({ k: 'INFO', t: 'hint.details' }); l.push({ k: 'TOOLS', t: 'hint.options' });
       return l;
     };
     s.enter = function () {
@@ -279,7 +279,7 @@
     s.railBlur = function () { if (zone === 'btn') { U.cls(btns[bf], 'is-focus', false); U.show(blbl, false); } else if (zone === 'list') list.setFocused(false); };
     s.railFocus = function () { if (zone === 'btn') { U.cls(btns[bf], 'is-focus', true); paintLabel(); } else if (zone === 'list') list.setFocused(true); };
     s.onKey = function (k) {
-      if (k === 'BLUE') { N.router.push('search'); return true; }
+      if (k === 'BLUE') { N.router.push(N.disc.blueView()); return true; }
       if (zone === 'state') { if (sb.onKey(k)) return true; return k !== 'RETURN'; }
       if (k === 'RETURN') { if (zone === 'list') { toBtn(); return true; } N.router.back(); return true; }
       if (k === 'INFO') { showInfo(); return true; }

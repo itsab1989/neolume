@@ -5,6 +5,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.10] - 2026-11-01
+
+### Added
+- **The blue button can open Discover.** A new setting under Settings › Display, "Blue button opens", lets the blue button
+  on Home, in libraries and on detail pages open Discover instead of Search. Discover is the same search, but it also
+  shows movies and shows that are not on your server yet. In kids profiles, and while Discover is switched off, the blue
+  button keeps opening Search, and the key hints at the bottom always show where it leads.
+
+If getting from the sofa straight to the movie you still want to see makes your evening a little nicer, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.9] - 2026-10-31
 
 ### Fixed

@@ -21,6 +21,9 @@
       return v === undefined ? D.defaultOn() : v === true;
     },
     defaultOn: function () { return !!(N.session && N.session.isAdmin()); },
+    /* Blaue Taste (Einstellung blueKey, Nutzerwunsch 31.10.): "search" (Standard) oder "discover"; Entdecken aus bzw. Kinderprofil -> Suche */
+    blueView: function () { var S = N.session; return S && S.settings && S.settings.blueKey === 'discover' && D.enabled() ? 'discover' : 'search'; },
+    blueHint: function () { return { k: 'blue', t: D.blueView() === 'discover' ? 'hint.discover' : 'hint.search' }; },
     /* Helfer-Adresse: setup.json (Einrichtung) vor config.json (Entwicklung); nur http:// + private IPv4.
      * Nach erfolgreicher Erkennung die gefundene Adresse (helperBase, s. probeHelper). */
     helper: function () { return helperBase || D.helperConf(); },

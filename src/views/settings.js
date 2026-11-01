@@ -239,9 +239,12 @@
       /* Inspiration anpassen (Entdecken vor der Eingabe, N.insp): gleiche Liste wie "Startseite anpassen" */
       var ir = { id: 'insprows', type: 'action', label: 'set.inspRows', desc: 'set.inspRows.desc', disabled: function () { return !D.enabled(); }, ddesc: 'set.inspRows.off.desc',
         val: function () { return N.tn('set.inspRows.val', inspCount()); }, run: function () { N.router.push('insprows'); } };
-      if (!D.helper()) return [d, { id: 'watchlist', type: 'value', label: 'set.watchlist', desc: 'set.watchlist.none.desc', val: function () { return v('notSetUp'); } }, ir];
+      /* Blaue Taste oeffnet Suche oder Entdecken (Nutzerwunsch 31.10.): haengt an "Entdecken" -> direkt darunter, gedimmt wenn aus */
+      var bk = choice('blueKey', [['search', v('bkSearch'), null, v('bkSearch.s')], ['discover', v('bkDisc'), null, v('bkDisc.s')]]);
+      bk.disabled = function () { return !D.enabled(); }; bk.ddesc = 'set.blueKey.off.desc'; bk.help = 'help.blueKey';
+      if (!D.helper()) return [d, bk, { id: 'watchlist', type: 'value', label: 'set.watchlist', desc: 'set.watchlist.none.desc', val: function () { return v('notSetUp'); } }, ir];
       D.probeHelper(function () { paintAll(); });
-      return [d, { id: 'watchlist', type: 'toggle', label: 'set.watchlist', desc: 'set.watchlist.desc',
+      return [d, bk, { id: 'watchlist', type: 'toggle', label: 'set.watchlist', desc: 'set.watchlist.desc',
         get: function () { return D.watchlistOn(); }, set: function (x) { S.setSetting('watchlist', x); },
         disabled: function () { return D.helperState() === 'down' || !D.enabled(); },
         ddesc: function () { return D.helperState() === 'down' ? 'set.watchlist.down.desc' : 'set.watchlist.off.desc'; } }, ir].concat(hideRows());

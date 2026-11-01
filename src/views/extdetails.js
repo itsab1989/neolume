@@ -154,7 +154,7 @@
       switch (k) {
         case 'INFO': info(); return true;
         case 'RETURN': N.router.back(); return true;
-        case 'BLUE': N.router.push('search'); return true;
+        case 'BLUE': N.router.push(N.disc.blueView()); return true;
         case 'DOWN': if (zone === 'btn') toRow(); return true;
         case 'UP': if (zone === 'row') toBtn(); return true;
       }

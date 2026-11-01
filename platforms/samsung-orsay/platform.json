@@ -18,7 +18,7 @@
   "artifact": { "format": "setup-program", "name": "{slug}-setup-{os}-{arch}", "signing": "none" },
   "mediaServers": ["plex"],
   "status": "maintainer-tested",
-  "lastTested": { "version": "1.0.9", "date": "2026-10-31", "model": "UE48H8000", "testPlan": "release" },
+  "lastTested": { "version": "1.0.10", "date": "2026-11-01", "model": "UE48H8000", "testPlan": "release" },
   "guide": { "en": "docs/INSTALL.md", "de": "docs/INSTALL.de.md" },
   "maintainer": "itsab1989",
   "features": {

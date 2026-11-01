@@ -549,12 +549,12 @@
 
     /* ---------- Hinweisleiste ---------- */
     s.hints = function () {
-      if (sb.on && zone === 'state') return [{ k: 'blue', t: 'hint.search' }, { k: 'ret', t: 'hint.back' }];
+      if (sb.on && zone === 'state') return [N.disc.blueHint(), { k: 'ret', t: 'hint.back' }];
       var it = zone === 'grid' ? cur() : null, list = [];
       if (mode() === 'lib' || xPanel()) list.push({ k: 'red', t: 'hint.sort' });
       else if (viewOnly()) list.push({ k: 'red', t: 'hint.view' });
       if (it && !it.ext && M.isVideo(it)) list.push({ k: 'yellow', t: M.watched(it) ? 'hint.markUnwatched' : 'hint.markWatched' });
-      list.push({ k: 'blue', t: 'hint.search' });
+      list.push(N.disc.blueHint());
       if (it) list.push({ k: 'INFO', t: 'hint.details' });
       if (list.length < 5) list.push({ k: 'TOOLS', t: 'hint.options' });
       return list;
@@ -632,7 +632,7 @@
     s.onKey = function (k) {
       keyed = true;
       if (N.keys.isDigit(k)) { if (zone === 'grid' || zone === 'reg') digit(k); return true; }
-      if (k === 'BLUE') { N.router.push('search'); return true; }
+      if (k === 'BLUE') { N.router.push(N.disc.blueView()); return true; }
       if (zone === 'state') {
         if (sb.onKey(k)) return true;
         if (k === 'UP' && chips.length) { zone = 'chips'; setChip(cf, true); N.router.refreshHints(); return true; }

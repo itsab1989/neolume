@@ -401,3 +401,19 @@ test('Reihe "Deine Merkliste": EIN GUID-Abgleich am PMS, eigene Titel abspielbar
     });
   } finally { N.plex.get = plex; }
 });
+
+test('Blaue Taste (blueKey): Entdecken nur, wenn eingestellt UND Entdecken an; Kinderprofil/aus -> Suche, Hinweis passend', function () {
+  var S = N.session, kid = S.isKid, adm = S.isAdmin;
+  S.isKid = function () { return false; }; S.isAdmin = function () { return true; };
+  prof({ uuid: 'a' });
+  assert.strictEqual(D.blueView(), 'search');                                  // Standard
+  S.settings = { blueKey: 'discover' };
+  assert.strictEqual(D.blueView(), 'discover');
+  H.eq(D.blueHint(), { k: 'blue', t: 'hint.discover' });
+  S.settings = { blueKey: 'discover', discover: false };                        // Entdecken aus -> Suche
+  assert.strictEqual(D.blueView(), 'search');
+  H.eq(D.blueHint(), { k: 'blue', t: 'hint.search' });
+  S.settings = { blueKey: 'discover' }; S.isKid = function () { return true; };  // Kinderprofil -> Suche
+  assert.strictEqual(D.blueView(), 'search');
+  S.isKid = kid; S.isAdmin = adm;
+});

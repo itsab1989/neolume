@@ -190,7 +190,7 @@
       if (sb.on) return [{ k: 'ret', t: 'hint.back' }];
       var l = [];
       if (N.audio.active()) l.push({ k: 'green', t: 'mu.hint.nowPlaying' });
-      l.push({ k: 'blue', t: 'hint.search' }); l.push({ k: 'INFO', t: 'hint.details' });
+      l.push(N.disc.blueHint()); l.push({ k: 'INFO', t: 'hint.details' });
       return l;
     };
     s.enter = function () {
@@ -211,7 +211,7 @@
     s.railFocus = function () { var z = zone; if (z === 'state') return; zone = '';   // Fehlermeldung bleibt fokussiert (Review 1.0.5)
       if (z === 'btn') { zone = 'btn'; U.cls(btns[bf], 'is-focus', true); } else to(z); };
     s.onKey = function (k) {
-      if (k === 'BLUE') { N.router.push('search'); return true; }
+      if (k === 'BLUE') { N.router.push(N.disc.blueView()); return true; }
       if (zone === 'state') { if (sb.onKey(k)) return true; return k !== 'RETURN'; }
       if (k === 'RETURN') { if (zone !== 'btn') { to('btn'); return true; } N.router.back(); return true; }
       if (k === 'INFO') { if (zone === 'row') { var a = rows[ri].item(rows[ri].f); if (a) MU.open(a); } else btnAct('more'); return true; }

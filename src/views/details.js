@@ -741,9 +741,9 @@
       /* Rot/Gruen nur, wo sie etwas tun: Knoepfe und echte Folgen (TV-Test 29.10.: auf dem Reiter einer ganz fehlenden Staffel stand
        * "Von vorne / Ton & UT"; in der Reiter-Zeile tun beide nichts) */
       var x = focusedItem(), list = zone === 'btn' || (zone === 'eps' && x) ? [{ k: 'red', t: 'hint.fromStart' }, { k: 'green', t: 'hint.tracks' }] : [];
-      if (zone === 'row' && x && x.ext) return [{ k: 'OK', t: 'hint.details' }, { k: 'blue', t: 'hint.search' }];   // Karte ausserhalb des Servers: nur Details
+      if (zone === 'row' && x && x.ext) return [{ k: 'OK', t: 'hint.details' }, N.disc.blueHint()];   // Karte ausserhalb des Servers: nur Details
       if (x && M.isVideo(x)) list.push({ k: 'yellow', t: M.watched(x) ? 'hint.markUnwatched' : 'hint.markWatched' });
-      list.push({ k: 'blue', t: 'hint.search' });
+      list.push(N.disc.blueHint());
       if (list.length < 5) list.push({ k: 'INFO', t: 'hint.details' });
       if (xt && xt.hints) list = xt.hints(zone === 'eps' ? eps[epRow.f] : null, list) || list;
       return list;
@@ -793,7 +793,7 @@
     };
     s.onKey = function (k) {
       if (arrowH >= 0) hoverArrow(-1);                    // Taste: wieder der normale Reiter-Fokus
-      if (k === 'BLUE') { N.router.push('search'); return true; }
+      if (k === 'BLUE') { N.router.push(N.disc.blueView()); return true; }
       if (zone === 'state') { if (sb.onKey(k)) return true; return k !== 'RETURN'; }
       if (k === 'RETURN') { N.router.back(); return true; }
       if (k === 'DOWN') { down(); return true; }

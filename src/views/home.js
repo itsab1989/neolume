@@ -232,15 +232,15 @@
     /* ---------- Hinweisleiste (Kontextwechsel, Idle-Queue) ---------- */
     function updateHints() { N.router.refreshHints(); }
     s.hints = function () {
-      if (sb.on) return sb.ids.length ? [{ k: 'ret', t: 'hint.exit' }] : [{ k: 'blue', t: 'hint.search' }, { k: 'ret', t: 'hint.exit' }];
-      if (!rows.length) return [{ k: 'blue', t: 'hint.search' }];      // Lade-Skelett: keine Karten-Aktionen
+      if (sb.on) return sb.ids.length ? [{ k: 'ret', t: 'hint.exit' }] : [N.disc.blueHint(), { k: 'ret', t: 'hint.exit' }];
+      if (!rows.length) return [N.disc.blueHint()];      // Lade-Skelett: keine Karten-Aktionen
       var it = curItem(), list = [];
-      if (it && it.ext) return [{ k: 'OK', t: 'hint.details' }, { k: 'blue', t: 'hint.search' }];   // Erweiterungs-Karte: nur Details
-      if (it && it.all) return [{ k: 'OK', t: 'hint.showAll' }, { k: 'blue', t: 'hint.search' }];   // HOME-14 "Alle anzeigen"
-      if (!it && rows[R] && rows[R].note) return [{ k: 'blue', t: 'hint.search' }];   // Hinweis-Reihe ohne Karten
+      if (it && it.ext) return [{ k: 'OK', t: 'hint.details' }, N.disc.blueHint()];   // Erweiterungs-Karte: nur Details
+      if (it && it.all) return [{ k: 'OK', t: 'hint.showAll' }, N.disc.blueHint()];   // HOME-14 "Alle anzeigen"
+      if (!it && rows[R] && rows[R].note) return [N.disc.blueHint()];   // Hinweis-Reihe ohne Karten
       if (rows[R] && rows[R].id === 'cw') list.push({ k: 'red', t: 'hint.hide' });
       if (M.isVideo(it)) list.push({ k: 'yellow', t: M.watched(it) ? 'hint.markUnwatched' : 'hint.markWatched' });
-      list.push({ k: 'blue', t: 'hint.search' });
+      list.push(N.disc.blueHint());
       list.push({ k: 'INFO', t: 'hint.details' });
       if (list.length < 5) list.push({ k: 'TOOLS', t: 'hint.options' });
       return list;
@@ -762,7 +762,7 @@
       if (sb.on) {
         if (sb.onKey(k)) return true;
         if (k === 'LEFT') { N.ui.rail.open(); return true; }
-        if (k === 'BLUE') { N.router.push('search'); return true; }
+        if (k === 'BLUE') { N.router.push(N.disc.blueView()); return true; }
         if (k === 'RETURN') { N.ui.dialog.exitApp(); return true; }
         return true;
       }
@@ -777,7 +777,7 @@
         case 'PLAY': openItem(it, true); return true;
         case 'RED': hideCard(); return true;
         case 'YELLOW': toggleWatched(); return true;
-        case 'BLUE': N.router.push('search'); return true;
+        case 'BLUE': N.router.push(N.disc.blueView()); return true;
         case 'INFO': if (it && (it.ext || it.all)) openItem(it, false); else N.details.open(it); return true;
         case 'TOOLS': menu(); return true;
         case 'FF': moveCol(Math.min(sl.count() - 1, f + 5)); return true;
