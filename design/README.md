@@ -168,6 +168,8 @@ Focus is shown by the accent colour plus a scale on a permanent GPU layer. No z-
 | `@fo.row-border@` | `3px` | Border of a settings row (always present, transparent at rest, accent when focused, so focus never changes layout) |
 | `@fo.scale@` | `1.08` | Scale of focused cards, avatars, icon buttons |
 | `@fo.scale-btn@` | `1.04` | Scale of focused text buttons |
+| `@fo.ring-width-ptr@` | `2px` | Focus ring under a mouse/trackpad pointer: thin accent border (keyboard keeps ring-width) |
+| `@fo.scale-ptr@` | `1.03` | Scale of the card under a mouse/trackpad pointer (keyboard keeps scale) |
 
 ## Motion (`@mo.…@`)
 

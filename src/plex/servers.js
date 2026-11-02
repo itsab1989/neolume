@@ -1,10 +1,12 @@
 /* N.srv – "Weitere Server": Plex-Server, die ANDERE fuer dieses Profil freigegeben haben (z. B. der Server eines Freundes;
- * Nutzerwunsch 27.10., docs/research/other-servers.md). Optional: nur, wenn das Einrichtungsprogramm sie in setup.json
- * eingetragen hat (je Profil `servers`, eigener Zugang dieses Profils, nie fremde Tokens). Der eigene Server bleibt davon
- * unberuehrt: N.plex.base/token zeigen immer auf ihn, alles hier ist ein zusaetzlicher Weg.
+ * Nutzerwunsch 27.10., docs/research/other-servers.md). Optional. Am TV nur, wenn das Einrichtungsprogramm sie in setup.json
+ * eingetragen hat (je Profil `servers`, eigener Zugang dieses Profils, nie fremde Tokens). Mit TLS 1.2 ohne setup.json (Apple,
+ * SRV-5) kommt dieselbe Liste aus den plex.tv-Ressourcen des Profils (N.session.otherServers, N.plexConn.others). Der eigene
+ * Server bleibt davon unberuehrt: N.plex.base/token zeigen immer auf ihn, alles hier ist ein zusaetzlicher Weg.
  *
- * - Verbindung: nur http (der TV kann hoechstens TLS 1.1, plex.direct-https geht nicht) -> klappt nur, wenn beim fremden
- *   Server "Sichere Verbindungen: Bevorzugt" eingestellt ist (das Einrichtungsprogramm prueft und erklaert es).
+ * - Verbindung am TV: nur http (der TV kann hoechstens TLS 1.1, plex.direct-https geht nicht) -> klappt nur, wenn beim fremden
+ *   Server "Sichere Verbindungen: Bevorzugt" eingestellt ist (das Einrichtungsprogramm prueft und erklaert es). Mit TLS 1.2:
+ *   https (plex.direct) zuerst entfernt, dann lokal, Relay zuletzt.
  * - Adressen: alle http-Kandidaten aus setup.json; der zuletzt funktionierende zuerst (srv-<profil>.json, ohne Token).
  *   Jede Adresse wird erst mit GET /identity OHNE Token geprueft (machineIdentifier muss passen), erst dann geht das Token
  *   dorthin. Keine passt: Zustand 'down' (nur dieser Server; Bibliothek zeigt eine Meldung), neuer Versuch fruehestens nach
@@ -15,7 +17,7 @@
  * - Speicher-Schluessel, die nur die ratingKey/Bibliotheks-ID kennen (Spurwahl, Anime-Markierung, Bibliotheks-Ansicht), bekommen
  *   fuer fremde Eintraege ein Praefix (N.srv.skey), damit sie nicht mit gleichen Nummern des eigenen Servers kollidieren. */
 (function (N) {
-  var U = N.util, IDT = 5000, LIBT = 20000, RETRY = 30000, MAX_LIBS = 7, TIMEOUT = 25000;   // TV-Test 1.0.4: Internet-Latenz
+  var U = N.util, IDT = 5000, LIBT = 20000, RETRY = 30000, MAX_LIBS = 7, TIMEOUT = 25000, FRESH = 300000;   // TV-Test 1.0.4: Internet-Latenz
   var list = [], byId = {}, uuid = '', ctx = '', gen = 0, startT = 0;
 
   function now() { return U.now(); }
@@ -189,8 +191,10 @@
             if (mid === sv.id) libs(uri); else next();
           });
       }
-      /* optional: frische Adressen ueber den Helfer (plex.tv); nur einmal je Pruefung, nie ein Token an den Helfer */
+      /* optional: frische Adressen ueber den Helfer (plex.tv); nur einmal je Pruefung, nie ein Token an den Helfer.
+       * Mit TLS 1.2 ohne setup.json statt des Helfers direkt von plex.tv (nur im Profil des Kontos, hoechstens alle 5 min). */
       function fromHelper() {
+        if (!helperAsked && N.session && N.session.tlsDirect && N.session.tlsDirect()) { helperAsked = true; fromPlexTv(); return; }
         if (helperAsked || !N.disc || !N.disc.helper || !N.disc.helper()) { sv.base = ''; fin('down'); return; }
         helperAsked = true;
         N.disc.probeHelper(function (ok) {
@@ -201,6 +205,21 @@
             if (n) N.log('srv ' + sv.name + ': ' + n + ' neue Adresse(n) vom Helfer');
             next();
           });
+        });
+      }
+      function fromPlexTv() {
+        var ss = N.session, acc = ss.state.account;
+        if (!ss.profile || !acc || !acc.token || ss.profile.uuid !== acc.uuid || now() - (sv.freshAt || 0) < FRESH) { sv.base = ''; fin('down'); return; }
+        sv.freshAt = now();
+        N.auth.resources(acc.token, function (err, servers) {
+          if (g !== gen) { fin(); return; }
+          var o = err ? [] : N.plexConn.others(servers, ss.state.server && ss.state.server.machineId), n = 0;
+          for (var i = 0; i < o.length; i++) {
+            if (o[i].machineId !== sv.id) continue;
+            for (var j = 0; j < o[i].uris.length; j++) if (sv.uris.indexOf(o[i].uris[j]) < 0) { sv.uris.push(o[i].uris[j]); n++; }
+          }
+          if (n) N.log('srv ' + sv.name + ': ' + n + ' neue Adresse(n) von plex.tv');
+          next();
         });
       }
       next();

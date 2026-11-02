@@ -38,6 +38,16 @@ function load(opts) {
   opts = opts || {};
   var manifest = JSON.parse(fs.readFileSync(path.join(SRC, 'manifest.json'), 'utf8'));
   if (opts.ext && opts.ext.length) manifest = manifest.concat(extModules(opts.ext));
+  // Plattform-Adapter (tools/platform.js; opts.platform oder Standard) direkt hinter dem Vertrag, wie im Bau
+  var plat = require('../../tools/platform.js'), pabs = {}, pi = manifest.indexOf('platform/platform.js');
+  if (pi >= 0) {
+    var pm = plat.modules(opts.platform || plat.DEFAULT);
+    pm.forEach(function (m) { pabs[m.rel] = m.abs; });
+    manifest = manifest.slice(0, pi + 1).concat(pm.map(function (m) { return m.rel; }), manifest.slice(pi + 1));
+  }
+  (opts.ext || []).forEach(function (f) {                  // Plattform-Zusaetze einer Erweiterung, wie im Bau (tools/platform.js extModules)
+    plat.extModules(opts.platform || plat.DEFAULT, f).forEach(function (m) { pabs[m.rel] = m.abs; manifest.push(m.rel); });
+  });
   var ctx = { console: console };
   if (opts.fakeTimers) {
     var T = FakeTimers();
@@ -50,11 +60,12 @@ function load(opts) {
   } else {
     ctx.setTimeout = setTimeout; ctx.clearTimeout = clearTimeout; ctx.setInterval = setInterval; ctx.clearInterval = clearInterval;
   }
+  for (var g in opts.globals || {}) ctx[g] = opts.globals[g];   // z. B. PN_NATIVE (Apple-Adapter liest es beim Laden)
   ctx.window = ctx;
   vm.createContext(ctx);
   manifest.forEach(function (f) {
-    if (opts.only && opts.only.indexOf(f) < 0 && f !== 'core/ns.js') return;
-    vm.runInContext(fs.readFileSync(path.join(SRC, f), 'utf8'), ctx, { filename: f });
+    if (opts.only && opts.only.indexOf(pabs[f] ? 'platform/platform.js' : f) < 0 && f !== 'core/ns.js') return;   // Adapter nur mit dem Vertrag
+    vm.runInContext(fs.readFileSync(pabs[f] || path.join(SRC, f), 'utf8'), ctx, { filename: f });
   });
   return ctx;
 }
@@ -89,4 +100,19 @@ function synthetic(name) { return JSON.parse(fs.readFileSync(path.join(__dirname
 
 function eq(a, b, msg) { var A = require('assert'); if (msg === undefined) A.deepStrictEqual(JSON.parse(JSON.stringify(a)), b); else A.deepStrictEqual(JSON.parse(JSON.stringify(a)), b, msg); }
 
-module.exports = { eq: eq, load: load, FakeTimers: FakeTimers, FakeXHR: FakeXHR, synthetic: synthetic };
+/* Tests, die die Apple-Plattform laden (H.load({ platform: 'apple' })): im oeffentlichen Baum fehlt platforms/apple/ (nie
+ * exportiert) -> dort uebersprungen statt rot. Aufruf: var test = H.appleTest(require('node:test')); */
+var APPLE = fs.existsSync(path.join(__dirname, '..', '..', 'platforms', 'apple', 'adapter'));
+function appleTest(test) {
+  if (APPLE) return test;
+  var NO = /platforms\/apple\/adapter\/ fehlt/, WHY = 'Apple-Plattform fehlt (oeffentlicher Baum)';
+  return function (name, opts, fn) {
+    if (typeof opts === 'function') { fn = opts; opts = {}; }
+    return test(name, opts, function (t) {
+      var r;
+      try { r = fn.apply(this, arguments); } catch (e) { if (NO.test(e && e.message)) return t.skip(WHY); throw e; }
+      return r && typeof r.then === 'function' ? r.then(null, function (e) { if (NO.test(e && e.message)) return t.skip(WHY); throw e; }) : r;
+    });
+  };
+}
+module.exports = { appleTest: appleTest, eq: eq, load: load, FakeTimers: FakeTimers, FakeXHR: FakeXHR, synthetic: synthetic };

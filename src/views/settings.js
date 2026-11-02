@@ -3,12 +3,18 @@
  * Kategorien (Reihenfolge docs/research/settings-order-2026-10-29.md): Wiedergabe, Ton & Untertitel, Anime, Oberflaeche,
  * [Erweiterung], Bildschirmschoner, Profil & Konto (Konto-Aktionen nur Hauptkonto, SPEC 7.15.1), Diagnose, Hilfe & Info – je Kategorie
  * EINE geordnete Liste. Mehr als 6 Zeilen: EIN Listen-Container scrollt per translate3d (Anker 3. Zeile). ◀ von jeder Zeile -> Kategorie; RETURN: Zeile -> Kategorie -> Start bzw. vorheriger Bereich (NAV-5).
- * Listen oeffnen das Auswahl-Panel (keine Wertaenderung per ◀▶). Speichern entprellt ueber N.store. */
+ * Listen oeffnen das Auswahl-Panel (keine Wertaenderung per ◀▶). Speichern entprellt ueber N.store.
+ * Finger/Trackpad (caps.scroll 'free', App.pan -> s.pan): senkrechtes Wischen ueber einer langen Liste verschiebt sie frei unter
+ * dem Finger und laeuft frei aus (N.kinetic, kein Einrasten – Nr. 18; Gummiband an den Enden), der Fokus bleibt; Wischen ueber den Kategorien tut nichts. Nur Tippen setzt
+ * den Fokus. Ein Tipper in den laufenden Schwung haelt ihn an (kein Klick). */
 (function (N) {
-  var U = N.util, CAT_Y = 112, CAT_STEP = 56, ROW_Y = 112, ROW_STEP = 64, MAXROWS = 6;
+  var U = N.util, CAT_Y = 112, CAT_STEP = 56, ROW_Y = 112, ROW_STEP = 64;
   N.router.define('settings', function (params) {
-    var s = { rail: 'settings', wheelKeys: ['UP', 'DOWN'] };
-    var cats = [], catEls = [], rowEls = [], desc, zone = 'cat', c = 0, r = 0, list = null, off = 0, more = null;
+    var s = { rail: 'settings', wheelKeys: ['UP', 'DOWN'], flex: true };
+    // flexible Flaeche (N.screen, nur Apple): die Liste nutzt die Hoehe – je 64 px mehr eine Zeile mehr (TV: 6 Zeilen)
+    var EXTRA = Math.max(0, Math.floor((N.screen.area(true).h - 720) / ROW_STEP)), MAXROWS = 6 + EXTRA, DY = EXTRA * ROW_STEP;
+    var cats = [], catEls = [], cTips = [], rowEls = [], desc, zone = 'cat', c = 0, r = 0, list = null, off = 0, more = null;
+    var kin = null, px = 0, panOn = false, animT = 0, gen = 0, free = false, eat = false;   // freies Scrollen (nur caps.scroll 'free')
     function st() { return N.session; }
     /* Zahl der eingeschalteten Reihen (aus Einstellung + bekannten Bibliotheken/Katalog) */
     function homeCount() {
@@ -40,17 +46,24 @@
     /* zurueck kuerzer als vor (wie Plex/Podcast-Apps): ein zusaetzlicher Wert in derselben Liste statt einer zweiten Zeile */
     function secBF(v) { var st = N.osd.steps(v, 10); return [[v, N.t('set.v.secBF', { b: st.b, f: st.f })]]; }
     function stills() { var o = []; N.osd.STILL.forEach(function (n) { o.push([n, n ? N.tn('set.v.afterEp', n) : v('off')]); }); return o; }
-    function quals() { var o = [], q = N.decision.QUAL; ['20', '12', '8', '4'].forEach(function (k) { o.push([k, N.t('set.v.q', { n: k, r: q[k][1] === '1920x1080' ? '1080p' : '720p' })]); }); return o; }
+    function quals(q) { var o = []; q = q || N.decision.QUAL; ['20', '12', '8', '4'].forEach(function (k) { o.push([k, N.t('set.v.q', { n: k, r: q[k][1] === '1920x1080' ? '1080p' : '720p' })]); }); return o; }
+    /* Grenze ueber das Internet (Weitere Server, eigener Server unterwegs) und – nur auf Geraeten mit Mobilfunk – ueber Mobilfunk;
+     * Werte wie "beim Umwandeln", 8 Mbit/s hier mit 1080p (N.decision.QWAN, seit TV-Test 1.0.4) */
+    function netQuals() {
+      var o = [choice('qualityRemote', quals(N.decision.QWAN))];
+      if (N.platform.caps.cellular) o.push(choice('qualityCell', quals(N.decision.QWAN)));
+      return o;
+    }
     /* Wiedergabe (Reihenfolge docs/research/settings-order-2026-10-29.md 2.2): Fortsetzen, Serien-Abend (Intro … Sleep-Timer),
-     * Qualitaet + Bildformat, Spulen. Ton-Ausgabe (Durchreichen, Verstaerkung) steht unter "Ton & Untertitel". */
+     * Qualitaet (beim Umwandeln, ueber das Internet, [ueber Mobilfunk]) + Bildformat, Spulen. Ton-Ausgabe (Durchreichen, Verstaerkung) steht unter "Ton & Untertitel". */
     function playRows() {
       return [choice('resume', vals(['ask', 'resume', 'start'])), choice('resumeRewind', rewinds()),
         choice('skipIntro', vals(['off', 'button', 'auto'])), choice('skipCredits', vals(['off', 'button', 'auto'])), toggle('autoNext'), countdownRow(),
         choice('stillWatching', stills()), choice('stillTime', hours()), choice('sleepDefault', sleeps()),
-        choice('quality', quals()), toggle('directPlay'), toggle('lowerOffer'),
+        choice('quality', quals())].concat(netQuals(), [toggle('directPlay'), toggle('lowerOffer'),
         choice('aspect', [['auto', v('auto')], ['orig', v('orig')], ['fill', v('fill')], ['43', v('a43')], ['zoom', v('zoom')]]),
         choice('seekArrows', secs([5, 10, 15, 30]).concat(secBF('10/30'))), ffrwRow(), choice('seekFf', secs([10, 30, 60]).concat(secBF('15/30'))),
-        toggle('thumbs'), loupeRow(), loupeStyleRow()];
+        toggle('thumbs'), loupeRow(), loupeStyleRow()]);
     }
     /* Wartezeit vor naechster Folge: wirkt nur mit "Naechste Folge automatisch" (player/markers.js: cd nur bei autoNext) -> sonst gedimmt */
     function countdownRow() {
@@ -318,6 +331,7 @@
         adult && { id: 'railitems', type: 'action', label: 'set.railItems', desc: 'set.railItems.desc',
           val: function () { return N.tn('set.railItems.val', N.ui.rail.order().length); }, run: function () { N.router.push('railitems'); } },
         sectionBackRow(),
+        N.platform.caps.home !== 'tiles' && homeSizeRow(),   // HOME-15: direkt vor der Bibliotheksansicht (gleiche Werte Gross/Mittel/Klein); Kacheln-Startseite (Apple): eigene Masse
         choice('libView', [['L', N.t('lib.view.L')], ['M', N.t('lib.view.M')], ['S', N.t('lib.view.S')], ['list', N.t('lib.view.list')]]),   // Bibliotheksansicht (Feedback-Regel 2)
         accentRow(),
         toggle('backgrounds')].concat(libBgRows(), [
@@ -343,6 +357,15 @@
         toggle('themeMusic'),                         // Titelmelodie (SPEC v2.2, M3b: Standard aus)
         themeVolRow()
       ]), adult ? discRows() : []));                   // P4 Entdecken + Merkliste (Kinderprofile: nicht vorhanden)
+    }
+    /* Kachelgroesse der Startseite (HOME-15): Groß/Mittel/Klein wie die Bibliotheksansicht; Unterzeile = Kacheln je Reihe aus RowMath */
+    function homeSizeRow() {
+      var RM = N.RowMath, o = [];
+      RM.HOME_SIZES.forEach(function (k) {
+        var n = { a: RM.homeGeom(k, 'land').full, b: RM.homeGeom(k, 'poster').full };
+        o.push([k, N.t('lib.view.' + k), null, N.t(k === 'L' ? 'set.v.homeSizeL.s' : 'set.v.homeSize.s', n)]);
+      });
+      return choice('homeSize', o);
     }
     /* Zurueck aus einem Bereich (NAV-5, N.sections): wohin RETURN oben in einem Bereich der Seitenleiste fuehrt; INFO erklaert die Kette */
     function sectionBackRow() {
@@ -417,8 +440,9 @@
         U.el('span', 'bar', ce);
         ce.appendChild(document.createTextNode(N.t('set.cat.' + cats[i].id)));
         catEls.push(ce);
+        cTips.push(N.i18n.has(catKey(i)) ? N.ui.infotip.icon(ce) : null);   // Finger/Maus: ⓘ statt Beschreibungsflaeche (Nr. 28)
       }
-      var clip = U.el('div', 'set-clip', root);
+      var clip = U.el('div', 'set-clip', root, DY ? 'height:' + (384 + DY) + 'px' : '');
       list = U.el('div', 'set-list', clip);
       for (i = 0; i < maxRows(); i++) {
         var re = { el: U.el('div', 'set-row', list, 'display:none;top:' + (i * ROW_STEP) + 'px') };
@@ -427,22 +451,73 @@
         re.tg = U.el('div', 'toggle', re.el); U.el('i', '', re.tg);
         re.sw = U.el('span', 'sw', re.el);              // Farbfeld (nur Zeilen mit sw, z. B. Akzentfarbe)
         U.el('div', 'sep', re.el);
+        re.tip = N.ui.infotip.icon(re.el);              // nur Plattformen mit umschaltbarer Eingabeart (am TV null)
+        if (re.tip) U.cls(re.el, 'itr', true);
         rowEls.push(re);
       }
       desc = U.txt('div', 'set-desc', root, '');
+      if (DY) desc.parentNode.style.top = (528 + DY) + 'px';
       /* Mehr-Hinweis (NAV-11, Nutzer-Befund 29.10.: unter "Bildübergang" ging die Liste ohne jeden Hinweis weiter): ▲ in der Luecke
        * ueber der ersten Zeile, ▼ zwischen Liste (bis y 496) und Beschreibung (ab y 528), mittig ueber der Liste */
-      more = N.ui.more(root, 'left:818px;top:84px', 'left:818px;top:498px');
+      more = N.ui.more(root, 'left:818px;top:84px', 'left:818px;top:' + (498 + DY) + 'px');
     };
     function rowsOf() { return cats[c].rows; }
     function maxRows() { var n = 0; for (var i = 0; i < cats.length; i++) n = Math.max(n, cats[i].rows.length); return n; }
     function paintAll() { for (var k = 0; k < rowEls.length; k++) paintRow(k); if (zone === 'row') setDesc(); }
     /* Liste scrollen: Fokus-Anker = 3. Zeile, nie ueber das Ende hinaus */
     function scrollTo(i) {
+      var snap = free;                                  // nach freiem Scrollen (Lage zwischen Zeilen): Tasten rasten wieder ein (TV: nie)
+      if (free) { stopAnim(); free = false; list.style.webkitTransition = ''; off = rowAt(); }
       var o = Math.max(0, Math.min(i - 2, rowsOf().length - MAXROWS));
-      if (o !== off) { off = o; N.fx.move(list); U.tf(list, 0, -off * ROW_STEP); }
+      if (o !== off || (snap && px !== o * ROW_STEP)) { off = o; px = off * ROW_STEP; N.fx.move(list); U.tf(list, 0, -off * ROW_STEP); }
       more.set(off > 0, off + MAXROWS < rowsOf().length);
     }
+    /* ---- freies Scrollen (App.pan) ---- */
+    function maxPx() { return Math.max(0, rowsOf().length - MAXROWS) * ROW_STEP; }
+    function setPx(p) {
+      px = p;
+      U.tf(list, 0, -Math.round(p * 100) / 100);           // nicht auf ganze px: Feder/Ausklingen sonst in Treppenstufen
+      more.set(p > 0.5, p < maxPx() - 0.5);
+    }
+    function now() { return U.now(); }                 // gleiche Uhr wie e.t des Laders (Date, ms)
+    function stopAnim() { animT = 0; gen++; if (kin) kin.stop(); }
+    function rowAt() { return Math.max(0, Math.min(Math.round(px / ROW_STEP), rowsOf().length - MAXROWS)); }
+    /* Ruhe (Nr. 18: kein Einrasten): die Liste bleibt, wo sie ausgelaufen ist (innerhalb der Grenzen); Treffer rechnen mit px */
+    function settle() {
+      stopAnim();
+      setPx(Math.max(0, Math.min(maxPx(), px)));
+      off = rowAt();
+    }
+    function run() { var g = gen; animT = 1; U.raf(function (ts) { if (g === gen) tick(ts); }); }
+    function tick(ts) {
+      if (kin.step(N.kinetic.frameTime(ts, now))) setPx(kin.pos);   // Frame-Zeitstempel (60/120 Hz gleichmaessig)
+      if (kin.ph.length) run(); else settle();
+    }
+    s.pan = function (e) {
+      if (e.phase === 'start') {
+        panOn = e.axis === 'y' && e.x >= 464 && e.x < 1200 && e.y >= ROW_Y && e.y < ROW_Y + MAXROWS * ROW_STEP && maxPx() > 0;
+        if (!panOn) return true;                          // Kategorien, kurze Liste: Zug annehmen und nichts tun (kein Rueckfall auf Fokus-Schritte)
+        stopAnim();
+        free = true;
+        if (!kin && N.kinetic) kin = new N.kinetic.Scroller({ snap: 0, dim: MAXROWS * ROW_STEP });   // Nr. 18: frei auslaufen, Gummiband an den Enden
+        if (kin) { kin.setMax(maxPx(), MAXROWS * ROW_STEP); kin.pos = px; kin.grab(e.t); }
+        panOn = { y0: px, dy: 0 };
+        list.style.webkitTransition = 'none';            // folgt dem Finger ohne Nachgleiten
+        return true;
+      }
+      if (!panOn) return true;
+      var d = -(e.dy - panOn.dy);                         // Finger nach oben -> Inhalt nach oben (Lage waechst)
+      panOn.dy = e.dy;
+      if (e.phase === 'move') {
+        if (kin) { kin.move(d, e.t); setPx(kin.pos); } else setPx(Math.max(0, Math.min(maxPx(), panOn.y0 - e.dy)));
+        return true;
+      }
+      panOn = false;                                      // end
+      if (!kin || e.cancel) { settle(); return true; }
+      kin.up(e.t);
+      if (kin.ph.length) run(); else settle();
+      return true;
+    };
     function paintRow(i) {
       var d = rowsOf()[i], re = rowEls[i];
       if (!d) { U.show(re.el, false); return; }
@@ -463,9 +538,22 @@
       off = -1; scrollTo(0);
     }
     function setDesc() {
-      if (zone === 'cat') { U.setText(desc, N.t(cats[c].desc || 'set.cat.' + cats[c].id + '.desc')); return; }
+      if (zone === 'cat') { U.setText(desc, N.t(catKey(c))); return; }
       var d = rowsOf()[r];
       U.setText(desc, N.t(descKey(d)));
+    }
+    function catKey(i) { return cats[i].desc || 'set.cat.' + cats[i].id + '.desc'; }
+    /* Text wie INFO: Hilfe (bzw. info()) einer aktiven Zeile, sonst die Beschreibung (gedimmt: warum) */
+    function infoText(d) { var on = !(d.disabled && d.disabled()); return d.info && on ? d.info() : N.t(d.help && on ? d.help : descKey(d)); }
+    /* Info-Symbol (Finger/Maus, N.ui.infotip): Blase mit dem Text am Symbol; Lage aus Zeilen-Mathe (Mitte des 32er-Symbols) */
+    var TIP_X = 1168, TIP_CX = 400;
+    function scrollPx() { return free ? px : off * ROW_STEP; }
+    function rowTip(i) {
+      var d = rowsOf()[i];
+      if (d) N.ui.infotip.open({ title: N.t(d.label), text: infoText(d), x: TIP_X, y: ROW_Y + i * ROW_STEP - scrollPx() + 32, flex: true, el: rowEls[i].tip });
+    }
+    function catTip(i) {
+      N.ui.infotip.open({ title: N.t('set.cat.' + cats[i].id), text: N.t(catKey(i)), x: TIP_CX, y: CAT_Y + i * CAT_STEP + 24, flex: true, el: cTips[i] });
     }
     function descKey(d) { return d.disabled && d.disabled() && d.ddesc ? (typeof d.ddesc === 'function' ? d.ddesc() : d.ddesc) : d.desc; }
     function focusCat(i) {
@@ -516,26 +604,42 @@
       if (k === 'UP' || k === 'DOWN') { n = N.nav.list(r, rowsOf().length, k, true); if (n >= 0) focusRow(n); }
       else if (k === 'LEFT' || k === 'RETURN') focusCat(c);
       else if (k === 'ENTER') activate();
-      else if (k === 'INFO') { var d = rowsOf()[r], on = !(d.disabled && d.disabled()); N.ui.panel.help(N.t(d.label), d.info && on ? d.info() : N.t(d.help && on ? d.help : descKey(d))); }   // info(): fertiger Text (z. B. mit Werten)
+      else if (k === 'INFO') N.ui.panel.help(N.t(rowsOf()[r].label), infoText(rowsOf()[r]));   // info(): fertiger Text (z. B. mit Werten)
       return true;
     };
-    /* Zeiger: Kategorien und Zeilen per Index-Mathe */
+    /* Zeiger: Kategorien und Zeilen per Index-Mathe. Finger/Maus (Nr. 28): Treffer auf dem ⓘ (Kategorie x 376–444, Zeile
+     * x 1136–1216, je volle Zeilenhoehe >= 44 pt) oeffnet nur die Info-Blase – kein Umschalten, keine Auswahl */
     s.pointer = function (x, y, kind) {
-      var i;
-      if (x >= 144 && x < 424) {
-        i = N.hit.list(CAT_Y, CAT_STEP, 48, cats.length, y);
-        if (i < 0) return false;
+      var i, tip = N.ui.infotip.on();
+      if (animT) { settle(); eat = true; return true; }   // Tipper in den Schwung: nur anhalten (wo er gerade ist)
+      if (eat) { eat = kind !== 'click'; return true; }
+      if (x >= 144 && x < (tip ? 444 : 424)) {
+        i = N.hit.list(CAT_Y, CAT_STEP, tip ? CAT_STEP : 48, cats.length, tip ? y + 4 : y);
+        if (i < 0) { N.ui.infotip.hover(null); return false; }
+        if (tip && cTips[i] && x >= 376) { N.ui.infotip.hover(cTips[i]); if (kind === 'click') catTip(i); return true; }
+        N.ui.infotip.hover(null);
+        if (x >= 424) return false;
         if (zone !== 'cat' || i !== c) focusCat(i);
         return true;
       }
-      if (x >= 464 && x < 1200) {
-        i = N.hit.list(ROW_Y, ROW_STEP, 64, Math.min(MAXROWS, rowsOf().length - off), y);
-        if (i < 0) return false;
-        i += off;
+      if (x >= 464 && x < (tip ? 1216 : 1200)) {
+        if (free) {                                       // frei gescrollt: Zeile per Pixel-Lage (auch angeschnittene)
+          if (y < ROW_Y || y >= ROW_Y + MAXROWS * ROW_STEP) return false;
+          i = Math.floor((y - ROW_Y + px) / ROW_STEP);
+          if (i < 0 || i >= rowsOf().length) return false;
+        } else {
+          i = N.hit.list(ROW_Y, ROW_STEP, 64, Math.min(MAXROWS, rowsOf().length - off), y);
+          if (i < 0) return false;
+          i += off;
+        }
         if (zone !== 'row' || i !== r) focusRow(i, true);
+        if (tip && rowEls[i].tip && x >= 1136) { N.ui.infotip.hover(rowEls[i].tip); if (kind === 'click') rowTip(i); return true; }
+        N.ui.infotip.hover(null);
+        if (x >= 1200) return true;
         if (kind === 'click') activate();
         return true;
       }
+      N.ui.infotip.hover(null);
       return false;
     };
     return s;

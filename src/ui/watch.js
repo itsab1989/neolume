@@ -34,7 +34,7 @@
         restore(it, sn); if (o.reverted) o.reverted(it); undo = null;
         N.ui.toast.show(N.t('toast.actionFailed'));
       });
-      N.ui.toast.show(N.t(w ? 'toast.markedWatched' : 'toast.markedUnwatched'), { undo: true, icon: 'confirm' });
+      N.ui.toast.show(N.t((w ? 'toast.markedWatched' : 'toast.markedUnwatched') + N.ui.toast.tapSuffix()), { undo: true, icon: 'confirm' });
       undo = { until: U.now() + 6000, revert: function () {
         restore(it, sn); if (o.reverted) o.reverted(it);
         scrobble(it, !w, function () {});

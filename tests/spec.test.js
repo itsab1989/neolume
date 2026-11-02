@@ -38,7 +38,9 @@ test('ports.schema.json rejects bad entries; references to unknown requirement I
   p = spec.checkRefs('doc', 'Blocks between `<!-- gen:… -->` markers.\nlist editor (A5.4), see A9.3 and C2.4.\n<!-- gen:x -->\nA77.1\n<!-- /gen:x -->\n', idx, false);
   assert.deepStrictEqual(p.map(function (x) { return /section (\S+),/.exec(x)[1]; }), ['A5.4']);
   // "X-1 … X-n" = all of them: reported when X-(n+1) exists in the same section; a range not starting at 1 is a subset
-  var lastPlay = Object.keys(idx.ids).filter(function (k) { return /^PLAY-\d+$/.test(k); }).map(function (k) { return +k.slice(5); }).sort(function (a, b) { return b - a; })[0];
+  // hoechste PLAY-n, deren Vorgaenger im selben Abschnitt steht (PLAY-34 steht in A9.5 hinter PLAY-27, PLAY-33 in A9.6)
+  var lastPlay = Object.keys(idx.ids).filter(function (k) { return /^PLAY-\d+$/.test(k); }).map(function (k) { return +k.slice(5); })
+    .filter(function (n) { return idx.ids['PLAY-' + (n - 1)] === idx.ids['PLAY-' + n]; }).sort(function (a, b) { return b - a; })[0];
   p = spec.checkRefs('doc', 'PLAY-1 … PLAY-' + (lastPlay - 1) + ', PLAY-3 … PLAY-5, PLAY-1 … PLAY-' + lastPlay, idx, false);
   assert.strictEqual(p.length, 1, p.join('\n'));
   assert.ok(/misses PLAY-/.test(p[0]), p[0]);

@@ -9,7 +9,7 @@
     T.ic = N.ui.icon(T.el, 'info', 's2');
     T.txt = document.createTextNode(''); T.el.appendChild(T.txt);
   };
-  /* show(text, {icon:'info'|'confirm', undo:bool, low:bool}); low fehlt -> wie der oberste Bildschirm (scr.toastLow) */
+  /* show(text, {icon:'info'|'confirm', undo:bool, undoKey:'YELLOW'(Standard)|'RED', low:bool}); low fehlt -> wie der oberste Bildschirm (scr.toastLow) */
   T.show = function (text, o) {
     o = o || {};
     if (!T.el) return;
@@ -22,8 +22,20 @@
     U.cls(T.el, 'high', !!(top && top.toastHigh) && !o.low);
     U.cls(T.el, 'on', true);
     T.timer = setTimeout(T.hide, o.ms || (o.undo ? 6000 : 4000));
+    T.undoKey = o.undo ? o.undoKey || 'YELLOW' : '';
+  };
+  /* Finger/Maus (Apple Nr. 26, keine Hinweisleiste/Farbtasten): Rueckgaengig-Toast antippen = dieselbe Taste; Text-Schluessel mit
+   * Endung 'Tap' ("Tippen: rückgängig"). Rechteck erst beim Klick lesen (nie im Tastenpfad). Am TV nie (N.input.direct false). */
+  T.tapSuffix = function () { return N.input && N.input.direct() ? 'Tap' : ''; };
+  T.tap = function (x, y) {
+    if (!T.timer || !T.undoKey || !N.input.direct()) return false;
+    var e = T.el, l = e.offsetLeft, t = e.offsetTop;
+    if (x < l || x >= l + e.offsetWidth || y < t || y >= t + e.offsetHeight) return false;
+    var k = T.undoKey; T.undoKey = '';
+    N.router.key(k);
+    return true;
   };
   T.on = function () { return !!T.timer; };
-  T.hide = function () { if (T.timer) clearTimeout(T.timer); T.timer = 0; if (T.el) U.cls(T.el, 'on', false); };
+  T.hide = function () { if (T.timer) clearTimeout(T.timer); T.timer = 0; T.undoKey = ''; if (T.el) U.cls(T.el, 'on', false); };
   N.ui.toast = T;
 })(N);

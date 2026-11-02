@@ -73,6 +73,8 @@ So they are part of every change:
   rows first, a row that depends on another (dimmed while that one is off) directly under its parent, information and
   technical rows towards the end, reset, set-up and sign-out rows last. The order you choose is the order of the settings
   table in `docs/SPEC.md` after `npm run spec` – check it there.
+- Platform-specific code goes into `platforms/<id>/adapter/` behind `N.platform` (contract `src/platform/platform.js`); the
+  core branches on `N.platform.caps`, never on a platform name.
 - No real IP addresses, names, tokens or titles from your own media library in commits – use `<TV-IP>`, `<PMS-IP>`,
   RFC 5737 examples (192.0.2.x) and invented demo titles.
 - Community ports: one entry in [`ports.json`](ports.json) (format [`ports.schema.json`](ports.schema.json)); please read

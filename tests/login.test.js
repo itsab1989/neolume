@@ -206,3 +206,167 @@ test('PIN: authExpired-Fehler sperrt nicht', function () {
   for (var i = 0; i < 6; i++) typePin(p, '1111');
   assert.ok(!p.locked()); assert.ok(p.s.error); assert.strictEqual(p.s.tries, 0);
 });
+
+/* ---- Anmeldung direkt am Geraet (caps.webLogin): N.WebLoginFlow ---- */
+function webSetup(api) {
+  var ctx = H.load({ fakeTimers: true }), T = ctx.timers, states = [], win = { opened: [], closed: 0, cb: null };
+  api.webUrl = api.webUrl || function (code) { return 'https://app.plex.tv/auth#?code=' + code; };
+  var f = new ctx.N.WebLoginFlow({ api: api, now: T.now, timers: { set: T.setTimeout, clear: T.clearTimeout },
+    web: { open: function (url, cb) { win.opened.push(url); win.cb = cb; }, close: function () { win.closed++; var c = win.cb; win.cb = null; if (c) c(null, { closed: true, reason: 'closed' }); } },
+    onChange: function (s) { states.push(s.name + (s.notice ? ':' + s.notice : '')); } });
+  return { f: f, T: T, states: states, win: win };
+}
+function pinApi(o) {
+  o = o || {};
+  var a = { polls: 0, strong: [] };
+  a.createPin = function (cb, strong) { a.strong.push(strong); cb(null, { id: 9, code: 'LONGCODE', expiresIn: o.expiresIn || 1800 }); return { abort: function () {} }; };
+  a.checkPin = function (id, cb) { a.polls++; var r = o.check ? o.check(a.polls) : [null, null]; cb(r[0], r[1]); return { abort: function () {} }; };
+  return a;
+}
+
+test('Web-Anmeldung: starke PIN, Anmeldeseite oeffnen, Abfrage alle 2 s, Token -> Fenster zu, authorized', function () {
+  var api = pinApi({ check: function (n) { return [null, n >= 2 ? 'TOK' : null]; } }), s = webSetup(api);
+  s.f.start();
+  assert.deepStrictEqual(api.strong, [true]);
+  assert.deepStrictEqual(s.win.opened, ['https://app.plex.tv/auth#?code=LONGCODE']);
+  assert.strictEqual(s.f.state.name, 'open');
+  s.T.tick(4000);
+  assert.strictEqual(api.polls, 2);
+  assert.strictEqual(s.f.state.name, 'authorized'); assert.strictEqual(s.f.state.token, 'TOK');
+  assert.strictEqual(s.win.closed, 1, 'Fenster per auth.close geschlossen');
+  s.T.tick(10000); assert.strictEqual(api.polls, 2);
+  assert.deepStrictEqual(s.states, ['requesting', 'open', 'authorized']);
+});
+
+test('Web-Anmeldung: Nutzer schliesst das Fenster -> sofort nachsehen; Token da = angemeldet, sonst "abgebrochen"', function () {
+  var tok = null, api = pinApi({ check: function () { return [null, tok]; } }), s = webSetup(api);
+  s.f.start(); s.T.tick(2000);
+  assert.strictEqual(api.polls, 1);
+  s.win.cb(null, { closed: true, reason: 'cancelled' });
+  assert.strictEqual(api.polls, 2, 'sofortige Abfrage beim Schliessen');
+  assert.strictEqual(s.f.state.name, 'idle'); assert.strictEqual(s.f.state.notice, 'cancelled');
+  assert.strictEqual(s.win.closed, 0, 'Fenster war schon zu');
+  s.T.tick(10000); assert.strictEqual(api.polls, 2, 'keine Abfrage mehr');
+  // zweiter Versuch: Anmeldung kurz vor dem Schliessen fertig
+  tok = 'LATE';
+  s.f.start();
+  s.win.cb(null, { closed: true, reason: 'cancelled' });
+  assert.strictEqual(s.f.state.name, 'authorized'); assert.strictEqual(s.f.state.token, 'LATE');
+});
+
+test('Web-Anmeldung: Fenster geht nicht auf, PIN abgelaufen (Zeit/404), viele Fehler, stop() schliesst das Fenster', function () {
+  var s = webSetup(pinApi());
+  s.f.start(); s.win.cb({ code: 'web_failed' });
+  assert.strictEqual(s.f.state.notice, 'failed');
+  s.T.tick(10000); assert.strictEqual(s.f.state.notice, 'failed');
+
+  s = webSetup(pinApi({ expiresIn: 5 }));
+  s.f.start(); s.T.tick(6000);
+  assert.strictEqual(s.f.state.name, 'idle'); assert.strictEqual(s.f.state.notice, 'expired'); assert.strictEqual(s.win.closed, 1);
+
+  s = webSetup(pinApi({ check: function () { return [{ type: 'http', status: 404 }, null]; } }));
+  s.f.start(); s.T.tick(2000);
+  assert.strictEqual(s.f.state.notice, 'expired'); assert.strictEqual(s.win.closed, 1);
+
+  s = webSetup(pinApi({ check: function () { return [{ type: 'network', status: 0 }, null]; } }));
+  s.f.start(); s.T.tick(2000 * 8);
+  assert.strictEqual(s.f.state.name, 'error'); assert.strictEqual(s.f.state.kind, 'proxy'); assert.strictEqual(s.win.closed, 1);
+
+  var api = pinApi(); s = webSetup(api);
+  s.f.start(); s.f.stop();
+  assert.strictEqual(s.win.closed, 1);
+  s.T.tick(10000); assert.strictEqual(api.polls, 0);
+});
+
+test('Web-Anmeldung: Anmeldeseite = app.plex.tv/auth mit clientID, code, Produkt; starke PIN per strong=true', function (t, done) {
+  var s = authSetup(function () { return { status: 201, body: { id: 6, code: 'abc def', expiresIn: 1800 } }; });
+  var u = s.N.auth.webUrl('abc def');
+  assert.strictEqual(u, 'https://app.plex.tv/auth#?clientID=cid-1&code=abc%20def&context%5Bdevice%5D%5Bproduct%5D=Neolume');
+  s.N.auth.createPin(function (err, pin) {
+    assert.ifError(err);
+    assert.strictEqual(pin.code, 'abc def');
+    assert.strictEqual(s.log.opened[0].url, 'http://192.0.2.10:3000/?url=' + encodeURIComponent('https://plex.tv/api/v2/pins?strong=true'));
+    done();
+  }, true);
+});
+
+test('Web-Anmeldung: Plattform wirft beim Oeffnen -> Hinweis "failed" statt ewigem Ladekreis, Abfrage gestoppt', function () {
+  var api = pinApi(), s = webSetup(api);
+  s.f.d.web.open = function () { throw new Error('keine Bruecke'); };
+  s.f.start();
+  assert.strictEqual(s.f.state.name, 'idle'); assert.strictEqual(s.f.state.notice, 'failed');
+  assert.strictEqual(s.win.closed, 0, 'kein Schliessen ohne offenes Fenster');
+  s.T.tick(10000); assert.strictEqual(api.polls, 0);
+});
+
+/* ---- Ansicht 'login' mit caps.webLogin (views/login.js) ohne Browser: Mini-DOM, Plattform und PIN als Attrappe.
+ * iPad 02.11. (Nr. 15): "Mit Plex anmelden" zeigte nur den Ladekreis – webRender schrieb style.left auf den Textknoten der
+ * Statuszeile (U.txt liefert den Textknoten), warf beim ersten Zustand "requesting", die PIN wurde nie angelegt. */
+function MiniDoc() {
+  function El(tag) { this.tagName = tag; this.style = {}; this.childNodes = []; this.className = ''; this.offsetWidth = 240; }
+  El.prototype.appendChild = function (c) { this.childNodes.push(c); c.parentNode = this; return c; };
+  El.prototype.setAttribute = function (k, v) { this[k] = v; };
+  El.prototype.addEventListener = function () {};
+  Object.defineProperty(El.prototype, 'firstChild', { get: function () { return this.childNodes[0] || null; } });
+  return { createElement: function (t) { return new El(t); }, createTextNode: function (t) { return { nodeValue: t }; } };
+}
+function webView(o) {
+  o = o || {};
+  var fs = require('fs'), path = require('path'), vm = require('vm');
+  var ctx = H.load({ fakeTimers: true }), N = ctx.N, calls = { pins: [], opened: [], closed: 0, cb: null }, factory = null;
+  ctx.document = MiniDoc();
+  N.i18n.set('de');
+  N.platform.caps.webLogin = true;
+  N.platform.auth = {
+    web: function (url, cb) { if (o.throwOpen) throw new Error('kaputt'); calls.opened.push(url); calls.cb = cb; },
+    close: function () { calls.closed++; }
+  };
+  N.auth.createPin = function (cb, strong) { calls.pins.push(strong); cb(null, { id: 4, code: 'WEBCODE', expiresIn: 1800 }); return { abort: function () {} }; };
+  N.auth.checkPin = function (id, cb) { cb(null, null); return { abort: function () {} }; };
+  N.router.refreshHints = function () {};
+  var def = N.router.define;
+  N.router.define = function (n, fn) { if (n === 'login') factory = fn; };
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'views', 'login.js'), 'utf8'), ctx, { filename: 'views/login.js' });
+  N.router.define = def;
+  var scr = factory({}), root = ctx.document.createElement('div');
+  scr.create(root);
+  scr.enter({});
+  var layer = root.childNodes[0];
+  function find(text) {
+    for (var i = 0; i < layer.childNodes.length; i++) { var e = layer.childNodes[i]; if (e.firstChild && e.firstChild.nodeValue === text) return e; }
+    return null;
+  }
+  return { N: N, scr: scr, calls: calls, find: find };
+}
+
+test('Ansicht Web-Anmeldung: Tippen auf "Mit Plex anmelden" legt starke PIN an, oeffnet das Fenster, Status sichtbar', function () {
+  var v = webView(), N = v.N;
+  assert.ok(v.find(N.t('login.btnWeb')) && v.find(N.t('login.btnCode')), 'Knoepfe gebaut');
+  assert.ok(v.scr.pointer(200, 370, 'click'), 'Tippen auf den Knopf');
+  assert.deepStrictEqual(v.calls.pins, [true], 'starke PIN angelegt');
+  assert.strictEqual(v.calls.opened.length, 1, 'auth.web aufgerufen');
+  assert.ok(/^https:\/\/app\.plex\.tv\/auth#\?/.test(v.calls.opened[0]));
+  var stat = v.find(N.t('login.web.waiting'));
+  assert.ok(stat, 'Statuszeile zeigt "wartet"');
+  assert.strictEqual(stat.style.left, '180px', 'Statuszeile neben dem Ladekreis');
+  // Nutzer schliesst das Fenster ohne Anmeldung -> sichtbarer Hinweis, kein Ladekreis mehr
+  v.calls.cb(null, { closed: true, reason: 'cancelled' });
+  stat = v.find(N.t('login.web.cancelled'));
+  assert.ok(stat, 'Hinweis "abgebrochen"');
+  assert.strictEqual(stat.style.left, '144px');
+});
+
+test('Ansicht Web-Anmeldung: Fokus wechselt zwischen den Knoepfen (Klasse am Element), Fehler beim Oeffnen sichtbar', function () {
+  var v = webView(), N = v.N, btn = v.find(N.t('login.btnWeb')), code = v.find(N.t('login.btnCode'));
+  v.scr.onKey('DOWN');
+  assert.ok(/is-focus/.test(code.className) && !/is-focus/.test(btn.className));
+  v.scr.onKey('UP');
+  assert.ok(/is-focus/.test(btn.className) && !/is-focus/.test(code.className));
+  v.scr.onKey('ENTER');
+  v.calls.cb({ code: 'web_failed' });
+  assert.ok(v.find(N.t('login.web.failed')), 'Hinweis "liess sich nicht oeffnen"');
+  v = webView({ throwOpen: true });
+  v.scr.onKey('ENTER');
+  assert.ok(v.find(v.N.t('login.web.failed')), 'Hinweis nach Ausnahme der Plattform');
+  assert.strictEqual(v.calls.closed, 0);
+});

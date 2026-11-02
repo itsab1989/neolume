@@ -12,6 +12,7 @@
   var BTNS = [
     { id: 'prev', x: 416, y: 80, w: 48, h: 48 },
     { id: 'back', x: 480, y: 80, w: 48, h: 48 }, { id: 'pp', x: 544, y: 76, w: 64, h: 56 }, { id: 'fwd', x: 624, y: 80, w: 48, h: 48 }, { id: 'next', x: 688, y: 80, w: 48, h: 48 },
+    { id: 'pip', x: 880, y: 80, w: 48, h: 48 },                          // Bild in Bild: nur mit caps.pip (nicht am TV, SPEC PLAY-35)
     { id: 'chap', x: 944, y: 80, w: 48, h: 48 }, { id: 'tracks', x: 1008, y: 80, w: 48, h: 48 }, { id: 'more', x: 1072, y: 80, w: 48, h: 48 }
   ];
   var BY = {};
@@ -27,6 +28,17 @@
   var O = {
     BTNS: BTNS, ISL_X: ISL_X, ISL_Y: ISL_Y, ISL_H: ISL_H, BAR_Y: ISL_Y + 27, LBL_Y: ISL_Y + 140,
     btn: function (id) { return BY[id]; },
+    /* Player auf voller Flaeche (flexible Flaeche, Apple Nr. 17; Lage per flex.css): Bildschirm-Punkt (W x H) -> Punkt im 1280x720-
+     * Raster, in dem die Ansicht rechnet. o = Lage des Kastens (N.screen.off()), h = Hoehe H. how '': obere Haelfte = Titel-Ebene
+     * (an der Oberkante, ab dem linken Rand) -> (x, y), untere Haelfte = Bedien-Ebene (an der Unterkante, waagerecht im Kasten)
+     * -> (x - o.x, y - 2 o.y); 'low' immer Bedien-Ebene (Ziehen am Balken); 'mid' = Mitte (Laden, Verbindung unterbrochen, Fehler:
+     * im Kasten) -> (x - o.x, y - o.y). Am TV o = 0/0: unveraendert. */
+    fullPt: function (x, y, o, h, how) {
+      if (!o || (!o.x && !o.y)) return { x: x, y: y };
+      if (how === 'mid') return { x: x - o.x, y: y - o.y };
+      if (how === 'low' || y >= h / 2) return { x: x - o.x, y: y - 2 * o.y };
+      return { x: x, y: y };
+    },
     steps: steps,
     /* Aufschrift der Sprungknoepfe: ['-10', '+30'] (ASCII-Minus: U+2212 fehlt in der TV-Schrift, Regel 10) */
     stepNums: function (st) { return ['-' + st.b, '+' + st.f]; },
@@ -55,12 +67,12 @@
     nextChapter: function (chs, ms) { var k = O.chapterAt(chs, ms + CH_EARLY); return chs && k + 1 < chs.length ? chs[k + 1].start : -1; },
     /* Label-Schluessel fuer ⏮/⏭ je Modus */
     pnLabel: function (mode, id) { return 'pl.btn.' + id + ({ ep: 'Ep', chap: 'Ch', item: 'Item' }[mode] || 'Ep'); },
-    /* sichtbare Knoepfe: f {pn: Modus aus pnMode, chap: Kapitel vorhanden} */
+    /* sichtbare Knoepfe: f {pn: Modus aus pnMode, chap: Kapitel vorhanden, pip: Bild in Bild moeglich (caps.pip)} */
     visible: function (f) {
       var out = [];
       for (var i = 0; i < BTNS.length; i++) {
         var id = BTNS[i].id;
-        if (((id === 'prev' || id === 'next') && !f.pn) || (id === 'chap' && !f.chap)) continue;
+        if (((id === 'prev' || id === 'next') && !f.pn) || (id === 'chap' && !f.chap) || (id === 'pip' && !f.pip)) continue;
         out.push(id);
       }
       return out;

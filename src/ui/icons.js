@@ -11,7 +11,7 @@
     return e;
   };
   N.ui.setIcon = function (e, name) { e.style.backgroundPositionX = (-(COLS[name] || 0) * 32) + 'px'; };
-  /* Avatar: Bild (PMS-Transcode des plex.tv-Avatars) oder Initiale auf Farbflaeche aus festem 8er-Satz */
+  /* Avatar: Bild (plex.tv-Avatar, N.img.avatar: PMS-Transcode bzw. mit TLS 1.2 direkt) oder Initiale auf Farbflaeche aus festem 8er-Satz */
   N.ui.avatarClass = function (name) {
     var s = String(name || '?'), h = 0;
     for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 0xffff;

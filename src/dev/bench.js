@@ -3,7 +3,7 @@
  * drueckt die Tasten selbst (N.router.key im festen Takt) und misst per rAF.
  * Start: Ziffernfolge 9,8,7 auf der Fernbedienung (je < 4 s Abstand) | window.PN_BENCH = 'all' | 'home,lib,leak' (tools/dev.py serve
  * --bench …, Vorschau &bench=…). RETURN/EXIT bricht ab. Ergebnis: je Szenario eine Zeile "bench <name>: …" im Protokoll (ctx.log).
- * Szenarien: home, home-hero, lib-L/M/S/list, details-movie, details-show, search, discover, player-osd, xtab (nur auf Wunsch: erster Erweiterungs-Reiter mit Quelle) (readOnly erzwungen, keine
+ * Szenarien: home, home-hero, home-M/S (Kachelgroesse Mittel/Klein, HOME-15), lib-L/M/S/list, details-movie, details-show, search, discover, player-osd, xtab (nur auf Wunsch: erster Erweiterungs-Reiter mit Quelle) (readOnly erzwungen, keine
  * Fortschritts-/Spur-Schreibzugriffe), loupe (Feinauswahl am Balken: Zeiger ruht -> oeffnet, Hin-und-her im 40-ms-Takt, nach oben weg;
  * nur mit Zeiger-Steuerung, Einstellung waehrend des Laufs an; Darstellung A Lasche = Standard, frueher 'loupe-panel'),
  * loupe-stretch / loupe-film (dasselbe in den anderen Darstellungen, SPEC PLAY-31; film misst nur mit Vorschaubildern des ersten Films den Filmstreifen, sonst das Panel), leak (Details Film/Serie, Bibliothek, Suche, Einstellungen, Musik, Player je Runde
@@ -267,6 +267,18 @@
       later(2500, function () { measure(label || 'home', BM.keys('R12 D R8 D R8 U U D'), GAP, function () { if (undo) undo(); done(); }); });
     });
   };
+  /* HOME-15: Startseite in Kachelgroesse Mittel/Klein (gleiche Tasten wie home; Einstellung nur im Speicher, danach zurueck).
+   * In 'all' (9,8,7) und 'home' (9,8,6 / 9,8,9): Vergleich mit home (= Gross) */
+  ['M', 'S'].forEach(function (v) {
+    S['home-' + v] = function (done) {
+      S.home(done, 'home-' + v, function (hb) {
+        if (!hb.size) return null;
+        var st = N.session.settings || {}, old = st.homeSize;
+        st.homeSize = v; hb.size(); hb.top();
+        return function () { st.homeSize = old; hb.size(); };
+      });
+    };
+  });
   /* Runde 6, Gegenproben der Startseite (nicht in 'all'; Ziffern 9,8,0 = home + hvar mit Frame-Protokoll):
    * hvar-cue0  = Hinweis unten wie bis 1.0.5 (display-Wechsel, ohne eigene Ebene) – zeigt, ob die dauerhafte Ebene die langen
    *              Frames bei Querformat <-> Poster beseitigt hat (home muss besser sein als hvar-cue0);
@@ -533,7 +545,7 @@
       });
     };
   });
-  var NAMES = ['home', 'home-hero', 'lib-L', 'lib-M', 'lib-S', 'lib-list', 'details-movie', 'details-show', 'search', 'discover', 'player-osd', 'loupe', 'loupe-stretch', 'loupe-film', 'leak', 'xtab'].concat(CHUNKS, SAVERS, HVARS, RVARS);
+  var NAMES = ['home', 'home-hero', 'home-M', 'home-S', 'lib-L', 'lib-M', 'lib-S', 'lib-list', 'details-movie', 'details-show', 'search', 'discover', 'player-osd', 'loupe', 'loupe-stretch', 'loupe-film', 'leak', 'xtab'].concat(CHUNKS, SAVERS, HVARS, RVARS);
 
   function waitHome(my, tries, fn) {
     if (run !== my || my.stop) return;
@@ -573,7 +585,8 @@
       // 1 = Feinauswahl (loupe, loupe-stretch, loupe-film; Video mit Ton) mit Frame-Protokoll
       // 0 = Startseite + Gegenproben (home, hvar-cue0, hvar-herol) mit Frame-Protokoll (Runde 6)
       // 8 = Fokus-Ring Runde 8: home, rvar-op0, rvar-none, discover, rvar-op0-disc mit Frame-Protokoll
-      var LAST = { '8': 'home,rvar-op0,rvar-none,discover,rvar-op0-disc,frames', '0': 'home,hvar,frames', '7': 'all', '6': 'home,lib,frames', '5': 'chunk,nocapl,frames', '4': 'saver,frames', '3': 'amb,frames', '2': 'discover,frames', '1': 'loupe,frames' };   // 4: Bildschirmschoner-Uebergaenge, 3: Hintergrund in Bibliotheken
+      // 9 = Startseite in allen Kachelgroessen (home, home-hero, home-M, home-S; HOME-15) mit Frame-Protokoll
+      var LAST = { '9': 'home,frames', '8': 'home,rvar-op0,rvar-none,discover,rvar-op0-disc,frames', '0': 'home,hvar,frames', '7': 'all', '6': 'home,lib,frames', '5': 'chunk,nocapl,frames', '4': 'saver,frames', '3': 'amb,frames', '2': 'discover,frames', '1': 'loupe,frames' };   // 4: Bildschirmschoner-Uebergaenge, 3: Hintergrund in Bibliotheken
       if (seq === SEQ.length - 1 && LAST[k] && U.now() - seqT < SEQ_MS) { seq = 0; B.start(LAST[k]); return true; }
       if (k === SEQ[seq] && (seq === 0 || U.now() - seqT < SEQ_MS)) { seq++; seqT = U.now(); if (seq === SEQ.length) { seq = 0; B.start('all'); return true; } }
       else seq = k === SEQ[0] ? 1 : 0;

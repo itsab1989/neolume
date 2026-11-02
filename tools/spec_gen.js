@@ -12,7 +12,7 @@
  *   routes        N.router.define('<name>', …) in src/**
  *   setup-schema  fields read by N.setupFile.parse (src/core/setupfile.js)
  *   helper        installer/neosetup/helper.py (TV routes + query keys, upstream allow-list, Discover lists)
- *   geometry      library grid views (src/ui/gridmath.js) and requested image sizes (src/ui/images.js)
+ *   geometry      library grid views (src/ui/gridmath.js), Home tile sizes (src/ui/rowmath.js) and requested image sizes (src/ui/images.js)
  *   assets        pictures in src/assets/ with pixel size (each needs a hand-written row: what it is for)
  *   bench         key scripts of the benchmark scenarios (src/dev/bench.js)
  *   tokens        design/tokens.json (tables from tools/design_doc.js), brand/public.json
@@ -60,7 +60,9 @@ var SCEN = [
   { id: 'M', name: 'main profile (setup.json)', admin: true, kind: 'main', pkg: true },
   { id: 'A', name: 'other adult profile (setup.json)', admin: false, kind: '', pkg: true },
   { id: 'K', name: 'kids/teen profile (setup.json)', admin: false, kind: 'kid', pkg: true },
-  { id: 'D', name: 'development build without setup.json, main profile', admin: true, kind: 'main', pkg: false }
+  { id: 'D', name: 'development build without setup.json, main profile', admin: true, kind: 'main', pkg: false },
+  /* extra: only marks rows that no other scenario shows (everything else is as in D) */
+  { id: 'C', name: 'additionally on a device with mobile data (platform capability `cellular`, e.g. a phone; otherwise like D)', admin: true, kind: 'main', pkg: false, cellular: true, extra: true }
 ];
 function settingsData() {
   var ctx = loadApp(), N = ctx.N;
@@ -103,12 +105,16 @@ function settingsData() {
       users: function () { return users; }, startProfile: viaReal('startProfile'),
       pinSwitchAvailable: viaReal('pinSwitchAvailable'), hasRestricted: viaReal('hasRestricted'), pinSwitchOn: viaReal('pinSwitchOn'),
       setSetting: function () {}, save: function () {} };
+    var caps = N.platform.caps, cell = caps.cellular;
+    caps.cellular = !!sc.cellular;
     var s = factory();
-    var list = s.__defs();
+    var list;
+    try { list = s.__defs(); } finally { caps.cellular = cell; }
     list.forEach(function (cat) {
       if (cats.indexOf(cat.id) < 0) cats.push(cat.id);
       cat.rows.forEach(function (d) {
         var key = d.id, r = rows[key];
+        if (sc.extra && r) return;
         if (!r) {
           r = rows[key] = { id: d.id, cat: cat.id, type: d.type, label: N.t(d.label), desc: N.t(d.desc), help: d.help ? N.t(d.help) : '',
             ddesc: [], store: storeOf(d), values: null, def: {}, scen: [] };
@@ -272,6 +278,17 @@ function genGeometry() {
       var g = G.make(v, sq), t = N.img.TIERS[g.TIER];
       o.push('| ' + name[v] + ' | ' + (sq ? 'square' : 'poster') + ' | ' + g.COLS + ' | ' + g.W + ' × ' + g.H + ' | ' + (g.COLS > 1 ? g.SX : '–') + ' / ' + g.SY +
         ' | ' + g.CAP_X + ', ' + g.CAP_Y + ' | ' + code(g.TIER) + (t ? ' ' + t[0] + ' × ' + t[1] : '') + ' | ' + g.POOL + ' |');
+    });
+  });
+  var RM = N.RowMath, kn = { land: 'landscape', poster: 'poster', sq: 'square' };
+  o.push('', 'Home tile sizes (setting `homeSize`, HOME-15; `N.RowMath.homeGeom`). Row heading at y 320, card top at y 372 (focus anchor), card *n* at ' +
+    'x = ' + RM.X0 + ' + (n − first visible) × step; row distance = heading to heading. Fully / on screen = cards fully visible / incl. the cut one at the right.', '',
+    '| Size | Cards | Card w × h | Step | Caption at y | Row distance | Fully / on screen | Image size requested |', '|---|---|---|---|---|---|---|---|');
+  RM.HOME_SIZES.forEach(function (v) {
+    ['land', 'poster', 'sq'].forEach(function (k) {
+      var g = RM.homeGeom(v, k), t = N.img.TIERS[g.tier];
+      o.push('| ' + name[v] + ' | ' + kn[k] + ' | ' + g.w + ' × ' + g.h + ' | ' + g.step + ' | ' + (k === 'land' ? g.capY : '–') + ' | ' + g.pitch + ' | ' + g.full + ' / ' + g.visible +
+        ' | ' + code(g.tier) + (t ? ' ' + t[0] + ' × ' + t[1] : '') + ' |');
     });
   });
   var T = N.img.TIERS;

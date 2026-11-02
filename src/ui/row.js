@@ -21,8 +21,18 @@
     this.clip = U.el('div', 'rclip', this.el);          // schneidet links an der Inhaltskante ab (Karten nicht unter der Rail)
     this.strip = U.el('div', 'strip', this.clip);
     this.pool = [];
-    for (var i = 0; i < POOL; i++) this.pool.push(this._make());
-    this.model = null; this.g = R.geom('land'); this.f = 0; this.sc = 0; this.byIdx = {}; this.focused = false; this.top = 0; this.kind = ''; this.pend = false; this.vis = true;
+    /* Flaechenbreite (opts.w, nur flexible Ansichten auf Apple, N.screen): mehr sichtbare Karten -> Ausschnitt breiter, Pool
+     * groesser (deckt sc-2 … sc+visible). Am TV 1280: Ausschnitt per CSS, Pool 11 wie immer */
+    this.w = this.opts.w || 1280;
+    var need = POOL;
+    if (this.w !== 1280) { this.clip.style.width = (this.w - 128) + 'px'; need = Math.max(POOL, R.geom('cast', this.w).visible + 3); }
+    /* freies Scrollen (opts.free, nur caps.scroll 'free'): Pool aus der Geometrie – sichtbare + 2 links + 4 rechts Puffer, damit bei
+     * Zug und Schwung keine leeren Karten hereinkommen (08-touch.md 1 Punkt 3) */
+    if (this.opts.clipH) this.clip.style.height = this.opts.clipH + 'px';   // Kacheln: Platz fuer Poster-Beschriftung unter der Karte
+    if (this.opts.free) need = Math.max(need, R.geom('cast', this.w).visible + 6);
+    for (var i = 0; i < need; i++) this.pool.push(this._make());
+    this.model = null; this.g = this._geom('land'); this.f = 0; this.sc = 0; this.byIdx = {}; this.focused = false; this.top = 0; this.kind = ''; this.pend = false; this.vis = true;
+    this.free = false; this.px = 0;    // freie Pixel-Lage (nur nach Zug/Rad; sonst gilt sc * step)
   }
 
   Row.prototype._make = function () {
@@ -43,23 +53,28 @@
     return e;
   };
 
+  /* Geometrie je Art: opts.geom (Startseite: Kachelgroesse, RowMath.homeGeom) oder die feste Tabelle (fuer die Flaechenbreite this.w) */
+  Row.prototype._geom = function (kind) { return this.opts.geom ? this.opts.geom(kind) : R.geom(kind, this.w); };
+  function isLand(g) { return (g.base || g.kind) === 'land'; }
+  function tierOf(g) { return g.tier || (isLand(g) ? 'land' : g.kind === 'cast' ? 'cast' : 'poster'); }
   Row.prototype.setTop = function (y) { if (y !== this.top) { this.top = y; this.el.style.top = y + 'px'; } };
   Row.prototype.cardY = function () { return this.top + HEAD_H; };
   Row.prototype.count = function () { return this.model ? this.model.items.length : 0; };
   Row.prototype.item = function (i) { return this.model ? this.model.items[i] : null; };
-  Row.prototype.showCaptions = function () { return this.opts.captions ? this.opts.captions(this.g.kind) : true; };
+  Row.prototype.showCaptions = function () { return this.opts.captions ? this.opts.captions(this.g.base || this.g.kind) : true; };
 
   /* neues Modell (Reihe recycelt oder erstmals befuellt); f = gemerkte Spalte; mode: siehe render (Standard 0 = alles sofort) */
   /* sc (optional): erste sichtbare Karte vorgeben (Startseite HOME-12: geaenderte Reihe, fokussierte Karte bleibt an ihrer Stelle) */
   Row.prototype.setModel = function (model, f, mode, sc) {
     var i;
     this.model = model;
-    this.g = R.geom(model ? model.kind : 'land');
+    this.g = this._geom(model ? model.kind : 'land');
     this.kind = this.g.kind;          // perf2: Kartenklasse/-groesse erst beim Befuellen je Karte (_fill), nicht fuer alle 11 auf einmal
     // freigeben ohne zu verstecken: Karten werden im selben Aufruf (mode 0) bzw. in Haeppchen (mode 2) wiederverwendet –
     // kein display-Wechsel; Karten an einer Position, die neu gebraucht wird, nehmen genau diese (render: byX)
-    for (i = 0; i < POOL; i++) { if (model) this._release(this.pool[i]); else this._free(this.pool[i]); }
+    for (i = 0; i < this.pool.length; i++) { if (model) this._release(this.pool[i]); else this._free(this.pool[i]); }
     this.byIdx = {};
+    this._fixed();
     this.f = model ? U.clamp(f || 0, 0, Math.max(0, model.items.length - 1)) : 0;
     this.sc = R.scroll(this.count(), this.f, this.g.full);
     if (sc !== undefined && sc >= 0 && sc <= R.maxScroll(this.count(), this.g.full) && this.f >= sc && this.f < sc + this.g.full) this.sc = sc;
@@ -77,7 +92,7 @@
     U.setText(this.headT, N.hubs.rowTitle(this.model));
     U.setText(this.cntT, this.model.kind === 'land' ? String(N.hubs.realCount(this.model)) : '');   // ohne "Alle anzeigen" (HOME-14)
   };
-  Row.prototype._scrollX = function () { return -this.sc * this.g.step; };
+  Row.prototype._scrollX = function () { return this.free ? -Math.round(this.px * 100) / 100 : -this.sc * this.g.step; };
   Row.prototype._jumpStrip = function () {
     var s = this.strip;
     s.style.webkitTransition = 'none';
@@ -96,7 +111,7 @@
     if (e.capOn && e.idx < 0) { e.cap.style.display = 'none'; e.capOn = false; }
   };
   Row.prototype._fill = function (e, i, prio) {
-    var it = this.model.items[i], g = this.g, x = i * g.step + 'px', land = g.kind === 'land', tier = g.tier || (land ? 'land' : g.kind === 'cast' ? 'cast' : 'poster');
+    var it = this.model.items[i], g = this.g, x = i * g.step + 'px', land = isLand(g), tier = tierOf(g);
     if (e.idx >= 0 && e.idx !== i && this.byIdx[e.idx] === e) delete this.byIdx[e.idx];
     e.idx = i; this.byIdx[i] = e;
     if (e.kind !== this.kind) {         // Reihe hat die Art gewechselt (land/poster/cast/sq): Groesse nur fuer diese Karte umstellen
@@ -139,16 +154,17 @@
    * mode 0 = alles sofort; 1 = sichtbare sofort, Puffer im naechsten Frame; 2 = Haeppchen zu CHUNK Karten (sichtbare zuerst) */
   Row.prototype.render = function (prio, mode) {
     if (!this.model) return;
-    var n = this.count(), w = R.win(n, this.sc, POOL), i, e, free = [], todo = [], nv;
-    for (i = 0; i < POOL; i++) { e = this.pool[i]; if (e.idx < w.first || e.idx > w.last) { if (e.idx >= 0) this._release(e); free.push(e); } }
-    var sc = this.sc, v1 = Math.min(w.last, sc + this.g.visible - 1);
+    var n = this.count(), w = R.win(n, this.sc, this.pool.length), i, e, free = [], todo = [], nv;
+    for (i = 0; i < this.pool.length; i++) { e = this.pool[i]; if (e.idx < w.first || e.idx > w.last) { if (e.idx >= 0) this._release(e); free.push(e); } }
+    var sc = this.sc, v1 = Math.min(w.last, sc + this.g.visible - (this.free && this.px - sc * this.g.step > 0.5 ? 0 : 1));   // frei: eine Karte mehr angeschnitten
     for (i = Math.max(w.first, sc); i <= v1; i++) if (!this.byIdx[i]) todo.push(i);
     nv = todo.length;
     for (i = w.first; i <= w.last; i++) if (!this.byIdx[i] && (i < sc || i > v1)) todo.push(i);
-    var budget = !mode ? todo.length : mode === 1 ? nv : chunk(), byX = {}, need = {}, step = this.g.step;
+    var budget = !mode ? todo.length : mode === 1 ? nv : chunk(), byX = {}, need = {}, step = this.g.step, until = mode === 2 && budget > todo.length ? U.now() + BUDGET_MS : 0;
     for (i = 0; i < todo.length; i++) need[todo[i] * step + 'px'] = 1;
     for (i = 0; i < free.length; i++) { e = free[i]; if (e.on && need[e.x]) byX[e.x] = e; }
     for (i = 0; i < todo.length && i < budget; i++) {
+      if (until && i > 0 && U.now() > until) break;     // schnelles Geraet: Haeppchen nach Zeitbudget statt fester Zahl (09-perf E6)
       e = byX[todo[i] * step + 'px'];                   // steht schon an dieser Stelle (nach setModel) -> genau die nehmen
       if (!e) for (var k = 0; k < free.length; k++) if (!free[k].on || !need[free[k].x] || byX[free[k].x] !== free[k]) { e = free[k]; break; }
       if (!e) e = free[0];
@@ -173,14 +189,14 @@
     for (var i = sc; i < sc + this.g.visible; i++) {
       var e = this.byIdx[i], it = this.item(i);
       if (!e || !it) continue;
-      var src = this.g.kind === 'land' ? it.still : it.thumb;
-      if (src) N.img.want(e.img, N.img.url(src, this.g.tier || (this.g.kind === 'land' ? 'land' : this.g.kind === 'cast' ? 'cast' : 'poster')), 0);
+      var src = isLand(this.g) ? it.still : it.thumb;
+      if (src) N.img.want(e.img, N.img.url(src, tierOf(this.g)), 0);
     }
   };
   /* Bild-URLs der Spalten [a, b] (geklemmt) – fuer N.img.warm (Startseite: Karten ausserhalb des Bildschirms vorab dekodieren) */
   Row.prototype.urls = function (a, b, out) {
     out = out || [];
-    var n = this.count(), land = this.g.kind === 'land', tier = this.g.tier || (land ? 'land' : this.g.kind === 'cast' ? 'cast' : 'poster');
+    var n = this.count(), land = isLand(this.g), tier = tierOf(this.g);
     for (var i = Math.max(0, a); i <= Math.min(n - 1, b); i++) {
       var it = this.model.items[i], src = it && (land ? it.still : it.thumb);
       if (src) out.push(N.img.url(src, tier));
@@ -200,12 +216,47 @@
   Row.prototype.page = function (dir) { var p = R.page(this.count(), this.f, this.sc, this.g.full, dir); return this.focusTo(p.f, p.sc); };
   Row.prototype.canPage = function (dir) { return dir < 0 ? this.sc > 0 : this.sc < R.maxScroll(this.count(), this.g.full); };
   Row.prototype.hit = function (x) { return R.hit(this.count(), this.sc, this.g, x); };
+  /* ---- freies Scrollen (caps.scroll 'free'): Lage px folgt dem Finger/Trackpad, ein Transform je Frame, keine Layout-Abfragen.
+   * Fenster und Treffer ueber sc = floor(px/step); Fokus bleibt, wo er ist (unsichtbar bei Touch). Tasten rasten wieder ein (fix). */
+  Row.prototype.curPx = function () { return this.free ? this.px : this.sc * this.g.step; };
+  Row.prototype.maxPx = function () { return R.maxPx(this.count(), this.g, this.w); };
+  Row.prototype.setPx = function (px) {
+    if (!this.model) return;
+    if (!this.free) { this.free = true; this.strip.style.webkitTransition = 'none'; }   // folgt dem Finger ohne Nachgleiten
+    this.px = px;
+    var sc = R.scOf(px, this.g.step, this.count());
+    if (sc !== this.sc) { this.sc = sc; this.render(undefined, 1); }
+    U.tf(this.strip, this._scrollX(), 0);
+  };
+  /* Treffer auf jeder sichtbaren Karte (auch angeschnittenen) */
+  Row.prototype.hitAny = function (x) { return R.hitPx(this.count(), this.curPx(), this.g, x, this.w); };
+  /* erste ganz sichtbare Karte (Anker fuer die erste Taste nach dem Wischen) */
+  Row.prototype.anchorCol = function () { return R.anchor(this.curPx(), this.g.step, this.count()); };
+  /* zurueck ins Tastenraster: Fokus f, Lage nach der Anker-Regel, ohne Gleiten */
+  Row.prototype.fix = function (f) {
+    var n = this.count();
+    if (!n) { this._fixed(); return; }
+    f = U.clamp(f, 0, n - 1);
+    var was = this.free, old = this.byIdx[this.f];
+    this._fixed();
+    this.f = f; this.sc = R.scroll(n, f, this.g.full);
+    this.render(undefined, 1);
+    if (old && old.foc && old !== this.byIdx[f]) { old.card.className = old.base; old.cap.className = old.capBase; old.foc = false; }
+    if (this.focused) { var cur = this.byIdx[f]; if (cur && !cur.foc) { cur.card.className = cur.base + ' is-focus'; cur.cap.className = cur.capBase + ' is-focus'; cur.foc = true; } }
+    if (was) this._jumpStrip();
+  };
+  Row.prototype._fixed = function () {
+    if (!this.free) return;
+    this.free = false; this.px = 0;
+    this.strip.style.webkitTransition = '';
+  };
   /* gemeinsamer Fokusschritt: nur alte + neue Karte, 1 Transform am Streifen. Rueckgabe: Ringziel */
   Row.prototype.focusTo = function (f, sc) {
     var n = this.count();
     if (!n) return null;
     var old = this.byIdx[this.f];
     var oldScroll = this._scrollX();
+    if (this.free && sc !== this.sc) this._fixed();   // Taste/Blaettern verschiebt: wieder im Raster (Zeiger-Fokus bei freier Lage: Lage bleibt)
     this.f = f; this.sc = sc;
     this.render(undefined, 1);                         // Recycling: nur sichtbare sofort, Puffer im naechsten Frame
     var cur = this.byIdx[f];
@@ -219,7 +270,7 @@
     return this.ringPos();
   };
   Row.prototype.ringPos = function () {
-    return { x: R.x(this.f, this.sc, this.g), y: this.cardY(), shape: this.g.kind };
+    return { x: this.free ? Math.round(R.xPx(this.f, this.px, this.g)) : R.x(this.f, this.sc, this.g), y: this.cardY(), shape: this.g.kind };
   };
   /* Reihe bekommt/verliert den Fokus (vertikaler Wechsel) */
   Row.prototype.setFocused = function (on) {
@@ -238,8 +289,9 @@
   Row.prototype.removeAt = function (i) {
     this.model.items.splice(i, 1);
     var n = this.count();
-    for (var k = 0; k < POOL; k++) this._free(this.pool[k]);
+    for (var k = 0; k < this.pool.length; k++) this._free(this.pool[k]);
     this.byIdx = {};
+    this._fixed();
     this.f = n ? Math.min(i, n - 1) : 0;
     this.sc = Math.min(this.sc, R.maxScroll(n, this.g.full));
     if (this.f < this.sc) this.sc = this.f;
@@ -248,14 +300,15 @@
   };
   Row.prototype.insertAt = function (i, item) {
     this.model.items.splice(i, 0, item);
-    for (var k = 0; k < POOL; k++) this._free(this.pool[k]);
+    for (var k = 0; k < this.pool.length; k++) this._free(this.pool[k]);
     this.byIdx = {};
+    this._fixed();
     this.f = i; this.sc = R.scroll(this.count(), i, this.g.full);
     this.relabel(); this._jumpStrip(); this.render(0);
   };
   Row.prototype.clear = function () {
-    for (var k = 0; k < POOL; k++) this._free(this.pool[k]);
-    this.byIdx = {}; this.model = null; this.focused = false; this.relabel();
+    for (var k = 0; k < this.pool.length; k++) this._free(this.pool[k]);
+    this.byIdx = {}; this.model = null; this.focused = false; this._fixed(); this.relabel();
   };
   /* Reihe zeigen/verbergen (Startseite: Reihe ueber der fokussierten liegt unter dem Hero-Text). TV-Nachmessung 28.10. (home 6 Frames
    * > 50 ms, je ▼/▲ einer): vorher visibility:hidden an der ganzen Reihe – WebKit gibt dann die Ebenen-Inhalte aller Karten und
@@ -277,6 +330,8 @@
   };
   /* Haeppchen-Groesse je Frame (P7 perf2: per Messlauf einstellbar, 'chunks' vergleicht Varianten am TV); FAST = waehrend Tastenwiederholung */
   Row.CHUNK = 1; Row.CHUNK_FAST = 1;   // perf3: wie Grid (TV 9,8,5)
-  function chunk() { return N.fx && N.fx.isFast() ? Row.CHUNK_FAST : Row.CHUNK; }
+  /* caps.images 'fast' (Apple, 09-perf E6): je Frame so viele Karten, wie in BUDGET_MS passen (statt 1) */
+  var BUDGET_MS = 2;
+  function chunk() { return N.platform && N.platform.caps.images === 'fast' ? 1e6 : N.fx && N.fx.isFast() ? Row.CHUNK_FAST : Row.CHUNK; }
   N.ui.Row = Row;
 })(N);

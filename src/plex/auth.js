@@ -9,8 +9,9 @@
     return '';                           // auch verwaltete Konten mit eigenen Einschraenkungen (kein Kinderprofil)
   }
   var A = {
-    createPin: function (cb) {
-      return P.tv('POST', '/api/v2/pins', { strong: 'false' }, null, { retries: 0 }, function (err, d) {
+    /* strong = true: langer Code fuer die Anmeldeseite app.plex.tv/auth (N.WebLoginFlow); sonst 4 Zeichen fuer plex.tv/link */
+    createPin: function (cb, strong) {
+      return P.tv('POST', '/api/v2/pins', { strong: strong ? 'true' : 'false' }, null, { retries: 0 }, function (err, d) {
         if (err || !d || !d.code || !d.id) { cb(err || { type: 'parse' }); return; }
         cb(null, { id: d.id, code: String(d.code), expiresIn: d.expiresIn || 900 });
       });
@@ -20,6 +21,12 @@
         if (err) { cb(err); return; }
         cb(null, d && d.authToken ? d.authToken : null);
       });
+    },
+    /* Offizielle Plex-Anmeldeseite fuer eine starke PIN (wie installer/neosetup/plextv.py auth_url; ohne forwardUrl) */
+    webUrl: function (code) {
+      var e = encodeURIComponent;
+      return 'https://app.plex.tv/auth#?clientID=' + e(P.clientId || 'plexneo-unknown') + '&code=' + e(code) +
+        '&context%5Bdevice%5D%5Bproduct%5D=' + e(N.config.product);
     },
     user: function (token, cb) {
       return P.tv('GET', '/api/v2/user', null, token, {}, function (err, d) {
@@ -59,27 +66,14 @@
       });
     },
     resources: function (token, cb) {
-      return P.tv('GET', '/api/v2/resources', { includeHttps: 1, includeRelay: 0, includeIPv6: 0 }, token, {}, function (err, d) {
+      return P.tv('GET', '/api/v2/resources', { includeHttps: 1, includeRelay: N.platform && N.platform.caps.tls12 ? 1 : 0, includeIPv6: 0 }, token, {}, function (err, d) {
         if (err) { cb(err); return; }
         cb(null, A.normServers(d));
       });
     },
-    normServers: function (list) {
-      var out = [];
-      for (var i = 0; list && i < list.length; i++) {
-        var r = list[i];
-        if (!r || String(r.provides || '').indexOf('server') < 0) continue;
-        var conns = [];
-        for (var j = 0; r.connections && j < r.connections.length; j++) {
-          var c = r.connections[j];
-          if (c.relay || c.IPv6 || !c.address) continue;
-          // Der TV kann kein modernes TLS: lokale Verbindungen per http://adresse:port
-          conns.push({ uri: 'http://' + c.address + ':' + (c.port || 32400), local: !!c.local });
-        }
-        out.push({ name: r.name || '', machineId: r.clientIdentifier, owned: !!r.owned, token: r.accessToken || null, conns: conns });
-      }
-      return out;
-    },
+    /* Server + Verbindungen (N.plexConn): ohne caps.tls12 (TV) nur http://adresse:port wie bisher; mit tls12 auch
+     * https (plex.direct), lokal -> entfernt -> Relay (SPEC NET-7) */
+    normServers: function (list) { return N.plexConn.normServers(list, N.platform && N.platform.caps); },
     /* Serverwahl: gemerkte machineId > Server mit Fallback-Adresse > eigener mit lokaler Verbindung > erster lokaler.
      * Ergebnis {name, machineId, uri, token} oder null */
     pickServer: function (servers, prefId, fallbackUri) {
@@ -99,12 +93,13 @@
       }
       return { name: pick.name, machineId: pick.machineId, uri: uri, token: pick.token };
     },
-    /* Server-Token eines Profils: aus dessen Ressourcen-Liste der Eintrag mit unserer machineId */
+    /* Server-Token eines Profils: aus dessen Ressourcen-Liste der Eintrag mit unserer machineId; cb(err, token, servers) –
+     * servers = die ganze Liste dieses Profils (Weitere Server auf Plattformen mit TLS 1.2, SRV-5) */
     serverTokenFor: function (userToken, machineId, cb) {
       return A.resources(userToken, function (err, servers) {
         if (err) { cb(err); return; }
-        for (var i = 0; i < servers.length; i++) if (servers[i].machineId === machineId && servers[i].token) { cb(null, servers[i].token); return; }
-        cb({ type: 'noserver' });
+        for (var i = 0; i < servers.length; i++) if (servers[i].machineId === machineId && servers[i].token) { cb(null, servers[i].token, servers); return; }
+        cb({ type: 'noserver' }, null, servers);
       });
     }
   };

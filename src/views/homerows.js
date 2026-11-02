@@ -10,7 +10,7 @@
 (function (N) {
   var U = N.util, HR = N.homeRows, X = 144, W = 736, TOP = 112, STEP = 64, VIS = 6, ANCHOR = 2, STALE = 600000;
   function editor(C) { return function () {
-    var s = { rail: null, wheelKeys: ['UP', 'DOWN'], toastLow: true }, K = C.keys;   // Toast unter der Beschreibung (.hr-desc bis y 608, NAV-10)
+    var s = { rail: null, wheelKeys: ['UP', 'DOWN'], toastLow: true, backBtn: true }, K = C.keys;   // backBtn: Finger/Maus ohne Hinweisleiste (Nr. 26)   // Toast unter der Beschreibung (.hr-desc bis y 608, NAV-10)
     var S = N.session, root, clip, list, desc, stat, els = [], items = [], f = 0, sc = 0, moving = false, cat = null, busy = null, dead = false, more = null;
     var MOD = C.model || HR;                            // Listen-Logik (view/store/move): Startseite/Inspiration N.homeRows, Seitenleiste N.railRows
     function locked(it) { return !it.reset && !!(C.locked && C.locked(it)); }   // immer an (z. B. Start in der Seitenleiste)
@@ -34,7 +34,7 @@
     function special(it) { return !!(it && (it.reset || it.add)); }
     function removable(it) { return !!(C.ext && it && !special(it) && N.ext.has('home:removable') && N.ext.call('home:removable', it.id)); }
     function descText(it) {
-      if (moving) return N.t('set.hr.moving');
+      if (moving) return N.t(N.input.direct() ? 'set.hr.movingTouch' : 'set.hr.moving');
       if (it.reset) return N.t(K.resetDesc);
       if (it.add) return it.add.d;
       return C.desc(it, ctx());
@@ -83,6 +83,8 @@
       e.tg = U.el('div', 'toggle', e.el); U.el('i', '', e.tg);
       e.mv = U.el('div', 'mv', e.el); U.el('i', 'up', e.mv); U.el('i', 'dn', e.mv);   // CSS-Dreiecke statt ▲ ▼ (TV-Schrift, Regel 10)
       U.el('div', 'sep', e.el);
+      e.tip = N.ui.infotip.icon(e.el);                 // Finger/Maus: ⓘ statt Beschreibungsflaeche (Nr. 28; am TV null)
+      if (e.tip) U.cls(e.el, 'itr', true);
       return e;
     }
     function paint(i) {
@@ -182,6 +184,15 @@
         N.ui.toast.show(N.t(had ? 'toast.hrOn' : 'toast.hrAdded'), { icon: 'confirm' });
       });
     }
+    /* Langes Druecken bzw. TOOLS (Finger/Maus haben keine Hinweisleiste, Nr. 26): Verschieben/Entfernen als Menue */
+    function actions() {
+      var it = items[f], b = [];
+      if (!it || special(it)) return;
+      b.push({ id: 'move', t: N.t('hint.move') });
+      if (removable(it)) b.push({ id: 'remove', t: N.t('hint.removeRow') });
+      N.ui.dialog.open({ title: label(it), buttons: b, vertical: true, focus: 0, top: 120,
+        onSelect: function (id) { if (dead) return; if (id === 'move') startMove(); else removeRow(); } });
+    }
     /* Erweiterung: hinzugefuegte Reihe entfernen (Rot, Rueckfrage mit Fokus auf "Behalten") */
     function removeRow() {
       var it = items[f];
@@ -241,17 +252,27 @@
       else if (k === 'ENTER') activate();
       else if (k === 'YELLOW') startMove();
       else if (k === 'RED') removeRow();
+      else if (k === 'TOOLS') actions();
       else if (k === 'INFO') N.ui.panel.help(N.t(K.title), N.t(K.help));
       else if (k === 'RETURN') N.router.back();
       return true;
     };
+    /* Finger/Maus (Nr. 28): Treffer auf dem ⓘ (x 824–896, volle Zeilenhoehe) oeffnet nur die Info-Blase mit dem Text der Zeile */
     s.pointer = function (x, y, kind) {
-      if (x < X || x >= X + W) return false;
+      var tip = N.ui.infotip.on() && !moving;
+      if (x < X || x >= X + W + (tip ? 16 : 0)) { N.ui.infotip.hover(null); return false; }
       var i = N.hit.list(TOP, STEP, STEP, Math.min(VIS, items.length - sc), y);
-      if (i < 0) return false;
+      if (i < 0) { N.ui.infotip.hover(null); return false; }
       i += sc;
       if (moving) { if (kind === 'click') drop(); return true; }
       if (i !== f) { U.cls(els[f].el, 'is-focus', false); f = i; U.cls(els[f].el, 'is-focus', true); U.setText(desc, descText(items[f])); N.router.refreshHints(); }
+      if (tip && els[i].tip && x >= X + W - 56) {
+        N.ui.infotip.hover(els[i].tip);
+        if (kind === 'click') N.ui.infotip.open({ title: label(items[i]), text: descText(items[i]), x: X + W - 32, y: TOP + (i - sc) * STEP + 32, el: els[i].tip });
+        return true;
+      }
+      N.ui.infotip.hover(null);
+      if (x >= X + W) return true;
       if (kind === 'click') activate();
       return true;
     };

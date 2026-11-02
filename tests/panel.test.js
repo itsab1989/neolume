@@ -102,3 +102,28 @@ test('Mehr-Hinweis: N.ui.more schaltet nur bei Aenderung um; Titelliste zeigt ob
   assert.ok(!on(tl.more.up));
 });
 function document0(N) { return N.util.el('div', ''); }
+
+test('Player auf voller Flaeche (Apple Nr. 17): Panel rechts buendig ueber die ganze Hoehe, mehr Zeilen, Zeiger umgerechnet; sonst wie TV', function () {
+  var s = setup(), N = s.N, picked = [];
+  var e = []; for (var i = 0; i < 12; i++) e.push({ id: 'i' + i, t: 'E' + i });
+  N.router.top = function () { return { panelFull: true }; };
+  var p = N.ui.panel.select({ title: 'T', entries: e, onSelect: function (id) { picked.push(id); } });
+  var el = p.el.childNodes[1];
+  assert.ok(!has(el, 'pfull') && !el.style.cssText, 'TV (keine flexible Flaeche): unveraendert');
+  p.cancel();
+  N.screen.flex = true; N.screen.w = 1560; N.screen.h = 960;   // Kasten bei x 140, y 120
+  N.router.top = function () { return null; };
+  assert.strictEqual(N.ui.panelFrame(72).on, false, 'andere Ansichten: Panel im Kasten');
+  N.router.top = function () { return { panelFull: true }; };
+  var f = N.ui.panelFrame(72);
+  H.eq([f.on, f.x, f.y, f.n], [true, 140, 120, 3]);
+  p = N.ui.panel.select({ title: 'T', entries: e, onSelect: function (id) { picked.push(id); } });
+  el = p.el.childNodes[1];
+  assert.ok(has(el, 'pfull'));
+  assert.strictEqual(el.style.cssText, 'left:980px;top:-120px;height:960px');
+  assert.ok(p.up && p.dn, '12 Eintraege > 8 + 3 Zeilen: scrollt mit Mehr-Hinweis');
+  // Zeiger kommt in Kasten-Koordinaten: Eintrag 0 liegt im Panel bei x 864, y 112 -> im Kasten x 1004, y -8
+  p.pointer(1004, 2, 'click');
+  H.eq(picked, ['i0']);
+  N.screen.flex = false; N.screen.w = 1280; N.screen.h = 720;
+});

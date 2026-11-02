@@ -14,6 +14,7 @@
     function get(path, q, o, cb) { return N.plex.get(path, q, N.srv.o(srv, o), cb); }
     function railId(lib) { return N.railRows.libId({ id: lib, srv: srv }); }
     var s = { rail: it0.lib ? railId(it0.lib) : N.ui.rail && N.ui.rail.cur || 'home', wheelKeys: ['LEFT', 'RIGHT'] };
+    s.card = true;                                   // Detailkarte (caps.details 'card'): Kuenstler in der Karte (N.router prueft die Faehigkeit)
     var root, hero, pg, bar, btns = [], bdefs = [], btnRects = null, rows = [], ri = 0, groups = [], popY = PEEK + ROW_H, popHead, pop, ring, sb;
     var meta = null, popular = [], zone = 'btn', bf = 0, off = 0, gen = 0, tasks = [], dead = false, away = false, onTrack = null, onMini = null;
 

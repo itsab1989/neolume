@@ -107,7 +107,8 @@
     newsNote: 'exact', newsSecs: 5, newsPlay: false };   // Hinweis bei neuen Inhalten (N.newsLogic, HOME-13): Aus/Allgemein/Genau, Anzeigedauer, auch im Video
   C.applyDefaults = function (st, kid) {
     if (!st) return st;
-    for (var k in C.DEFAULTS) if (Object.prototype.hasOwnProperty.call(C.DEFAULTS, k) && st[k] === undefined) st[k] = k === 'stillTime' && kid ? 1 : C.DEFAULTS[k];
+    var sd = N.platform && N.platform.caps && typeof N.platform.caps.saverDefault === 'number' ? N.platform.caps.saverDefault : C.DEFAULTS.screensaver;   // Plattform (iPad/iPhone: aus)
+    for (var k in C.DEFAULTS) if (Object.prototype.hasOwnProperty.call(C.DEFAULTS, k) && st[k] === undefined) st[k] = k === 'stillTime' && kid ? 1 : k === 'screensaver' ? sd : C.DEFAULTS[k];
     var rs = Number(st.recentSearches);               // Zuletzt gesucht: fruehere Stufen 6/3 (bis 28.10.) -> 8/4, Aus bleibt Aus
     if (rs === 6) st.recentSearches = 8; else if (rs === 3) st.recentSearches = 4;
     if (st.recentSearches === null || st.recentSearches === '') st.recentSearches = C.DEFAULTS.recentSearches;   // leer ist nicht "Aus"

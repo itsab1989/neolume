@@ -15,6 +15,7 @@
 
   N.router.define('extdetails', function (params) {
     var it = params.it || {}, s = { rail: params.rail || 'discover', wheelKeys: ['LEFT', 'RIGHT'] };   // rail: von der Startseite 'home'
+    s.card = true;                                   // Detailkarte (caps.details 'card'): wie Film/Serie in der Karte (N.router prueft die Faehigkeit)
     var root, hero, pg, bar, row = null, ring, btns = [], bdefs = [], btnRects = null, bf = 0, dead = false, task = null, dtask = null, busy = false, xt = null;
     /* TV-Befund 28.10.: Knopfreihe sprang (eine Erweiterung setzte spaeter einen Knopf davor, Fokus wechselte) und die
      * Freigabe wechselte von der US- auf die deutsche Angabe. Meldet eine Erweiterung, dass ihr Stand noch kommt (xt.pending()), werden die Knoepfe

@@ -4,7 +4,7 @@
  *   clip     Text wird abgeschnitten: Element mit overflow:hidden ist zu klein (ohne "…"/line-clamp) oder ragt aus einem
  *            abschneidenden Vorfahren heraus, obwohl das Element selbst darin liegt
  *   button   Text liegt ueber einem Bedienelement (Knopf, Karte, Eintrag), zu dem er nicht gehoert
- *   offscreen Text laeuft ueber den Bildschirmrand (1280 x 720)
+ *   offscreen Text laeuft ueber den Bildschirmrand (1280 x 720; window.PN_PROBE_AREA = {w, h} fuer die flexible Apple-Flaeche)
  *   safe     Text ragt in den Titel-Sicherheitsrand (64 / 36 px)
  *   panel    zwei sichtbare Flaechen (Hintergrundfarbe) derselben Ebene ueberlappen sich teilweise (keine liegt ganz in der
  *            anderen; Overlays mit eigenem z-index wie Dialog/Panel/Leiste liegen bewusst ueber dem Inhalt)
@@ -175,6 +175,8 @@
   function elInfo(e) { var t = (e.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60); return { p: path(e), s: t, r: box(rr(e.getBoundingClientRect())) }; }
 
   function run() {
+    var ar = window.PN_PROBE_AREA;                        // Apple-Fassung (flexible Flaeche): logische Groesse W x H statt 1280 x 720
+    if (ar && ar.w >= 1280 && ar.h >= 720) { W = ar.w; H = ar.h; }
     var t0 = Date.now(), out = [], items, pe = document.createElement('style');
     pe.textContent = '*{pointer-events:auto!important}';          // elementsFromPoint soll alles sehen
     document.head.appendChild(pe);

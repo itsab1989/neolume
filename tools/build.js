@@ -4,10 +4,15 @@
  * verbotene ES6-APIs, Groessenbericht. Kopiert die Bilder aus src/assets nach app/.
  * P7: zwei Ausgaben – app/app.js (lesbar, mit dev/-Modulen; dev.py serve liefert sie zum Debuggen) und app/app.min.js
  * (terser, ecma 5, ohne dev/-Module; geht ins TV-Paket). Beide durchlaufen dieselben Gates.
- *   node tools/build.js [--no-test] [--no-min] */
+ *   node tools/build.js [--no-test] [--no-min] [--platform <id>] [--bench]
+ * --bench (nur --platform apple): Mess-Bau nach dist/apple/<marke>-bench/ – app.min.js MIT dev/-Modulen (Messlauf src/dev/bench.js),
+ * dazu platforms/apple/bench/ (Demo-Daten, In-App-Messung) und, falls vorhanden, das Demo-Paket dist/apple-demo/ (make-pack.js).
+ * Nie im normalen Paket; Ablauf: docs/research/apple/09-perf.md, platforms/apple/tools/perf.sh.
+ * --platform (Standard samsung-orsay, tools/platform.js): Adapter-Module aus platforms/<id>/adapter/ direkt hinter
+ * platform/platform.js. Standard-Plattform schreibt nach app/, jede andere nach dist/<id>/<marke>/. */
 'use strict';
 var fs = require('fs'), path = require('path'), vm = require('vm');
-var ROOT = path.join(__dirname, '..'), SRC = path.join(ROOT, 'src'), OUT = path.join(ROOT, 'app');
+var ROOT = path.join(__dirname, '..'), SRC = path.join(ROOT, 'src'), OUT = path.join(ROOT, 'app');   // OUT je Plattform in build()
 var errors = [];
 function fail(msg) { errors.push(msg); }
 
@@ -122,7 +127,9 @@ function accentCss(css, pal) {
     var f = parts(prop);
     return tok.some(function (t) {
       if (t.ri === ri || !t.parts.some(function (x) { return f.indexOf(x) >= 0; })) return false;
-      return t.sel.some(function (sa) { return sel.some(function (sb) { return overlaps(sa, sb) && specificity(sb) >= specificity(sa); }); });
+      // Begleitregel noetig, wenn sie die Token-Regel ueberstimmt, die Farb-Variante (".ac-x " davor = +1 Klasse, steht hinten)
+      // sie aber wieder ueberstimmen wuerde; spezifischer als die Variante gewinnt sie ohnehin (z. B. "body.inp-touch …")
+      return t.sel.some(function (sa) { return sel.some(function (sb) { var a = specificity(sa), b = specificity(sb); return overlaps(sa, sb) && b >= a && b <= a + 100; }); });
     });
   }
   function scoped(sels, list) { var o = []; list.forEach(function (p) { sels.forEach(function (s) { o.push('.ac-' + p.id + ' ' + s); }); }); return o.join(','); }
@@ -309,6 +316,13 @@ function build() {
   var t0 = Date.now();
   var manifest = JSON.parse(fs.readFileSync(path.join(SRC, 'manifest.json'), 'utf8'));
   var brand = brandConfig();
+  var plat = require('./platform.js'), pid, pmods = [];
+  try { pid = plat.id(process.argv, process.env); pmods = plat.modules(pid); plat.unlisted(pid).forEach(function (f) { fail('Adapter-Datei nicht im Manifest: ' + f); }); }
+  catch (e) { console.error('BUILD FEHLGESCHLAGEN:\n  - ' + e.message); process.exit(1); }
+  var BENCH = process.argv.indexOf('--bench') >= 0;
+  if (BENCH && pid !== 'apple') { console.error('BUILD FEHLGESCHLAGEN:\n  - --bench gibt es nur mit --platform apple'); process.exit(1); }
+  if (pid !== plat.DEFAULT) { OUT = path.join(ROOT, 'dist', pid, (brand ? brand.id : 'public') + (BENCH ? '-bench' : '')); fs.mkdirSync(OUT, { recursive: true }); }
+  console.log('Plattform: ' + pid + (pid !== plat.DEFAULT ? ' -> ' + path.relative(ROOT, OUT) + '/' : ''));
   var ext = extensions(brand);
   if (ext.on.length) console.log('Erweiterungen: ' + ext.on.join(', ') + ' (' + ext.js.length + ' Module)');
   fs.readdirSync(path.join(SRC, 'css')).filter(function (f) { return /\.css$/.test(f); }).forEach(function (f) {
@@ -325,14 +339,24 @@ function build() {
   var keys = checkI18n(ext.strings);
   var local = localConfig();
   var parts = ['/* gebaut aus src/ (tools/build.js). Nicht von Hand bearbeiten. */'], rel = [];
+  var pi = manifest.indexOf('platform/platform.js');
+  if (pi < 0) fail('src/manifest.json: platform/platform.js fehlt');
+  var pabs = {};
+  pmods.forEach(function (m) { pabs[m.rel] = m.abs; });
   var main = manifest.slice();
+  manifest = manifest.slice(0, pi + 1).concat(pmods.map(function (m) { return m.rel; }), manifest.slice(pi + 1));   // Adapter direkt hinter dem Vertrag
   manifest = manifest.concat(ext.js);                      // Erweiterungen hinter dem Haupt-Manifest (melden sich per N.ext an)
+  ext.on.forEach(function (f) {                            // Plattform-Zusaetze einer Erweiterung (platforms/<id>/private/<f>/), Orsay: keine
+    var xm = [];
+    try { xm = plat.extModules(pid, f); } catch (e) { fail(e.message); }
+    xm.forEach(function (m) { pabs[m.rel] = m.abs; manifest.push(m.rel); });
+  });
   manifest.forEach(function (f, i) {
-    var p = path.join(SRC, f);
+    var p = pabs[f] || path.join(SRC, f);
     if (!fs.existsSync(p)) { fail('Manifest-Datei fehlt: ' + f); return; }
     var chunk = '/* ===== ' + f + ' ===== */\n' + fs.readFileSync(p, 'utf8');
     parts.push(chunk);
-    if (!/^dev\//.test(f)) rel.push(chunk);                // Release (minifiziert): ohne Entwicklungs-Module
+    if (!/^dev\//.test(f) || BENCH) rel.push(chunk);       // Release (minifiziert): ohne Entwicklungs-Module (Mess-Bau: mit)
     var extra = i === 0 ? 'N.CSS = ' + JSON.stringify(css) + ';' : f === 'core/config.js' && Object.keys(local).length ? 'N.config.apply(' + JSON.stringify(local) + ');   /* aus local.json */' :
       f === 'core/brand.js' && brand ? 'N.brand = ' + JSON.stringify({ id: brand.id, name: brand.name, wordmark: brand.wordmark, accent: brand.accentId }) + ';   /* brand/' + brand.id + '.json */' +
         (ext.on.length ? '\nN.features = ' + JSON.stringify(ext.on) + ';' : '') : '';
@@ -361,6 +385,63 @@ function build() {
     write(code, min);
   }, function (e) { fail('Minifizierung: ' + (e && e.message)); abort(); });
 
+  /* Andere Plattform: Startseite (platforms/<id>/loader/index.html, Titel = Markenname) und Lader-Skripte (ES5-Gate) ins Paket;
+   * app.js (lesbar, mit dev/) bleibt draussen – das Paket enthaelt nur app.min.js. Nie local.json/setup.json/helper.json. */
+  function platformPackage() {
+    var ld = path.join(ROOT, 'platforms', pid, 'loader');
+    if (!fs.existsSync(path.join(ld, 'index.html'))) { fail('platforms/' + pid + '/loader/index.html fehlt'); return; }
+    var html = fs.readFileSync(path.join(ld, 'index.html'), 'utf8').replace(/<title>[^<]*<\/title>/, '<title>' + ((brand && brand.name) || 'Neolume') + '</title>');
+    fs.writeFileSync(path.join(OUT, 'index.html'), html);
+    var dest = path.join(OUT, 'loader'), n = 0;
+    fs.rmSync(dest, { recursive: true, force: true });
+    (function copy(sub) {
+      fs.readdirSync(path.join(ld, sub)).forEach(function (f) {
+        var r = sub ? sub + '/' + f : f, abs = path.join(ld, r);
+        if (fs.statSync(abs).isDirectory()) return copy(r);
+        if (!/\.(js|css)$/.test(f)) return;
+        var t = fs.readFileSync(abs, 'utf8');
+        var before = errors.length; if (/\.js$/.test(f)) es5Gate(t);   // .css: Apple-eigene Regeln (z. B. loader/flex.css)
+        for (var i = before; i < errors.length; i++) errors[i] = 'platforms/' + pid + '/loader/' + r + ': ' + errors[i];
+        fs.mkdirSync(path.dirname(path.join(dest, r)), { recursive: true });
+        fs.copyFileSync(abs, path.join(dest, r)); n++;
+      });
+    })('');
+    // Vektor-Fassungen der Symbole (Retina: das 32er PNG-Sprite waere hochskaliert unscharf); loader/flex.css nimmt sie unter body.flex
+    fs.writeFileSync(path.join(OUT, 'icons.svg'), TOKENS.spriteSvg() + '\n');
+    fs.writeFileSync(path.join(OUT, 'all-grid.svg'), TOKENS.allGridSvg() + '\n');
+    ['app.js', 'local.json', 'setup.json', 'helper.json'].forEach(function (f) { fs.rmSync(path.join(OUT, f), { force: true }); });
+    ['bench', 'demo'].forEach(function (d) { fs.rmSync(path.join(OUT, d), { recursive: true, force: true }); });
+    if (BENCH) n += benchPackage();
+    if (errors.length) { console.error('BUILD FEHLGESCHLAGEN:\n  - ' + errors.join('\n  - ')); process.exit(1); }
+    console.log('Paket ' + path.relative(ROOT, OUT) + '/: index.html, app.min.js, loader/ (' + n + ' Skripte), Bilder');
+  }
+  /* Mess-Bau: Mess-Skripte + Demo-Paket ins Paket, index.html startet ueber PNA.perf.boot() (platforms/apple/bench/perf.js) */
+  function benchPackage() {
+    var bd = path.join(ROOT, 'platforms', pid, 'bench'), dest = path.join(OUT, 'bench'), n = 0, ip = path.join(OUT, 'index.html');
+    fs.mkdirSync(dest, { recursive: true });
+    ['demo.js', 'perfmath.js', 'perf.js'].forEach(function (f) {
+      var t = fs.readFileSync(path.join(bd, f), 'utf8'), before = errors.length;
+      es5Gate(t);
+      for (var i = before; i < errors.length; i++) errors[i] = 'platforms/' + pid + '/bench/' + f + ': ' + errors[i];
+      fs.writeFileSync(path.join(dest, f), t); n++;
+    });
+    var cp = require('child_process'), commit = '', dirty = '';
+    try { commit = cp.execSync('git rev-parse --short HEAD', { cwd: ROOT, encoding: 'utf8' }).trim(); } catch (e) {}
+    try { dirty = cp.execSync('git status --porcelain -- src platforms tools', { cwd: ROOT, encoding: 'utf8' }).trim() ? '+' : ''; } catch (e) {}
+    fs.writeFileSync(path.join(dest, 'build-info.js'), 'window.PNA_BENCH_BUILD = ' + JSON.stringify({ commit: commit + dirty, date: new Date().toISOString().slice(0, 16) }) + ';\n' +
+      'window.PNA = window.PNA || {}; PNA.perfTargets = ' + JSON.stringify(JSON.parse(fs.readFileSync(path.join(bd, 'targets.json'), 'utf8'))) + ';\n');
+    var html = fs.readFileSync(ip, 'utf8'), a = '<script src="app.min.js"></script>', b = /<script>PNA\.boot\.start\([^<]*<\/script>/;
+    if (html.indexOf(a) < 0 || !b.test(html)) { fail('Mess-Bau: index.html ohne erwartete Skript-Zeilen (app.min.js / PNA.boot.start)'); return n; }
+    html = html.replace(a, '<script src="bench/demo.js"></script>\n<script src="demo/pack.js"></script>\n' + a)
+      .replace(b, '<script src="bench/perfmath.js"></script>\n<script src="bench/build-info.js"></script>\n<script src="bench/perf.js"></script>\n<script>PNA.perf.boot();</script>');
+    fs.writeFileSync(ip, html);
+    var pack = path.join(ROOT, 'dist', 'apple-demo');
+    if (fs.existsSync(path.join(pack, 'pack.js'))) {
+      fs.cpSync(pack, path.join(OUT, 'demo'), { recursive: true });
+      console.log('Mess-Bau: Demo-Paket dist/apple-demo/ uebernommen');
+    } else console.log('HINWEIS: Mess-Bau ohne Demo-Paket (node platforms/apple/tools/make-pack.js) – nur Messung gegen den echten Server.');
+    return n;
+  }
   function write(code, min) {
     var appPath = path.join(OUT, 'app.js'), minPath = path.join(OUT, 'app.min.js');
     var previous = fs.existsSync(appPath) ? fs.readFileSync(appPath) : null, prevMin = fs.existsSync(minPath) ? fs.readFileSync(minPath) : null;
@@ -375,16 +456,19 @@ function build() {
     var assets = fs.readdirSync(path.join(SRC, 'assets')).filter(function (f) { return /\.(png|gif)$/.test(f) && (!isPtr(f) || mine.indexOf(f) >= 0); });
     fs.readdirSync(OUT).forEach(function (f) { if (isPtr(f) && mine.indexOf(f) < 0) fs.unlinkSync(path.join(OUT, f)); });
     assets.forEach(function (f) { fs.copyFileSync(path.join(SRC, 'assets', f), path.join(OUT, f)); });
+    if (pid !== plat.DEFAULT) platformPackage();
     var gz = require('zlib');
-    console.log('app/app.js: ' + kb(code.length) + ' KB lesbar (' + manifest.length + ' Module, CSS ' + kb(css.length) + ' KB davon Akzent-Varianten ' + kb(cssStats.bytes) + ' KB (' + cssStats.variants + ' Farben x ' + cssStats.tokenRules + ' Regeln, ' + cssStats.copies + ' Begleitregeln), ' + keys + ' Texte je Sprache), ' +
+    console.log(path.relative(ROOT, OUT) + '/app.js: ' + kb(code.length) + ' KB lesbar (' + manifest.length + ' Module, CSS ' + kb(css.length) + ' KB davon Akzent-Varianten ' + kb(cssStats.bytes) + ' KB (' + cssStats.variants + ' Farben x ' + cssStats.tokenRules + ' Regeln, ' + cssStats.copies + ' Begleitregeln), ' + keys + ' Texte je Sprache), ' +
       'Startdateien: 1 (CSS eingebettet), Bilder: ' + assets.join(', ') + ' – ' + (Date.now() - t0) + ' ms');
     if (min !== null) {
-      console.log('app/app.min.js: ' + kb(min.length) + ' KB minifiziert, ' + kb(gz.gzipSync(min).length) + ' KB gzip (Release-Paket, ohne dev/)');
+      console.log(path.relative(ROOT, OUT) + '/app.min.js: ' + kb(min.length) + ' KB minifiziert, ' + kb(gz.gzipSync(min).length) + ' KB gzip (Release-Paket, ohne dev/)');
       if (min.length > 180 * 1024) console.log('HINWEIS: app.min.js > 180 KB (Budget SPEC 16.2) – Rest sind Texte (de/en), CSS und Eigenschaftsnamen, siehe docs/P7-TV-TEST.md.');
     } else console.log('HINWEIS: --no-min – app/app.min.js nicht neu gebaut.');
     // Regressionsschutz: alle Unit-Tests laufen im Build; bei Fehlern bleiben die vorherigen Dateien stehen
     if (process.argv.indexOf('--no-test') < 0) {
       var globs = ['tests/*.test.js'].concat(fs.existsSync(path.join(ROOT, 'tests', EXT_DIR)) ? ['tests/' + EXT_DIR + '/*.test.js'] : []);
+      // Apple-Fassung (privat, nicht exportiert): Tests nur, wenn die Ordner vorhanden sind
+      ['platforms/apple/tests', 'platforms/apple/shell/tests', 'platforms/apple/probe/tests', 'platforms/apple/private/tests'].forEach(function (d) { if (fs.existsSync(path.join(ROOT, d))) globs.push(d + '/*.test.js'); });
       var r = require('child_process').spawnSync(process.execPath, ['--test'].concat(globs), { cwd: ROOT, stdio: 'inherit' });
       if (r.status !== 0) {
         if (previous) fs.writeFileSync(appPath, previous);

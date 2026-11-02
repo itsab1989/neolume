@@ -3,6 +3,8 @@
  *   deps.sef      {exec(name, a, b, …) -> Rueckgabe}         (N.sef.create)
  *   deps.get      (path, query, opts, cb)  PMS-GET           deps.write (method, path, query, cb)  schreibend (readOnly beachtet)
  *   deps.timers   {now, set, clear}         deps.base / token / clientId   deps.cfg (Einstellungen)   deps.mem(showRk) -> gemerkte Spuren
+ *   deps.wan      ueber das Internet (Grenze qualityRemote, location=wan); deps.wanDirect: trotzdem zuerst Direct Play (eigener
+ *                 Server unterwegs; Weitere Server am TV nie, TV-Test 1.0.4)   deps.cell  ueber Mobilfunk (Grenze qualityCell)
  * Zustaende: resolving -> buffering <-> playing <-> paused -> ended | stopped | error. Schnellspulen (PLAY-32): speed != 1 bei
  * Zustand 'playing' (Trick-Modus des SEF, nur Direct Play), siehe trick()/normal().
  * Ereignisse (on(fn(ev, data))): meta, state, time, buffer, sub, ended, error, tracks, speed, trickEdge. */
@@ -10,7 +12,7 @@
   var U = N.util, D = N.decision, TR = N.tracks, TL_MS = 10000;
   function Playback(deps, item) {
     this.d = deps; this.item = item; this.state = 'idle'; this.t = item.off || 0; this.resume = item.off || 0;
-    this.meta = null; this.r = null; this.hls = false; this.att = { dp: deps.cfg.directPlay !== false && !deps.wan, ds: true };   // weiterer Server uebers Internet: gleich HLS (Direct Stream/Umwandlung)
+    this.meta = null; this.r = null; this.hls = false; this.att = { dp: deps.cfg.directPlay !== false && (!deps.wan || !!deps.wanDirect), ds: true };   // weiterer Server uebers Internet: gleich HLS (Direct Stream/Umwandlung)
     this.fns = []; this.loop = 0; this.session = ''; this.sub = null; this.subMode = 'none'; this.firstTick = false; this.dead = false;
     this.aspect = deps.cfg.aspect || 'auto'; this.base = 0; this.rel = false; this.t0 = 0; this.cropped = null;
     this.queueItem = item.pqi || null; this.queueId = item.pqId || null;
@@ -110,12 +112,18 @@
       self.emit('subs', now);
     });
   };
+  /* Felder fuer die Qualitaetsgrenze (N.decision.cap/query): Einstellungen + Netz */
+  P.capOpts = function () {
+    var c = this.d.cfg;
+    return { quality: c.quality, wan: !!this.d.wan, qWan: c.qualityRemote, cell: !!this.d.cell, qCell: c.qualityCell };
+  };
   P.decide = function () {
     var self = this, c = this.d.cfg, M = this.meta;
     this.session = U.uuid();
     var burn = TR.subMode(this.sub, c.ass, false) === 'burn';
-    var o = { rk: M.rk, mediaIndex: M.mi, session: this.session, clientId: this.d.clientId, token: this.d.token, wan: !!this.d.wan, dp: this.att.dp && !burn, ds: this.att.ds, subs: burn ? 'burn' : 'none', quality: c.quality,
+    var o = { rk: M.rk, mediaIndex: M.mi, session: this.session, clientId: this.d.clientId, token: this.d.token, dp: this.att.dp && !burn, ds: this.att.ds, subs: burn ? 'burn' : 'none',
       stereo: c.passthrough === false, boost: c.passthrough === false ? Number(c.audioBoost) || 100 : 100 };
+    U.extend(o, this.capOpts());
     this.setState('resolving');
     this.d.get('/video/:/transcode/universal/decision', D.query(o), { timeout: 15000, retries: 1 }, function (err, json) {
       if (self.dead) return;

@@ -72,3 +72,64 @@ test('Datumszeile: "Mi., 28. Okt." / "Wed 28 Oct", Maerz/Mai ohne Punkt', functi
   N.i18n.set('en');
   assert.strictEqual(N.fmt.dateShort(new Date(2026, 9, 28)), 'Wed 28 Oct');
 });
+
+/* Apple Nr. 23/26 (SPEC NAV-16): bei Finger/Maus/Trackpad keine Hinweisleiste; Zurueck-Knopf fuer Ansichten mit scr.backBtn */
+function direct(mode) {
+  var ctx = H.load(), N = ctx.N;
+  ctx.document = { body: { className: '' } };
+  N.platform.caps.focusRing = 'keys'; N.platform.caps.touch = true;
+  N.input.init(); N.input.set(mode);
+  return N;
+}
+var CARD = [{ k: 'red', t: 'hint.hide' }, { k: 'yellow', t: 'hint.markWatched' }, { k: 'blue', t: 'hint.search' }, { k: 'INFO', t: 'hint.details' }, { k: 'ret', t: 'hint.back' }];
+test('Hinweisleiste Finger/Maus: ganz weg; Tastatur und TV unveraendert (dieselbe Liste)', function () {
+  ['touch', 'pointer'].forEach(function (m) {
+    var Hn = direct(m).ui.hints;
+    assert.strictEqual(Hn.pick(CARD).length, 0, m);
+    assert.strictEqual(Hn.pick([{ k: 'ret', t: 'hint.cancel' }, { k: 'green', t: 'hint.newCode' }]).length, 0, m + ': auch Dialoge/Anmeldung (echte Knoepfe)');
+  });
+  assert.strictEqual(direct('key').ui.hints.pick(CARD), CARD, 'Tastatur: dieselbe Liste');
+  var tv = H.load().N;                                    // TV: focusRing 'always' -> nie direkt
+  tv.input.init(); tv.input.set('touch');
+  assert.strictEqual(tv.ui.hints.pick(CARD), CARD, 'TV: unveraendert');
+});
+
+test('Zurueck-Knopf: nur Finger/Maus und nur auf Wunsch der Ansicht; Treffer oben links', function () {
+  var N = direct('touch'), Hn = N.ui.hints, B = Hn.BACK;
+  Hn.back(true);
+  assert.ok(Hn.backHit(B.x + 10, B.y + 10));
+  assert.ok(!Hn.backHit(400, 300));
+  Hn.back(false);
+  assert.ok(!Hn.backHit(B.x + 10, B.y + 10), 'Ansicht ohne backBtn');
+  N.input.set('key'); Hn.back(true);
+  assert.ok(!Hn.backHit(B.x + 10, B.y + 10), 'Tastatur: RETURN statt Knopf');
+});
+
+test('Hinweisleiste: Wechsel der Eingabeart holt die Liste der Ansicht neu (router.refreshHints)', function () {
+  var N = direct('touch'), n = 0;
+  N.ui.hints.el = { className: '' };
+  N.router.refreshHints = function () { n++; };
+  N.input.set('key');
+  assert.strictEqual(n, 1);
+  N.input.set('key');
+  assert.strictEqual(n, 1, 'gleiche Art: nichts');
+});
+
+test('Rueckgaengig-Toast: Finger/Maus antippen = dieselbe Taste (Gelb bzw. Rot), Text "Tippen"; Tastatur/TV nicht', function () {
+  var N = direct('touch'), T = N.ui.toast, keys = [];
+  T.el = { className: '', offsetLeft: 144, offsetTop: 568, offsetWidth: 400, offsetHeight: 56 };
+  T.ic = {}; T.txt = {}; N.ui.setIcon = function () {}; N.util.setText = function () {};
+  N.router.key = function (k) { keys.push(k); };
+  assert.strictEqual(T.tapSuffix(), 'Tap');
+  T.show('x', { undo: true });
+  assert.strictEqual(T.tap(10, 10), false, 'daneben');
+  assert.strictEqual(T.tap(200, 590), true);
+  T.show('x', { undo: true, undoKey: 'RED' }); T.tap(200, 590);
+  T.show('x', {}); assert.strictEqual(T.tap(200, 590), false, 'ohne Rueckgaengig');
+  assert.deepStrictEqual(keys, ['YELLOW', 'RED']);
+  N.input.set('key');
+  T.show('x', { undo: true });
+  assert.strictEqual(T.tap(200, 590), false, 'Tastatur: Farbtaste');
+  assert.strictEqual(T.tapSuffix(), '');
+  T.hide();
+});

@@ -50,9 +50,7 @@ fs.readdirSync(path.join(ROOT, 'brand')).filter(function (f) { return /\.json$/.
  * TV-Test 30.10.: das 32er Sprite-Symbol (sichtbar 18 px) wirkte aus 3 m klein und leer; hochskaliert waere es unscharf. Gleiche
  * Form wie design/icons/grid.svg, Farbe Token c.text-1. Nur dieses: node tools/make_assets.js --allgrid */
 function allGrid() {
-  var it = T.icons().filter(function (x) { return x.name === 'grid'; })[0], col = T.color('text-1'), S = 48, k = S / 18;
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + S + '" height="' + S + '"><g transform="scale(' + k + ') translate(-5 -5)" ' +
-    it.attrs.replace(/currentColor/g, col) + '>' + it.body.replace(/currentColor/g, col) + '</g></svg>';
+  var svg = T.allGridSvg();
   var t = path.join(require('os').tmpdir(), 'neo-all-grid.svg');
   fs.writeFileSync(t, svg);
   try { cp.execFileSync('rsvg-convert', ['-o', path.join(OUT, 'all-grid.png'), t]); } catch (e) { console.error('rsvg-convert fehlt – all-grid.png'); }

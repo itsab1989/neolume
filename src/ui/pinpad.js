@@ -13,7 +13,7 @@
     if (!u || !u.thumb || !st || !st.state) return '';
     var tok = st.cachedToken(st.admin()) || (st.state.server && st.state.server.token);
     var base = N.plex.base || (st.state.server && (st.state.server.uri || '').replace(/\/+$/, '')) || '';
-    return tok && base ? N.img.url(u.thumb, 'avatarM', { token: tok, base: base }) : '';
+    return N.img.avatar(u.thumb, 'avatarM', { token: tok, base: base });
   }
   N.ui.avatarUrl = avatarUrl;
   function open(o) {
@@ -22,8 +22,9 @@
     var d = U.el('div', 'pdlg', ov.el);
     var av = U.el('div', 'pav ' + N.ui.avatarClass(o.name), d);
     av.appendChild(document.createTextNode(N.ui.initial(o.name)));
-    var avUrl = o.avatar !== undefined && o.avatar !== '' ? o.avatar : avatarUrl(N.session && N.session.user(o.uuid || o.key));   // F18: Foto wie auf der Profilwahl
-    if (avUrl) { var im = U.el('img', '', av); im.src = N.img.BLANK; N.img.want(im, avUrl, 0); }
+    var im, avU = N.session && N.session.user(o.uuid || o.key);   // F18: Foto wie auf der Profilwahl; PROF-11: gespeichertes Bild sofort
+    if (o.avatar) { im = U.el('img', '', av); im.src = N.img.BLANK; N.img.want(im, o.avatar, 0); }
+    else if (avU && avU.thumb) { im = U.el('img', '', av); im.src = N.img.BLANK; N.avatars.show(im, { uuid: avU.uuid, thumb: avU.thumb, tier: 'avatarM', url: avatarUrl(avU), prio: 0 }); }
     U.txt('div', 'a t-h2 ell', d, o.title, 'left:24px;top:140px;width:432px;text-align:center');
     for (var i = 0; i < 4; i++) ov.dots.push(U.el('div', 'pin-dot', d, 'left:' + (170 + i * 40) + 'px'));
     for (i = 0; i < KEYS.length; i++) {
@@ -64,6 +65,7 @@
     ov.hints = function () { return [{ k: 'DIGITS', t: 'hint.type' }, { k: 'ret', t: 'hint.cancel' }]; };
     ov.onKey = function (k) {
       if (N.keys.isDigit(k)) { logic.input(k); return true; }
+      if (k === 'DEL') { logic.del(); return true; }                 // Ruecktaste einer Hardware-Tastatur (Apple), am TV ohne Code
       if (N.keys.isNav(k)) { var n = N.nav.grid(ov.f, KEYS.length, 3, k); if (n >= 0) setF(n); return true; }
       if (k === 'ENTER') { press(ov.f); return true; }
       if (k === 'INFO') { N.ui.panel.help(N.t('help.title'), N.t(o.helpKey || (N.session.pkg ? 'help.pin.app' : 'help.pin'))); return true; }
@@ -79,6 +81,7 @@
     setF(4);
     render(logic.s);
     N.router.openOverlay(ov);
+    setTimeout(function () { if (!ov.closed) ov.box = [d.offsetLeft, d.offsetTop, d.offsetWidth, d.offsetHeight]; }, 50);   // Finger/Maus: Tipp daneben = Abbrechen (N.pointer)
     return ov;
   }
   N.ui.pinpad = { open: open, KEYS: KEYS };

@@ -61,3 +61,31 @@ test('Visueller Vergleich: gleich, Abweichung, Maske, PNG-Roundtrip', function (
   var r = V.readPng(tmp);
   assert.strictEqual(r.w, 3); assert.deepStrictEqual([r.px[0], r.px[1], r.px[2], r.px[3]], [10, 20, 30, 255]);
 });
+test('Plattform: Standard-Bau enthaelt den Orsay-Adapter direkt hinter dem Vertrag', function () {
+  var code = fs.readFileSync(path.join(__dirname, '..', 'app', 'app.js'), 'utf8');
+  var a = code.indexOf('N.Platform = {'), b = code.indexOf("id: 'samsung-orsay'"), c = code.indexOf('N.LRU = LRU');   // Kommentare entfernt der Bau
+  assert.ok(a > 0 && b > a && c > b, 'Reihenfolge Vertrag -> Adapter -> Rest');
+});
+test('Plattform: --platform mit unbekannter Kennung scheitert verstaendlich, ohne app/ anzufassen', function () {
+  var r = require('child_process').spawnSync(process.execPath, [path.join(__dirname, '..', 'tools', 'build.js'), '--platform', 'gibtsnicht', '--no-test', '--no-min'], { encoding: 'utf8' });
+  assert.notStrictEqual(r.status, 0);
+  assert.ok(/Plattform "gibtsnicht" unbekannt: platforms\/gibtsnicht\/adapter\/ fehlt/.test(r.stderr), r.stderr);
+  var p = require('../tools/platform.js');
+  assert.strictEqual(p.id([], {}), 'samsung-orsay');
+  assert.strictEqual(p.id(['--platform', 'apple'], {}), 'apple');
+  assert.strictEqual(p.id([], { PLATFORM: 'apple' }), 'apple');
+  assert.throws(function () { p.id(['--platform', '../x'], {}); }, /ungueltige Kennung/);
+});
+test('Plattform: Orsay-Bau (app/) enthaelt keine Apple-Module', function () {
+  var code = fs.readFileSync(path.join(__dirname, '..', 'app', 'app.js'), 'utf8');
+  assert.ok(code.indexOf("id: 'apple'") < 0 && code.indexOf('PN_NATIVE') < 0, 'kein Apple-Adapter im TV-Bau');
+  assert.ok(code.indexOf("id: 'samsung-orsay'") > 0);
+});
+test('Plattform: --platform apple schreibt ein Paket nach dist/apple/<marke>/ (index.html, loader/, ohne app.js/local.json)', { skip: !fs.existsSync(path.join(__dirname, '..', 'platforms', 'apple', 'adapter', 'manifest.json')) && 'Apple-Plattform fehlt (oeffentlicher Baum)' }, function () {
+  var root = path.join(__dirname, '..'), out = path.join(root, 'dist', 'apple', 'public');
+  var r = require('child_process').spawnSync(process.execPath, [path.join(root, 'tools', 'build.js'), '--platform', 'apple', '--brand', 'public', '--no-test', '--no-min'], { encoding: 'utf8' });
+  assert.strictEqual(r.status, 0, r.stderr);
+  assert.ok(fs.existsSync(path.join(out, 'index.html')) && fs.existsSync(path.join(out, 'loader', 'boot.js')) && fs.existsSync(path.join(out, 'loader', 'player', 'video.js')));
+  ['app.js', 'local.json', 'setup.json', 'helper.json'].forEach(function (f) { assert.ok(!fs.existsSync(path.join(out, f)), f); });
+  assert.ok(/<title>Neolume<\/title>/.test(fs.readFileSync(path.join(out, 'index.html'), 'utf8')));
+});

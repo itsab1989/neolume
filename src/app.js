@@ -1,5 +1,6 @@
 /* App-Einstieg. Der Lader (loader/boot.js) ruft App.start(ctx) und leitet Tasten per App.onKey(code, event) weiter.
- * ctx: {source:'dev …'|'lokal …', log(msg), store:{read,write,probe}, widgetAPI, pluginAPI, tvKey}
+ * ctx: Lader-Kontext {source:'dev …'|'lokal …', log(msg), store:{read,write,probe}, …} – weitere Felder je Plattform
+ * (Orsay: widgetAPI, pluginAPI, tvKey), gelesen von N.platform.init (src/platform/platform.js)
  * Startpfad (SPEC 14.3/16.1): Store lesen -> setup.json aus dem Paket (N.setupFile, PMS-only) -> Sprache -> Router-Start
  * (Login | Setup | Profilwahl | Home aus dem Cache). Mit setup.json nie plex.tv; ohne (Entwicklung) kein plex.tv, wenn die Tokens gecacht sind. */
 (function (N) {
@@ -20,7 +21,7 @@
   }
   function tvLanguage() {
     var raw = '';
-    try { var tv = document.getElementById('pluginObjectTVMW'); if (tv && tv.GetLanguage) raw = tv.GetLanguage(); } catch (e) {}
+    try { raw = N.platform.tv.language(); } catch (e) {}
     var nav = (window.navigator && (navigator.language || navigator.userLanguage)) || '';
     N.log('lang raw tvmw=' + raw + ' nav=' + nav);
     // TVMW liefert u. U. eine Zahl (Samsung-Enum) – dann zaehlt navigator.language; alles Unbekannte -> Deutsch
@@ -37,6 +38,8 @@
   var A = {
     start: function (c) {
       ctx = c || {};
+      N.platform.init(ctx);
+      N.screen.init();                                 // logische Flaeche: TV 1280x720, flexible Plattform W x H (Apple)
       var t0 = U.now();
       marks = []; markT = t0;
       A.source = String(ctx.source || '');
@@ -49,7 +52,7 @@
       while (root.firstChild) root.removeChild(root.firstChild);
       screens = U.el('div', 'layer', root); chrome = U.el('div', 'layer', root); over = U.el('div', 'layer', root);
       over.id = 'pn-over';
-      N.store.init(ctx.store || { read: function () { return null; }, write: function () {} });
+      N.store.init(N.platform.store(ctx));
       N.config.apply(N.store.get('config.json'));
       mark('store');
       N.setupFile.read(ctx, function (pkg, why) {
@@ -67,6 +70,7 @@
       N.i18n.set(st.lang || tvLanguage());
       N.accent.apply(st.accent);                       // zuletzt genutzte Akzentfarbe vor dem ersten Bild (kein Farbsprung)
       mark('i18n');
+      N.input.init();                                  // Eingabeart (caps.focusRing 'keys': Klasse am body; TV: nichts)
       N.img.decoder(chrome);                           // Vorab-Dekodieren (Runde 5): 1x1-Ebene fuer Bilder ausserhalb des Bildschirms
       N.ui.hints.init(chrome);
       N.ui.toast.init(chrome);
@@ -86,9 +90,9 @@
       mark('saver+net');
       // SUBTITLE und CH▲/CH▼ registriert der Lader nicht -> zur Laufzeit (kein Lader-Update noetig, research/player.md 7).
       // CH▲/▼: vorige/naechste Folge bzw. Kapitel im Player, Titel in Jetzt laeuft, Seiten in Listen (sonst wechselt der TV ggf. den Sender)
-      ['KEY_SUBTITLE', 'KEY_CH_UP', 'KEY_CH_DOWN'].forEach(function (k) {
-        try { if (ctx.pluginAPI && ctx.tvKey && ctx.tvKey[k] !== undefined) ctx.pluginAPI.registKey(ctx.tvKey[k]); } catch (e0) { N.log('registKey ' + k + ' ' + e0.message); }
-      });
+      N.platform.keys.register(['SUBTITLE', 'CH_UP', 'CH_DOWN']);
+      // flexible Flaeche (nur Apple): Fenster gezogen / Geraet gedreht -> Seitenleiste und flexible Ansichten neu aufbauen
+      if (N.screen.flex) N.evt.on('screen:resized', function () { if (N.ui.rail.el) N.ui.rail.build(); N.router.relayout(); });
       window.onunload = A.flush;
       window.onerror = function (msg, url, line, col, err) {
         N.diag.error('JS-Fehler ' + msg + ' @' + String(url || '').split('/').pop() + ':' + line + ':' + (col || 0), err);
@@ -170,33 +174,81 @@
       N.router.rebuild();
       if (N.ui.saver && N.ui.saver.relabel) N.ui.saver.relabel();   // Datum der Startseiten-Uhr in der neuen Sprache
     },
-    /* Beenden/EXIT/onunload: ausstehende Schreibzugriffe (Ausblenden) senden, Protokoll und Speicher sofort schreiben */
-    flush: function () {
-      try { N.evt.emit('app:flush'); } catch (e) {}
+    /* Beenden/EXIT/onunload: ausstehende Schreibzugriffe (Ausblenden) senden, Protokoll und Speicher sofort schreiben.
+     * why 'background' (Plattform-Lader, App geht in den Hintergrund und laeuft weiter, z. B. Bild in Bild): Speicher schreiben,
+     * aber die Wiedergabe nicht abschliessen (Player/Musik melden sonst "gestoppt" und nehmen keine Ereignisse mehr an) */
+    flush: function (why) {
+      try { N.evt.emit('app:flush', why === 'background' ? why : ''); } catch (e) {}
       N.diag.flush(); N.store.flush();
     },
     exit: function () {
       A.flush();
-      try { if (ctx.widgetAPI) ctx.widgetAPI.sendReturnEvent(); } catch (e) { N.log('exit ' + e.message); }
+      N.platform.tv.exit();
     },
-    onKey: function (code) {
-      var k = N.keys.name(code);
+    onKey: function (code, ev) {
+      var k = N.platform.keys.name(code, ev);
       if (!k) return;
+      A.press(k);
+    },
+    /* Taste nach Namen (Vertrag N.Platform.KEYS) – fuer Plattformen ohne Tastencodes (Touch, Hinweisleiste, Bruecke).
+     * via: Herkunft fuer die Eingabeart (N.input) – fehlt = echte Taste ('key'), 'touch'/'pointer' = Geste des Laders,
+     * anderes (z. B. 'sys': Anruf pausiert) = Art bleibt */
+    press: function (k, via) {
       try {
+        N.input.set(via === undefined || via === null ? 'key' : via);
         if (N.ui.saver.key(k)) return;               // Schoner an: Taste beendet ihn ohne ihre Funktion (SPEC 7.14)
         if (N.devperf && N.devperf.key(k)) return;
         if (N.audio.key(k)) return;                   // M4: globale Medientasten waehrend Musik
+        // Nr. 22: Pfeil aus einem Finger-Wisch (Rueckfall-Fokus-Schritte des Laders) oeffnet nie die Seitenleiste (N.ui.rail.open)
+        N.input.swipe = via === 'touch' && N.keys.isNav(k);
         N.router.key(k);
       } catch (e) { N.diag.error('Taste ' + k, e); }
+      N.input.swipe = false;
+    },
+    /* Wisch vom linken Bildschirmrand (Touch-Schicht der Plattform, Nr. 9): Seitenleiste ausklappen, wo es eine gibt (nicht ueber
+     * Dialogen/Panels, nicht im Player). Rueckgabe true = offen */
+    rail: function () {
+      try {
+        var rl = N.ui.rail;
+        if (!rl || !rl.attached() || N.router.hasOverlay() || (N.ui.saver && N.ui.saver.on)) return false;
+        N.input.set('touch');
+        if (!rl.isOpen()) rl.open();
+        return rl.isOpen();
+      } catch (e) { N.diag.error('Rail', e); return false; }
+    },
+    /* Rand-Wisch live (Touch-Schicht, Nr. 24): {phase 'start'|'move'|'end', dx (App-px seit Start), t, cancel} -> Seitenleiste folgt
+     * dem Finger (N.ui.rail.pan). Bei 'start' false = keine Leiste hier (Dialog, Player, Schoner) -> der Lader verwirft den Zug. */
+    railPan: function (e) {
+      try {
+        var rl = N.ui.rail;
+        if (!e || !rl || !rl.pan) return false;
+        if (e.phase === 'start') {
+          if (!rl.attached() || rl.isOpen() || N.router.hasOverlay() || (N.ui.saver && N.ui.saver.on)) return false;
+          N.input.set('touch');
+        }
+        return rl.pan({ phase: e.phase, from: 'edge', dx: e.dx || 0, t: e.t || 0, cancel: !!e.cancel });
+      } catch (er) { N.diag.error('Rail-Pan', er); return false; }
+    },
+    /* Eingabeart vom Lader melden (Beruehrung: 'touch'), bevor die Geste als Maus-Ereignis/Pan ankommt */
+    input: function (m) { N.input.set(m); },
+    /* Wischen bei caps.scroll 'free' (Lader, 08-touch.md 5): {phase:'start'|'move'|'end', axis:'x'|'y', x, y (Start, App-px),
+     * dx, dy (Weg seit Start, App-px), t (ms), cancel}. -> true, wenn eine Ansicht den Zug nimmt; sonst passiert nichts */
+    pan: function (e) {
+      try { return N.router.pan(e); } catch (er) { N.diag.error('Pan', er); return false; }
+    },
+    /* Rad/Trackpad bei caps.scroll 'free' (Lader): {x, y} App-Koordinaten des Zeigers, {dx, dy} Weg in App-px -> N.pointer.wheelPx */
+    wheel: function (e) {
+      try { return !!(e && N.pointer.wheelPx(e.x, e.y, e.dx || 0, e.dy || 0)); } catch (er) { N.diag.error('Rad', er); return false; }
     }
   };
   N.app = A;
-  /* TV-Dienste fuer den Player: TV-eigener Bildschirmschoner aus waehrend der Wiedergabe, an in Pause/nach Stop (Orca) */
-  N.tv = {
-    saver: function (on) {
-      try { var p = ctx && ctx.pluginAPI; if (!p) return; if (on) p.setOnScreenSaver(); else p.setOffScreenSaver(); } catch (e) { N.log('saver ' + e.message); }
-    }
-  };
+  /* TV-Dienste fuer den Player: TV-eigener Bildschirmschoner aus waehrend der Wiedergabe, an in Pause/nach Stop (Orca).
+   * Alias auf N.platform.tv.saver (Aufrufer: views/player.js, player/audio.js) */
+  N.tv = { saver: function (on) { N.platform.tv.saver(on); } };
   /* Schnittstelle zum Lader */
-  window.App = { start: A.start, onKey: A.onKey, flush: A.flush };
+  /* Finger-Ziehen (Touch-Schicht der Plattform, App-Koordinaten): grab(x, y) -> 'drag' | 'tap' | '' fragt nur, drag(phase, x, y)
+   * fuehrt aus (N.pointer.grab/drag; Player-Balken = Scrubbing, im Player kein Wischen) */
+  function grab(x, y) { try { return N.pointer.touchGrab(x, y); } catch (e) { N.diag.error('grab', e); return ''; } }
+  function drag(ph, x, y) { try { return N.pointer.touchDrag(ph, x, y); } catch (e) { N.diag.error('drag ' + ph, e); return false; } }
+  window.App = { start: A.start, onKey: A.onKey, press: A.press, flush: A.flush, grab: grab, drag: drag, input: A.input, pan: A.pan, wheel: A.wheel, rail: A.rail, railPan: A.railPan };
 })(N);

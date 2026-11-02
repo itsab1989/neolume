@@ -95,6 +95,18 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .card-sq .bdg.all { top: 46px; } .card-sq .ph.all { top: 106px; }
 .cap { position: absolute; -webkit-transform: translate3d(0,0,0); }   /* perf3: eigene kleine GPU-Ebene (TV: 9,8,5 capl-M 57,4 statt 53,5 fps) */
 .cap-land { width: 288px; } .cap-poster { width: 176px; }
+/* Startseite Mittel/Klein (HOME-15, RowMath.homeGeom): Querformat 240x135 / 192x108, quadratisch 120; Poster 144x216 (.card-poster-s)
+ * und 120x180 (.card-poster-q), quadratisch 144 (.card-sq-s) wie Mediathek/Suche. Ring 8 px aussen (w+16 x h+16) */
+.card-land-m { width: 240px; height: 135px; } .card-land-m img { width: 240px; height: 135px; } .cap-land-m { width: 240px; } .fr-land-m { width: 256px; height: 151px; }
+.card-land-s { width: 192px; height: 108px; } .card-land-s img { width: 192px; height: 108px; } .cap-land-s { width: 192px; } .fr-land-s { width: 208px; height: 124px; }
+.card-sq-q { width: 120px; height: 120px; } .card-sq-q img { width: 120px; height: 120px; } .cap-sq-q { width: 120px; } .fr-sq-q { width: 136px; height: 136px; }
+/* "Alle anzeigen" mittig: Symbol 48 + 12 + Text 24 = Block 84 hoch */
+.card-land-m .bdg.all { top: 26px; } .card-land-m .ph.all { top: 86px; }
+.card-land-s .bdg.all { top: 12px; } .card-land-s .ph.all { top: 72px; }
+.card-poster-s .bdg.all { top: 66px; } .card-poster-s .ph.all { top: 126px; }
+.card-poster-q .bdg.all { top: 48px; } .card-poster-q .ph.all { top: 108px; }
+.card-sq-s .bdg.all { top: 30px; } .card-sq-s .ph.all { top: 90px; }
+.card-sq-q .bdg.all { top: 18px; } .card-sq-q .ph.all { top: 78px; }
 .cap .t1 { font-size: 18px; line-height: 24px; font-weight: 600; color: @c.text-2@; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cap .t2 { font-size: 16px; line-height: 22px; color: @c.text-3@; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cap.is-focus .t1 { color: @c.text-1@; } .cap.is-focus .t2 { color: @c.text-2@; }
@@ -347,7 +359,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .skel { position: absolute; left: 0; top: 0; width: @l.screen-w@; height: @l.screen-h@; }
 .skel i { position: absolute; background: @c.surface-2@; border-radius: @r.sm@; }
 .stb .big { position: absolute; left: 0; top: 0; width: 64px; height: 64px; background-image: url(@A/icons.png); background-repeat: no-repeat;
-  -webkit-background-size: 896px 256px; background-size: 896px 256px; background-position: -704px -128px; }
+  -webkit-background-size: 1984px 256px; background-size: 1984px 256px; background-position: -704px -128px; }
 .stb .st { position: absolute; left: 0; top: 88px; width: 800px; }
 .stb .sx { position: absolute; left: 0; top: 140px; width: 640px; }
 .stb .sb { position: absolute; left: 0; top: 240px; width: 800px; height: 48px; white-space: nowrap; }
@@ -383,6 +395,59 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .rm .card, .rm .btn, .rm .prof .av, .rm .focus-ring, .rm .strip, .rm .pg, .rm .nav-panel, .rm #pn-toast, .rm .hero-txt { -webkit-transition: none; }
 .rm .card.is-focus, .rm .btn.is-focus, .rm .prof .lock, .rm .prof.is-focus .lock { -webkit-transition: none; }
 .rm .prof.is-focus .av { -webkit-transform: translate3d(0,0,0); }
+
+/* ---------- Eingabeart Finger/Maus (N.input, nur mit caps.focusRing 'keys' – der Fernseher setzt diese Klassen nie) ----------
+   Finger: kein Fokusrahmen, keine Fokus-Vergroesserung, keine Fokusfarbe an Knoepfen und Einstellungen (ein Tipper loest sofort
+   aus); die Fokus-Klassen laufen unsichtbar weiter, die erste Taste schaltet auf inp-key (Fokus wie am TV). Maus/Trackpad (Nr. 20):
+   duenner Akzent-Rahmen, Kachel leicht groesser (Aufhellen nur Apple: platforms/apple/loader/flex.css), Knoepfe behalten die Fokusfarbe als Rueckmeldung beim Darueberfahren. Fokusrahmen = Huelle .frw (Deckkraft 0, Ebene bleibt, Runde 8).
+   Farb-Regeln mit "#root": spezifischer als alle Akzent-Varianten (.ac-x …), darum ohne Begleitregeln je Farbe (tools/build.js). */
+.inp-touch .frw { opacity: 0; }
+/* Maus/Trackpad (Nr. 20): dezent – duenner Rand in der Akzentfarbe, Kachel leicht groesser; Tastatur behaelt den TV-Fokus */
+.inp-ptr .focus-ring { border-width: @fo.ring-width-ptr@; }
+.inp-ptr .card.is-focus { -webkit-transform: translate3d(0,0,0) scale(@fo.scale-ptr@); }
+.inp-touch .card.is-focus, .inp-touch .btn.is-focus, .inp-ptr .btn.is-focus, .inp-touch .btn.ib.is-focus, .inp-ptr .btn.ib.is-focus,
+.inp-touch .prof.is-focus .av, .inp-ptr .prof.is-focus .av, .inp-touch .prof.is-focus .lock, .inp-ptr .prof.is-focus .lock { -webkit-transform: translate3d(0,0,0); }
+.inp-touch #root .btn.is-focus { background: @c.surface-3@; color: @c.text-1@; }
+.inp-touch #root .btn.ib.is-focus .ic { background-position-y: @ic.row.text-1@; }
+.inp-touch #root .set-cat.is-focus { background: transparent; color: @c.text-1@; } .inp-touch #root .set-cat.is-focus .bar { display: block; }
+.inp-touch #root .set-row.is-focus, .inp-ptr #root .set-row.is-focus { border-color: transparent; }
+.inp-touch #root .set-row.is-focus { background: transparent; } .inp-touch #root .set-row.is-focus .val { color: @c.text-2@; } .inp-touch #root .set-row.is-focus .sep { visibility: visible; }
+/* Hinweisleiste als antippbare Knoepfe nur mit Text (keine Farbquadrate A–D, keine Tastenkappen); Trefferflaeche N.ui.hints.hit */
+.inp-touch #pn-hints .hint, .inp-ptr #pn-hints .hint { height: 36px; margin-top: -4px; margin-left: @sp.3@; padding: 0 @sp.4@; border-radius: @r.md@;
+  background: @c.surface-3@; color: @c.text-1@; line-height: 36px; }
+.inp-touch #pn-hints .k, .inp-touch #pn-hints .kt, .inp-ptr #pn-hints .k, .inp-ptr #pn-hints .kt { display: none; }
+/* Einstellungen bei Finger/Maus (Nr. 28, SPEC SET-9, N.ui.infotip): statt der festen Beschreibungsflaeche ein ⓘ hinter jeder Option
+   bzw. Kategorie (Sprite "info", text-2; Akzent nur unter dem Maus-Zeiger und solange die Blase offen ist – eine Regel, Akzent-Budget); Wert, Umschalter und
+   Farbfeld ruecken dafuer nach links. Die Symbole gibt es nur mit umschaltbarer Eingabeart (am TV kein Element). */
+.itip { position: absolute; width: 32px; height: 32px; border-radius: 16px; display: none; }
+.inp-touch #root .itip, .inp-ptr #root .itip { display: block; }
+#root .itip .ic { left: 0; top: 0; background-position-y: @ic.row.text-2@; }
+#root .itip.on { background: @accent@; } #root .itip.on .ic { background-position-y: @ic.row.on-accent@; }   /* .on: Zeiger darueber oder Blase offen */
+.inp-touch #root .set-desc, .inp-ptr #root .set-desc { display: none; }
+.set-row .itip { right: 13px; top: 13px; } .set-cat .itip { right: 8px; top: 8px; }
+.inp-touch #root .set-row.itr .val, .inp-ptr #root .set-row.itr .val, .inp-touch #root .set-row.itr .toggle, .inp-ptr #root .set-row.itr .toggle,
+.inp-touch #root .set-row.itr .sw, .inp-ptr #root .set-row.itr .sw { right: 57px; }
+.inp-touch #root .set-row.itr.has-sw .val, .inp-ptr #root .set-row.itr.has-sw .val { right: 93px; }
+.inp-touch #root .hr-row.itr .val, .inp-ptr #root .hr-row.itr .val { right: 129px; width: 180px; }
+/* Blase: 520 breit, Pfeil (zwei Rand-Dreiecke: Linie + Flaeche) zum Symbol; Lage und Hoehe setzt N.ui.infotip.open */
+.itip-pop { position: absolute; width: 520px; border-radius: @r.2xl@; background: @c.surface-2@; border: 1px solid @c.line@; }
+.itip-t { position: absolute; left: 23px; top: 19px; width: 416px; font-size: @ty.title.size@; line-height: @ty.title.lh@; font-weight: @ty.title.weight@;
+  color: @c.text-1@; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.itip-x { position: absolute; right: 7px; top: 7px; width: 56px; height: 56px; }
+.itip-x span { position: absolute; left: 10px; top: 10px; width: 36px; height: 36px; border-radius: 18px; background: @c.surface-3@; }
+.itip-x i, .itip-x b { position: absolute; left: 19px; top: 27px; width: 18px; height: 2px; border-radius: 1px; background: @c.text-1@; -webkit-transform: rotate(45deg); }
+.itip-x b { -webkit-transform: rotate(-45deg); }
+.itip-x.is-hover span { background: @c.line@; }
+.itip-clip { position: absolute; left: 23px; top: 59px; width: 472px; overflow: hidden; }
+.itip-tx { position: absolute; left: 0; top: 0; width: 472px; font-size: @ty.body.size@; line-height: @ty.body.lh@; color: @c.text-2@; white-space: pre-line;
+  -webkit-transform: translate3d(0,0,0); }
+.itip-ar { position: absolute; width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent; }
+.itip-ar i { position: absolute; left: -11px; width: 0; height: 0; border-left: 11px solid transparent; border-right: 11px solid transparent; }
+.itip-ar.up { top: -13px; border-bottom: 12px solid @c.line@; } .itip-ar.up i { top: 1px; border-bottom: 11px solid @c.surface-2@; }
+.itip-ar.dn { bottom: -13px; border-top: 12px solid @c.line@; } .itip-ar.dn i { top: -12px; border-top: 11px solid @c.surface-2@; }
+/* Zurueck-Knopf oben links (Profilwahl aus den Einstellungen): nur Finger/Maus; mit Tasten gilt RETURN */
+.tback { display: none; left: @l.safe-x@; top: 40px; }
+.inp-touch .tback, .inp-ptr .tback { display: block; }
 .stb .btn.inl { width: 300px; text-align: center; padding: 0; }
 
 /* ---------- P5: Uhr (Startseite), Bildschirmschoner (SPEC 7.14), Offline-Leiste, Tastenbelegung, Willkommenskarte ---------- */
@@ -483,6 +548,12 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .pl-t2 { height: 32px; font-size: @ty.h2.size@; line-height: @ty.h2.lh@; font-weight: @ty.h2.weight@; color: @c.text-1@; }
 .pl-clk { right: 0; top: 0; height: 72px; padding: 0 @sp.8@; font-size: 20px; line-height: 72px; color: @c.text-1@; white-space: nowrap;
   font-variant-numeric: tabular-nums; }
+/* Zurueck-Knopf (Finger/Maus, caps.pointer 'mouse'; am TV nie angelegt, Apple Nr. 17): runde Insel 72 x 72 oben links in der
+ * Titel-Ebene (blendet mit dem OSD), Tippflaeche >= 44 pt ab Faktor 0,62; nur unter .pl-dir (letzte Eingabe Finger/Maus), dann
+ * rueckt die Titel-Insel um 72 + 16 nach rechts. Symbol "ret" in text-1 (32er Raster, mittig) */
+.pl-bk { display: none; left: 0; top: 0; width: 72px; height: 72px; }
+.pl-bk .ic { left: 20px; top: 20px; -webkit-transform: scale(1.5); }   /* Sprite-Pfeil ist fuer Tastenkappen gezeichnet (klein) */
+.pl-dir .pl-bk { display: block; } .pl-dir .pl-ti { left: 88px; }
 /* Bedien-Insel (TV-Befund 27.10. nachmittags): Balken · Zeiten · Knopfreihe · Label unter dem Fokus-Knopf, Raster 32 px Innenrand;
  * Farbtasten-Hinweise als eigene Insel darunter (Lage der Hinweisleiste). Koordinaten muessen zu N.osd passen. */
 .pl-bot { left: @l.safe-x@; top: 458px; width: 1152px; height: 180px; -webkit-transform: translate3d(0,0,0); }
@@ -518,6 +589,11 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .pl-b .num { position: absolute; left: 0; top: 12px; width: 48px; text-align: center; font-size: 18px; line-height: 24px; font-weight: 600; color: @c.text-1@; }
 .pl-b.is-focus .num { color: @c.on-accent@; }
 .rm .pl-b { -webkit-transition: none; } .rm .pl-b.is-focus { -webkit-transform: translate3d(0,0,0); }
+/* Bild in Bild (PLAY-35, nur caps.pip): Bildschirm-Rahmen 24 x 18 mit kleinem gefuellten Fenster unten rechts, Strich 2 px wie die
+ * Sprite-Symbole; Farbe text-1, im Fokus on-accent (Symbol gezeichnet statt Sprite-Spalte, siehe views/player.js) */
+.pl-pip { position: absolute; left: 12px; top: 15px; width: 20px; height: 14px; border: 2px solid @c.text-1@; border-radius: @r.xs@; }
+.pl-pip i { position: absolute; right: 2px; bottom: 2px; width: 9px; height: 6px; border-radius: 1px; background: @c.text-1@; }
+.pl-b.is-focus .pl-pip { border-color: @c.on-accent@; } .pl-b.is-focus .pl-pip i { background: @c.on-accent@; }
 .pl-lbl { position: absolute; top: 598px; width: 300px; height: 26px; text-align: center; }
 .pl-lbl span { display: inline-block; height: 26px; color: @c.text-1@; font-size: 20px; line-height: 26px; font-weight: 600; white-space: nowrap; }
 .pl-th { position: absolute; top: 283px; width: 240px; height: 163px; border-radius: @r.sm@; overflow: hidden; background: @c.surface-1@; z-index: 2; }   /* ueber Skip-Knopf/Countdown-Karte: nur sichtbar, solange der Nutzer gerade spult/zeigt */

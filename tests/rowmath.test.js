@@ -121,3 +121,39 @@ test('Detailseiten per Zeiger (DET-9): nur der eingerastete Abschnitt bekommt so
   assert.strictEqual(R.secEdgeB([{ cy: 392, h: 162 }, { cy: 680, h: 162 }], 316), 604);
   assert.strictEqual(R.secEdgeB([{ cy: 288, h: 176 }, { cy: 592, h: 176 }], 236), 592, 'nicht zeigbare angeschnittene Reihe gehoert zur Zone');
 });
+
+test('Startseite HOME-15: Gross = bisherige Masse, Mittel/Klein kleiner, alles im Pool 11 und auf dem 8er-Raster', function () {
+  ['land', 'poster', 'sq'].forEach(function (k) {
+    var L = R.homeGeom('L', k), g0 = R.geom(k);
+    ['kind', 'w', 'h', 'step', 'capY', 'full', 'visible'].forEach(function (f) { assert.strictEqual(L[f], g0[f], 'L ' + k + ' ' + f); });
+    assert.strictEqual(R.homeGeom('x', k), L, 'unbekannte Groesse = Gross');
+    assert.strictEqual(R.homeGeom(undefined, k), L);
+  });
+  assert.deepStrictEqual(['land', 'poster', 'sq'].map(function (k) { return R.homeGeom('L', k).pitch; }), [288, 360, 280], 'Reihenabstand wie bisher');
+  assert.strictEqual(R.homeGeom('L', 'land').tier, 'land'); assert.strictEqual(R.homeGeom('L', 'poster').tier, 'poster'); assert.strictEqual(R.homeGeom('L', 'sq').tier, 'square');
+  assert.strictEqual(R.homeGeom('L', 'cast').base, 'poster', 'unbekannte Art -> Poster');
+  var want = { M: { land: [4, 5, 264], poster: [6, 7, 312], sq: [6, 7, 248] }, S: { land: [5, 6, 240], poster: [7, 8, 280], sq: [7, 8, 224] } };
+  ['M', 'S'].forEach(function (sz) {
+    ['land', 'poster', 'sq'].forEach(function (k) {
+      var g = R.homeGeom(sz, k), L = R.homeGeom('L', k), id = sz + ' ' + k;
+      assert.deepStrictEqual([g.full, g.visible, g.pitch], want[sz][k], id);
+      assert.ok(g.w < L.w && g.h < L.h && g.full > L.full, id + ' kleiner, mehr Karten');
+      assert.strictEqual(g.step - g.w, 24, id + ' Abstand 24');
+      assert.strictEqual(g.base, k); assert.strictEqual(g.capY, g.h + 22);
+      assert.strictEqual(g.pitch % 8, 0, id + ' Raster');
+      assert.ok(144 + g.full * g.step - 24 <= 1216, id + ' ganz sichtbare enden vor dem rechten Rand');
+      assert.ok(N.img.TIERS[g.tier][0] === g.w && N.img.TIERS[g.tier][1] === g.h, id + ' Bild exakt in Anzeigegroesse');
+      if (k === 'land') assert.ok(Math.abs(g.w / g.h - 16 / 9) < 0.01, id + ' 16:9');
+      // Fenster des festen Pools (row.js POOL = 11) deckt jede sichtbare Karte ab
+      [1, 8, 12, 40].forEach(function (n) {
+        for (var f = 0; f < n; f++) {
+          var sc = R.scroll(n, f, g.full), w = R.win(n, sc, 11);
+          for (var i = sc; i < Math.min(n, sc + g.visible); i++) assert.ok(i >= w.first && i <= w.last, id + ' n=' + n + ' f=' + f + ' i=' + i);
+        }
+      });
+      // naechste Reihe erst unter dem Fokus-Bereich (Kopf der Folgereihe unter der Beschriftung bzw. den Karten)
+      assert.ok(320 + g.pitch >= 372 + (k === 'land' ? g.capY + 46 : g.h), id + ' keine Ueberlappung');
+      assert.ok(320 + 2 * g.pitch >= 720, id + ' Reihe R+2 nie im Bild (4 Slots reichen)');
+    });
+  });
+});

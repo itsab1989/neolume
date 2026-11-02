@@ -38,6 +38,8 @@
   W.ping = function (cb) {
     if (W.checking) { if (cb) cb(false); return; }
     W.checking = true;
+    // TLS 1.2 (N.plexConn, NET-7): offline -> alle Adressen des Servers neu pruefen; die Probe unten wartet darauf
+    if (W.offline && N.plexConn && N.plexConn.on() && !N.plexConn.busy()) N.plexConn.check('retry');
     N.plex.get('/identity', null, { timeout: 4000, retries: 0, dedupe: false }, function (err) {
       W.checking = false;
       var ok = reachable(err);

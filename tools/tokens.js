@@ -6,6 +6,7 @@
  *   T.palette()             -> [{ id, color }]                    accent palette in order
  *   T.icons()               -> [{ name, attrs, body }]            icon sources in sprite column order
  *   T.spriteSvg()           -> SVG text of the whole sprite (input of rsvg-convert, also checked into src/assets/icons.svg)
+ *   T.allGridSvg()          -> SVG text of the 48 px grid symbol of the "Show all" card (input of all-grid.png; Apple: as is)
  * Placeholder syntax: @<group>.<name>@ with group = lower-case letters, name = [a-z0-9.-]. The brand tokens @accent@ and
  * @pointer@ (no dot) are handled by tools/build.js itself (accent variants). */
 'use strict';
@@ -96,6 +97,13 @@ function spriteSvg(t) {
   });
   return svg + '</svg>';
 }
+/* Raster-Symbol der Karte "Alle anzeigen" (HOME-14): Form design/icons/grid.svg auf ihren 18er Inhalt beschnitten, 48 px, c.text-1 */
+function allGridSvg(t) {
+  t = t || load();
+  var it = icons().filter(function (x) { return x.name === 'grid'; })[0], col = color('text-1', t), S = 48, k = S / 18;
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + S + '" height="' + S + '"><g transform="scale(' + k + ') translate(-5 -5)" ' +
+    it.attrs.replace(/currentColor/g, col) + '>' + it.body.replace(/currentColor/g, col) + '</g></svg>';
+}
 
 module.exports = { FILE: FILE, ICON_DIR: ICON_DIR, EXT_DIR: EXT_DIR, extFiles: extFiles, extGroups: extGroups, PLACEHOLDER: PLACEHOLDER, load: load, map: map, resolve: resolve, color: color, palette: palette,
-  order: order, icons: icons, iconFiles: iconFiles, parseIcon: parseIcon, spriteSvg: spriteSvg };
+  order: order, icons: icons, iconFiles: iconFiles, parseIcon: parseIcon, spriteSvg: spriteSvg, allGridSvg: allGridSvg };

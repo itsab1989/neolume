@@ -358,7 +358,7 @@
     };
   }
   function relay(ev, data) {
-    if (ev === 'state' && (data === 'stopped' || data === 'done')) { N.sef.close(); N.evt.emit('playback:stopped', { rk: core && core.item ? core.item.rk : '' }); }   // Startseite/Details laden Fortschritt neu
+    if (ev === 'state' && (data === 'stopped' || data === 'done')) { N.platform.player.close(); N.evt.emit('playback:stopped', { rk: core && core.item ? core.item.rk : '' }); }   // Startseite/Details laden Fortschritt neu
     N.evt.emit('audio:' + ev, data);
   }
   function exitSync() {
@@ -378,8 +378,8 @@
       core = new Core(deps(items[0] && items[0].srv || ''));
       core.on(relay);
       var me = core;
-      core.d.sef = N.sef.create(function (type, data) { if (me === core) me.onEvent(type, data); });
-      if (!onFlush) { onFlush = exitSync; N.evt.on('app:flush', onFlush); }
+      core.d.sef = N.platform.player.create(function (type, data) { if (me === core) me.onEvent(type, data); });
+      if (!onFlush) { onFlush = function (why) { if (why !== 'background') exitSync(); }; N.evt.on('app:flush', onFlush); }
       N.tv.saver(true);                                  // Musik: TV-Bildschirmschoner bleibt an (Orca, research 2.4)
       core.play(items, start, o);
     },
@@ -388,7 +388,7 @@
     restart: function () {
       if (!core || !core.q || core.active()) return;
       var me = core, at = core.state === 'done' ? 0 : core.t;
-      core.d.sef = N.sef.create(function (type, data) { if (me === core) me.onEvent(type, data); });
+      core.d.sef = N.platform.player.create(function (type, data) { if (me === core) me.onEvent(type, data); });
       if (core.state === 'done') core.q.go(0);
       core.startCur(at);
     },

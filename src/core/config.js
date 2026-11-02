@@ -2,12 +2,12 @@
  * Netz-Standards sind im Repo leer: tools/build.js setzt die lokalen Werte aus local.json (git-ignoriert) ins gebaute app.js. */
 (function (N) {
   var C = {
-    version: '1.0.10',
+    version: '1.0.11',
     product: N.brand.name,
-    platform: 'Samsung',
-    platformVersion: 'Orsay 2014',
-    device: 'Samsung TV',
-    deviceName: N.brand.name + ' (TV)',
+    platform: N.platform.info.platform,               // X-Plex-Kopfzeilen je Plattform (N.platform.info, Adapter)
+    platformVersion: N.platform.info.platformVersion,
+    device: N.platform.info.device,
+    deviceName: N.brand.name + ' (' + N.platform.info.short + ')',
     proxyHost: '',                      // LAN-Proxy fuer plex.tv (TLS kann der TV nicht), aus local.json / config.json
     pmsFallback: '',                    // http://<PMS-IP>:32400, aus local.json / config.json
     watchedThreshold: 0.9,
@@ -20,7 +20,7 @@
     helperKey: '',
     cropBase: 'app',
     logHost: '',                        // "Protokoll senden" (Dev-/Update-Server, tools/dev.py serve), aus local.json / config.json
-    model: 'UE48H8000',              // SPEC 6.4
+    model: N.platform.info.model || '',   // SPEC 6.4 (Orsay-Adapter)
     /* HLS-Start (Umwandlung) – A/B-Schalter fuer den TV-Test (docs/research/player.md 3.5).
      * wait: Pause vor InitPlayer (ms). Orca wartet 1000 ms; am TV gemessen (26.10.) startet HEVC->H.264 in 2,6 s, Direct Play 1,7 s,
      * Fortsetzen mit eingebrannten UT 4,6 s – die Sekunde ist fast die Haelfte davon. Standard jetzt 300 ms, per config.json

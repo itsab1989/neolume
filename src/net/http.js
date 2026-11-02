@@ -2,11 +2,12 @@
  * Dedupe gleicher laufender GETs (URL + Token), max. 3 parallel, 401 -> Ereignis auth:expired (SPEC 14.8).
  * Liefert nebenbei Proben fuer die Uhr-Korrektur (Date-Kopf -> N.clock.sample).
  * o.cred: XHR mit withCredentials (Cookie eines fremden Hosts, z. B. Anmeldung bei einem Dienst im Heimnetz).
+ * o.xhr: eigene XHR-Fabrik fuer diese Anfrage (z. B. N.platform.net.native fuer Dienste ohne CORS); sonst die Standard-Fabrik.
  * cb(err, data, meta) ; err = {type:'timeout'|'network'|'http'|'parse', status} ; Rueckgabe task {abort()} */
 (function (N) {
   var U = N.util, active = 0, MAX = 3, queue = [], inflight = {};
   var DELAYS = [500, 1500];
-  var factory = function () { return new XMLHttpRequest(); };
+  var factory = (N.platform && N.platform.net.factory) || function () { return new XMLHttpRequest(); };   // Orsay: null -> XHR
   var timers = { set: function (f, ms) { return setTimeout(f, ms); }, clear: function (t) { clearTimeout(t); } };
 
   function finishSlot() { active--; pump(); }
@@ -17,7 +18,7 @@
 
   /* ein einzelner Versuch */
   function attempt(o, done) {
-    var x = factory(), fin = false, t, sent = 0, dated = false;
+    var x = (o.xhr || factory)(), fin = false, t, sent = 0, dated = false;
     /* Uhr-Korrektur (core/clock.js): Date-Kopf der ohnehin laufenden Anfrage, sobald die Koepfe da sind (readyState 2,
      * sonst 4). Ohne getResponseHeader/lesbaren Kopf (CORS im Browser) einfach nichts. */
     function clockSample() {
@@ -37,7 +38,7 @@
       if (!dated && x.readyState >= 2 && !fin) clockSample();
       if (x.readyState !== 4 || fin) return;
       var st = x.status, txt = x.responseText, data = null;
-      if (st === 0) { end({ type: 'network', status: 0 }, null, 0); return; }
+      if (st === 0) { var ne = { type: 'network', status: 0 }; if (x.pnCode) ne.code = x.pnCode; end(ne, null, 0); return; }   // pnCode: Geraete-Netz (N.platform.net.native)
       if (st < 200 || st >= 300) { end({ type: 'http', status: st, body: U.parse(txt) }, null, st); return; }
       if (o.json !== false && txt) {
         data = U.parse(txt);

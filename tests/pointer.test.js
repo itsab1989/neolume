@@ -384,3 +384,64 @@ test('Seitenleiste: nach Klick auf einen Eintrag bleibt sie zu, auch wenn der Pu
     hover(400, 300);
   });
 });
+
+/* Ziehen und Eingabeart (SPEC PLAY-34, Entscheidung Apple Nr. 14/15): der Bildschirm entscheidet ueber pointerGrab/pointerDrag */
+function dragRig() {
+  var ctx = H.load({ fakeTimers: true }), N = ctx.N, T = ctx.timers;
+  N.router._reset(T.now);
+  N.ui.hints = { el: null, set: function () {}, refresh: function () {}, hit: function () { return null; } };
+  N.ui.rail = { el: null, isOpen: function () { return false; }, attached: function () { return false; } };
+  var s = { keys: [], ptr: [], drag: [] };
+  N.router.define('pl', function () {
+    return { create: function () {}, touchLong: false, onKey: function (k) { s.keys.push(k); return true; },
+      pointer: function (x, y, kind) { s.ptr.push(kind + '@' + x + ',' + y); return true; },
+      pointerGrab: function (x, y) { return y > 480 && y < 500 ? 'drag' : 'tap'; },
+      pointerDrag: function (ph, x, y) { s.drag.push(ph + (ph === 'cancel' ? '' : '@' + x + ',' + y)); return true; } };
+  });
+  N.router.reset('pl');
+  return { N: N, T: T, s: s, P: N.pointer };
+}
+test('Ziehen: grab fragt nur, drag start/move/end gehen an den Bildschirm; Punkt + Lebenszeichen folgen (Feinauswahl)', function () {
+  var c = dragRig(), P = c.P;
+  assert.strictEqual(P.touchGrab(300, 490), 'drag');
+  assert.strictEqual(P.touchGrab(300, 200), 'tap');
+  assert.deepStrictEqual(c.s.drag, [], 'grab hat keine Nebenwirkung');
+  assert.strictEqual(P.touchDrag('start', 300, 490), true);
+  assert.strictEqual(c.N.input.mode, 'touch');
+  P.touchDrag('move', 350, 470); c.T.tick(10);
+  assert.deepStrictEqual([P.x, P.y, P.rawT], [350, 470, c.T.now() - 10]);
+  P.touchDrag('end', 360, 470);
+  assert.deepStrictEqual(c.s.drag, ['start@300,490', 'move@350,470', 'end@360,470']);
+  assert.strictEqual(P.touchDrag('move', 1, 1), false, 'nach dem Ende kein Zug mehr');
+  assert.strictEqual(P.touchDrag('start', 300, 200), false, 'kein Zug-Ziel -> nicht uebernommen');
+  assert.deepStrictEqual(c.s.ptr, [], 'kein Klick/Hover durch das Ziehen');
+});
+test('Ziehen: Taste mitten im Zug bricht ab; Schoner an oder Zeiger aus = kein Zug-Ziel', function () {
+  var c = dragRig(), P = c.P, N = c.N;
+  P.touchDrag('start', 300, 490);
+  N.app.press('DOWN');                                  // echte Taste (App.press: Eingabeart key, router.key -> keyUsed)
+  assert.deepStrictEqual(c.s.drag, ['start@300,490', 'cancel']);
+  assert.strictEqual(N.input.mode, 'key');
+  var sv = N.ui.saver;
+  N.ui.saver = { on: true };
+  assert.strictEqual(P.touchGrab(300, 490), '', 'Schoner: Tippen weckt ihn wie immer');
+  N.ui.saver = sv;
+  P.on = false; assert.strictEqual(P.touchGrab(300, 490), ''); P.on = true;
+  assert.strictEqual(P.touchGrab(300, 490), 'drag');
+});
+test('Langer Druck: Finger auf einem Bildschirm mit touchLong false = nichts (kein TOOLS, Klick entfaellt); Maus/Zeiger wie immer', function () {
+  var c = dragRig(), P = c.P;
+  c.N.input.mode = 'touch';
+  P.down(300, 200); c.T.tick(800); P.up(); P.click(300, 200, null);
+  assert.deepStrictEqual(c.s.keys, []);
+  assert.deepStrictEqual(c.s.ptr, [], 'Klick nach dem langen Druck verschluckt');
+  c.N.input.mode = 'pointer';
+  P.down(300, 200); c.T.tick(800); P.up();
+  assert.deepStrictEqual(c.s.keys, ['TOOLS'], 'Maus/Smart Control: TOOLS wie bisher');
+});
+test('caps.pointer: Standard remote (TV), Vertrag prueft den Wert', function () {
+  var N = H.load().N;
+  assert.strictEqual(N.platform.caps.pointer, 'remote');
+  assert.strictEqual(N.Platform.defaults().pointer, 'remote');
+  assert.ok(N.Platform.check({ caps: { pointer: 'finger' } }).indexOf('caps.pointer muss remote|mouse sein') >= 0);
+});

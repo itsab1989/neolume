@@ -1,13 +1,13 @@
 /* N.session – Konto, Server, Plex-Home-Profile, aktives Profil, Einstellungen je Profil, Start-Regeln (SPEC 7.15, 14.9).
- * state.json: {v, clientId, account{token,uuid,name,thumb}, server{uri,machineId,name,token}, users[], usersTs,
- *              profiles{uuid:{serverToken}}, lastProfile, lang, pinSwitch(null=Standard), protectRemindAt, firstPicker}
+ * state.json: {v, clientId, account{token,uuid,name,thumb}, server{uri,machineId,name,token[,conns,connsTs]}, users[], usersTs,
+ *              profiles{uuid:{serverToken[,servers,srvTs]}}, lastProfile, lang, pinSwitch(null=Standard), protectRemindAt, firstPicker}
  * PMS-only (setup.json im Paket, N.setupFile): S.pkg gesetzt; Konto/Server/Profile/Tokens kommen aus dem Paket und stehen nur im
  * Speicher (save() schreibt sie nicht), kein plex.tv. PIN-Profile = eigene App-PIN (N.appPin). Ohne setup.json: alter Ablauf. */
 (function (N) {
   var U = N.util, ST = 'state.json', DAY = 86400000;
   /* Wiedergabe (M3): alles abschaltbar, Standardwerte nach SPEC 10.4 bzw. Nutzer (Fortsetzen fragen, Vorschaubilder an) */
   var DEFAULT_SETTINGS = { episodeProgress: true, seriesProgress: true, reduceMotion: false,
-    resume: 'ask', quality: '12', directPlay: true, thumbs: true, skipIntro: 'button', skipCredits: 'button', autoNext: true, countdown: 10,
+    resume: 'ask', quality: '12', qualityRemote: '8', qualityCell: '4', directPlay: true, thumbs: true, skipIntro: 'button', skipCredits: 'button', autoNext: true, countdown: 10,
     seekArrows: 10, seekFf: 30, ffrw: 'jump', ptrLoupe: false, loupeStyle: 'panel', rememberTracks: true, audioLang: 'de', subs: 'forced', subLang: 'de', ass: 'burn', anime: false,
     aspect: 'auto', subSize: 'medium', subPos: 'low', subBg: 'dim', stillWatching: 3,
     themeMusic: false, themeVol: 50, blueKey: 'search' };   // Titelmelodie (SPEC v2.2): Nutzerentscheidung M3b Standard AUS
@@ -112,17 +112,62 @@
     activate: function (user, serverToken) {
       S.profile = user;
       S.state.lastProfile = user.uuid;
-      S.state.profiles[user.uuid] = { serverToken: serverToken };   // PMS-only: nur im Speicher (save() laesst es weg)
+      var old = S.state.profiles[user.uuid], pe = { serverToken: serverToken };   // PMS-only: nur im Speicher (save() laesst es weg)
+      if (old && old.servers) { pe.servers = old.servers; pe.srvTs = old.srvTs; }   // Weitere Server von plex.tv (nur TLS 1.2)
+      S.state.profiles[user.uuid] = pe;
       S.state.firstPicker = false;
       S.save();
       N.plex.setServer(S.state.server.uri, serverToken);
+      if (N.plexConn) N.plexConn.start();          // TLS 1.2: gemerkte Adresse mit /identity pruefen, bei Netzwechsel neu waehlen (NET-7)
       if (N.img) N.img.reset();
       S.own = N.store.get('settings-' + user.uuid + '.json') || {};
       S.applyDefaults();
       N.fx.setReduced(S.settings.reduceMotion);
-      // Weitere Server dieses Profils (setup.json, optional): Bibliotheken aus dem Speicher, Adressen spaeter im Hintergrund pruefen
-      if (N.srv) { var pp = S.pkgProfile(user.uuid); N.srv.setProfile(pp ? pp.servers : [], user.uuid); N.srv.start(); }
+      // Weitere Server dieses Profils (setup.json bzw. mit TLS 1.2 von plex.tv): Bibliotheken aus dem Speicher, Adressen spaeter
+      // im Hintergrund pruefen
+      if (N.srv) { var pp = S.pkgProfile(user.uuid); N.srv.setProfile(pp ? pp.servers : S.otherServers(user.uuid), user.uuid); N.srv.start(); }
       N.evt.emit('profile:changed', user);
+    },
+    /* ---- TLS 1.2 ohne setup.json (Apple): Verbindungen des eigenen Servers und Weitere Server aus plex.tv (NET-7, SRV-5) ---- */
+    tlsDirect: function () { return !!(N.platform && N.platform.caps.tls12) && !S.pkg; },
+    /* Weitere Server eines Profils (gemerkt aus dessen plex.tv-Ressourcen) in der Form von setup.json; TV: immer [] */
+    otherServers: function (uuid) {
+      var p = S.tlsDirect() && uuid && S.state.profiles[uuid];
+      return p && p.servers ? p.servers : [];
+    },
+    /* Ressourcen-Liste (N.auth.normServers) eines Profils uebernehmen: Verbindungen des eigenen Servers (ohne Token) und die
+     * fremden Server dieses Profils mit ihrem Zugriffs-Token. quiet: das aktive Profil nicht neu aufbauen (folgt ohnehin). */
+    takeServers: function (uuid, servers, quiet) {
+      var sv = S.state.server;
+      if (!S.tlsDirect() || !sv || !sv.machineId || !servers) return;
+      for (var i = 0; i < servers.length; i++) if (servers[i].machineId === sv.machineId && servers[i].conns.length) {
+        var c = [];
+        for (var j = 0; j < servers[i].conns.length; j++) { var x = servers[i].conns[j]; c.push({ uri: x.uri, local: !!x.local, https: !!x.https, relay: !!x.relay }); }
+        sv.conns = c; sv.connsTs = U.now();
+      }
+      if (uuid) {
+        var pe = S.state.profiles[uuid] || (S.state.profiles[uuid] = {}), o = N.plexConn.others(servers, sv.machineId);
+        var same = JSON.stringify(pe.servers || []) === JSON.stringify(o);
+        pe.servers = o; pe.srvTs = U.now();
+        if (!same && !quiet && N.srv && S.profile && S.profile.uuid === uuid) { N.srv.setProfile(o, uuid); N.srv.start(0); }
+      }
+      S.save();
+    },
+    /* Hoechstens einmal am Tag im Hintergrund (N.plexConn.start, nie im Startpfad): Ressourcen des Kontos und – fuer ein
+     * anderes Profil ohne PIN – dieses Profils neu holen. cb(ok) optional. */
+    refreshServers: function (cb) {
+      cb = cb || function () {};
+      if (!S.tlsDirect() || !S.state.account || !S.state.account.token || !S.state.server) { cb(false); return; }
+      var acc = S.state.account.token, me = S.state.account.uuid, prof = S.profile;
+      N.auth.resources(acc, function (err, servers) {
+        if (err || !S.state.account || S.state.account.token !== acc) { cb(false); return; }
+        S.takeServers(me, servers);
+        if (!prof || prof.uuid === me || prof.pin || S.profile !== prof) { cb(true); return; }
+        N.auth.switchUser(acc, prof.uuid, null, function (e2, ut) {
+          if (e2 || S.profile !== prof) { cb(false); return; }
+          N.auth.resources(ut, function (e3, sv3) { if (!e3 && S.profile === prof) S.takeServers(prof.uuid, sv3); cb(!e3); });
+        });
+      });
     },
     pkgProfile: function (uuid) {
       for (var i = 0; S.pkg && i < S.pkg.profiles.length; i++) if (S.pkg.profiles[i].uuid === uuid) return S.pkg.profiles[i];
@@ -183,6 +228,7 @@
             // Kontoinhaber: Server-Token direkt aus den Ressourcen
             for (var i = 0; i < users.length; i++) if (users[i].uuid === me.uuid && !users[i].pin) S.state.profiles[me.uuid] = { serverToken: pick.token || tok };
             if (a && a.uuid === me.uuid && !S.state.profiles[me.uuid]) S.state.profiles[me.uuid] = { serverToken: pick.token || tok, needPin: true };
+            S.takeServers(me.uuid, servers, true);         // TLS 1.2: alle Verbindungen + Weitere Server des Kontos merken
             S.save();
             cb(null);
           });
@@ -223,7 +269,8 @@
       if (!user.pin && cached && !(S.state.profiles[user.uuid] || {}).needPin) { cb(null, cached); return null; }
       return N.auth.switchUser(S.state.account.token, user.uuid, pin, function (err, userToken) {
         if (err) { cb(err); return; }
-        N.auth.serverTokenFor(userToken, S.state.server.machineId, function (e2, serverToken) {
+        N.auth.serverTokenFor(userToken, S.state.server.machineId, function (e2, serverToken, servers) {
+          S.takeServers(user.uuid, servers, true);         // TLS 1.2: Weitere Server dieses Profils (SRV-5); TV: nichts
           if (e2 && e2.type === 'noserver' && user.admin) { cb(null, userToken); return; }
           cb(e2, serverToken);
         });
@@ -243,6 +290,7 @@
       S.state = keep; S.profile = null; S.settings = null; S.own = null;
       if (N.srv) N.srv.setProfile([], '');
       N.store.remove('auth.json');
+      if (N.avatars) N.avatars.clear();   // PROF-10/11: gespeicherte Profilbilder gehoeren zum Konto
       S.save();
       N.plex.setServer('', null);
       if (N.img) N.img.reset();

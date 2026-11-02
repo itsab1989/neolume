@@ -22,6 +22,18 @@ test('URL in exakter Groesse mit Profil-Token, Pfad kodiert', function () {
   assert.strictEqual(N.img.url('', 'poster'), '');
 });
 
+test('Profilbild (N.img.avatar): ohne TLS ueber den PMS-Umrechner, mit caps.tls12 direkt von plex.tv (Apple unterwegs, Nr. 13)', function () {
+  var N = setup().N, AV = 'https://plex.tv/users/a/avatar?c=1', o = { token: 'T', base: 'http://pms.local:32400' };
+  assert.strictEqual(N.platform.caps.tls12, false);
+  assert.strictEqual(N.img.avatar(AV, 'avatar', o), N.img.url(AV, 'avatar', o), 'Orsay: wie bisher ueber den PMS');
+  assert.strictEqual(N.img.avatar(AV, 'avatar', { token: 'T', base: '' }), '', 'ohne Server-Adresse kein Bild');
+  assert.strictEqual(N.img.avatar('', 'avatar', o), '');
+  assert.strictEqual(N.img.avatar(AV, 'avatarS'), N.img.url(AV, 'avatarS'), 'ohne opts: aktiver Server');
+  N.platform.caps.tls12 = true;                                  // Plattform mit TLS 1.2 (Apple): plex.tv direkt, kein PMS noetig
+  assert.strictEqual(N.img.avatar(AV, 'avatar', { token: '', base: '' }), N.platform.net.plexTv(AV));
+  assert.strictEqual(N.img.avatar('/library/x', 'avatar', o), N.img.url('/library/x', 'avatar', o), 'PMS-Pfad bleibt beim PMS');
+});
+
 test('Hintergrund (N.img.bg): Art scharf, ohne Art Poster/Cover unscharf vom Server, Einstellung aus -> keins (TV 27.10.)', function () {
   var N = setup().N, M = N.model;
   function q(u) { var o = {}; u.split('?')[1].split('&').forEach(function (kv) { var p = kv.split('='); o[p[0]] = decodeURIComponent(p[1]); }); return o; }

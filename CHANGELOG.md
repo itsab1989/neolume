@@ -5,6 +5,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.11] - 2026-11-02
+
+### Added
+- **Choose how big the Home tiles are.** A new setting under Settings › Display, "Home tile size", offers Large (as
+  before), Medium and Small. Smaller tiles show more titles side by side and more of the next row, so you see more at a
+  glance without scrolling. Pictures stay sharp in every size, and the focus stays on the same tile when you switch.
+- **Quality over the internet.** A new setting under Settings › Playback sets an upper limit for videos that come over
+  the internet, for example from a friend's server. The default, 8 Mbit/s (1080p), is the value the app always used.
+  If videos from far away stall, choose a lower value; the server then converts larger files to fit.
+
+### Changed
+- **Profile pictures appear at once.** The profile picker, the PIN pad and the sidebar now show the stored profile
+  pictures straight away, even before the server answers. The app refreshes them quietly in the background later.
+- **Clearer symbol when a server can't be reached.** The info block for a server that is switched off or out of reach now
+  shows a clean "i" symbol.
+- **Groundwork for other devices.** Everything that depends on the TV model (keys, player, storage) now sits behind one
+  small platform layer. On the TV nothing looks or behaves differently; it makes ports to other devices simpler.
+
+If having just the right number of tiles on the screen makes your evening a little cosier, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.10] - 2026-11-01
 
 ### Added

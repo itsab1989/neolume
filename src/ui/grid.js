@@ -14,13 +14,14 @@
     this.pg = U.el('div', 'gpg', this.clip);
     this.pool = [];
     this.items = []; this.n = 0; this.f = 0; this.r = 0; this.byIdx = {}; this.focused = false; this.pend = false;
+    this.free = false; this.py = 0; this.onScroll = null;   // freie Seitenlage (nur nach Zug/Rad, caps.scroll 'free'); onScroll(r): Zeile gewechselt
     this.setGeom(N.GridMath);
   }
   /* Ansicht wechseln (nur zusammen mit setModel/clear, nie im Fokusschritt) */
   Grid.prototype.setGeom = function (G) {
     this.G = G;
     this.cardCls = 'card card-' + G.CLS; this.capCls = 'cap cap-' + G.CLS;
-    this.vis = Math.max(1, Math.ceil((CLIP_B - G.Y0) / G.SY));     // Zeilen ab der Fokuszeile, die im Clip sichtbar sind
+    this.vis = Math.max(1, Math.ceil(((G.AH || CLIP_B) - G.Y0) / G.SY));   // Zeilen ab der Fokuszeile, die im Clip sichtbar sind (AH: flexible Flaeche)
     while (this.pool.length < G.POOL) this.pool.push(this._make());
     for (var i = 0; i < this.pool.length; i++) {
       var e = this.pool[i];
@@ -45,6 +46,7 @@
   Grid.prototype.setModel = function (items, n, f) {
     for (var i = 0; i < this.pool.length; i++) this._free(this.pool[i]);
     this.byIdx = {}; this.items = items; this.n = n;
+    this._fixed();
     this.f = n ? U.clamp(f || 0, 0, n - 1) : 0; this.r = this.G.row(this.f);
     var pg = this.pg;
     pg.style.webkitTransition = 'none'; U.tf(pg, 0, this.G.offset(this.r));
@@ -107,12 +109,13 @@
   Grid.prototype.render = function (prio, mode) {
     var G = this.G, w = G.win(this.n, this.r), free = [], todo = [], i, e, nv = 0;
     for (i = 0; i < this.pool.length; i++) { e = this.pool[i]; if (e.idx < w.first || e.idx > w.last) { if (e.idx >= 0) this._release(e); free.push(e); } }
-    var v0 = Math.max(w.first, this.r * G.COLS), v1 = Math.min(w.last, (this.r + this.vis) * G.COLS - 1);
+    var v0 = Math.max(w.first, this.r * G.COLS), v1 = Math.min(w.last, (this.r + this.vis + (this.free ? 1 : 0)) * G.COLS - 1);   // frei: eine Zeile mehr angeschnitten
     for (i = v0; i <= v1; i++) if (!this.byIdx[i] || this.byIdx[i].st) todo.push(i);
     nv = todo.length;
     for (i = w.first; i <= w.last; i++) if ((!this.byIdx[i] || this.byIdx[i].st) && (i < v0 || i > v1)) todo.push(i);
-    var budget = !mode ? todo.length : mode === 1 ? nv : chunk(), stop = false;
+    var budget = !mode ? todo.length : mode === 1 ? nv : chunk(), stop = false, until = mode === 2 && budget > todo.length ? U.now() + BUDGET_MS : 0;
     for (i = 0; i < todo.length && i < budget; i++) {
+      if (until && i > 0 && U.now() > until) break;     // schnelles Geraet: Haeppchen nach Zeitbudget (09-perf E6)
       e = this.byIdx[todo[i]] || free.shift();          // veraltete Karte (refresh) an ihrem Platz, sonst eine freie
       if (!e) { stop = true; break; }
       var rr = G.row(todo[i]);
@@ -141,8 +144,10 @@
   Grid.prototype.focusTo = function (i, still) {
     if (!this.n) return null;
     i = U.clamp(i, 0, this.n - 1);
-    var ri = this.G.row(i), keep = still && ri >= this.r && ri < this.r + this.hitRows();
-    var old = this.byIdx[this.f], r = keep ? this.r : ri, moved = r !== this.r;
+    var ri = this.G.row(i), keep = still && (this.free || (ri >= this.r && ri < this.r + this.hitRows()));   // frei: Zeiger rollt nie
+    var unfree = this.free && !keep;
+    if (unfree) this._fixed();                         // Taste/Sprung: zurueck ins Raster (Zeiger bei freier Lage: Lage bleibt)
+    var old = this.byIdx[this.f], r = keep ? this.r : ri, moved = r !== this.r || unfree;
     this.f = i; this.r = r;
     if (moved) this.render(0, 1);
     var cur = this.byIdx[i];
@@ -157,7 +162,9 @@
   Grid.prototype.scrollBy = function (d) {
     if (!this.n) return null;
     var G = this.G, last = G.row(this.n - 1), r = U.clamp(this.r + d, 0, last), c = G.col(this.f), fr = G.row(this.f), h = this.hitRows();
-    if (r === this.r) return this.ringPos();
+    var unfree = this.free;
+    if (unfree) this._fixed();
+    if (r === this.r && !unfree) return this.ringPos();
     if (fr < r) fr = r; else if (fr > r + h - 1) fr = r + h - 1;
     var i = Math.min(this.n - 1, fr * G.COLS + c), old = this.byIdx[this.f];
     this.f = i; this.r = r;
@@ -171,7 +178,41 @@
     return this.ringPos();
   };
   Grid.prototype.canScroll = function (d) { return d < 0 ? this.r > 0 : this.n > 0 && this.r < this.G.row(this.n - 1); };
-  Grid.prototype.ringPos = function () { var G = this.G; return { x: G.X0 + G.col(this.f) * G.SX, y: G.Y0 + (G.row(this.f) - this.r) * G.SY, shape: G.CLS, noScale: G.NO_SCALE }; };
+  Grid.prototype.ringPos = function () { var G = this.G; return { x: G.X0 + G.col(this.f) * G.SX, y: this.free ? Math.round(G.Y0 + G.row(this.f) * G.SY - this.py) : G.Y0 + (G.row(this.f) - this.r) * G.SY, shape: G.CLS, noScale: G.NO_SCALE }; };
+  /* ---- freies Scrollen (caps.scroll 'free', Apple Nr. 12/18): Seitenlage py folgt Finger/Trackpad, EIN Transform je Frame,
+   * Fenster ueber r = floor(py/SY), keine Layout-Abfragen. Tasten rasten wieder ein (fix). ---- */
+  Grid.prototype.curPy = function () { return this.free ? this.py : this.r * this.G.SY; };
+  Grid.prototype.maxPy = function () { return this.G.maxPx(this.n); };
+  Grid.prototype.setPy = function (py) {
+    if (!this.n) return;
+    if (!this.free) { this.free = true; this.pg.style.webkitTransition = 'none'; }
+    this.py = py;
+    var r = this.G.rowPx(this.n, py);
+    if (r !== this.r) { this.r = r; this.render(0, 1); if (this.onScroll) this.onScroll(r); }
+    U.tf(this.pg, 0, -Math.round(py * 100) / 100);
+  };
+  Grid.prototype.hitAt = function (x, y) { return this.G.hitPx(this.n, this.curPy(), x, y); };
+  /* Karte am Anker (erste Taste nach dem Wischen): Zeile am Anker, Spalte des bisherigen Fokus */
+  Grid.prototype.anchorIdx = function () { var G = this.G; return this.n ? Math.min(this.n - 1, G.anchorRow(this.n, this.curPy()) * G.COLS + G.col(this.f)) : 0; };
+  /* zurueck ins Tastenraster: Fokus i, Zeile von i am Anker (y = Y0), ohne Gleiten */
+  Grid.prototype.fix = function (i) {
+    if (!this.n) { this._fixed(); return null; }
+    var was = this.free, old = this.byIdx[this.f];
+    this._fixed();
+    i = U.clamp(i, 0, this.n - 1);
+    this.f = i; this.r = this.G.row(i);
+    this.render(0, 1);
+    var cur = this.byIdx[i];
+    if (old && old !== cur && old.foc) { old.card.className = this.cardCls; old.cap.className = this.capCls; old.foc = false; }
+    if (this.focused && cur && !cur.foc) { cur.card.className = this.cardCls + ' is-focus'; cur.cap.className = this.capCls + ' is-focus'; cur.foc = true; }
+    if (was) { var pg = this.pg; pg.style.webkitTransition = 'none'; U.tf(pg, 0, this.G.offset(this.r)); setTimeout(function () { pg.style.webkitTransition = ''; }, 60); }
+    return this.ringPos();
+  };
+  Grid.prototype._fixed = function () {
+    if (!this.free) return;
+    this.free = false; this.py = 0;
+    this.pg.style.webkitTransition = '';
+  };
   Grid.prototype.setFocused = function (on) {
     this.focused = on;
     var e = this.byIdx[this.f];
@@ -209,11 +250,12 @@
   Grid.prototype.clear = function () {
     if (this.endEl) { this.endEl.style.display = 'none'; this.endT = ''; }
     for (var i = 0; i < this.pool.length; i++) this._free(this.pool[i]);
-    this.byIdx = {}; this.items = []; this.n = 0; this.f = 0; this.r = 0;
+    this.byIdx = {}; this.items = []; this.n = 0; this.f = 0; this.r = 0; this._fixed();
   };
   Grid.prototype.setVisible = function (on) { U.vis(this.clip, on); };
   /* Haeppchen-Groesse je Frame (P7 perf2: per Messlauf einstellbar, 'chunks' vergleicht Varianten am TV); FAST = waehrend Tastenwiederholung */
   Grid.CHUNK = 1; Grid.CHUNK_FAST = 1;   // perf3: TV 9,8,5 chunk-S1 58,8 / S3 53,5 / S9 50,1 fps
-  function chunk() { return N.fx && N.fx.isFast() ? Grid.CHUNK_FAST : Grid.CHUNK; }
+  var BUDGET_MS = 2;                    // caps.images 'fast' (Apple, 09-perf E6): je Frame so viele Karten, wie in 2 ms passen
+  function chunk() { return N.platform && N.platform.caps.images === 'fast' ? 1e6 : N.fx && N.fx.isFast() ? Grid.CHUNK_FAST : Grid.CHUNK; }
   N.ui.Grid = Grid;
 })(N);

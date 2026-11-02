@@ -27,6 +27,13 @@
       opts = opts || {};
       var base = opts.base !== undefined ? opts.base : P.base, tok = opts.token !== undefined ? opts.token : P.token, no401 = opts.no401;
       if (opts.srv) return P.pmsSrv(method, path, query, opts, cb);
+      // TLS 1.2 (N.plexConn, NET-7): waehrend die Adresse des eigenen Servers geprueft wird, warten Anfragen darauf –
+      // das Token geht nur an eine Adresse, deren /identity gepasst hat. Am TV nie aktiv.
+      if (opts.base === undefined && N.plexConn && N.plexConn.busy()) {
+        var dead = false, inner = null;
+        N.plexConn.when(function () { if (!dead) inner = P.pms(method, path, query, opts, cb); });
+        return { abort: function () { dead = true; if (inner) inner.abort(); } };
+      }
       return N.http.request({
         method: method, url: U.addQs(base + path, query), headers: P.headers(tok),
         timeout: opts.timeout || 8000, retries: opts.retries, json: opts.json, dedupe: opts.dedupe, no401: no401, nowatch: opts.nowatch
@@ -66,7 +73,7 @@
       return P.pms(method, path, query, { json: false, retries: method === 'GET' ? 1 : 0, dedupe: false,
         base: who ? who.base : undefined, token: who ? who.token : undefined }, cb);
     },
-    /* plex.tv (https) ueber den Proxy. no401: 401 hier heisst "falsche PIN" o. ae., kein globales Abmelden */
+    /* plex.tv (https) – Weg je Plattform (N.platform.net.plexTv; Orsay: LAN-Proxy). no401: 401 hier heisst "falsche PIN" o. ae., kein globales Abmelden */
     tv: function (method, path, query, token, opts, cb) {
       opts = opts || {};
       if (N.session && N.session.pkg) {                // PMS-only (setup.json): nie plex.tv, auch nicht versehentlich
@@ -76,7 +83,7 @@
       }
       var url = U.addQs('https://plex.tv' + path, query);
       return N.http.request({
-        method: method, url: C.proxy(url), headers: P.headers(token), timeout: opts.timeout || 10000,
+        method: method, url: N.platform.net.plexTv(url), headers: P.headers(token), timeout: opts.timeout || 10000,
         retries: opts.retries, no401: true, dedupe: false
       }, cb);
     }

@@ -4,7 +4,12 @@
  * - brief: sichtbar, wenn ein Bildschirm/Overlay aufgeht (router.refreshHints meldet den Kontextwechsel per wake) und nach
  *   jeder Farbtaste, INFO oder TOOLS (router.key); nach WAKE_MS ausblenden. Nur opacity (kleine Flaeche, Klasse .hid),
  *   ein Timer, kein Layout. Ausgeblendet ist die Leiste nicht anklickbar (hit -> null).
- * - off: Leiste nie sichtbar. Alle Tasten bleiben unter Hilfe & Info -> Tastenbelegung erklaert (views/help.js). */
+ * - off: Leiste nie sichtbar. Alle Tasten bleiben unter Hilfe & Info -> Tastenbelegung erklaert (views/help.js).
+ * Eintraege, die das Geraet nicht kann, entfallen ueber caps (NEEDS: "Beenden" nur mit caps.exit).
+ * Finger/Maus/Trackpad (N.input.direct(), nur caps.focusRing 'keys'; Apple Nr. 23/26): KEINE Hinweisleiste – die Bildschirme
+ * haben echte Knoepfe, Tippen, langes Druecken (Optionen), Karte (X/Pfeil, Wisch) und Seitenleiste. Wo sonst nur die Leiste
+ * "Zurueck" anbot (Ansicht mit scr.backBtn, z. B. "Startseite anpassen"), zeigt sie oben links einen runden Zurueck-Knopf
+ * (#pn-tbk, wirkt wie RETURN). Mit Tasten (inp-key) und am TV genau wie immer; ein Wechsel der Eingabeart wirkt sofort. */
 (function (N) {
   var U = N.util, MAX = 5;
   var COLOR = { red: ['k-red', 'A'], green: ['k-green', 'B'], yellow: ['k-yellow', 'C'], blue: ['k-blue', 'D'] };
@@ -43,9 +48,31 @@
     }
   };
   /* list: [{k:'red'|'green'|'yellow'|'blue'|'ret'|'INFO'|'TOOLS'|'DIGITS', t:'hint.key'}] */
-  H.set = function (list) {
+  var NEEDS = { 'hint.exit': 'exit' };
+  function direct() { return !!(N.input && N.input.direct && N.input.direct()); }
+  function usable(d) { var c = N.platform && N.platform.caps, n = d && NEEDS[d.t]; return !n || !c || c[n] !== false; }
+  /* rein (getestet): Eintraege, die gezeigt werden – Finger/Maus: keine; sonst ohne Aenderung dieselbe Liste (kein neues Array am TV) */
+  H.pick = function (list) {
     list = list || [];
-    apply();                                          // z. B. Profil verlassen (Profilwahl): Modus "immer"
+    if (direct()) return [];
+    for (var j = 0; j < list.length; j++) if (!usable(list[j])) return list.filter(usable);
+    return list;
+  };
+  /* Zurueck-Knopf oben links (nur Finger/Maus, scr.backBtn; vom Router bei jedem Kontextwechsel): Element erst beim ersten Gebrauch */
+  var BK = { x: 64, y: 40, w: 48, h: 48 }, bkOn = false;
+  H.BACK = BK;
+  H.back = function (want) {
+    var on = !!want && direct();
+    if (on === bkOn || (!on && !H.bk)) { bkOn = on; return; }
+    bkOn = on;
+    if (!H.bk && H.el) { H.bk = U.txt('div', 'btn tback tbk', H.el.parentNode, '\u2039', 'left:' + BK.x + 'px;top:' + BK.y + 'px;width:' + BK.w + 'px;padding:0;text-align:center;border-radius:24px;font-size:36px;line-height:44px').parentNode; }
+    if (H.bk) U.show(H.bk, on);
+  };
+  /* Treffer auf dem Zurueck-Knopf (N.pointer, vor der Ansicht) */
+  H.backHit = function (x, y) { return bkOn && x >= BK.x - 8 && x < BK.x + BK.w + 8 && y >= BK.y - 8 && y < BK.y + BK.h + 8; };
+  H.set = function (list) {
+    list = H.pick(list);
+    apply();                                         // z. B. Profil verlassen (Profilwahl): Modus "immer"
     var sig = '', i;
     for (i = 0; i < list.length; i++) sig += list[i].k + ':' + list[i].t + '|';
     sig += N.i18n.lang();
@@ -93,5 +120,11 @@
   H.refresh = function () { H.sig = ''; };
   N.evt.on('settings:changed', function (e) { if (e && e.key === 'hints') H.applyMode(); });
   N.evt.on('profile:changed', function () { H.applyMode(); });
+  /* Tasten <-> Finger/Maus: Knoepfe sind anders breit als Tastenkappen -> Trefferflaechen neu (einen Frame spaeter, wie set); die
+   * Auswahl der Eintraege haengt an der Art (FOCUS, hintBar) -> Liste der Ansicht neu holen */
+  N.evt.on('input:mode', function () {
+    H.rects = null; if (!H.measureQ && H.el) { H.measureQ = true; U.raf(H.measure); }
+    if (H.el && N.router && N.router.refreshHints) N.router.refreshHints();
+  });
   N.ui.hints = H;
 })(N);

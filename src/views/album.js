@@ -16,6 +16,7 @@
     function get(path, q, o, cb) { return N.plex.get(path, q, N.srv.o(srv, o), cb); }
     function railId(lib) { return N.railRows.libId({ id: lib, srv: srv }); }
     var s = { rail: it0.lib ? railId(it0.lib) : N.ui.rail && N.ui.rail.cur || 'home', wheelKeys: ['UP', 'DOWN'] };
+    s.card = true;                                   // Detailkarte (caps.details 'card'): Album/Hoerbuch in der Karte (N.router prueft die Faehigkeit)
     var root, hero, pg, bar, btns = [], bdefs = [], btnRects = null, blbl, blblT, headT, cntT, list, sb;
     var meta = null, tracks = [], chs = [], rows = [], kind = 'tracks', res = null, zone = 'btn', bf = 0, off = 0, gen = 0, tasks = [], dead = false, away = false;
     var onTrack = null, onMini = null, jump = { d: '', t: 0 };

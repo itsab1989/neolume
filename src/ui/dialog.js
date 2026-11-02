@@ -48,6 +48,7 @@
     setTimeout(function () {            // einmalige Messung fuer den Zeiger (nicht im Tastenpfad)
       if (ov.closed) return;
       ov.rects = [];
+      ov.box = [box.offsetLeft, box.offsetTop, box.offsetWidth, box.offsetHeight];   // Finger/Maus: Tipp daneben = Abbrechen (N.pointer)
       for (var i = 0; i < ov.btns.length; i++) {
         var b = ov.btns[i], x = 0, y = 0, e = b;
         while (e && e !== ov.el) { x += e.offsetLeft; y += e.offsetTop; e = e.offsetParent; }
@@ -56,8 +57,9 @@
     }, 50);
     return ov;
   }
-  /* Beenden-Dialog (SPEC 6.2) */
+  /* Beenden-Dialog (SPEC 6.2). Geraete, deren Apps sich nicht selbst beenden (caps.exit false, z. B. iPad): nichts tun */
   function exitApp() {
+    if (N.platform && N.platform.caps && N.platform.caps.exit === false) return;
     open({ title: N.t('dlg.exit.title'), text: N.t('dlg.exit.text'),
       buttons: [{ id: 'exit', t: N.t('dlg.exit.confirm') }, { id: 'cancel', t: N.t('dlg.exit.cancel') }], focus: 1,
       onSelect: function (id) { if (id === 'exit') N.app.exit(); } });

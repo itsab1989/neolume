@@ -1,10 +1,12 @@
 /* Ansicht 'profiles' – Profilwahl + PIN (SPEC 7.2, 7.15, Mockups profiles.html / profiles-pin.html).
  * Start-Fokus: zuletzt genutztes Profil. ◀▶ ohne Wrap. OK: ohne PIN -> Start, mit PIN -> PIN-Dialog (jedes Mal).
- * Kein "Konto wechseln" – ausser einmalig direkt nach der Anmeldung ("Anderes Konto"). Fokus-Gedaechtnis wird beim Wechsel verworfen. */
+ * Kein "Konto wechseln" – ausser einmalig direkt nach der Anmeldung ("Anderes Konto"). Fokus-Gedaechtnis wird beim Wechsel verworfen.
+ * Aus der App geoeffnet (Einstellungen, Seitenleiste): Zurueck-Knopf oben links, sichtbar nur bei Finger/Maus (N.input.direct,
+ * CSS .tback); mit Tasten fuehrt RETURN zurueck wie bisher. */
 (function (N) {
-  var U = N.util, STEP = 208, W = 168, Y = 232, MAXROW = 6;
+  var U = N.util, STEP = 208, W = 168, Y = 232, MAXROW = 6, BACK = { x: 64, y: 40, w: 160, h: 48 };
   N.router.define('profiles', function (params) {
-    var s = {}, tiles = [], users = [], f = 0, ring, other = null, onOther = false, busy = false, x0 = 0, rows = 1, seq = 0, dead = false, subRow = [true, true];
+    var s = {}, tiles = [], users = [], f = 0, ring, other = null, onOther = false, busy = false, x0 = 0, rows = 1, seq = 0, dead = false, subRow = [true, true], back = null;
     /* Unterzeile: Hauptkonto/Kind/Jugendlich */
     function subKey(u) { return u.kind ? 'prof.sub.' + u.kind : ''; }
     function pos(i) {
@@ -34,7 +36,7 @@
         var u = users[i], p = pos(i), t = U.el('div', 'prof', root, 'left:' + p.x + 'px;top:' + p.y + 'px');
         var av = U.el('div', 'av ' + N.ui.avatarClass(u.name), t);
         av.appendChild(document.createTextNode(N.ui.initial(u.name)));
-        if (u.thumb && base && tok) { var im = U.el('img', '', av); im.src = N.img.BLANK; N.img.want(im, N.img.url(u.thumb, 'avatar', { token: tok, base: base }), 0); }
+        if (u.thumb) { var im = U.el('img', '', av); im.src = N.img.BLANK; N.avatars.show(im, { uuid: u.uuid, thumb: u.thumb, tier: 'avatar', url: N.img.avatar(u.thumb, 'avatar', { token: tok, base: base }), prio: 0 }); }   // PROF-11: gespeichertes Bild sofort; TLS 1.2: direkt von plex.tv (ohne PMS)
         U.txt('div', 'nm', t, u.name);
         if (subKey(u)) U.txt('div', 'sub', t, N.t(subKey(u)));   // ohne Typ keine leere Unterzeile (TV-Test 27.10., F16)
         if (u.pin) { t.lk = U.el('div', 'lock', t); N.ui.icon(t.lk, 'lock'); }
@@ -46,6 +48,10 @@
       if (st.state.firstPicker) {
         other = U.el('div', 'btn', root, 'left:540px;top:580px;width:200px;text-align:center;padding:0');
         other.appendChild(document.createTextNode(N.t('prof.otherAccount')));
+      }
+      if (!(params && params.atStart) && N.router.depth() >= 2) {   // aus der App: Zurueck-Knopf (am TV per CSS nie sichtbar)
+        back = U.el('div', 'btn tback', root, 'width:' + BACK.w + 'px;text-align:center;padding:0');
+        back.appendChild(document.createTextNode('\u2039 ' + N.t('hint.back')));
       }
       ring = new N.ui.Ring(root);
     };
@@ -78,7 +84,6 @@
       var st = N.session, u = st.user(users[i].uuid) || users[i];      // frische Liste: PIN evtl. neu dazugekommen
       if (u.pin) {
         N.ui.pinpad.open({ key: u.uuid, name: u.name, title: N.t('prof.pin.title', { name: u.name }),
-          avatar: u.thumb && s.avTok && s.avBase ? N.img.url(u.thumb, 'avatarM', { token: s.avTok, base: s.avBase }) : '',
           verify: function (pin, cb) {
             st.tokenFor(u, pin, function (err, tok) {
               if (err) { cb(false, err); if (err.authExpired) askSignIn(); return; }
@@ -152,6 +157,7 @@
     }
     /* Zeiger: Kachel per Index-Mathe (Reihe y, Spalte x) */
     s.pointer = function (x, y, kind) {
+      if (back && N.input.direct() && N.hit.rect(BACK.x, BACK.y, BACK.w, BACK.h, x, y)) { if (kind === 'click') { if (busy) cancelChoose(); N.router.back(); } return true; }
       if (other && N.hit.rect(540, 580, 200, 48, x, y)) { if (!onOther) focusOther(); if (kind === 'click') askOther(); return true; }
       var y0 = pos(0).y, y1 = rows === 2 ? pos(MAXROW).y : -1e4, row = y >= y0 && y < y0 + 240 ? 0 : rows === 2 && y >= y1 && y < y1 + 240 ? 1 : -1;
       if (row < 0) return false;

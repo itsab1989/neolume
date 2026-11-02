@@ -27,7 +27,15 @@
  * Ziel-Schnittstelle (Bildschirm/Overlay/Rail): pointer(x, y, kind:'move'|'click', target) -> bool,
  *   optional pointerArrows() -> {y, h, left, right} | null, pointerPage(dir), wheelKeys ['LEFT','RIGHT'],
  *   pointerSig() -> Zahl/Text der aktuellen Scroll-Lage, pointerEdge(x, y) -> {d: -1|1, x, y} | null (Randzone, Anzeige-Mitte),
- *   pointerScroll(d) (einen Schritt rollen, Fokus bleibt sichtbar) */
+ *   pointerScroll(d) (einen Schritt rollen, Fokus bleibt sichtbar),
+ *   pointerGrab(x, y) -> 'drag' | 'tap' | '' (Finger/Maus-Druck an dieser Stelle: Ziehen an pointerDrag, nur Tippen, Standard),
+ *   pointerDrag(phase 'start'|'move'|'end'|'cancel', x, y) -> bool (start: true = uebernommen), touchLong (false = langer
+ *   Finger-Druck tut nichts statt TOOLS), pointerDown(x, y) (Finger/Maus gedrueckt: z. B. Schwung anhalten),
+ *   wheel(x, y, dx, dy) -> bool (nur caps.scroll 'free': Rad/Trackpad-Weg in App-px, P.wheelPx)
+ * Eingabeart (Entscheidung Apple Nr. 14): EINE Quelle N.input.mode = 'key' | 'pointer' | 'touch' (src/core/input.js); hier gesetzt
+ *   aus Maus-Ereignissen (pointer bzw. touch), Tasten setzt App.press. Finger-Ereignisse tragen
+ *   e.pnInput = 'touch' (Touch-Schicht der Plattform). Ziehen (P.grab/P.drag): Finger ueber App.grab/App.drag, Maus nur bei
+ *   caps.pointer 'mouse' (Druck auf ein Zug-Ziel -> Bewegungen gehen an pointerDrag, der Klick danach entfaellt). TV unveraendert. */
 (function (N) {
   var U = N.util, THROTTLE = 40, IDLE = 3000, KEY_GUARD = 16, LONG = 800;
   var JITTER = 4, SCROLL_COOL = 450, SCROLL_MOVE = 40, EDGE_DWELL = 400, EDGE_RATE = 300, WHEEL_RATE = 150, EDGE_SLOW = 400, EDGE_FAST = 120, LIVE = 1000, HOLD = 250, CX = 640, CY = 360, CENTRE = 8, JUMP = 200;
@@ -35,7 +43,8 @@
   // max ~710 ms; Loslassen liefert KEIN Ereignis (kein mouseout/blur), nur Stille -> 1 s Frist = kurzer Nachlauf, kein Abbruch
   // beim Stillhalten. Wiederauflegen: Punkt erscheint in der Bildmitte (~639,360) = Sprung, siehe P.retouch.
   var P = { on: true, root: null, x: -1, y: -1, pend: false, timer: 0, lastMove: 0, keyT: 0, ax: -1, ay: -1, idleT: 0, arrows: null, arrowsOn: false,
-    rx: -1e4, ry: -1e4, rawT: 0, holdT: 0, gaps: [], lockT: 0, lx: 0, ly: 0, edge: null, edgeT: 0, edgeEl: null, wheelT: 0 };
+    rx: -1e4, ry: -1e4, rawT: 0, holdT: 0, gaps: [], lockT: 0, lx: 0, ly: 0, edge: null, edgeT: 0, edgeEl: null, wheelT: 0,
+    dragOn: false, dragScr: null, mdrag: false, dragDone: false };
   P.accel = true;
   /* Einstellung "Mit dem Zeiger am Rand weiterblaettern" (state.ptrEdge, Standard an; TV-Befund 1.0.5): an = Verweilen in einer
    * Randzone rollt (edgeCheck), Verweilen auf einer angeschnittenen Zeile/naechsten Reihe holt sie herein (P.hold). Aus = Inhalt
@@ -64,10 +73,25 @@
     if (R.hasOverlay()) return R.topOverlay();
     return null;
   }
+  /* flexible Flaeche (N.screen, nur Apple): Overlays und Ansichten ohne scr.flex stehen im mittigen 1280x720-Kasten -> ihre
+   * Koordinaten sind um dessen Lage verschoben. Am TV immer 0/0. */
+  function stageOff(t, isOv) { return N.screen && N.screen.flex && t && (isOv || !t.flex) ? N.screen.off() : null; }
   function route(x, y, kind, target) {
-    var ov = owner();
-    if (ov) return ov.pointer ? ov.pointer(x, y, kind, target) : false;
-    var rail = N.ui.rail, scr = N.router.top();
+    if (kind === 'click' && N.ui.toast && N.ui.toast.tap && N.ui.toast.tap(x, y)) return true;   // Rueckgaengig-Toast antippen (Nr. 26)
+    var ov = owner(), o = stageOff(ov, true);
+    if (ov) {
+      var hit = ov.pointer ? ov.pointer(o ? x - o.x : x, o ? y - o.y : y, kind, target) : false;
+      /* Finger/Maus ohne Hinweisleiste (Apple Nr. 26): Tipp neben das Fenster (Dialog, PIN …) = Abbrechen wie RETURN */
+      if (!hit && kind === 'click' && N.input.direct() && ov.box && !N.hit.rect(ov.box[0], ov.box[1], ov.box[2], ov.box[3], o ? x - o.x : x, o ? y - o.y : y)) { N.router.key('RETURN'); return true; }
+      return hit;
+    }
+    if (N.ui.hints.backHit && N.ui.hints.backHit(x, y)) { if (kind === 'click') N.router.key('RETURN'); return true; }   // Zurueck-Knopf (Nr. 26)
+    var rail = N.ui.rail, scr = N.router.top(), cf = N.router.cardFrame ? N.router.cardFrame(scr) : null;
+    if (cf && !(rail && rail.isOpen())) {            // Detailkarte (nur caps.details 'card'): Inhalt, X/Pfeil, Flaeche daneben
+      var ch = N.ui.card.hit(x, y);
+      if (ch === 'in') { P.holdCancel(); return scr.pointer ? scr.pointer((x - cf.x) / cf.k, (y - cf.y) / cf.k, kind, target) : false; }
+      if (!(ch === 'out' && x < 112 && rail && rail.attached()) && N.router.cardPointer(x, y, kind)) return true;
+    }
     if (rail && rail.attached()) {
       if (rail.isOpen()) {
         if (x < 320) return rail.pointer(x, y, kind);
@@ -82,13 +106,14 @@
       var d = arrowHit(x, y);
       if (d && scr && scr.pointerPage) { scr.pointerPage(d); return true; }
     }
-    return scr && scr.pointer ? scr.pointer(x, y, kind, target) : false;
+    o = stageOff(scr, false);
+    return scr && scr.pointer ? scr.pointer(o ? x - o.x : x, o ? y - o.y : y, kind, target) : false;
   }
   function arrowHit(x, y) {
     var a = P.curArrows;
     if (!a || y < a.y || y >= a.y + a.h) return 0;
-    if (a.left && x >= 124 && x < 164) return -1;
-    if (a.right && x >= 1236 && x < 1276) return 1;
+    if (a.left && x >= a.lx && x < a.lx + 40) return -1;
+    if (a.right && x >= a.rx && x < a.rx + 40) return 1;
     return 0;
   }
   /* Drossel mit Vorderflanke (rein, getestet): fire() sofort, wenn seit dem letzten Lauf >= ms vergangen sind, sonst einmal
@@ -185,7 +210,12 @@
     }, (N.config && N.config.ptrEdgeDwell) || EDGE_DWELL);
   }
   var thr = new Throttle(THROTTLE, process);
-  function onMove(e) { P.move(e.clientX, e.clientY); }
+  function kindOf(e) { return e && e.pnInput === 'touch' ? 'touch' : 'pointer'; }
+  function onMove(e) {
+    if (P.mdrag) { P.x = e.clientX; P.y = e.clientY; P.rawT = U.now(); P.drag('move', e.clientX, e.clientY); return; }   // Maus zieht
+    N.input.set(kindOf(e));
+    P.move(e.clientX, e.clientY);
+  }
   /* echte Bewegung (rein, getestet): gleiche Position = kuenstliches Ereignis (Inhalt bewegt sich unter dem Punkt) -> ignorieren */
   P.move = function (x, y) {
     if (!P.on) return;
@@ -234,6 +264,8 @@
   function onClick(e) {
     if (!P.on) { P.refocus(); return; }
     if (e.preventDefault) e.preventDefault();
+    if (P.dragDone) { P.dragDone = false; P.refocus(); return; }   // Klick nach einem Maus-Zug: der Zug hat schon gewirkt
+    N.input.set(kindOf(e));
     P.click(e.clientX, e.clientY, e.target);
     P.refocus();
   }
@@ -243,6 +275,8 @@
     if (P.longDone) { P.longDone = false; return; }  // langer Druck hat schon TOOLS ausgeloest
     var hk = hintKey(x, y);
     if (hk) { N.router.key(hk); return; }            // Klick auf die Hinweisleiste = diese Taste
+    var rl = N.ui.rail;                               // Finger neben die ausgeklappte Seitenleiste: nur einklappen (wie iOS), nichts antippen
+    if (N.input.mode === 'touch' && rl && rl.isOpen() && !owner() && x >= 320) { rl.close(); return; }
     if (N.idle) N.idle.touch();
     N.fx.step(true);
     route(x, y, 'move', target);
@@ -258,14 +292,44 @@
       P.longT = 0;
       if (hintKey(x, y)) return;
       P.longDone = true;
+      var sc = owner() ? null : N.router.top();
+      if (N.input.mode === 'touch' && sc && sc.touchLong === false) return;   // Finger: langer Druck tut hier nichts (Klick entfaellt)
       N.fx.step(true);
       route(x, y, 'move', null);
       N.router.key('TOOLS');
     }, LONG);
   };
   P.up = function () { if (P.longT) { clearTimeout(P.longT); P.longT = 0; } };
+  /* Ziehen (Finger: Touch-Schicht ueber App.grab/App.drag; Maus: mousedown bei caps.pointer 'mouse'). grab fragt nur, drag fuehrt
+   * aus. Nur am Bildschirm selbst (kein Overlay, keine offene Rail, kein Schoner): dort bleibt alles beim Tippen/Klicken. */
+  function dragScreen() {
+    if (!P.on || owner() || (N.ui.saver && N.ui.saver.on) || (N.ui.rail && N.ui.rail.isOpen && N.ui.rail.isOpen())) return null;
+    return N.router.top();
+  }
+  P.grab = function (x, y) {
+    var sc = dragScreen();
+    return sc && sc.pointerGrab ? sc.pointerGrab(x, y) || '' : '';
+  };
+  P.drag = function (phase, x, y) {
+    if (phase === 'start') {
+      var sc = dragScreen();
+      P.dragOn = !!(sc && sc.pointerDrag && sc.pointerGrab && sc.pointerGrab(x, y) === 'drag' && sc.pointerDrag('start', x, y));
+      P.dragScr = P.dragOn ? sc : null;
+    } else if (P.dragOn) {
+      if (phase === 'end' || phase === 'cancel') P.dragOn = false;
+      if (P.dragScr === N.router.top()) P.dragScr.pointerDrag(phase, x, y);
+      if (!P.dragOn) P.dragScr = null;
+    } else return false;
+    if (phase !== 'cancel') { P.x = x; P.y = y; P.rawT = U.now(); P.keyT = 0; }   // Lebenszeichen: Feinauswahl wartet auf Ruhe
+    if (N.idle) N.idle.touch();
+    return P.dragOn || phase === 'end';
+  };
+  /* Finger-Ziehen von der Touch-Schicht: Eingabeart setzen, dann wie P.drag */
+  P.touchGrab = function (x, y) { return P.grab(x, y); };
+  P.touchDrag = function (phase, x, y) { N.input.set('touch'); return P.drag(phase, x, y); };
   function onWheel(e) {
     if (!P.on) return;
+    if (N.platform.caps.scroll === 'free' && P.freeWheel) { if (e.preventDefault) e.preventDefault(); return; }   // Pixel-Weg (P.wheelPx)
     var d = e.wheelDelta ? -e.wheelDelta : (e.detail || 0);
     if (!d) return;
     if (e.preventDefault) e.preventDefault();
@@ -274,15 +338,31 @@
   /* Mausrad/Touchpad-Wischen -> Taste, gedrosselt (ein Schritt je WHEEL_RATE ms; schnelle Raeder liefern Dutzende Ereignisse) */
   P.wheel = function (d) {
     if (!P.on) return false;
-    var now = U.now();
+    var now = U.now(), ov = owner(), t = ov || (N.ui.rail && N.ui.rail.isOpen() ? N.ui.rail : N.router.top());
+    if (t && t.wheelPx && t.wheelPx(d)) return true;   // Ansicht rollt selbst frei, ungedrosselt (Detailkarte, caps.details 'card'); am TV nie
     if (now - P.wheelT < WHEEL_RATE) return false;
     P.wheelT = now;
-    var ov = owner(), t = ov || (N.ui.rail && N.ui.rail.isOpen() ? N.ui.rail : N.router.top());
     var keys = (t && t.wheelKeys) || ['UP', 'DOWN'];
     N.router.key(d > 0 ? keys[1] : keys[0]);
     return true;
   };
 
+  /* Rad/Trackpad in Pixeln (caps.scroll 'free', Apple Nr. 10/12): der Plattform-Lader liefert App-Koordinaten und den Weg in App-px
+   * (dx/dy > 0 = Inhalt nach links/oben, wie deltaX/deltaY). Ziel: Bildschirm (kein Overlay, keine offene Seitenleiste) mit
+   * wheel(x, y, dx, dy) -> true = verschoben. Sonst Rueckfall auf den Tasten-Weg (P.wheel, gedrosselt). */
+  P.freeWheel = false;
+  P.wheelPx = function (x, y, dx, dy) {
+    if (!P.on) return false;
+    P.freeWheel = true;
+    N.input.set('pointer');
+    if (N.idle) N.idle.touch();
+    var sc = owner() || (N.ui.rail && N.ui.rail.isOpen && N.ui.rail.isOpen()) ? null : N.router.top(), o = stageOff(sc, false);
+    var cf = sc && N.router.cardFrame ? N.router.cardFrame(sc) : null;   // Detailkarte: Inhalts-Koordinaten der Karte
+    if (cf) { if (sc.wheel && sc.wheel((x - cf.x) / cf.k, (y - cf.y) / cf.k, dx / cf.k, dy / cf.k)) return true; }
+    else if (sc && sc.wheel && sc.wheel(o ? x - o.x : x, o ? y - o.y : y, dx, dy)) return true;
+    var d = Math.abs(dy) >= Math.abs(dx) ? dy : 0;
+    return d ? P.wheel(d) : false;
+  };
   /* Tasten kommen nur ueber onkeydown von #anchor (loader/index.html). WebKit verschiebt den Fokus beim mousedown ->
    * mousedown ohne Standardaktion, nach jedem Klick und bei jedem blur/onfocus den Anker wieder fokussieren. */
   var refT = 0;
@@ -302,9 +382,20 @@
     root.addEventListener('mousewheel', onWheel, false);
     root.addEventListener('mousedown', function (e) {
       if (e && e.preventDefault) e.preventDefault();
-      if (P.on) { press(true); P.down(e.clientX, e.clientY); }
+      if (!P.on) return;
+      if (P.mdrag) { P.mdrag = false; P.drag('cancel', P.x, P.y); }   // Loslassen ausserhalb des Fensters kam nie an
+      N.input.set(kindOf(e)); P.dragDone = false;
+      // Beruehrung/Druck haelt freies Scrollen an (Schwung stoppt, iOS-Verhalten); die Ansicht verschluckt dann den Klick selbst
+      var ds = dragScreen();
+      if (ds && ds.pointerDown) ds.pointerDown(e.clientX, e.clientY);
+      // Maus/Trackpad (caps.pointer 'mouse', nicht am TV): Druck auf ein Zug-Ziel (Player-Balken) -> Ziehen statt Klick/langer Druck
+      if (N.input.mode === 'pointer' && N.platform.caps.pointer === 'mouse' && P.grab(e.clientX, e.clientY) === 'drag' && P.drag('start', e.clientX, e.clientY)) { P.mdrag = true; return; }
+      press(true); P.down(e.clientX, e.clientY);
     }, false);
-    root.addEventListener('mouseup', function () { press(false); P.up(); P.refocus(); }, false);
+    root.addEventListener('mouseup', function (e) {
+      if (P.mdrag) { P.mdrag = false; P.dragDone = true; P.drag('end', e.clientX, e.clientY); P.refocus(); return; }
+      press(false); P.up(); P.refocus();
+    }, false);
     var a = anchor();
     if (a) a.addEventListener('blur', refocusSoon, false);
     if (typeof window !== 'undefined' && window.addEventListener) {
@@ -347,6 +438,8 @@
   P.active = function () { return P.on && P.lastMove > 0 && U.now() - P.lastMove < IDLE; };
   /* Router meldet jede Taste: Pfeile weg, Zeiger-Bewegungen bis zur naechsten deutlichen Bewegung ignorieren */
   P.keyUsed = function () {
+    if (P.mdrag) { P.mdrag = false; P.dragDone = false; }
+    if (P.dragOn) P.drag('cancel', P.x, P.y);             // Taste mitten im Zug: Zug abbrechen
     P.keyT = U.now(); P.ax = P.x; P.ay = P.y; P.lastMove = 0; P.pend = false; thr.cancel(); P.lockT = 0; P.rx = P.ry = -1e4;
     if (P.edge) edgeStop();
     P.holdCancel();
@@ -361,10 +454,13 @@
     if (!P.arrows) return;
     var scr = N.router.top(), a = P.active() && !N.router.hasOverlay() && !(N.ui.rail && N.ui.rail.isOpen()) && scr && scr.pointerArrows ? scr.pointerArrows() : null;
     if (!a) { P.hideArrows(); return; }
+    // Lage in Wurzel-Koordinaten: am TV links 124, rechts 1236; flexible Flaeche: rechts an der Breite der Ansicht, Kasten verschoben
+    var o = stageOff(scr, false) || { x: 0, y: 0 }, aw = N.screen ? N.screen.area(scr.flex).w : 1280;
+    a = { y: a.y + o.y, h: a.h, left: a.left, right: a.right, lx: 124 + o.x, rx: aw - 44 + o.x };
     P.curArrows = a;
     var css = 'top:' + (a.y + Math.round(a.h / 2) - 32) + 'px;';
-    P.arrows[0].style.cssText = css + 'left:124px;display:' + (a.left ? 'block' : 'none');
-    P.arrows[1].style.cssText = css + 'left:1236px;display:' + (a.right ? 'block' : 'none');
+    P.arrows[0].style.cssText = css + 'left:' + a.lx + 'px;display:' + (a.left ? 'block' : 'none');
+    P.arrows[1].style.cssText = css + 'left:' + a.rx + 'px;display:' + (a.right ? 'block' : 'none');
     P.arrowsOn = true;
   };
   N.pointer = P;

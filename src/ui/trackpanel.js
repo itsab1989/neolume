@@ -3,16 +3,16 @@
  * (Hoerfilm, fuer Hoergeschaedigte, "wird ins Bild eingefuegt"). Mehr als 7 Eintraege: Liste scrollt per translate3d.
  * o: {tracks:{audio, subs}, tab:'a'|'s', hls, ass, onPick(kind, id)} */
 (function (N) {
-  var U = N.util, X = 840, TOP = 160, STEP = 72, H = 64, VIS = 7;
+  var U = N.util, X = 840, TOP = 160, STEP = 72, H = 64, VIS0 = 7;
   function open(o) {
     var ov = { el: U.el('div', 'layer'), closed: false, tab: o.tab === 's' ? 's' : 'a', f: 0, items: [] };
     U.el('div', 'dim', ov.el);                       // Hintergrund leicht abdunkeln: zeigt, was gerade im Fokus ist
-    var p = U.el('div', 'panel', ov.el);
+    var fr = N.ui.panelFrame(STEP), VIS = VIS0 + fr.n, p = N.ui.panelEl(ov.el, fr);   // Player auf voller Flaeche: mehr Zeilen
     U.txt('div', 'pt t-h2', p, N.t('pl.tracks'));
     var tabs = [U.el('div', 'tp-tab', p, 'left:32px'), U.el('div', 'tp-tab', p, 'left:184px')];
     tabs[0].appendChild(document.createTextNode(N.t('pl.tab.audio')));
     tabs[1].appendChild(document.createTextNode(N.t('pl.tab.subs')));
-    var clip = U.el('div', 'tp-clip', p), list = U.el('div', 'tp-list', clip);
+    var clip = U.el('div', 'tp-clip', p, fr.on ? 'height:' + VIS * STEP + 'px' : undefined), list = U.el('div', 'tp-list', clip);
     /* Mehr-Hinweis (NAV-11) wie im Panel "Sortieren & Filter" (ui/tabpanel.js): scrollt die Liste, 28 px tiefer und eine Zeile weniger */
     var MT = TOP + 28, more = N.ui.more(p, 'top:' + TOP + 'px', 'top:' + (MT + (VIS - 1) * STEP + 4) + 'px'), vis = VIS, top = TOP;
     function entries() {
@@ -69,6 +69,7 @@
     };
     ov.wheelKeys = ['UP', 'DOWN'];
     ov.pointer = function (x, y, kind) {
+      x -= fr.x; y += fr.y;                           // volle Hoehe: Panel-Koordinaten (sonst 0)
       if (x < X) { if (kind === 'click') close(); return true; }
       if (y >= 112 && y < 152) { if (kind === 'click') tab(x < X + 176 ? 'a' : 's'); return true; }
       var off = ov.off || 0, i = N.hit.list(top, STEP, H, Math.min(vis, ov.items.length - off), y);

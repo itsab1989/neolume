@@ -3,6 +3,8 @@
 (function (N) {
   var U = N.util, queue = [], timer = 0, lastKey = 0, running = false;
   var DELAY = 160, SLICE = 6;
+  /* caps.images 'fast' (Apple, 09-perf E4): bei 120 Hz ist ein Bild 8,3 ms – kleinere Haeppchen, Nacharbeit frueher. TV unveraendert. */
+  if (N.platform && N.platform.caps && N.platform.caps.images === 'fast') { DELAY = 80; SLICE = 3; }
   /* Ruhezeit seit der letzten Taste. Die TV-Uhr (Date) kann zurueckspringen (Orsay stellt sie nach, s. core/clock.js): dann laege
    * lastKey in der Zukunft, die Ruhe waere negativ und alles, was auf Ruhe wartet (Bildlader, Idle-Aufgaben, Startseiten-Antwort),
    * stuende so lange still, wie der Sprung gross war (Nutzerbefund 30.10.: nach App-Neustart 15 s keine einzige Bildanfrage,

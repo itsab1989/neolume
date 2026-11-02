@@ -20,11 +20,17 @@
   N.router.define('library', function (params) {
     var lib = params.lib || { id: 0, title: '', type: 'movie' }, coll = params.coll || null, list = params.list || null, once = params.once || null;
     // Seitenleiste markiert die Bibliothek auch in Sammlung/Personenfilter (TV-Befund 26.10.); sub: RETURN geht dort zurueck
-    var sub = !!(coll || params.actor || list || once), s = { rail: params.rail || (lib.id ? N.railRows.libId(lib) : null), wheelKeys: ['UP', 'DOWN'], miniX: REG_X - 16 - 360, news: 'top' };   // news: HOME-13 Hinweis oben rechts neben dem Titel   // Mini-Player links neben A–Z (F26)
+    // flexible Flaeche (N.screen, nur Apple): Raster mit mehr Spalten/Zeilen, A–Z-Leiste am rechten Rand (TV: 1280x720, REG_X 1160)
+    var A = N.screen.area(true), regX = REG_X + A.w - 1280;
+    var sub = !!(coll || params.actor || list || once), s = { rail: params.rail || (lib.id ? N.railRows.libId(lib) : null), wheelKeys: ['UP', 'DOWN'], miniX: regX - 16 - 360, news: 'top', flex: true };   // news: HOME-13 Hinweis oben rechts neben dem Titel   // Mini-Player links neben A–Z (F26)
     // Weitere Server (N.srv): Bibliothek eines fremden Servers -> alle Anfragen dorthin, Ansicht-Merken mit eigenem Schluessel
     var srv = lib.srv || '', libKey = srv ? N.srv.skey(srv, lib.id) : lib.id;
     function get(path, q, o, cb) { return N.plex.get(path, q, N.srv.o(srv, o), cb); }
-    var G = N.GridMath, root, titleT, statT, chipBar, chips = [], chipRects = null, grid, ring, sb, amb, regDivs = [], regCur = -1, regFoc = false, regHas = '', bubble, bubbleT, skel, fade;
+    // caps.images 'fast' (Apple Nr. 13): 3 Zeilen mehr Vorrat ueber/unter dem Fenster und beim Seiten-Vorladen; caps.scroll 'free' (S7):
+    // Raster folgt senkrecht frei dem Finger/Trackpad (N.kinetic.Drive, kein Einrasten), erste Taste danach: Fokus am Anker
+    var caps = N.platform.caps, AHEAD = caps.images === 'fast' ? 3 : 0, FREE = caps.scroll === 'free';
+    var drv = null, pan = null, loose = false, eat = false;
+    var G = A.w === 1280 && A.h === 720 && !AHEAD ? N.GridMath : N.GridMath.make('L', false, A, AHEAD), root, titleT, statT, chipBar, chips = [], chipRects = null, grid, ring, sb, amb, regDivs = [], regCur = -1, regFoc = false, regHas = '', bubble, bubbleT, skel, fade;
     var prefs = null, items = [], n = -1, total = -1, chars = [], pages = {}, gen = 0, tasks = [], collN = -1;
     // M4 Musik/Hoerbuecher: Reiter 'lib' = Kuenstler (Musik) bzw. Buecher (Hoerbuecher), 'alt' = Alben bzw. Autoren; quadratische Karten
     var music = lib.type === 'artist', book = music && N.music.bookLib(lib);
@@ -45,17 +51,19 @@
       statT = U.txt('div', 'a t-small c2 ell', root, N.t('common.loading'), 'left:144px;top:84px;width:1000px');
       chipBar = U.el('div', 'lchips', root);
       grid = new N.ui.Grid(root);
+      if (G !== N.GridMath) grid.setGeom(G);
+      if (FREE) grid.onScroll = function () { ensurePages(); };   // freie Lage: Seiten fuer das neue Fenster holen (Anfrage, kein DOM)
       skel = U.el('div', 'skel', root);
       for (var i = 0; i < 5; i++) U.el('i', '', skel, 'left:' + (G.X0 + i * G.SX) + 'px;top:' + G.Y0 + 'px;width:176px;height:264px');
       fade = U.el('img', 'fade fade-frame', root); fade.src = N.assetBase + 'fade-frame.png';   // unter A–Z-Leiste/Sprungbuchstabe: Band ab y 612, Leiste bis 628
       /* A–Z-Leiste: vollstaendiges Alphabet sofort sichtbar (NUTZER-FEEDBACK-REGELN 1), 27 feste Elemente */
-      var reg = U.el('div', 'regcol', root, 'display:none');
+      var reg = U.el('div', 'regcol', root, 'display:none' + (regX !== REG_X ? ';left:' + regX + 'px' : ''));
       for (i = 0; i < LETTERS.length; i++) {
         var re = U.el('div', 'reg', reg, 'top:' + (i * REG_STEP) + 'px');
         re.appendChild(document.createTextNode(LETTERS.charAt(i))); regDivs.push(re);
       }
       regDivs.box = reg;
-      bubble = U.el('div', 'jump', root, 'display:none');
+      bubble = U.el('div', 'jump', root, 'display:none' + (A.w !== 1280 ? ';left:' + Math.round(G.X0 + G.width() / 2 - 80) + 'px' : ''));
       bubbleT = document.createTextNode(''); bubble.appendChild(bubbleT);
       ring = new N.ui.Ring(root);
       sb = new N.ui.StateBlock(root);
@@ -170,7 +178,7 @@
       items = []; n = -1; pages = {}; chars = []; total = -1;
       if (!keepF) restoreF = 0;
       grid.clear(); ring.hide(); sb.hide(); hideReg(); U.show(skel, true);
-      if (G.size !== L.view(prefs) || !!G.square !== music) { G = N.GridMath.make(L.view(prefs), music); grid.setGeom(G); }   // Ansicht Gross/Mittel/Klein/Liste
+      if (G.size !== L.view(prefs) || !!G.square !== music) { G = N.GridMath.make(L.view(prefs), music, A, AHEAD); grid.setGeom(G); }   // Ansicht Gross/Mittel/Klein/Liste
       buildChips(); paintStatus();
       U.cls(grid.clip, 'is-ext', mode() === 'x');       // Erweiterungs-Reiter: Karten gedimmt (nicht abspielbar), per Klasse am Raster
       if (xsrc) { items = xsrc.items(); if (!items.length && xsrc.more()) { xLoad(); return; } n = items.length; firstPaint(); return; }
@@ -610,6 +618,7 @@
     }
     s.leave = function () {
       away = true;
+      stopPan(); pan = null;
       if (regT) { clearTimeout(regT); regT = 0; }
       return { f: grid.f, prefs: params.actor || once || list ? prefs : null };   // nicht gemerkte Ansicht: Stand fuer die Rueckkehr
     };
@@ -662,6 +671,7 @@
         return true;
       }
       if (n <= 0) { if (k === 'LEFT' && s.rail) N.ui.rail.open(); else if (k === 'RETURN') up(); return true; }
+      if (loose) { reanchor(); if (N.keys.isNav(k)) return true; }   // erste Taste nach Wischen/Rad: Fokus auf die Karte am Anker (wie TV)
       var f = grid.f, it = cur(), nx;
       switch (k) {
         case 'LEFT': if (G.col(f) > 0) moveTo(f - 1); else if (s.rail) N.ui.rail.open(); return true;
@@ -690,6 +700,7 @@
     /* ---------- Zeiger (Index-Mathe) ---------- */
     s.pointer = function (x, y, kind) {
       keyed = true;
+      if (eat) { if (kind === 'click') eat = false; return true; }   // Beruehrung hat den Schwung angehalten: nichts oeffnen
       if (sb.on && zone === 'state') return sb.pointer(x, y, kind);
       if (y >= 120 && y < 152 && chipRects) {
         for (var i = 0; i < chipRects.length; i++) if (x >= chipRects[i][0] && x < chipRects[i][0] + chipRects[i][1]) {
@@ -700,25 +711,33 @@
         }
         return false;
       }
-      if (regOn() && x >= REG_X && x < REG_X + 56 && y >= REG_Y && y < REG_Y + LETTERS.length * REG_STEP) {
+      if (regOn() && x >= regX && x < regX + 56 && y >= REG_Y && y < REG_Y + LETTERS.length * REG_STEP) {
         var lt = LETTERS.charAt(Math.floor((y - REG_Y) / REG_STEP));
         if (kind === 'click' && L.present(chars).indexOf(lt) >= 0) jumpTo(lt);
         return true;
       }
       if (n <= 0) return false;
+      if (FREE) {                                       // freies Scrollen: jede sichtbare Karte (auch angeschnitten), Liste rollt nie
+        var jf = grid.hitAt(x, y);
+        if (jf < 0) return false;
+        if (zone !== 'grid') toGrid();
+        if (jf !== grid.f) { N.fx.step(true); placeRing(grid.focusTo(jf, true)); afterMove(); }
+        if (kind === 'click' && !N.details.tap(grid.item(jf))) open(grid.item(jf));   // Detailkarte: Tipp oeffnet die Karte (auch Weiterschauen-Listen)
+        return true;
+      }
       var ez = s.pointerEdge(x, y);
       if (ez) { if (kind === 'click') s.pointerScroll(ez.d); return true; }   // Randzone: rollt (Verweilen/Klick), fokussiert nicht
       var j = G.hit(n, grid.r, x, y);
       if (j < 0) { N.pointer.holdCancel(); return false; }
       if (G.row(j) - grid.r >= grid.hitRows()) {                          // angeschnittene, aber zeigbare Zeile (G.part)
-        if (kind === 'click') { reveal(j); open(grid.item(j)); return true; }
+        if (kind === 'click') { reveal(j); if (!N.details.tap(grid.item(j))) open(grid.item(j)); return true; }
         N.pointer.hold(function () { if (!dead && G.hit(n, grid.r, N.pointer.x, N.pointer.y) === j) reveal(j); });   // ~250 ms: Vorbeiziehen loest nichts aus
         return true;
       }
       N.pointer.holdCancel();
       if (zone !== 'grid') toGrid();
       if (j !== grid.f) { N.fx.step(true); placeRing(grid.focusTo(j, true)); afterMove(); }   // still: Liste rollt nicht unter dem Punkt
-      if (kind === 'click') open(grid.item(j));
+      if (kind === 'click' && !N.details.tap(grid.item(j))) open(grid.item(j));   // Detailkarte: Tipp oeffnet die Karte
       return true;
     };
     /* Zeiger-Rollen nur ueber Randzonen (TV-Befund 27.10. nachmittags): oben Streifen y 154–196 (unter den Chips, oberer Rand der
@@ -735,17 +754,61 @@
     }
     s.pointerSig = function () { return grid.r; };
     s.pointerEdge = function (x, y) {
-      if (n <= 0 || (sb.on && zone === 'state') || zone === 'reg' || railOpen) return null;
+      if (FREE || n <= 0 || (sb.on && zone === 'state') || zone === 'reg' || railOpen) return null;   // frei: Rad/Trackpad statt Randzonen
       var w = G.width(), cx = G.X0 + Math.round(w / 2);
       if (x < G.X0 || x >= G.X0 + w) return null;
       if (y >= 154 && y < G.Y0 + 20 && grid.canScroll(-1)) return { d: -1, x: cx, y: 176 };
-      if (y >= G.edgeB() && y < 656 && grid.canScroll(1)) return { d: 1, x: cx, y: 628 };
+      if (y >= G.edgeB() && y < G.VIS + 24 && grid.canScroll(1)) return { d: 1, x: cx, y: G.VIS - 4 };   // TV: bis 656, Mitte 628
       return null;
     };
     s.pointerScroll = function (d) {
       if (zone !== 'grid') toGrid();
       placeRing(grid.scrollBy(d)); afterMove();
     };
+    /* ---------- freies Scrollen (caps.scroll 'free', 08-touch S7) ----------
+     * Senkrechtes Wischen ueber dem Raster verschiebt die Seite frei mit Schwung, ohne Einrasten (Nr. 18), Gummiband an den Enden;
+     * der Fokus bleibt (unsichtbar bei Touch). Waagerecht bzw. ueber Kopf/Chips: Zug annehmen, nichts tun (nie Fokus-Schritte, nie
+     * die Seitenleiste – Nr. 22). Ein Transform je Frame (Grid.setPy), keine Layout-Abfragen. */
+    function stopPan() { return drv ? drv.stop() : false; }
+    function drive() {
+      if (!drv) drv = new N.kinetic.Drive({ dim: G.AH - G.Y0, get: function () { return grid.curPy(); }, max: function () { return grid.maxPy(); },
+        set: function (p) { if (N.idle) N.idle.touch(); grid.setPy(p); } });
+      return drv;
+    }
+    s.pan = function (e) {
+      if (e.phase === 'start') {
+        if (!FREE || !N.kinetic) return false;
+        stopPan(); eat = false; pan = null;
+        if (e.axis !== 'y' || n <= 0 || zone === 'reg' || (sb.on && zone === 'state') || e.y < 152) return true;
+        if (regOn() && e.x >= regX) return true;          // A–Z-Leiste
+        loose = true;
+        pan = { last: 0 };
+        drive().grab(e.t);
+        return true;
+      }
+      if (!pan) return true;
+      var d = -(e.dy - pan.last);
+      pan.last = e.dy;
+      if (e.phase === 'move') { drv.move(d, e.t); return true; }
+      pan = null;
+      drv.up(e.t, e.cancel);
+      return true;
+    };
+    s.pointerDown = function () { if (FREE && stopPan()) eat = true; };
+    s.wheel = function (x, y, dx, dy) {
+      if (!FREE || !N.kinetic || n <= 0 || zone === 'reg' || Math.abs(dy) < Math.abs(dx)) return false;
+      eat = false; loose = true;
+      drive().nudge(dy);
+      return true;
+    };
+    /* erste Taste nach freiem Scrollen: Karte am Anker (Zeile oben, Spalte des Fokus), Raster zurueck ins Tastenraster */
+    function reanchor() {
+      stopPan(); loose = false; pan = null;
+      if (!grid.free) return;
+      if (zone !== 'grid') toGrid();
+      placeRing(grid.fix(grid.anchorIdx()));
+      afterMove();
+    }
     s.relabel = function () { buildChips(); paintStatus(); };
     return s;
   });

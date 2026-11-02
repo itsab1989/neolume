@@ -13,6 +13,18 @@
    * unter min Haken gedimmt, die Unterzeile sagt warum. RETURN/Klick daneben = onCancel() (nichts uebernommen). Ohne done wie bisher.
    * hint: kurze Zeile unter dem Titel (die Hinweisleiste liegt hinter dem Panel), z. B. "OK: an/aus · Zurück: abbrechen". */
   var VIS = 8;
+  /* Panel ueber die ganze Hoehe am rechten Rand (flexible Flaeche, nur ueber Ansichten mit scr.panelFull – Player, Apple Nr. 17):
+   * Versatz gegen den mittigen 1280x720-Kasten (x, y) und zusaetzliche Zeilen (n). Sonst (TV, andere Ansichten) alles 0. */
+  N.ui.panelFrame = function (step) {
+    var S = N.screen, t = N.router && N.router.top ? N.router.top() : null;
+    if (!S || !S.flex || !t || !t.panelFull) return { on: false, x: 0, y: 0, n: 0 };
+    var o = S.off();
+    return { on: true, x: o.x, y: o.y, n: Math.max(0, Math.floor(2 * o.y / (step || STEP))) };
+  };
+  /* Panel-Flaeche anlegen (mit Rahmen fr: rechts buendig, volle Hoehe) */
+  N.ui.panelEl = function (parent, fr) {
+    return U.el('div', 'panel' + (fr.on ? ' pfull' : ''), parent, fr.on ? 'left:' + (X + fr.x) + 'px;top:' + (-fr.y) + 'px;height:' + (720 + 2 * fr.y) + 'px' : undefined);
+  };
   /* Mehr-Hinweis (SPEC NAV-11) fuer jede scrollende senkrechte Liste: zwei dauerhafte Elemente (oben/unten), Lage per css-Text;
    * set(oben, unten) schaltet nur bei Aenderung die Klasse on (visibility) – keine neuen Ebenen im Tastenpfad */
   N.ui.more = function (parent, upCss, dnCss) {
@@ -27,13 +39,13 @@
   function select(o) {
     var ov = { el: U.el('div', 'layer'), items: [], f: 0, closed: false, off: 0 };
     U.el('div', 'dim', ov.el);                       // Hintergrund leicht abdunkeln: zeigt, was gerade im Fokus ist
-    var p = U.el('div', 'panel', ov.el);
+    var fr = N.ui.panelFrame(STEP), MAXV = VIS + fr.n, p = N.ui.panelEl(ov.el, fr);
     U.txt('div', 'pt t-h2', p, o.title);
     if (o.hint) U.txt('div', 'phint', p, o.hint);
     var act = o.multi && o.done ? o.done : null, ents = act ? o.entries.concat([{ id: '', act: true, t: '' }]) : o.entries;
-    var vis = o.more !== false && ents.length > VIS ? VIS - 1 : VIS;   // NAV-11: Mehr-Hinweis immer, wenn die Liste scrollt (more:false schaltet ab)
+    var vis = o.more !== false && ents.length > MAXV ? MAXV - 1 : MAXV;   // NAV-11: Mehr-Hinweis immer, wenn die Liste scrollt (more:false schaltet ab)
     var clip = U.el('div', 'tp-clip', p, 'top:' + TOP + 'px;height:' + (vis * STEP) + 'px'), list = U.el('div', 'tp-list', clip);
-    if (vis < VIS) { ov.up = U.txt('div', 'pmore up', p, '›').parentNode; ov.dn = U.txt('div', 'pmore dn', p, '›', 'top:' + (TOP + vis * STEP + 4) + 'px').parentNode; }
+    if (vis < MAXV) { ov.up = U.txt('div', 'pmore up', p, '›').parentNode; ov.dn = U.txt('div', 'pmore dn', p, '›', 'top:' + (TOP + vis * STEP + 4) + 'px').parentNode; }
     for (var i = 0; i < ents.length; i++) {
       var d = ents[i];
       if (d.act) { ov.act = U.el('div', 'pe two act', list, 'top:' + (i * STEP) + 'px'); ov.actT = U.txt('div', 'lb', ov.act, ''); ov.actS = U.txt('div', 'sb', ov.act, ''); ov.items.push(ov.act); continue; }
@@ -89,6 +101,7 @@
     };
     ov.wheelKeys = ['UP', 'DOWN'];
     ov.pointer = function (x, y, kind) {
+      x -= fr.x; y += fr.y;                           // volle Hoehe: Panel-Koordinaten (sonst 0)
       if (x < X) { if (kind === 'click') ov.cancel(); return true; }
       if (x < X + 24 || x >= X + 416) return false;
       var i = N.hit.list(TOP, STEP, H, Math.min(vis, ov.items.length - ov.off), y);
@@ -108,7 +121,7 @@
   function wait(o) {
     var ov = { el: U.el('div', 'layer'), closed: false };
     U.el('div', 'dim', ov.el);
-    var p = U.el('div', 'panel', ov.el);
+    var fr = N.ui.panelFrame(STEP), p = N.ui.panelEl(ov.el, fr);
     U.txt('div', 'pt t-h2', p, o.title);
     U.el('div', 'spinner sm pwait', p);
     U.txt('div', 'px pwait-t', p, o.text || '');
@@ -117,7 +130,7 @@
     ov.cancel = function () { close(); if (o.onCancel) o.onCancel(); };
     ov.hints = function () { return [{ k: 'ret', t: 'hint.cancel' }]; };
     ov.onKey = function (k) { return k !== 'RETURN'; };
-    ov.pointer = function (x, y, kind) { if (x < X && kind === 'click') ov.cancel(); return true; };
+    ov.pointer = function (x, y, kind) { if (x - fr.x < X && kind === 'click') ov.cancel(); return true; };
     N.router.openOverlay(ov);
     return ov;
   }
@@ -125,7 +138,7 @@
   function help(title, text) {
     var ov = { el: U.el('div', 'layer'), closed: false };
     U.el('div', 'dim', ov.el);                       // Hintergrund leicht abdunkeln: zeigt, was gerade im Fokus ist
-    var p = U.el('div', 'panel', ov.el);
+    var p = N.ui.panelEl(ov.el, N.ui.panelFrame(STEP));
     U.txt('div', 'pt t-h2', p, title);
     U.txt('div', 'px', p, text);
     function close() { if (!ov.closed) { ov.closed = true; N.router.closeOverlay(ov); } }

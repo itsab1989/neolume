@@ -2,7 +2,7 @@
 (function (N) {
   var U = N.util;
   N.router.define('soon', function (params) {
-    var s = {};
+    var s = { backBtn: true };                       // Finger/Maus: Zurueck-Knopf statt Hinweisleiste (Nr. 26)
     s.rail = params && params.rail ? params.rail : null;
     s.create = function (root) {
       var area = params.label || (params.area === 'search' ? N.t('nav.search') : N.t('soon.' + (params.area === 'player' ? 'player' : 'details')));

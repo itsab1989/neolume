@@ -37,6 +37,8 @@ loader-icons/original
 brand/README.md
 brand/public.json
 tools/build.js
+tools/platform.js
+platforms/samsung-orsay
 tools/dev.py
 tools/make_assets.js
 tools/tokens.js
@@ -132,6 +134,14 @@ if os.path.exists(pp):
             if prv['pointer'] != pub['pointer'] and os.path.exists(os.path.join(out, d, n)): os.remove(os.path.join(out, d, n))
     os.remove(pp)
 os.remove(os.path.join(out, '.brand-public.json'))
+# npm scripts of private platform folders (platforms/apple, never exported) would point to missing files
+pj = os.path.join(out, 'package.json')
+lines = open(pj, encoding='utf-8').read().split('\n')
+kept = [l for l in lines if not re.match(r'\s*"[^"]+": ".*platforms/apple', l)]
+for i, l in enumerate(kept):                                 # last entry of an object: no trailing comma
+    if l.rstrip().endswith(',') and i + 1 < len(kept) and kept[i + 1].strip().startswith('}'): kept[i] = l.rstrip()[:-1]
+open(pj, 'w', encoding='utf-8').write('\n'.join(kept))
+json.load(open(pj, encoding='utf-8'))
 PY
 
 # the private build/dev package of the app must not contain private icon sets

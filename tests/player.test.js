@@ -216,9 +216,9 @@ function rig(opts) {
   var sef = { exec: function (n, a) { calls.push(a === undefined ? n : n + ':' + a); return opts.jumpRet !== undefined && /^Jump/.test(n) ? opts.jumpRet : 1; } };
   var meta = opts.meta || 'meta-direct.json', dec = opts.dec || 'decision-direct.json';
   var deps = {
-    sef: sef, base: 'http://pms', token: 'TOK', clientId: 'CID', threshold: 0.9, wan: !!opts.wan,
+    sef: sef, base: 'http://pms', token: 'TOK', clientId: 'CID', threshold: 0.9, wan: !!opts.wan, wanDirect: !!opts.wanDirect, cell: !!opts.cell,
     timers: { now: T.now, set: T.setTimeout, clear: T.clearTimeout },
-    cfg: { directPlay: true, quality: '12', ass: 'burn', audioLang: 'server', subs: 'server', subLang: 'de', anime: false, rememberTracks: false },
+    cfg: { directPlay: true, quality: '12', qualityRemote: opts.qWan, qualityCell: opts.qCell, ass: 'burn', audioLang: 'server', subs: 'server', subLang: 'de', anime: false, rememberTracks: false },
     get: function (path, q, o, cb) { gets.push({ path: path, q: q }); cb(null, /decision/.test(path) ? S(opts.decs ? opts.decs[gets.length - 2] : dec) : opts.metaJson || S(meta)); },
     write: function (m, path, q, cb) { writes.push(m + ' ' + path + (q.state ? ' ' + q.state : '')); cb(null, ''); }
   };
@@ -296,6 +296,31 @@ test('Weiterer Server uebers Internet (TV-Test 1.0.4): kein Direct Play, 8 Mbit/
   p.on(function (e, d) { if (e === 'error') errs.push(d.kind); });
   p.start(); p.onEvent(1);
   eq(errs, ['server']);                                  // eigener Server unveraendert
+});
+test('Qualitaet ueber das Internet / ueber Mobilfunk (PLAY-36): Standard 8 = bisher, niedrigste Grenze gilt, eigener Server unterwegs mit Direct Play', function () {
+  var D = N.decision;
+  function cap(o) { var q = D.query(Object.assign({ rk: '1' }, o)); return q.maxVideoBitrate === undefined ? '-' : q.maxVideoBitrate + ' ' + q.videoResolution; }
+  // ohne Einstellung (alte Profile) und mit Standard 8: genau wie TV-Test 1.0.4
+  eq([cap({ wan: true, quality: '12' }), cap({ wan: true, quality: '12', qWan: '8' }), cap({ wan: true, quality: '20', qWan: '8' })],
+    ['8000 1920x1080', '8000 1920x1080', '8000 1920x1080']);
+  eq(cap({ wan: true, quality: '8', qWan: '8' }), '8000 1280x720');            // gleiche Bitrate: "beim Umwandeln" bleibt (720p)
+  eq(cap({ wan: true, quality: '12', qWan: '20' }), '12000 1920x1080');        // Internet hoeher als beim Umwandeln: Umwandeln gilt
+  eq(cap({ wan: true, quality: '20', qWan: '20' }), '20000 1920x1080');
+  eq(cap({ wan: true, quality: '20', qWan: '4' }), '4000 1280x720');
+  eq(cap({ quality: '12', qWan: '4' }), '-');                                   // Heimnetz: Einstellung wirkt nicht (K2)
+  eq(cap({ cell: true, quality: '12' }), '4000 1280x720');                      // Mobilfunk: Standard 4
+  eq(cap({ cell: true, wan: true, quality: '20', qWan: '12', qCell: '8' }), '8000 1920x1080');
+  eq(cap({ cell: true, wan: true, quality: '20', qWan: '4', qCell: '12' }), '4000 1280x720');
+  eq(D.query({ rk: '1', cell: true }).location, 'lan', 'Mobilfunk mit VPN nach Hause: location bleibt lan');
+  // Playback: Weitere Server ohne Direct Play (TV), eigener Server unterwegs (wanDirect) zuerst Direct Play – mit Grenze
+  var r = rig({ wan: true, wanDirect: true, qWan: '12' });
+  r.p.start();
+  var q = r.gets[1].q;
+  assert.strictEqual(q.directPlay, 1); assert.strictEqual(q.location, 'wan'); assert.strictEqual(q.maxVideoBitrate, 12000);
+  r = rig({ cell: true, qCell: '8' });
+  r.p.start();
+  q = r.gets[1].q;
+  assert.strictEqual(q.directPlay, 1); assert.strictEqual(q.location, 'lan'); assert.strictEqual(q.maxVideoBitrate, 8000); assert.strictEqual(q.videoResolution, '1920x1080');
 });
 test('Protokoll: oeffentliche IPv4-Adressen geschwaerzt, Heimnetz-Adressen bleiben', function () {
   assert.strictEqual(N.diag.redact('InitPlayer http://203.0.113.7:32400/library/parts/1/file.mkv'), 'InitPlayer http://<fern>:32400/library/parts/1/file.mkv');
@@ -411,11 +436,27 @@ test('Bildformat: Flaechen und Zoom-Zuschnitt (Orca-Raster 960x540 bzw. Quellpix
 });
 
 /* ---------- OSD-Logik (Knopfreihe, Kapitel, Mehr-Menue, Sleep, Verzoegerung) ---------- */
+test('Player auf voller Flaeche (Apple Nr. 17): Bildschirm-Punkt -> Raster; TV und 16:9 unveraendert', function () {
+  var O = N.osd, o = { x: 140, y: 120 }, H2 = 960;
+  eq(O.fullPt(600, 485, { x: 0, y: 0 }, 720, ''), { x: 600, y: 485 });
+  eq(O.fullPt(600, 485, null, 720, 'low'), { x: 600, y: 485 });
+  eq(O.fullPt(80, 60, o, H2, ''), { x: 80, y: 60 }, 'Zurueck-Knopf oben links: an der Oberkante, ab dem linken Rand');
+  eq(O.fullPt(740, 485 + 240, o, H2, ''), { x: 600, y: 485 }, 'Balken an der Unterkante (y + 2 * 120), waagerecht im Kasten');
+  eq(O.fullPt(740, 300, o, H2, 'low'), { x: 600, y: 60 }, 'Ziehen: immer Bedien-Ebene');
+  eq(O.fullPt(564, 520, o, H2, 'mid'), { x: 424, y: 400 }, 'Verbindung unterbrochen: mittig im Kasten');
+  eq(O.fullPt(10, 479, o, H2, ''), { x: 10, y: 479 }); eq(O.fullPt(150, 480, o, H2, ''), { x: 10, y: 240 }, 'Grenze = Bildmitte');
+});
 test('Knopfreihe: sichtbare Knoepfe, ◀▶ ohne Umlauf, Zeiger-Treffer, Label-Mitte', function () {
   var O = N.osd, all = O.visible({ pn: 'ep', chap: true });
   eq(all, ['prev', 'back', 'pp', 'fwd', 'next', 'chap', 'tracks', 'more']);
   var film = O.visible({ pn: '', chap: false });
   eq(film, ['back', 'pp', 'fwd', 'tracks', 'more']);
+  // Bild in Bild (caps.pip, PLAY-35): rechte Gruppe vor Kapitel, x 880 (64er Raster); ohne pip (TV) nie dabei
+  var pip = O.visible({ pn: '', chap: true, pip: true });
+  eq(pip, ['back', 'pp', 'fwd', 'pip', 'chap', 'tracks', 'more']);
+  assert.strictEqual(O.nav(pip, 'fwd', 'RIGHT'), 'pip');
+  assert.strictEqual(O.hit(pip, O.ISL_X + 880 + 24, O.ISL_Y + 104), 'pip');
+  assert.strictEqual(O.hit(film, O.ISL_X + 880 + 24, O.ISL_Y + 104), null, 'ohne caps.pip kein Treffer');
   assert.strictEqual(O.nav(film, 'pp', 'RIGHT'), 'fwd');
   assert.strictEqual(O.nav(film, 'fwd', 'RIGHT'), 'tracks', 'Luecke wird uebersprungen');
   assert.strictEqual(O.nav(film, 'more', 'RIGHT'), 'more', 'kein Umlauf');
