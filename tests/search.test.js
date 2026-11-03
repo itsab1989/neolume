@@ -186,3 +186,16 @@ test('Zuletzt gesucht: Pfeiltasten zwischen den Chips und Zeiger-Treffer in Seit
   assert.strictEqual(S.hitChip(p, 105, 60, 52, 44, 32), -1);   // Luecke zwischen zwei Chips
   assert.strictEqual(S.hitChip(p, 120, 52 + 36, 52, 44, 32), -1);   // Luecke zwischen den Zeilen
 });
+
+test('Tastatur flexibel (Apple, 10-screens 7): eigenes Raster, Leerzeichen/Loeschen/abc in einer Zeile, Navigation und Treffer damit', function () {
+  var g = { KX: 144, KY: 152, KS: 72, KW: 64, merge: true }, r = S.layout('abc', 'de', g);
+  assert.strictEqual(r.length, 6);
+  H.eq(r[5].map(function (k) { return [k.act, k.x, k.w, k.h]; }), [['space', 144, 136, 64], ['del', 288, 136, 64], ['mode', 432, 136, 64]]);
+  H.eq([r[1][2].x, r[1][2].y, r[1][2].h], [288, 224, 64]);
+  H.eq(S.move(r, { r: 4, c: 5 }, 'DOWN'), { r: 5, c: 2, col: 5 }, 'Spalte 5 -> abc/123');
+  H.eq(S.move(r, { r: 5, c: 0, col: 0 }, 'UP'), { r: 4, c: 0, col: 0 });
+  H.eq(S.hitKey(r, 300, 280), { r: 1, c: 2, col: 2 });
+  assert.strictEqual(S.hitKey(r, 300, 290), null, 'Luecke unter der 64er Taste');
+  var tv = S.layout('abc', 'de'); H.eq([tv.length, 'h' in tv[0][0], tv[5][1].x, tv[6][0].w], [7, false, 144 + 180, 172], 'ohne Raster: genau das TV-Ergebnis');
+  assert.strictEqual(S.layout('abc', 'de').g, undefined);
+});

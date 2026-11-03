@@ -6,14 +6,15 @@
  * - Tasten-Drossel: Pfeiltasten < 120 ms nach der letzten verarbeiteten -> verworfen; < 200 ms -> fast (keine Uebergaenge).
  * Bildschirm-Schnittstelle: create(root), enter(params, restore), leave() -> restore, destroy(), onKey(k, fast) -> bool,
  *   hints() -> [...], backBtn (Finger/Maus: Zurueck-Knopf oben links statt Hinweisleiste, N.ui.hints.back), rail -> 'home'|'settings'|null, railClosed(), relabel()   (alles ausser create/onKey optional),
- *   pan(e) -> bool (nur caps.scroll 'free': Wischen frei verschieben; bei phase 'start' true = Zug gehoert dieser Ansicht)
+ *   pan(e) -> bool (nur caps.scroll 'free': Wischen frei verschieben; bei phase 'start' true = Zug gehoert dieser Ansicht;
+ *   Overlays: nicht genommene Zuege verschluckt der Router)
  * Detailkarte (caps.details 'card', N.ui.card; am TV nie): Ansichten mit scr.card stehen in einer Karte ueber der Ansicht darunter
  *   (die sichtbar bleibt, abgedunkelt; sie bekommt leave(), aber kein display:none). Tiefere Karten-Ebenen wechseln in derselben
  *   Karte. Optional an Karten-Ansichten: cardTop() -> true = Inhalt steht ganz oben (Ziehen nach unten schliesst), cardBackOk(x, y)
  *   -> true = waagerechter Zug hier ist kein Reihen-Blaettern (Mitte -> rechts = eine Ebene zurueck). */
 (function (N) {
   var U = N.util, KEEP = 2, THROTTLE = 120, FAST = 200;
-  var factories = {}, stack = [], overlays = [], layer = null, overLayer = null, lastNav = 0, nowFn = U.now, hintCtx = null, panT = null;
+  var factories = {}, stack = [], overlays = [], layer = null, overLayer = null, lastNav = 0, nowFn = U.now, hintCtx = null, panT = null, SINK = {};
   var cg = null;                                     // laufende Karten-Geste (Ziehen nach unten / Mitte -> rechts)
   var WAKE_KEYS = { RED: 1, GREEN: 1, YELLOW: 1, BLUE: 1, INFO: 1, TOOLS: 1 };
 
@@ -25,7 +26,10 @@
     if (entry.card) { N.ui.card.init(layer); scr.el.className += ' incard'; N.ui.card.adopt(scr.el); }   // Detailkarte (nur caps.details 'card')
     if (layer && !scr.el.parentNode) layer.appendChild(scr.el);
     // flexible Flaeche (N.screen, nur Apple): angepasste Ansichten fuellen W x H, alle anderen im mittigen 1280x720-Kasten
-    if (!entry.card && N.screen && N.screen.flex && scr.el.className) scr.el.className += scr.flex ? ' flex' : ' stage720';
+    if (!entry.card && N.screen && N.screen.flex && scr.el.className) {
+      scr.el.className += scr.flex ? ' flex' : ' stage720';
+      if (scr.flex) { var vw = N.screen.view(), es = scr.el.style; es.left = vw.x + 'px'; es.width = vw.w + 'px'; es.height = vw.h + 'px'; }   // Breitenklasse M/K: Inhaltskante, Leiste unten
+    }
     if (scr.create) scr.create(scr.el, entry.params);
     entry.scr = scr;
     return scr;
@@ -171,10 +175,12 @@
     },
     /* Flaeche geaendert (N.screen 'screen:resized', nur Apple): flexible Ansichten neu aufbauen. Die oberste sofort (Fokus bleibt
      * ueber leave/restore wie beim Sprachwechsel), sobald kein Overlay mehr offen ist; tiefere beim Zurueckkehren (show). Ansichten
-     * im 1280x720-Kasten (Player, Dialoge …) bleiben unberuehrt. */
+     * im 1280x720-Kasten (Player, Dialoge …) bleiben unberuehrt, ausser sie setzen scr.reflow (ob sie flexibel sind, haengt von der
+     * Flaeche ab). */
     relayout: function () {
-      for (var i = 0; i < stack.length; i++) if (stack[i].scr && (stack[i].scr.flex || stack[i].card)) stack[i].dirty = true;
+      for (var i = 0; i < stack.length; i++) if (stack[i].scr && (stack[i].scr.flex || stack[i].card || stack[i].scr.reflow)) stack[i].dirty = true;
       if (N.ui.card && N.ui.card.el) N.ui.card.layout();
+      for (var j = 0; j < overlays.length; j++) N.screen.place(overlays[j]);
       R.settle();
     },
     settle: function () {
@@ -186,6 +192,7 @@
     openOverlay: function (ov) {
       overlays.push(ov);
       if (overLayer) { if (!ov.el.parentNode) overLayer.appendChild(ov.el); U.cls(overLayer, 'on', true); }
+      if (N.screen && N.screen.flex) N.screen.place(ov);   // flexible Flaeche: Overlay nach seinem Kasten (Panel rechts, Dialog mittig)
       R.refreshHints();
     },
     closeOverlay: function (ov) {
@@ -258,21 +265,32 @@
         return true;
       }
       // flexible Flaeche (N.screen, nur Apple): Overlays und Ansichten ohne scr.flex stehen im 1280x720-Kasten (wie N.pointer)
-      if (cur && N.screen && N.screen.flex && (o || (!cur.flex && !R.cardFrame(cur)))) {
-        var so = N.screen.off(), c2 = {}, k;
+      if (cur && N.screen && N.screen.flex && !o && cur.flex && N.screen.view().x) {   // flexible Ansicht (M/K): Inhaltskante verschoben
+        var vo = N.screen.view().x, c3 = {}, k3;
+        for (k3 in e) if (Object.prototype.hasOwnProperty.call(e, k3)) c3[k3] = e[k3];
+        c3.x = e.x - vo; e = c3;
+      } else if (cur && N.screen && N.screen.flex && (o || (!cur.flex && !R.cardFrame(cur)))) {
+        var so = o ? N.screen.stageFor(o) : N.screen.stage(), c2 = {}, k;
         for (k in e) if (Object.prototype.hasOwnProperty.call(e, k)) c2[k] = e[k];
-        c2.x = e.x - so.x; c2.y = e.y - so.y; e = c2;
+        c2.x = (e.x - so.x) / so.k; c2.y = (e.y - so.y) / so.k;   // k < 1: verkleinerter Kasten (schmale Flaeche),
+        if (so.k !== 1) { c2.dx = e.dx / so.k; c2.dy = e.dy / so.k; }   // Wege ebenso in Kasten-px
+        e = c2;
       }
       var cf = !o && cur ? R.cardFrame(cur) : null;
       if (cf) e = cardLocal(e, cf);                   // Detailkarte: Inhalts-Koordinaten (Karte verschoben, ggf. verkleinert)
       if (e.phase === 'start') {
         cg = null;
         if (cf && cardGesture(cur, e, cf)) return true;
-        panT = cur && cur.pan && cur.pan(e) ? cur : null; return !!panT;
+        panT = cur && cur.pan && cur.pan(e) ? cur : null;
+        /* Overlay (Panel, Dialog, PIN …), das den Zug nicht nimmt (keine/kurze Liste, waagerecht): annehmen und nichts tun – Wischen
+         * ist dort nie ein Fokus-Schritt (sonst Rueckfall des Laders: Fokus springt erst nach dem Abheben, Apple Nr. 12/18) */
+        if (!panT && o) panT = SINK;
+        return !!panT;
       }
       if (cg) return cardMove(e);
       var p = panT;
       if (e.phase === 'end') panT = null;
+      if (p === SINK) return true;
       if (!p) return false;
       if (p !== cur) {                                // Ziel verschwand mitten im Zug (Overlay zu/auf): sauber beenden
         panT = null;
@@ -281,6 +299,15 @@
       }
       p.pan(e);
       return true;
+    },
+    /* An den Anfang (App.scrollTop: Tipp ganz oben bzw. Cmd+Pfeil hoch, nur Apple; Auftrag 02.11. Punkt 3): Ziel wie bei Zuegen –
+     * oberstes Overlay, sonst der Bildschirm (Detailkarte eingeschlossen); offene Seitenleiste: nichts. Ansicht ohne scrollTop()
+     * oder schon oben: false (der Lader macht daraus einen normalen Klick). */
+    scrollTop: function () {
+      var o = overlays.length ? overlays[overlays.length - 1] : null, t = top();
+      if (!o && N.ui.rail && N.ui.rail.isOpen && N.ui.rail.isOpen()) return false;
+      var cur = o || (t && t.scr);
+      return !!(cur && typeof cur.scrollTop === 'function' && cur.scrollTop());
     },
     /* Tests */
     _reset: function (nf) { factories = {}; stack = []; overlays = []; layer = null; overLayer = null; lastNav = 0; nowFn = nf || U.now; panT = null; cg = null; }
@@ -293,7 +320,7 @@
   function cardLocal(e, f) {
     var c = {}, k;
     for (k in e) if (Object.prototype.hasOwnProperty.call(e, k)) c[k] = e[k];
-    c.x = (e.x - f.x) / f.k; c.y = (e.y - f.y) / f.k; c.dx = e.dx / f.k; c.dy = e.dy / f.k; c.ady = e.dy;
+    c.x = (e.x - f.x) / f.k + (f.cut || 0); c.y = (e.y - f.y) / f.k; c.dx = e.dx / f.k; c.dy = e.dy / f.k; c.ady = e.dy;   // cut: Inhaltskante (M/K)
     return c;
   }
   function cardGesture(scr, e, f) {

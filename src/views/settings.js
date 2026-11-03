@@ -11,10 +11,15 @@
   var U = N.util, CAT_Y = 112, CAT_STEP = 56, ROW_Y = 112, ROW_STEP = 64;
   N.router.define('settings', function (params) {
     var s = { rail: 'settings', wheelKeys: ['UP', 'DOWN'], flex: true };
-    // flexible Flaeche (N.screen, nur Apple): die Liste nutzt die Hoehe – je 64 px mehr eine Zeile mehr (TV: 6 Zeilen)
-    var EXTRA = Math.max(0, Math.floor((N.screen.area(true).h - 720) / ROW_STEP)), MAXROWS = 6 + EXTRA, DY = EXTRA * ROW_STEP;
+    /* flexible Flaeche (N.screen, nur Apple): die Liste nutzt die Hoehe – je 64 px mehr eine Zeile mehr (TV: 6 Zeilen).
+     * Schmal (Ansicht < 1264 breit: iPhone hoch/quer, iPad hoch, geteilte Fenster; 10-screens.md 6.3, SPEC SET-…): Kategorien und
+     * Zeilen nacheinander statt nebeneinander (STACK) – erst die Liste der Kategorien, ein Tipp/OK/▶ oeffnet ihre Zeilen ueber die
+     * volle Breite mit Zurueck "‹" oben links (RETURN/◀ wie bisher zurueck zu den Kategorien). Am TV nie (1280 breit). */
+    var VA = N.screen.view(), STACK = N.screen.flex && VA.w < 1264, LW = STACK ? VA.w - 168 : 736, RX = STACK ? 144 : 464;
+    var EXTRA = Math.max(0, Math.floor((VA.h - 720) / ROW_STEP)), MAXROWS = 6 + EXTRA, DY = EXTRA * ROW_STEP;
+    var titleT = null, bk = null;
     var cats = [], catEls = [], cTips = [], rowEls = [], desc, zone = 'cat', c = 0, r = 0, list = null, off = 0, more = null;
-    var kin = null, px = 0, panOn = false, animT = 0, gen = 0, free = false, eat = false;   // freies Scrollen (nur caps.scroll 'free')
+    var fl = null;                                       // freies Scrollen (nur caps.scroll 'free'): gemeinsame Hilfe N.ui.freeList
     function st() { return N.session; }
     /* Zahl der eingeschalteten Reihen (aus Einstellung + bekannten Bibliotheken/Katalog) */
     function homeCount() {
@@ -25,15 +30,16 @@
     function choice(id, opts, label) {
       var S = st();
       function cur() { var v = S.settings ? S.settings[id] : null; for (var i = 0; i < opts.length; i++) if (String(opts[i][0]) === String(v)) return opts[i]; return opts[0]; }
-      return { id: id, type: 'list', label: 'set.' + id, desc: 'set.' + id + '.desc', val: function () { return cur()[1]; },
+      var row = { id: id, type: 'list', label: 'set.' + id, desc: 'set.' + id + '.desc', val: function () { return cur()[1]; },
         sw: opts[0][2] ? function () { return cur()[2]; } : null,
         open: function () {
           var e = []; for (var i = 0; i < opts.length; i++) e.push({ id: String(opts[i][0]), t: opts[i][1], sw: opts[i][2], s: opts[i][3] });
-          N.ui.panel.select({ title: N.t('set.' + id), selected: String(cur()[0]), entries: e, onSelect: function (v) {
+          N.ui.panel.select({ title: N.t(row.label), selected: String(cur()[0]), entries: e, onSelect: function (v) {
             for (var j = 0; j < opts.length; j++) if (String(opts[j][0]) === v) S.setSetting(id, opts[j][0]);
             paintAll();
           } });
         } };
+      return row;
     }
     function toggle(id) {
       var S = st();
@@ -46,12 +52,27 @@
     /* zurueck kuerzer als vor (wie Plex/Podcast-Apps): ein zusaetzlicher Wert in derselben Liste statt einer zweiten Zeile */
     function secBF(v) { var st = N.osd.steps(v, 10); return [[v, N.t('set.v.secBF', { b: st.b, f: st.f })]]; }
     function stills() { var o = []; N.osd.STILL.forEach(function (n) { o.push([n, n ? N.tn('set.v.afterEp', n) : v('off')]); }); return o; }
-    function quals(q) { var o = []; q = q || N.decision.QUAL; ['20', '12', '8', '4'].forEach(function (k) { o.push([k, N.t('set.v.q', { n: k, r: q[k][1] === '1920x1080' ? '1080p' : '720p' })]); }); return o; }
+    /* Stufen dieses Geraets (N.decision.steps, SPEC PLAY-37): Original (ohne Grenze) zuerst mit Unterzeile je Zeile, dann 4K (nur
+     * Geraete mit caps.codecs.maxResolution >= 3840x2160) und 20 … 4 Mbit/s; INFO erklaert Original, 4K und die Datenmenge */
+    function quals(id, q) {
+      var D = N.decision, o = [];
+      D.steps().forEach(function (k) {
+        o.push(k === D.ORIG ? [k, D.label(k), null, N.t('set.v.qOrig.' + id + '.s', { q: D.label(D.top()) })] : [k, D.label(k, q)]);
+      });
+      var r = choice(id, o), def = { quality: '12', qualityRemote: '8', qualityCell: '4' }[id];
+      r.val = function () {                         // zu hoch fuer dieses Geraet (z. B. 4K am TV): hoechste Stufe; unbekannt: Standard
+        var v = D.eff(st().settings ? st().settings[id] : '', def), i;
+        for (i = 0; i < o.length; i++) if (o[i][0] === v) return o[i][1];
+        return D.label(def, q);
+      };
+      r.help = { quality: 'help.qualityOrig', qualityRemote: 'help.qualityOrigRemote', qualityCell: 'help.qualityOrigCell' }[id];
+      return r;
+    }
     /* Grenze ueber das Internet (Weitere Server, eigener Server unterwegs) und – nur auf Geraeten mit Mobilfunk – ueber Mobilfunk;
      * Werte wie "beim Umwandeln", 8 Mbit/s hier mit 1080p (N.decision.QWAN, seit TV-Test 1.0.4) */
     function netQuals() {
-      var o = [choice('qualityRemote', quals(N.decision.QWAN))];
-      if (N.platform.caps.cellular) o.push(choice('qualityCell', quals(N.decision.QWAN)));
+      var o = [quals('qualityRemote', N.decision.QWAN)];
+      if (N.platform.caps.cellular) o.push(quals('qualityCell', N.decision.QWAN));
       return o;
     }
     /* Wiedergabe (Reihenfolge docs/research/settings-order-2026-10-29.md 2.2): Fortsetzen, Serien-Abend (Intro … Sleep-Timer),
@@ -60,7 +81,7 @@
       return [choice('resume', vals(['ask', 'resume', 'start'])), choice('resumeRewind', rewinds()),
         choice('skipIntro', vals(['off', 'button', 'auto'])), choice('skipCredits', vals(['off', 'button', 'auto'])), toggle('autoNext'), countdownRow(),
         choice('stillWatching', stills()), choice('stillTime', hours()), choice('sleepDefault', sleeps()),
-        choice('quality', quals())].concat(netQuals(), [toggle('directPlay'), toggle('lowerOffer'),
+        quals('quality')].concat(netQuals(), [toggle('directPlay'), toggle('lowerOffer'),
         choice('aspect', [['auto', v('auto')], ['orig', v('orig')], ['fill', v('fill')], ['43', v('a43')], ['zoom', v('zoom')]]),
         choice('seekArrows', secs([5, 10, 15, 30]).concat(secBF('10/30'))), ffrwRow(), choice('seekFf', secs([10, 30, 60]).concat(secBF('15/30'))),
         toggle('thumbs'), loupeRow(), loupeStyleRow()]);
@@ -137,6 +158,16 @@
       for (var i = 0; i < ids.length; i++) o.push([ids[i], v('ac_' + ids[i]), ids[i]]);
       for (i = 0; i < o.length; i++) if (o[i][0] === b) o.unshift(o.splice(i, 1)[0]);   // Standard zuerst
       return choice('accent', o);
+    }
+    /* Farbe der Markierungen (ACC-2, N.accent.badge): Dreieck neu/ungesehen, Haken gesehen, Zahl ungesehener Folgen auf Kacheln;
+     * Hellgrau (bisher, Standard) zuerst, dann die Akzent-Palette in ihrer Reihenfolge. Steht direkt unter der Akzentfarbe: beides
+     * sind Farbwahlen mit Farbfeld, wer eine sucht, findet die andere daneben (docs/research/settings-order-2026-10-29.md) */
+    function badgeRow() {
+      var o = [], ids = N.accent.badgeIds();
+      for (var i = 0; i < ids.length; i++) o.push([ids[i], v(ids[i] === N.accent.LIGHT ? 'bdLight' : 'ac_' + ids[i]), ids[i]]);
+      var r = choice('badgeColor', o);
+      r.help = 'help.badgeColor';
+      return r;
     }
     /* Uhr auf der Startseite (ui/saver.js, N.comfort.CLOCK_STYLES): vier Stile mit Unterzeile, gedimmt bei "Uhrzeit anzeigen" aus */
     function clockStyleRow() {
@@ -233,14 +264,17 @@
     }
     /* Hintergrund in Bibliotheken (N.amb, ui/ambient.js): Modus und Staerke mit Erklaerung je Wert; Staerke gedimmt bei "Aus" */
     function libBgRows() {
-      var S = st(), A = N.amb;
-      function opt(val, k) { return [val, v(k), null, v(k + '.s')]; }
+      /* Startseite mit Kacheln (Apple, HOME-17): dieselbe Einstellung gilt auch hinter den Kacheln der Startseite -> eigene Texte
+       * ("Seitenhintergrund"); TV: Texte wie bisher (Hero, Hintergrund nur in Bibliotheken) */
+      var S = st(), A = N.amb, T = N.platform.caps.home === 'tiles';
+      function opt(val, k) { return [val, v(k), null, v(k + (T && k === 'bgRandom' ? '.sT' : '.s'))]; }
       var m = choice('libBg', [opt(A.MODES[0], 'bgOff'), opt(A.MODES[1], 'bgMood'), opt(A.MODES[2], 'bgTitle'), opt(A.MODES[3], 'bgRandom')]);
       var str = choice('libBgStrength', [opt(A.STRENGTHS[0], 'bgSoft'), opt(A.STRENGTHS[1], 'bgStrong')]);
       m.val = function () { return v(['bgOff', 'bgMood', 'bgTitle', 'bgRandom'][A.MODES.indexOf(A.mode(S.settings))]); };   // fehlend/unbekannt = Standard
       str.val = function () { return v(A.strength(S.settings) === 'strong' ? 'bgStrong' : 'bgSoft'); };
       str.disabled = function () { return A.mode(S.settings) === 'off'; };
       str.ddesc = 'set.libBgStrength.off.desc';
+      if (T) { m.label = 'set.pageBg'; m.desc = 'set.pageBg.desc'; str.desc = 'set.pageBgStrength.desc'; str.ddesc = 'set.pageBgStrength.off.desc'; }
       return [m, str];
     }
     /* P4 (docs/research/discover.md): Entdecken an/aus (Standard: an im Hauptprofil). Merkliste nur mit Helfer; ohne Helfer eine
@@ -319,7 +353,7 @@
             onSelect: function (l) { if (l !== N.i18n.lang()) N.app.setLang(l); } });
         } };
     }
-    /* Oberflaeche (2.5): Layout (Startseite, Seitenleiste, Zurueck aus einem Bereich, Ansicht) · Aussehen (Akzent, Hintergruende, Bewegung) · Kacheln
+    /* Oberflaeche (2.5): Layout (Startseite, Seitenleiste, Zurueck aus einem Bereich, Ansicht) · Aussehen (Akzent, Markierungen, Hintergruende, Bewegung) · Kacheln
      * (Fortschritt, Spoiler) · Uhr · Hinweise (neue Inhalte + Anzeigedauer + im Video, Tastenhinweise) · Bedienung (Zuletzt gesucht, Zeiger) ·
      * Titelmelodie · Entdecken-Block (nur Erwachsene) */
     function displayRows(S) {
@@ -333,7 +367,7 @@
         sectionBackRow(),
         N.platform.caps.home !== 'tiles' && homeSizeRow(),   // HOME-15: direkt vor der Bibliotheksansicht (gleiche Werte Gross/Mittel/Klein); Kacheln-Startseite (Apple): eigene Masse
         choice('libView', [['L', N.t('lib.view.L')], ['M', N.t('lib.view.M')], ['S', N.t('lib.view.S')], ['list', N.t('lib.view.list')]]),   // Bibliotheksansicht (Feedback-Regel 2)
-        accentRow(),
+        accentRow(), badgeRow(),
         toggle('backgrounds')].concat(libBgRows(), [
         { id: 'rm', type: 'toggle', label: 'set.reduceMotion', desc: 'set.reduceMotion.desc',
           get: function () { return !!(S.settings && S.settings.reduceMotion); }, set: function (x) { S.setSetting('reduceMotion', x); N.fx.setReduced(x); } },
@@ -434,19 +468,28 @@
     }
     s.create = function (root) {
       cats = defs();
-      U.txt('div', 'a t-h1', root, N.t('set.title'), 'left:144px;top:40px;width:900px');
+      titleT = U.txt('div', 'a t-h1 ell', root, N.t('set.title'), STACK ? 'left:144px;top:40px;width:' + LW + 'px' : 'left:144px;top:40px;width:900px');
+      if (STACK) {                                       // schmal: Zurueck "‹" vor dem Kategorie-Namen (nur auf der Seite der Zeilen)
+        bk = U.el('div', 'set-bk', root, 'display:none');
+        bk.setAttribute('role', 'button'); bk.setAttribute('aria-label', N.t('hint.back'));
+        bk.appendChild(document.createTextNode('‹'));
+      }
       for (var i = 0; i < cats.length; i++) {
-        var ce = U.el('div', 'set-cat', root, 'top:' + (CAT_Y + i * CAT_STEP) + 'px');
+        var ce = U.el('div', 'set-cat', root, 'top:' + (CAT_Y + i * CAT_STEP) + 'px' + (STACK ? ';width:' + LW + 'px' : ''));
         U.el('span', 'bar', ce);
         ce.appendChild(document.createTextNode(N.t('set.cat.' + cats[i].id)));
         catEls.push(ce);
         cTips.push(N.i18n.has(catKey(i)) ? N.ui.infotip.icon(ce) : null);   // Finger/Maus: ⓘ statt Beschreibungsflaeche (Nr. 28)
       }
-      var clip = U.el('div', 'set-clip', root, DY ? 'height:' + (384 + DY) + 'px' : '');
-      list = U.el('div', 'set-list', clip);
+      var clip = U.el('div', 'set-clip', root, (DY ? 'height:' + (384 + DY) + 'px;' : '') + (STACK ? 'left:144px;width:' + LW + 'px' : ''));
+      list = U.el('div', 'set-list', clip, STACK ? 'width:' + LW + 'px' : '');
+      s.clipEl = clip;
+      fl = N.ui.freeList({ el: list, max: maxPx, dim: MAXROWS * ROW_STEP,
+        hit: function (x, y) { return (!STACK || zone === 'row') && x >= RX && x < RX + LW && y >= ROW_Y && y < ROW_Y + MAXROWS * ROW_STEP; },
+        onSet: function (p) { more.set(p > 0.5, p < maxPx() - 0.5); } });
       for (i = 0; i < maxRows(); i++) {
-        var re = { el: U.el('div', 'set-row', list, 'display:none;top:' + (i * ROW_STEP) + 'px') };
-        re.lb = U.txt('div', 'lb', re.el, '');
+        var re = { el: U.el('div', 'set-row', list, 'display:none;top:' + (i * ROW_STEP) + 'px' + (STACK ? ';width:' + LW + 'px' : '')) };
+        re.lb = U.txt('div', 'lb', re.el, '', STACK ? 'width:' + Math.max(160, LW - 250) + 'px' : undefined);
         re.val = U.txt('div', 'val', re.el, '');
         re.tg = U.el('div', 'toggle', re.el); U.el('i', '', re.tg);
         re.sw = U.el('span', 'sw', re.el);              // Farbfeld (nur Zeilen mit sw, z. B. Akzentfarbe)
@@ -457,67 +500,44 @@
       }
       desc = U.txt('div', 'set-desc', root, '');
       if (DY) desc.parentNode.style.top = (528 + DY) + 'px';
+      if (STACK) { desc.parentNode.style.left = '144px'; desc.parentNode.style.width = LW + 'px'; }
       /* Mehr-Hinweis (NAV-11, Nutzer-Befund 29.10.: unter "Bildübergang" ging die Liste ohne jeden Hinweis weiter): ▲ in der Luecke
        * ueber der ersten Zeile, ▼ zwischen Liste (bis y 496) und Beschreibung (ab y 528), mittig ueber der Liste */
-      more = N.ui.more(root, 'left:818px;top:84px', 'left:818px;top:' + (498 + DY) + 'px');
+      var mx = STACK ? 144 + Math.round(LW / 2) - 10 : 818;
+      more = N.ui.more(root, 'left:' + mx + 'px;top:84px', 'left:' + mx + 'px;top:' + (498 + DY) + 'px');
     };
+    /* schmal (STACK): nur die Seite der Zone zeigen – Kategorien oder die Zeilen einer Kategorie (mit Zurueck und ihrem Namen) */
+    function page() {
+      if (!STACK) return;
+      var rowsOn = zone === 'row';
+      for (var i = 0; i < catEls.length; i++) U.show(catEls[i], !rowsOn);
+      U.show(s.clipEl, rowsOn); U.show(desc.parentNode, rowsOn); U.show(bk, rowsOn);
+      if (!rowsOn) more.set(false, false);
+      var t = rowsOn ? N.t('set.cat.' + cats[c].id) : N.t('set.title');
+      titleT.parentNode.style.left = rowsOn ? '208px' : '144px';
+      titleT.parentNode.style.width = (rowsOn ? LW - 64 : LW) + 'px';
+      U.setText(titleT, t);
+    }
     function rowsOf() { return cats[c].rows; }
     function maxRows() { var n = 0; for (var i = 0; i < cats.length; i++) n = Math.max(n, cats[i].rows.length); return n; }
     function paintAll() { for (var k = 0; k < rowEls.length; k++) paintRow(k); if (zone === 'row') setDesc(); }
     /* Liste scrollen: Fokus-Anker = 3. Zeile, nie ueber das Ende hinaus */
     function scrollTo(i) {
-      var snap = free;                                  // nach freiem Scrollen (Lage zwischen Zeilen): Tasten rasten wieder ein (TV: nie)
-      if (free) { stopAnim(); free = false; list.style.webkitTransition = ''; off = rowAt(); }
+      var snap = fl.keys();                             // nach freiem Scrollen (Lage zwischen Zeilen): Tasten rasten wieder ein (TV: nie)
+      if (snap) off = Math.max(0, Math.min(fl.near(ROW_STEP), rowsOf().length - MAXROWS));
       var o = Math.max(0, Math.min(i - 2, rowsOf().length - MAXROWS));
-      if (o !== off || (snap && px !== o * ROW_STEP)) { off = o; px = off * ROW_STEP; N.fx.move(list); U.tf(list, 0, -off * ROW_STEP); }
+      if (o !== off || (snap && fl.px !== o * ROW_STEP)) { off = o; N.fx.move(list); U.tf(list, 0, -off * ROW_STEP); }
+      fl.sync(off * ROW_STEP);
       more.set(off > 0, off + MAXROWS < rowsOf().length);
     }
-    /* ---- freies Scrollen (App.pan) ---- */
+    /* ---- freies Scrollen (App.pan, N.ui.freeList) ---- */
     function maxPx() { return Math.max(0, rowsOf().length - MAXROWS) * ROW_STEP; }
-    function setPx(p) {
-      px = p;
-      U.tf(list, 0, -Math.round(p * 100) / 100);           // nicht auf ganze px: Feder/Ausklingen sonst in Treppenstufen
-      more.set(p > 0.5, p < maxPx() - 0.5);
-    }
-    function now() { return U.now(); }                 // gleiche Uhr wie e.t des Laders (Date, ms)
-    function stopAnim() { animT = 0; gen++; if (kin) kin.stop(); }
-    function rowAt() { return Math.max(0, Math.min(Math.round(px / ROW_STEP), rowsOf().length - MAXROWS)); }
-    /* Ruhe (Nr. 18: kein Einrasten): die Liste bleibt, wo sie ausgelaufen ist (innerhalb der Grenzen); Treffer rechnen mit px */
-    function settle() {
-      stopAnim();
-      setPx(Math.max(0, Math.min(maxPx(), px)));
-      off = rowAt();
-    }
-    function run() { var g = gen; animT = 1; U.raf(function (ts) { if (g === gen) tick(ts); }); }
-    function tick(ts) {
-      if (kin.step(N.kinetic.frameTime(ts, now))) setPx(kin.pos);   // Frame-Zeitstempel (60/120 Hz gleichmaessig)
-      if (kin.ph.length) run(); else settle();
-    }
-    s.pan = function (e) {
-      if (e.phase === 'start') {
-        panOn = e.axis === 'y' && e.x >= 464 && e.x < 1200 && e.y >= ROW_Y && e.y < ROW_Y + MAXROWS * ROW_STEP && maxPx() > 0;
-        if (!panOn) return true;                          // Kategorien, kurze Liste: Zug annehmen und nichts tun (kein Rueckfall auf Fokus-Schritte)
-        stopAnim();
-        free = true;
-        if (!kin && N.kinetic) kin = new N.kinetic.Scroller({ snap: 0, dim: MAXROWS * ROW_STEP });   // Nr. 18: frei auslaufen, Gummiband an den Enden
-        if (kin) { kin.setMax(maxPx(), MAXROWS * ROW_STEP); kin.pos = px; kin.grab(e.t); }
-        panOn = { y0: px, dy: 0 };
-        list.style.webkitTransition = 'none';            // folgt dem Finger ohne Nachgleiten
-        return true;
-      }
-      if (!panOn) return true;
-      var d = -(e.dy - panOn.dy);                         // Finger nach oben -> Inhalt nach oben (Lage waechst)
-      panOn.dy = e.dy;
-      if (e.phase === 'move') {
-        if (kin) { kin.move(d, e.t); setPx(kin.pos); } else setPx(Math.max(0, Math.min(maxPx(), panOn.y0 - e.dy)));
-        return true;
-      }
-      panOn = false;                                      // end
-      if (!kin || e.cancel) { settle(); return true; }
-      kin.up(e.t);
-      if (kin.ph.length) run(); else settle();
-      return true;
-    };
+    /* Kategorien, kurze Liste: Zug annehmen und nichts tun (kein Rueckfall auf Fokus-Schritte) */
+    s.pan = function (e) { fl.pan(e); return true; };
+    s.wheel = function (x, y, dx, dy) { return fl.wheel(x, y, dy); };
+    s.pointerDown = function () { fl.down(); };
+    /* An den Anfang (App.scrollTop, Tipp ganz oben / Cmd+Pfeil hoch): Zeilenliste gleitet nach oben (N.ui.freeList.top) */
+    s.scrollTop = function () { return fl.top(); };
     function paintRow(i) {
       var d = rowsOf()[i], re = rowEls[i];
       if (!d) { U.show(re.el, false); return; }
@@ -546,8 +566,8 @@
     /* Text wie INFO: Hilfe (bzw. info()) einer aktiven Zeile, sonst die Beschreibung (gedimmt: warum) */
     function infoText(d) { var on = !(d.disabled && d.disabled()); return d.info && on ? d.info() : N.t(d.help && on ? d.help : descKey(d)); }
     /* Info-Symbol (Finger/Maus, N.ui.infotip): Blase mit dem Text am Symbol; Lage aus Zeilen-Mathe (Mitte des 32er-Symbols) */
-    var TIP_X = 1168, TIP_CX = 400;
-    function scrollPx() { return free ? px : off * ROW_STEP; }
+    var TIP_X = STACK ? RX + LW - 32 : 1168, TIP_CX = STACK ? RX + LW - 32 : 400;
+    function scrollPx() { return fl.free ? fl.px : off * ROW_STEP; }
     function rowTip(i) {
       var d = rowsOf()[i];
       if (d) N.ui.infotip.open({ title: N.t(d.label), text: infoText(d), x: TIP_X, y: ROW_Y + i * ROW_STEP - scrollPx() + 32, flex: true, el: rowEls[i].tip });
@@ -563,13 +583,16 @@
       zone = 'cat';
       U.cls(catEls[c], 'is-focus', true);
       setDesc();
+      page();
     }
     function focusRow(i, still) {
       if (zone === 'cat') U.cls(catEls[c], 'is-focus', false); else U.cls(rowEls[r].el, 'is-focus', false);
+      var was = zone;
       zone = 'row'; r = i;
       if (!still) scrollTo(r);                        // Zeiger: Liste laeuft nicht unter dem Punkt weg
       U.cls(rowEls[r].el, 'is-focus', true);
       setDesc();
+      if (was !== 'row') page();
     }
     function activate() {
       var d = rowsOf()[r];
@@ -611,8 +634,8 @@
      * x 1136–1216, je volle Zeilenhoehe >= 44 pt) oeffnet nur die Info-Blase – kein Umschalten, keine Auswahl */
     s.pointer = function (x, y, kind) {
       var i, tip = N.ui.infotip.on();
-      if (animT) { settle(); eat = true; return true; }   // Tipper in den Schwung: nur anhalten (wo er gerade ist)
-      if (eat) { eat = kind !== 'click'; return true; }
+      if (fl.eat(kind)) return true;                      // Tipper in den Schwung: nur anhalten (wo er gerade ist)
+      if (STACK) return stackPointer(x, y, kind, tip);
       if (x >= 144 && x < (tip ? 444 : 424)) {
         i = N.hit.list(CAT_Y, CAT_STEP, tip ? CAT_STEP : 48, cats.length, tip ? y + 4 : y);
         if (i < 0) { N.ui.infotip.hover(null); return false; }
@@ -623,10 +646,9 @@
         return true;
       }
       if (x >= 464 && x < (tip ? 1216 : 1200)) {
-        if (free) {                                       // frei gescrollt: Zeile per Pixel-Lage (auch angeschnittene)
-          if (y < ROW_Y || y >= ROW_Y + MAXROWS * ROW_STEP) return false;
-          i = Math.floor((y - ROW_Y + px) / ROW_STEP);
-          if (i < 0 || i >= rowsOf().length) return false;
+        if (fl.free) {                                    // frei gescrollt: Zeile per Pixel-Lage (auch angeschnittene)
+          i = fl.idx(y, ROW_Y, ROW_STEP, rowsOf().length, MAXROWS);
+          if (i < 0) return false;
         } else {
           i = N.hit.list(ROW_Y, ROW_STEP, 64, Math.min(MAXROWS, rowsOf().length - off), y);
           if (i < 0) return false;
@@ -642,6 +664,28 @@
       N.ui.infotip.hover(null);
       return false;
     };
+    /* schmal (STACK): Kategorien bzw. Zeilen ueber die volle Breite RX … RX + LW; ⓘ ganz rechts (64 breit); Zurueck oben links */
+    function stackPointer(x, y, kind, tip) {
+      var i;
+      if (x < RX - 24 || x >= RX + LW + 24) { N.ui.infotip.hover(null); return false; }
+      if (zone !== 'row') {
+        i = N.hit.list(CAT_Y, CAT_STEP, tip ? CAT_STEP : 48, cats.length, tip ? y + 4 : y);
+        if (i < 0) { N.ui.infotip.hover(null); return false; }
+        if (tip && cTips[i] && x >= RX + LW - 64) { N.ui.infotip.hover(cTips[i]); if (kind === 'click') catTip(i); return true; }
+        N.ui.infotip.hover(null);
+        if (i !== c) focusCat(i); else if (zone !== 'cat') focusCat(i);
+        if (kind === 'click') focusRow(0);                // Tipp oeffnet die Kategorie
+        return true;
+      }
+      if (y >= 32 && y < 104 && x < RX + 72) { if (kind === 'click') focusCat(c); return true; }   // Zurueck "‹"
+      if (fl.free) { i = fl.idx(y, ROW_Y, ROW_STEP, rowsOf().length, MAXROWS); if (i < 0) return false; }
+      else { i = N.hit.list(ROW_Y, ROW_STEP, 64, Math.min(MAXROWS, rowsOf().length - off), y); if (i < 0) return false; i += off; }
+      if (i !== r) focusRow(i, true);
+      if (tip && rowEls[i].tip && x >= RX + LW - 64) { N.ui.infotip.hover(rowEls[i].tip); if (kind === 'click') rowTip(i); return true; }
+      N.ui.infotip.hover(null);
+      if (kind === 'click') activate();
+      return true;
+    }
     return s;
   });
 })(N);

@@ -89,25 +89,28 @@
      * keep: Reihen, deren Anfrage fehlschlug -> alte Reihe an ihrer Stelle behalten (Teil-Fehler, M2) */
     buildRows: function (data) {
       var libs = data.libs || [], kinds = H.libKinds(data.alibs || libs), rows = [], keep = data.keep || {}, i;
+      /* Startseite mit Kacheln (Apple, HOME-17): Farbstimmung des Hintergrunds braucht UltraBlurColors (kommen trotz excludeElements
+       * mit, wie in den Bibliotheken) -> je Titel 24 Hex-Zeichen. TV (Hero): nicht mitgenommen, Home-Cache unveraendert */
+      var ub = !!(N.platform && N.platform.caps && N.platform.caps.home === 'tiles');
       var order = data.order || HR.enabled(null, HR.avail(libs, null)), libById = {};
       for (i = 0; i < libs.length; i++) libById[libs[i].id] = libs[i];
       var useCw = order.indexOf('cw') >= 0;
-      var cw = keep.cw ? keep.cw.items : M.normList(data.cw || [], kinds);
+      var cw = keep.cw ? keep.cw.items : M.normList(data.cw || [], kinds, null, ub);
       for (i = 0; i < order.length; i++) {
         var id = order[i], p = HR.parse(id), row = null, items;
         if (keep[id]) { rows.push(keep[id]); continue; }
         if (id === 'cw') { if (cw.length) row = { id: id, kind: 'land', tk: 'home.row.continue', tp: null, items: cw }; }
         else if (id === 'deck') {
-          items = H.nextEpisodes(M.normList(data.deck || [], kinds), useCw);
+          items = H.nextEpisodes(M.normList(data.deck || [], kinds, null, ub), useCw);
           items = useCw ? H.dedupe(cw, items) : H.dedupe([], items);
           if (items.length) row = { id: id, kind: 'land', tk: 'home.row.upNext', tp: null, items: items };
         } else if (p.group === 'new') {
           var lib = libById[p.lib];
-          items = lib ? H.byShow(M.normList(data.recent && data.recent[p.lib] || [], kinds), NEW_MAX) : [];
+          items = lib ? H.byShow(M.normList(data.recent && data.recent[p.lib] || [], kinds, null, ub), NEW_MAX) : [];
           if (items.length) row = { id: id, kind: 'poster', tk: 'home.row.newIn', tp: { library: lib.title }, items: items };
         } else if (p.group === 'hub') {
           var h = data.hubs && data.hubs[p.lib] ? HR.findHub(data.hubs[p.lib], id, p.lib) : null;
-          items = h ? M.normList(h.Metadata || h.Directory || [], kinds) : [];
+          items = h ? M.normList(h.Metadata || h.Directory || [], kinds, null, ub) : [];
           if (items.length) row = { id: id, kind: h.type === 'episode' ? 'land' : N.music.isAudio(items[0]) ? 'sq' : 'poster', title: String(h.title || ''), items: items.slice(0, NEW_MAX) };
         } else if (id === 'ab') {                       // M4 Weiterhoeren: je Buch der juengste angefangene Track
           items = N.music.continueCards(data.ab || []);

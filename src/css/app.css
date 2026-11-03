@@ -78,10 +78,11 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .card .prog { position: absolute; left: 10px; right: 10px; bottom: 10px; height: 4px; border-radius: 2px; background: @c.track-on-image@; overflow: hidden; display: none; }
 .card .prog i { position: absolute; left: 0; top: 0; height: 4px; background: @accent@; border-radius: 2px; }
 .bdg { position: absolute; display: none; }
-.bdg.new { display: block; right: 0; top: 0; width: 0; height: 0; border-top: 24px solid @c.text-1@; border-left: 24px solid transparent; }
+/* Markierungen: @badge@ = Einstellung "Farbe der Markierungen" (Standard c.text-1, tools/build.js badgeCss, SPEC ACC-2) */
+.bdg.new { display: block; right: 0; top: 0; width: 0; height: 0; border-top: 24px solid @badge@; border-left: 24px solid transparent; }
 .bdg.count { display: block; right: 8px; top: 8px; min-width: 28px; height: 24px; padding: 0 6px; border-radius: @r.xs@;
-  background: @c.text-1@; color: @c.on-accent@; font-size: @ty.label.size@; line-height: @ty.label.lh@; font-weight: @ty.label.weight@; text-align: center; }
-.bdg.done { display: block; right: 8px; top: 8px; width: 24px; height: 24px; border-radius: 12px; background-color: @c.text-1@;
+  background: @badge@; color: @c.on-accent@; font-size: @ty.label.size@; line-height: @ty.label.lh@; font-weight: @ty.label.weight@; text-align: center; }
+.bdg.done { display: block; right: 8px; top: 8px; width: 24px; height: 24px; border-radius: 12px; background-color: @badge@;
   background-image: url(@A/icons.png); background-repeat: no-repeat; background-position: -420px -100px; }
 /* HOME-14 Karte "Alle anzeigen" am Reihenende: ruhige Flaeche, Raster-Symbol 48 px (Abzeichen-Element, eigenes Bild all-grid.png) + Text
  * in der Groesse der Kartentitel; Symbol + 12 px + eine Textzeile (24) als Block mittig. TV-Test 30.10.: das 32er Sprite-Symbol
@@ -324,6 +325,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .set-row.dis .lb { color: @c.text-3@; }
 /* Farbfeld der Akzentfarbe (Farbe je Klasse .sw-<id>, erzeugt von tools/build.js); dunkler Rand: sichtbar auch auf dem Akzent */
 .sw { position: absolute; width: 24px; height: 24px; border-radius: 12px; border: 2px solid @c.on-accent@; }
+.sw-light { background: @c.text-1@; }   /* Farbe der Markierungen: Hellgrau (Standard, ACC-2) */
 .set-row .sw { right: 21px; top: 17px; display: none; }
 .set-row.has-sw .sw { display: block; } .set-row.has-sw .val { right: 57px; width: 200px; }
 .panel .pe .sw { right: 20px; top: 20px; } .panel .pe.has-sw .lb { width: 280px; }
@@ -448,6 +450,14 @@ body { color: @c.text-1@; font-family: @ty.family@;
 /* Zurueck-Knopf oben links (Profilwahl aus den Einstellungen): nur Finger/Maus; mit Tasten gilt RETURN */
 .tback { display: none; left: @l.safe-x@; top: 40px; }
 .inp-touch .tback, .inp-ptr .tback { display: block; }
+/* Zurueck-Pfeil im Panel mit Unterebenen (N.ui.panel.select, NAV-21): nur Finger/Maus, wirkt wie RETURN; Titel/Hinweis ruecken nach rechts */
+.panel .pbk { display: none; left: 24px; top: 40px; width: 48px; padding: 0; text-align: center; border-radius: 24px; font-size: 36px; line-height: 44px; }
+.inp-touch .panel .pbk, .inp-ptr .panel .pbk { display: block; }
+.inp-touch .panel.has-bk .pt, .inp-ptr .panel.has-bk .pt, .inp-touch .panel.has-bk .phint, .inp-ptr .panel.has-bk .phint { left: 88px; width: 320px; }
+/* Player-Insel (Intro/Abspann ueberspringen, Geringere Qualitaet?, Weitere Folgen anfragen …): bei Finger/Maus ist das Label der Knopf,
+ * kein OK-Kaestchen (Apple Nr. 14, NAV-22); mit Tasten wie am TV */
+.inp-touch .pl-skip .kc, .inp-ptr .pl-skip .kc { display: none; }
+.inp-touch .pl-skip, .inp-ptr .pl-skip { padding: 0 22px; }
 .stb .btn.inl { width: 300px; text-align: center; padding: 0; }
 
 /* ---------- P5: Uhr (Startseite), Bildschirmschoner (SPEC 7.14), Offline-Leiste, Tastenbelegung, Willkommenskarte ---------- */

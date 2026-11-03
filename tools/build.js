@@ -167,6 +167,26 @@ function accentCss(css, pal) {
   accentCss.stats = { variants: vars.length, tokenRules: rules.filter(function (r) { return !r.raw && r.decls.some(function (d) { return hasToken(d[1]); }); }).length, copies: copies, bytes: extra.join('').length };
   return head.join('') + extra.join('');
 }
+/* Farbe der Markierungen (SPEC ACC-2, src/core/accent.js N.accent.badge): @badge@ = Abzeichen-Farbe (Dreieck neu, Haken
+ * gesehen, Zahl ungesehen). Grundregel = c.text-1 (Hellgrau, Standard: kein Pixel aendert sich ohne Einstellung); je Palettenfarbe
+ * eine Variante ".bd-<id> <selektor>{nur die @badge@-Deklarationen}" ans Ende (eine Klasse mehr = gewinnt). Laufzeit: eine Klasse
+ * am <html>, keine Bilder, kein filter/mask (TV-WebKit 537): Dreieck = Rahmenfarbe, Kreis/Zahl = Hintergrund, der dunkle Haken
+ * (Sprite-Zeile on-accent) erreicht auf jeder Palettenfarbe 4.5:1. Keine Begleitregeln: @badge@ nur in Regeln, die niemand
+ * ueberstimmt (Test). Eigenes Budget, zaehlt nicht zu den Akzent-Varianten. */
+function badgeCss(code, pal) {
+  var base = TOKENS.color('text-1'), extra = [], n = 0;
+  cssRules(code).forEach(function (r) {
+    if (r.raw) { if (/@badge@/.test(r.raw)) fail('CSS: @badge@ in @-Regel'); return; }
+    var t = r.decls.filter(function (d) { return /@badge@/.test(d[1]); });
+    if (!t.length) return;
+    n++;
+    pal.forEach(function (p) {
+      extra.push(r.sel.map(function (s) { return '.bd-' + p.id + ' ' + s; }).join(',') + '{' + t.map(function (d) { return d[0] + ':' + d[1].replace(/@badge@/g, p.color); }).join(';') + '}');
+    });
+  });
+  badgeCss.stats = { rules: n, bytes: extra.join('').length };
+  return { code: code.replace(/@badge@/g, base), extra: extra.join('') };
+}
 function buildCss(cssText, brand) {
   var css = cssText !== undefined ? cssText : fs.readFileSync(path.join(SRC, 'css', 'app.css'), 'utf8');
   var b = brand || BRAND_CSS;
@@ -174,7 +194,7 @@ function buildCss(cssText, brand) {
   var tk = TOKENS.resolve(code);           // Design-Tokens vor den Gates einsetzen (die Gates sehen die echten Werte)
   tk.unknown.forEach(function (u) { fail('CSS: unbekannter Design-Token ' + u + ' (design/tokens.json)'); });
   code = tk.text;
-  if (/@[a-z]+@/.test(code.replace(/@(accent|pointer)@/g, ''))) fail('CSS: unbekannter Marken-Token ' + code.replace(/@(accent|pointer)@/g, '').match(/@[a-z]+@/)[0]);
+  if (/@[a-z]+@/.test(code.replace(/@(accent|pointer|badge)@/g, ''))) fail('CSS: unbekannter Marken-Token ' + code.replace(/@(accent|pointer|badge)@/g, '').match(/@[a-z]+@/)[0]);
   var bad = [[/gradient/i, 'gradient'], [/box-shadow/i, 'box-shadow'], [/text-shadow/i, 'text-shadow'], [/(^|[^-\w])filter\s*:/i, 'filter'],
     [/display\s*:\s*(-webkit-)?flex/i, 'flex'], [/calc\(/i, 'calc()'], [/\d(vw|vh)\b/i, 'vw/vh'], [/var\(/i, 'var()']];
   bad.forEach(function (b) { if (b[0].test(code)) fail('CSS verboten: ' + b[1]); });
@@ -185,7 +205,8 @@ function buildCss(cssText, brand) {
     if (r.test(code)) fail('CSS ohne -webkit--Praefix: ' + p);
   });
   code = code.replace(/\s+/g, ' ').replace(/\s*([{};:,])\s*/g, '$1').replace(/;}/g, '}').trim();
-  return accentCss(code, brandPalette(b));
+  var bd = badgeCss(code, brandPalette(b));
+  return accentCss(bd.code, brandPalette(b)) + bd.extra;
 }
 
 /* ---------- i18n ---------- */
@@ -488,7 +509,7 @@ module.exports = {
   /* Quell-Gate fuer src/css/*.css (Farb-Literale, Token-Platzhalter) -> Liste der Fehler */
   cssSourceErrors: cssSourceErrors,
   /* Akzent-Varianten (tests/accent.test.js): CSS (Rohtext) + Marke -> {css, errors, stats} */
-  css: function (css, brand) { errors = []; var out = buildCss(css, brand); return { css: out, errors: errors.slice(), stats: accentCss.stats }; },
+  css: function (css, brand) { errors = []; var out = buildCss(css, brand); return { css: out, errors: errors.slice(), stats: accentCss.stats, badge: badgeCss.stats }; },
   brandPalette: brandPalette, loadPalette: loadPalette, specificity: specificity,
   /* Erweiterungen eines Marken-Profils (tests/helpers/load.js, Werkzeuge): {js, css, strings, listed, on} */
   extensions: function (brand) { errors = []; return extensions(brand); },

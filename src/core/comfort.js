@@ -101,6 +101,7 @@
     saverFx: 'fade', saverInterval: 30, saverSrc: 'libs', saverLibs: null, saverUnwatched: false, saverInfo: 'ambient', saverPics: 'art', saverNight: 120,   // Schoner (N.saverLogic); saverNight: Min. bis nur noch Uhr (SAV-6)
     clockStyle: 'box', hints: 'always',   // Uhr auf der Startseite (C.CLOCK_STYLES), Tastenhinweise (N.ui.hints.MODES)
     accent: N.brand.accent,   // Akzentfarbe (N.accent): Standard = Farbe der Marke
+    badgeColor: 'light',   // Farbe der Markierungen auf Kacheln (N.accent.badge, ACC-2): Hellgrau wie bisher
     libBg: 'mood', libBgStrength: 'soft',   // Hintergrund in Bibliotheken (N.amb): Farbstimmung, dezent
     recentSearches: 8,   // Zuletzt gesucht (N.srch.limit): 0 = Aus, 4, 8
     sectionBack: 'home',   // Zurueck aus einem Bereich (N.sections, NAV-5): 'home' | 'prev'

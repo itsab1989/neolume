@@ -6,12 +6,14 @@
  * N.rowsEditor(C) ist die gemeinsame Fabrik: "Inspiration anpassen" (views/insprows.js) nutzt dieselbe Liste mit eigener
  * Einstellung (C.setting), eigenen Reihen (C.avail) und Texten (C.label/val/desc, C.keys).
  * Optionale Erweiterungen (nur "Startseite anpassen", C.ext): zusaetzliche Eintraege unten ("Reihe hinzufuegen …", N.ext
- * 'home:adders' / 'home:add') und entfernbare Reihen (Rot, N.ext 'home:removable', mit Rueckfrage). */
+ * 'home:adders' / 'home:add') und entfernbare Reihen (Rot, N.ext 'home:removable', mit Rueckfrage).
+ * Finger/Maus (caps.scroll 'free'): die Liste scrollt frei unter dem Finger (N.ui.freeList: Schwung, Gummiband, kein Einrasten),
+ * Wischen aendert den Fokus nicht, Tipp schaltet; beim Verschieben bleibt Wischen hoch/runter = ein Platz je Schritt (Nr. 26). */
 (function (N) {
   var U = N.util, HR = N.homeRows, X = 144, W = 736, TOP = 112, STEP = 64, VIS = 6, ANCHOR = 2, STALE = 600000;
   function editor(C) { return function () {
     var s = { rail: null, wheelKeys: ['UP', 'DOWN'], toastLow: true, backBtn: true }, K = C.keys;   // backBtn: Finger/Maus ohne Hinweisleiste (Nr. 26)   // Toast unter der Beschreibung (.hr-desc bis y 608, NAV-10)
-    var S = N.session, root, clip, list, desc, stat, els = [], items = [], f = 0, sc = 0, moving = false, cat = null, busy = null, dead = false, more = null;
+    var S = N.session, root, clip, list, desc, stat, els = [], items = [], f = 0, sc = 0, moving = false, cat = null, busy = null, dead = false, more = null, fl = null;
     var MOD = C.model || HR;                            // Listen-Logik (view/store/move): Startseite/Inspiration N.homeRows, Seitenleiste N.railRows
     function locked(it) { return !it.reset && !!(C.locked && C.locked(it)); }   // immer an (z. B. Start in der Seitenleiste)
 
@@ -46,6 +48,9 @@
       U.txt('div', 'a t-h1', root, N.t(K.title), 'left:144px;top:40px;width:720px');
       clip = U.el('div', 'hr-clip', root);
       list = U.el('div', 'hr-list', clip);
+      fl = N.ui.freeList({ el: list, max: maxPx, dim: VIS * STEP,
+        hit: function (x, y) { return !moving && x >= X && x < X + W + 16 && y >= TOP && y < TOP + VIS * STEP; },
+        onSet: function (p) { more.set(p > 0.5, p < maxPx() - 0.5); } });
       var how = U.el('div', 'hr-how', root);
       U.txt('div', 'hr-how-t', how, N.t('set.hr.how.title'));
       U.txt('div', 'hr-how-x', how, N.t(K.how));
@@ -96,16 +101,20 @@
       U.cls(e.el, 'off', !special(it) && !it.on);
     }
     function scrollFor(i) { return U.clamp(i - ANCHOR, 0, Math.max(0, items.length - VIS)); }
+    function maxPx() { return Math.max(0, items.length - VIS) * STEP; }
+    function scPx() { return fl.free ? fl.px : sc * STEP; }   // aktuelle Lage der Liste (frei gescrollt oder nach Tasten)
     function setFocus(i, jump) {
       if (els[f]) U.cls(els[f].el, 'is-focus', false);
       f = i;
       U.cls(els[f].el, 'is-focus', true);
       var nsc = scrollFor(f);
+      if (fl.keys()) jump = true;                       // nach freiem Scrollen: sofort auf ganze Zeilen (wie die Einstellungen)
       if (nsc !== sc || jump) {
         sc = nsc;
         if (jump) { list.style.webkitTransition = 'none'; U.tf(list, 0, -sc * STEP); setTimeout(function () { list.style.webkitTransition = ''; }, 60); }
         else { N.fx.move(list); U.tf(list, 0, -sc * STEP); }
       }
+      fl.sync(sc * STEP);
       more.set(sc > 0, sc + VIS < items.length);
       U.setText(desc, descText(items[f]));
     }
@@ -257,18 +266,25 @@
       else if (k === 'RETURN') N.router.back();
       return true;
     };
+    /* Finger/Trackpad: frei scrollen (N.ui.freeList); beim Verschieben nicht (false -> Wischen = ein Platz je Schritt) */
+    s.scrollTop = function () { return fl.top(); };   // An den Anfang (App.scrollTop, Tipp ganz oben / Cmd+Pfeil hoch)
+    s.pan = function (e) { return fl.pan(e) || (e.phase === 'start' && !moving); };   // kurze Liste/daneben: annehmen, nichts tun
+    s.wheel = function (x, y, dx, dy) { return fl.wheel(x, y, dy); };
+    s.pointerDown = function () { fl.down(); };
     /* Finger/Maus (Nr. 28): Treffer auf dem ⓘ (x 824–896, volle Zeilenhoehe) oeffnet nur die Info-Blase mit dem Text der Zeile */
     s.pointer = function (x, y, kind) {
+      if (fl.eat(kind)) return true;                    // Tipp in den Schwung: nur anhalten
       var tip = N.ui.infotip.on() && !moving;
       if (x < X || x >= X + W + (tip ? 16 : 0)) { N.ui.infotip.hover(null); return false; }
-      var i = N.hit.list(TOP, STEP, STEP, Math.min(VIS, items.length - sc), y);
+      var i;
+      if (fl.free) i = fl.idx(y, TOP, STEP, items.length, VIS);   // frei gescrollt: auch angeschnittene Zeilen
+      else { i = N.hit.list(TOP, STEP, STEP, Math.min(VIS, items.length - sc), y); if (i >= 0) i += sc; }
       if (i < 0) { N.ui.infotip.hover(null); return false; }
-      i += sc;
       if (moving) { if (kind === 'click') drop(); return true; }
       if (i !== f) { U.cls(els[f].el, 'is-focus', false); f = i; U.cls(els[f].el, 'is-focus', true); U.setText(desc, descText(items[f])); N.router.refreshHints(); }
       if (tip && els[i].tip && x >= X + W - 56) {
         N.ui.infotip.hover(els[i].tip);
-        if (kind === 'click') N.ui.infotip.open({ title: label(items[i]), text: descText(items[i]), x: X + W - 32, y: TOP + (i - sc) * STEP + 32, el: els[i].tip });
+        if (kind === 'click') N.ui.infotip.open({ title: label(items[i]), text: descText(items[i]), x: X + W - 32, y: TOP + i * STEP - scPx() + 32, el: els[i].tip });
         return true;
       }
       N.ui.infotip.hover(null);

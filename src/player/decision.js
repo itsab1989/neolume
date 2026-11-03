@@ -26,13 +26,27 @@
   }
   var EXTRA = extraFor(N.platform.caps.codecs);
   /* Qualitaet NUR fuer die Umwandlung (K2): kbit/s + Aufloesung */
-  var QUAL = { '20': [20000, '1920x1080'], '12': [12000, '1920x1080'], '8': [8000, '1280x720'], '4': [4000, '1280x720'] };
+  var QUAL = { '80': [80000, '3840x2160'], '40': [40000, '3840x2160'], '20': [20000, '1920x1080'], '12': [12000, '1920x1080'], '8': [8000, '1280x720'], '4': [4000, '1280x720'] };
+  /* Stufen ueber 1080p (Apple Nr. 5, SPEC PLAY-37): 4K nur, wenn das Geraet es dekodiert (caps.codecs.maxResolution >= 3840x2160;
+   * der TV 2014 nicht). 'orig' = "Original (ohne Grenze)": keine Bitratengrenze in der Decision (Direct Play/Stream, wenn die Datei
+   * passt); muss der Server trotzdem umwandeln (Format), dann mit der hoechsten Stufe des Geraets (D.origCap) – nie unbegrenzt. */
+  var ORIG = 'orig', ORDER = ['80', '40', '20', '12', '8', '4'];
+  function px(r) { var m = /^(\d+)x(\d+)$/.exec(String(r || '')); return m ? [Number(m[1]), Number(m[2])] : [0, 0]; }
+  function fits(r) { var a = px(r), b = px(N.platform.caps.codecs.maxResolution); return a[0] <= b[0] && a[1] <= b[1]; }
+  /* Zahlen-Stufen dieses Geraets, hoechste zuerst (TV: 20, 12, 8, 4) */
+  function nums() { var o = []; for (var i = 0; i < ORDER.length; i++) if (fits(QUAL[ORDER[i]][1])) o.push(ORDER[i]); return o; }
+  /* wirksame Stufe einer gespeicherten Einstellung: Original | Stufe des Geraets; eine bekannte Stufe ueber dem Geraet (z. B. 4K-Wert
+   * eines anderen Geraets am TV) = hoechste Stufe des Geraets; unbekannt = def */
+  function eff(k, def) { k = String(k); if (k === ORIG) return ORIG; if (QUAL[k]) return fits(QUAL[k][1]) ? k : nums()[0]; return def; }
+  /* Grenze einer Stufe auf diesem Geraet: [kbit/s, Aufloesung] | null (Original) | def (unbekannt) */
+  function step(k, def, tab) { var e = eff(k, ''); return e === ORIG ? null : e ? (tab || QUAL)[e] : def; }
+  function lower(a, b) { return !a ? b : !b ? a : b[0] < a[0] ? b : a; }   // niedrigere Grenze; bei gleicher Bitrate die erste
   /* Ueber das Internet (o.wan: Weitere Server; eigener Server unterwegs, Ansicht player) und ueber Mobilfunk (o.cell): Obergrenze
    * schon in der Decision (der Server wandelt dann nur um, wenn die Datei darueber liegt). Einstellungen "Qualitaet ueber das
    * Internet" (o.qWan, Standard 8 = REMOTE wie seit TV-Test 1.0.4) und "Qualitaet ueber Mobilfunk" (o.qCell, Standard 4); es gilt
    * die niedrigste Grenze (auch "beim Umwandeln"); 8 Mbit/s uebers Internet mit 1080p wie bisher. */
   var REMOTE = [8000, '1920x1080'];
-  var QWAN = { '20': QUAL['20'], '12': QUAL['12'], '8': REMOTE, '4': QUAL['4'] };
+  var QWAN = { '80': QUAL['80'], '40': QUAL['40'], '20': QUAL['20'], '12': QUAL['12'], '8': REMOTE, '4': QUAL['4'] };
   var IMG_SUBS = { pgs: 1, hdmv_pgs: 1, vobsub: 1, dvd_subtitle: 1, dvb_subtitle: 1, dvdsub: 1 };
   /* A/B (config hlsEac3): EAC3/AC3 im HLS unveraendert durchreichen statt nach AC3 umzuwandeln (GET-Decision 90546: Ton "copy") */
   var EAC3 = 'add-transcode-target-audio-codec(type=videoProfile&context=streaming&protocol=hls&audioCodec=eac3)';
@@ -41,10 +55,37 @@
    * wirkt laut Plex nur, wenn der Ton umgewandelt wird – Wirkung am TV hoeren (docs/P5-TV-TEST.md). */
   var STEREO = 'add-limitation(scope=videoAudioCodec&scopeName=*&type=upperBound&name=audio.channels&value=2&isRequired=false)';
   var D = {
-    EXTRA: EXTRA, extraFor: extraFor, QUAL: QUAL, QWAN: QWAN, REMOTE: REMOTE, EAC3: EAC3, STEREO: STEREO,
+    EXTRA: EXTRA, extraFor: extraFor, QUAL: QUAL, QWAN: QWAN, REMOTE: REMOTE, EAC3: EAC3, STEREO: STEREO, ORIG: ORIG,
+    nums: nums,
+    /* Werte der Einstellungen "Qualitaet beim Umwandeln/ueber das Internet/ueber Mobilfunk": Original zuerst, dann die Zahlen-Stufen */
+    steps: function () { return [ORIG].concat(nums()); },
+    /* hoechste Zahlen-Stufe des Geraets (TV '20', 4K-Geraet '80'): Umwandeln bei "Original" */
+    top: function () { return nums()[0]; },
+    /* wirksame Stufe einer gespeicherten Einstellung ('orig' | Stufe des Geraets; zu hoch -> hoechste, unbekannt -> def, Standard '12') */
+    eff: function (k, def) { return eff(k, def || '12'); },
+    /* darf das Video unveraendert in den HLS-Strom (Direct Stream)? hevc nur, wenn das Geraet es direkt spielt und HLS es traegt
+     * (caps.codecs.hevcStream !== false; Apple: HEVC im HLS braucht fMP4), h264 ausser bei false, andere Codecs nie */
+    copyOk: function (vc) {
+      var c = N.platform.caps.codecs; vc = String(vc || '').toLowerCase();
+      return vc === 'hevc' ? !!c.hevc && c.hevcStream !== false : vc === 'h264' ? c.h264 !== false : false;
+    },
+    /* Grenze beim Umwandeln mit "Original": hoechste Stufe des Geraets; ist der Quell-Codec (vc, falls bekannt) hier nicht direkt
+     * moeglich, wandelt der Server das ganze Bild neu – dann hoechstens 20 Mbit/s · 1080p (4K-HEVC -> 4K-H.264 mit 80 Mbit/s
+     * waere die teuerste Umwandlung, PLAY-37). TV: hoechste Stufe ist ohnehin 20. */
+    origCap: function (vc) { var t = QUAL[D.top()]; return vc && !D.copyOk(vc) ? lower(t, QUAL['20']) : t; },
+    /* Bitratengrenze fuer die Versionswahl (N.versions.choose): wie beim Umwandeln, ohne Netz (Detailseite = Wiedergabe) */
+    verLimit: function (quality) { return D.cap({ quality: quality })[0]; },
+    /* Aufloesung als Kurztext: 4K | 1080p | 720p */
+    resText: function (r) { var h = px(r)[1]; return h >= 2160 ? '4K' : h >= 1080 ? '1080p' : '720p'; },
+    /* Klartext einer Stufe ("12 Mbit/s · 1080p", "Original (ohne Grenze)"); tab = Tabelle (QUAL bzw. QWAN, Standard QUAL) */
+    label: function (k, tab) {
+      if (String(k) === ORIG) return N.t('set.v.qOrig');
+      var q = (tab || QUAL)[k] || QUAL[k] || QUAL['12'];
+      return N.t('set.v.q', { n: q[0] / 1000, r: D.resText(q[1]) });
+    },
     /* o: {rk, mediaIndex, partIndex, session, clientId, token, dp, ds, subs:'none'|'burn', quality:'12', offsetSec, transcode,
      *     stereo (P5: Mehrkanal nicht durchreichen), boost (P5: audioBoost 100–300, nur bei Ton-Umwandlung wirksam),
-     *     wan + qWan (ueber das Internet), cell + qCell (ueber Mobilfunk)}
+     *     wan + qWan (ueber das Internet), cell + qCell (ueber Mobilfunk), vcodec (Quell-Codec, fuer Original beim Umwandeln)}
      * Reihenfolge stabil (Tests). Token als Query: SEF kann keine Header setzen. */
     query: function (o) {
       var C = N.config, q = {
@@ -58,19 +99,26 @@
       if (H.eac3) q['X-Plex-Client-Profile-Extra'] = EXTRA + '+' + EAC3;
       if (o.stereo) q['X-Plex-Client-Profile-Extra'] += '+' + STEREO;
       if (H.incomplete) q['X-Plex-Incomplete-Segments'] = 1;
-      if (o.transcode || o.wan || o.cell) {           // Bitratengrenze nur, wenn das Video wirklich umgewandelt wird (K2) – bzw. uebers Internet/Mobilfunk immer
-        var qq = D.cap(o);
-        q.maxVideoBitrate = qq[0]; q.videoResolution = qq[1];
-      }
+      // Bitratengrenze nur, wenn das Video wirklich umgewandelt wird (K2) – bzw. uebers Internet/Mobilfunk, solange dort eine Grenze gilt
+      var qq = o.transcode ? D.cap(o) : o.wan || o.cell ? D.limit(o) : null;
+      if (qq) { q.maxVideoBitrate = qq[0]; q.videoResolution = qq[1]; }
       return q;
     },
-    /* wirksame Grenze [kbit/s, Aufloesung]: "beim Umwandeln", darunter ggf. Internet (wan) und Mobilfunk (cell); bei gleicher
-     * Bitrate bleibt die erste (8 beim Umwandeln = 720p wie bisher) */
+    /* Grenze im Internet/Mobilfunk VOR der Umwandlung (Decision): niedrigste der Zahlen-Grenzen "ueber das Internet" (wan) und
+     * "ueber Mobilfunk" (cell), dazu "beim Umwandeln" (gilt fuer das, was der Server dann umwandelt); bei gleicher Bitrate bleibt die
+     * erste (8 beim Umwandeln = 720p wie bisher). Steht Internet bzw. Mobilfunk auf Original, gilt dort keine Grenze -> null
+     * (Decision ohne maxVideoBitrate wie im Heimnetz, K2) */
+    limit: function (o) {
+      var w = null;
+      if (o.wan) w = lower(w, step(o.qWan, REMOTE, QWAN));
+      if (o.cell) w = lower(w, step(o.qCell, QUAL['4'], QWAN));
+      return w ? lower(step(o.quality, QUAL['12']), w) : null;
+    },
+    /* wirksame Grenze beim Umwandeln [kbit/s, Aufloesung], immer endlich: "beim Umwandeln" (Original = D.origCap(o.vcodec)),
+     * darunter ggf. Internet und Mobilfunk */
     cap: function (o) {
-      var qq = QUAL[o.quality] || QUAL['12'], w;
-      if (o.wan) { w = QWAN[o.qWan] || REMOTE; if (w[0] < qq[0]) qq = w; }
-      if (o.cell) { w = QWAN[o.qCell] || QUAL['4']; if (w[0] < qq[0]) qq = w; }
-      return qq;
+      var qq = step(o.quality, QUAL['12']) || D.origCap(o.vcodec);
+      return o.wan || o.cell ? lower(qq, D.limit(U.extend(U.extend({}, o), { quality: ORIG }))) : qq;
     },
     decisionUrl: function (base, o) { return base + '/video/:/transcode/universal/decision?' + U.qs(D.query(o)); },
     startUrl: function (base, o) {

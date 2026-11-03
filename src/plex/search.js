@@ -16,19 +16,30 @@
     { id: 'people', tk: 'search.group.people', types: { actor: 1, director: 1 }, kind: 'castS' },
     { id: 'collections', tk: 'search.group.collections', types: { collection: 1 }, kind: 'posterQ' }
   ];
+  function key(k, h) { if (h) k.h = h.h; return k; }
   var S = {
     KX: 144, KY: 152, KS: 60, KW: 52, WIDE: 172, MAX_RECENT: 8, DELAY: 400, T9MS: 900,
-    /* Tastatur-Modell: Zeilen von Tasten {k (Zeichen) | act ('space','del','mode'), x, y, w} */
-    layout: function (mode, lang) {
+    /* Tastatur-Modell: Zeilen von Tasten {k (Zeichen) | act ('space','del','mode'), x, y, w[, h]}.
+     * g (optional, nur flexible Flaeche auf Apple, 10-screens.md 7): eigenes Raster {KX, KY, KS (Schritt), KW (Taste), merge} –
+     * merge = Leerzeichen, Loeschen und abc/123 in EINER Zeile (je zwei Spalten breit), damit die Tastatur flacher wird. Ohne g das
+     * TV-Raster (S.KX …), Ergebnis unveraendert. rows.g = verwendetes Raster (Navigation/Treffer rechnen damit). */
+    layout: function (mode, lang, g) {
       var en = (lang || N.i18n.lang()) === 'en', rows = [], src = mode === 'num' ? (en ? NUM_EN : NUM) : (en ? ABC_EN : ABC), r, c;
+      var G = g || S, X = G.KX, Y = G.KY, P = G.KS, W = G.KW, h = g ? { h: W } : null;
       for (r = 0; r < src.length; r++) {
         var row = [];
-        for (c = 0; c < src[r].length; c++) row.push({ k: src[r].charAt(c), x: S.KX + c * S.KS, y: S.KY + r * S.KS, w: S.KW });
+        for (c = 0; c < src[r].length; c++) row.push(key({ k: src[r].charAt(c), x: X + c * P, y: Y + r * P, w: W }, h));
         rows.push(row);
       }
-      var y = S.KY + src.length * S.KS;
-      rows.push([{ act: 'space', x: S.KX, y: y, w: S.WIDE }, { act: 'del', x: S.KX + S.WIDE + 8, y: y, w: S.WIDE }]);
-      rows.push([{ act: 'mode', x: S.KX, y: y + S.KS, w: S.WIDE }]);
+      var y = Y + src.length * P;
+      if (g && g.merge) {
+        var ww = P + W;                                  // zwei Spalten
+        rows.push([key({ act: 'space', x: X, y: y, w: ww }, h), key({ act: 'del', x: X + 2 * P, y: y, w: ww }, h), key({ act: 'mode', x: X + 4 * P, y: y, w: ww }, h)]);
+      } else {
+        rows.push([key({ act: 'space', x: X, y: y, w: g ? 2 * P + W : S.WIDE }, h), key({ act: 'del', x: X + (g ? 3 * P : S.WIDE + 8), y: y, w: g ? 2 * P + W : S.WIDE }, h)]);
+        rows.push([key({ act: 'mode', x: X, y: y + P, w: g ? 2 * P + W : S.WIDE }, h)]);
+      }
+      if (g) rows.g = g;
       return rows;
     },
     /* Navigation in der Tastatur (kein Wrap). pos {r, c} -> neue Position oder null (Kante). Spalte wird ueber breite Tasten hinweg gemerkt (col) */
@@ -39,14 +50,14 @@
       var nr = dir === 'UP' ? r - 1 : dir === 'DOWN' ? r + 1 : r;
       if (nr < 0 || nr >= rows.length || nr === r) return null;
       var col = pos.col !== undefined ? pos.col : S.colOf(rows, r, c);
-      return { r: nr, c: S.cellFor(rows[nr], col), col: col };
+      return { r: nr, c: S.cellFor(rows[nr], col, rows.g), col: col };
     },
     /* Rasterspalte einer Taste (breite Tasten = Spalte ihrer Mitte) */
-    colOf: function (rows, r, c) { var k = rows[r][c]; return Math.round((k.x + k.w / 2 - S.KX - S.KW / 2) / S.KS); },
-    cellFor: function (row, col) {
-      var best = 0, bd = 1e9;
+    colOf: function (rows, r, c) { var k = rows[r][c], G = rows.g || S; return Math.round((k.x + k.w / 2 - G.KX - G.KW / 2) / G.KS); },
+    cellFor: function (row, col, g) {
+      var best = 0, bd = 1e9, G = g || S;
       for (var i = 0; i < row.length; i++) {
-        var k = row[i], x = S.KX + col * S.KS + S.KW / 2;
+        var k = row[i], x = G.KX + col * G.KS + G.KW / 2;
         if (x >= k.x && x < k.x + k.w) return i;
         var d = Math.abs(k.x + k.w / 2 - x); if (d < bd) { bd = d; best = i; }
       }
@@ -58,7 +69,7 @@
     hitKey: function (rows, x, y) {
       for (var r = 0; r < rows.length; r++) for (var c = 0; c < rows[r].length; c++) {
         var k = rows[r][c];
-        if (x >= k.x && x < k.x + k.w && y >= k.y && y < k.y + S.KW) return { r: r, c: c, col: S.colOf(rows, r, c) };
+        if (x >= k.x && x < k.x + k.w && y >= k.y && y < k.y + (k.h || S.KW)) return { r: r, c: c, col: S.colOf(rows, r, c) };
       }
       return null;
     },

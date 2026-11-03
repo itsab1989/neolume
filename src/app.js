@@ -77,6 +77,7 @@
       N.ui.news.init(chrome);                          // HOME-13: Hinweis bei neuen Inhalten (eine dauerhafte, leere Huellen-Ebene)
       N.ui.mini.init(chrome);                          // M4: Mini-Player (Musik/Hoerbuch beim Stoebern)
       N.ui.rail.init(chrome);
+      N.ui.tabbar.init(chrome);                        // nur flexible Flaeche (Apple): Leiste unten (K) bzw. Menue-Knopf (M); TV: nichts
       N.router.init(screens, over);
       N.pointer.init(root, chrome);
       N.pointer.setCursorMode(N.config.cursorMode);
@@ -92,7 +93,7 @@
       // CH▲/▼: vorige/naechste Folge bzw. Kapitel im Player, Titel in Jetzt laeuft, Seiten in Listen (sonst wechselt der TV ggf. den Sender)
       N.platform.keys.register(['SUBTITLE', 'CH_UP', 'CH_DOWN']);
       // flexible Flaeche (nur Apple): Fenster gezogen / Geraet gedreht -> Seitenleiste und flexible Ansichten neu aufbauen
-      if (N.screen.flex) N.evt.on('screen:resized', function () { if (N.ui.rail.el) N.ui.rail.build(); N.router.relayout(); });
+      if (N.screen.flex) N.evt.on('screen:resized', function () { if (N.ui.rail.el) N.ui.rail.build(); N.ui.tabbar.sync(); N.router.relayout(); });
       window.onunload = A.flush;
       window.onerror = function (msg, url, line, col, err) {
         N.diag.error('JS-Fehler ' + msg + ' @' + String(url || '').split('/').pop() + ':' + line + ':' + (col || 0), err);
@@ -236,6 +237,10 @@
     pan: function (e) {
       try { return N.router.pan(e); } catch (er) { N.diag.error('Pan', er); return false; }
     },
+    /* An den Anfang (Lader: Tipp ganz oben, Cmd+Pfeil hoch) -> true, wenn eine Liste losrollt */
+    scrollTop: function () {
+      try { return N.router.scrollTop(); } catch (er) { N.diag.error('scrollTop', er); return false; }
+    },
     /* Rad/Trackpad bei caps.scroll 'free' (Lader): {x, y} App-Koordinaten des Zeigers, {dx, dy} Weg in App-px -> N.pointer.wheelPx */
     wheel: function (e) {
       try { return !!(e && N.pointer.wheelPx(e.x, e.y, e.dx || 0, e.dy || 0)); } catch (er) { N.diag.error('Rad', er); return false; }
@@ -250,5 +255,5 @@
    * fuehrt aus (N.pointer.grab/drag; Player-Balken = Scrubbing, im Player kein Wischen) */
   function grab(x, y) { try { return N.pointer.touchGrab(x, y); } catch (e) { N.diag.error('grab', e); return ''; } }
   function drag(ph, x, y) { try { return N.pointer.touchDrag(ph, x, y); } catch (e) { N.diag.error('drag ' + ph, e); return false; } }
-  window.App = { start: A.start, onKey: A.onKey, press: A.press, flush: A.flush, grab: grab, drag: drag, input: A.input, pan: A.pan, wheel: A.wheel, rail: A.rail, railPan: A.railPan };
+  window.App = { start: A.start, onKey: A.onKey, press: A.press, flush: A.flush, grab: grab, drag: drag, input: A.input, pan: A.pan, wheel: A.wheel, scrollTop: A.scrollTop, rail: A.rail, railPan: A.railPan };
 })(N);

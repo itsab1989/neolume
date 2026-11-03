@@ -322,6 +322,92 @@ test('Qualitaet ueber das Internet / ueber Mobilfunk (PLAY-36): Standard 8 = bis
   q = r.gets[1].q;
   assert.strictEqual(q.directPlay, 1); assert.strictEqual(q.location, 'lan'); assert.strictEqual(q.maxVideoBitrate, 8000); assert.strictEqual(q.videoResolution, '1920x1080');
 });
+test('Qualitaet ueber 1080p (PLAY-37): Original ohne Grenze, 4K nur auf 4K-Geraeten, beim Umwandeln immer endlich', function () {
+  var D = N.decision, C = N.platform.caps.codecs, oldRes = C.maxResolution;
+  function cap(o) { var q = D.query(Object.assign({ rk: '1' }, o)); return q.maxVideoBitrate === undefined ? '- ' + q.videoResolution : q.maxVideoBitrate + ' ' + q.videoResolution; }
+  // TV (1920x1080): Stufen Original, 20, 12, 8, 4 – kein 4K; hoechste Zahlen-Stufe 20
+  eq(D.steps(), ['orig', '20', '12', '8', '4']); assert.strictEqual(D.top(), '20');
+  // Heimnetz, Decision: nie eine Grenze (K2) – auch nicht mit Original
+  eq(cap({ quality: 'orig' }), '- 1920x1080');
+  // beim Umwandeln: Original = hoechste Stufe des Geraets, nie unbegrenzt
+  eq(cap({ quality: 'orig', transcode: true }), '20000 1920x1080');
+  eq(D.cap({ quality: 'orig' }), [20000, '1920x1080']);
+  // ueber das Internet: Original = keine Grenze in der Decision (Direct Play/Stream moeglich); wird umgewandelt: "beim Umwandeln"
+  eq(cap({ wan: true, quality: '12', qWan: 'orig' }), '- 1920x1080');
+  eq(cap({ wan: true, quality: '12', qWan: 'orig', transcode: true }), '12000 1920x1080');
+  eq(cap({ wan: true, quality: 'orig', qWan: 'orig', transcode: true }), '20000 1920x1080');
+  // Zahl ueber das Internet, Original beim Umwandeln: Internet-Grenze gilt (wie bisher die niedrigste)
+  eq(cap({ wan: true, quality: 'orig', qWan: '8' }), '8000 1920x1080');
+  eq(cap({ wan: true, quality: 'orig', qWan: '8', transcode: true }), '8000 1920x1080');
+  // Mobilfunk Original + Internet Zahl: die Zahl gilt; beide Original: keine Grenze
+  eq(cap({ wan: true, cell: true, quality: '12', qWan: '4', qCell: 'orig' }), '4000 1280x720');
+  eq(cap({ cell: true, quality: '12', qCell: 'orig' }), '- 1920x1080');
+  // 4K-Werte am TV (z. B. aus einem anderen Geraet): hoechste Stufe des Geraets (Nacht F, Befund 4); unbekannt -> Standard
+  eq(cap({ wan: true, quality: '80', qWan: '80' }), '20000 1920x1080');
+  eq(cap({ quality: '40', transcode: true }), '20000 1920x1080');
+  eq(cap({ quality: 'x', transcode: true }), '12000 1920x1080');
+  eq(cap({ wan: true, quality: '12', qWan: 'x' }), '8000 1920x1080');
+  assert.strictEqual(D.eff('80'), '20'); assert.strictEqual(D.eff('x'), '12'); assert.strictEqual(D.eff('x', '8'), '8'); assert.strictEqual(D.eff('orig'), 'orig');
+  // Versionswahl (Detailseite, Startseite, Wiedergabe) = Grenze beim Umwandeln (Befund 1)
+  assert.strictEqual(D.verLimit('orig'), 20000); assert.strictEqual(D.verLimit('80'), 20000); assert.strictEqual(D.verLimit(undefined), 12000); assert.strictEqual(D.verLimit('8'), 8000);
+  // Original + Quell-Codec am TV: hoechste Stufe ist ohnehin 20
+  eq(cap({ quality: 'orig', transcode: true, vcodec: 'hevc' }), '20000 1920x1080');
+  // Texte
+  assert.strictEqual(D.label('orig'), N.t('set.v.qOrig'));
+  assert.ok(/^20 Mbit\/s · 1080p$/.test(D.label('20'))); assert.ok(/^8 Mbit\/s · 1080p$/.test(D.label('8', D.QWAN))); assert.ok(/720p$/.test(D.label('8')));
+  try {
+    C.maxResolution = '3840x2160';                     // 4K-Geraet (Apple-Adapter setzt das spaeter)
+    eq(D.steps(), ['orig', '80', '40', '20', '12', '8', '4']); assert.strictEqual(D.top(), '80');
+    eq(cap({ quality: 'orig', transcode: true }), '80000 3840x2160');
+    eq(cap({ quality: '40', transcode: true }), '40000 3840x2160');
+    eq(cap({ wan: true, quality: '80', qWan: '40' }), '40000 3840x2160');
+    eq(cap({ wan: true, quality: 'orig', qWan: 'orig' }), '- 3840x2160');
+    assert.ok(/^80 Mbit\/s · 4K$/.test(D.label('80')));
+    assert.strictEqual(N.osd.lower('orig', false), '40'); assert.strictEqual(N.osd.lower('80', false), '40');
+    assert.strictEqual(N.osd.lower('x', false), '8', 'unbekannte Stufe = 12 -> 8, nicht 20 (Befund 4)');
+    assert.strictEqual(D.verLimit('orig'), 80000);
+    // Original beim Umwandeln: Quell-Codec hier nicht direkt (HEVC ohne hevc, andere Codecs) -> hoechstens 20 Mbit/s · 1080p (Befund 3)
+    eq(cap({ quality: 'orig', transcode: true, vcodec: 'hevc' }), '20000 1920x1080');
+    eq(cap({ quality: 'orig', transcode: true, vcodec: 'mpeg2video' }), '20000 1920x1080');
+    eq(cap({ quality: 'orig', transcode: true, vcodec: 'h264' }), '80000 3840x2160');
+    eq(cap({ quality: '80', transcode: true, vcodec: 'hevc' }), '80000 3840x2160', 'eine gewaehlte Zahl gilt wie gewaehlt');
+    C.hevc = { maxBitDepth: 10 };
+    eq(cap({ quality: 'orig', transcode: true, vcodec: 'hevc' }), '80000 3840x2160', 'HEVC direkt und im HLS moeglich');
+    C.hevcStream = false;
+    eq(cap({ quality: 'orig', transcode: true, vcodec: 'hevc' }), '20000 1920x1080', 'HEVC nur Direct Play (Apple)');
+  } finally { C.maxResolution = oldRes; C.hevc = false; delete C.hevcStream; }
+  // eine Stufe geringer: am TV unveraendert, Original wandelt mit 20 um -> 12
+  assert.strictEqual(N.osd.lower('orig', false), '12'); assert.strictEqual(N.osd.lower('20', false), '12'); assert.strictEqual(N.osd.lower('x', false), '8');
+  assert.strictEqual(N.osd.lower('80', false), '12', '4K-Wert am TV = hoechste Stufe 20 -> 12');
+  // alle Versionswahlen rechnen mit derselben Grenze (Befund 1)
+  ['src/views/details.js', 'src/views/home.js', 'src/player/playback.js'].forEach(function (f) {
+    var src = require('fs').readFileSync(require('path').join(__dirname, '..', f), 'utf8');
+    assert.ok(src.indexOf('verLimit(') >= 0, f); assert.ok(!/decision\.QUAL\[/.test(src), f + ' rechnet die Grenze selbst');
+  });
+});
+test('HEVC nur Direct Play (caps.codecs.hevcStream false, Apple): Direct Stream mit HEVC -> gleich Umwandlung mit hoechstens 20 Mbit/s', function () {
+  var C = N.platform.caps.codecs, old = [C.hevc, C.maxResolution];
+  function streamHevc() { var j = S('decision-hevc.json'), p = j.MediaContainer.Metadata[0].Media[0].Part[0]; p.decision = 'copy'; p.Stream[0].codec = 'hevc'; p.Stream[0].decision = 'copy'; return j; }
+  try {
+    C.hevc = { maxBitDepth: 10 }; C.maxResolution = '3840x2160'; C.hevcStream = false;
+    var r = rig({ meta: 'meta-hevc.json' }), n = 0;
+    r.deps.get = function (path, q, o, cb) { r.gets.push({ path: path, q: q }); cb(null, /decision/.test(path) ? (n++ ? S('decision-hevc.json') : streamHevc()) : S('meta-hevc.json')); };
+    r.deps.cfg.quality = 'orig';
+    r.p.start();
+    var dec = r.gets.filter(function (g) { return /decision/.test(g.path); });
+    assert.strictEqual(dec.length, 2, 'zweite Decision ohne Direct Stream');
+    assert.strictEqual(dec[1].q.directPlay, 0); assert.strictEqual(dec[1].q.directStream, 0);
+    T.tick(1000);
+    var url = r.calls.filter(function (c) { return /^InitPlayer:/.test(c); })[0];
+    assert.ok(/maxVideoBitrate=20000/.test(url) && /videoResolution=1920x1080/.test(url), url);
+    // ohne hevcStream (HLS traegt HEVC): Direct Stream bleibt
+    delete C.hevcStream;
+    r = rig({ meta: 'meta-hevc.json' }); n = 0;
+    r.deps.get = function (path, q, o, cb) { r.gets.push({ path: path, q: q }); cb(null, /decision/.test(path) ? streamHevc() : S('meta-hevc.json')); };
+    r.p.start();
+    assert.strictEqual(r.gets.filter(function (g) { return /decision/.test(g.path); }).length, 1);
+  } finally { C.hevc = old[0]; C.maxResolution = old[1]; delete C.hevcStream; }
+});
 test('Protokoll: oeffentliche IPv4-Adressen geschwaerzt, Heimnetz-Adressen bleiben', function () {
   assert.strictEqual(N.diag.redact('InitPlayer http://203.0.113.7:32400/library/parts/1/file.mkv'), 'InitPlayer http://<fern>:32400/library/parts/1/file.mkv');
   assert.strictEqual(N.diag.redact('http://192.168.1.20:32400/x 10.0.0.5 172.16.3.4'), 'http://192.168.1.20:32400/x 10.0.0.5 172.16.3.4');
@@ -533,7 +619,7 @@ test('Mehr-Menue: Original bei Direct Play, UT-Darstellung nur bei UT an, Sleep-
   var O = N.osd, st = { direct: true, quality: '12', aspect: 'auto', subsOn: false, markers: false, autoNext: true, ep: false, sleep: 'Aus' };
   var ids = O.more(st).map(function (e) { return e.id; });
   eq(ids, ['quality', 'aspect', 'sleep', 'problem']);
-  assert.strictEqual(O.more(st)[0].s, N.t('pl.q.orig'));
+  assert.strictEqual(O.more(st)[0].s, N.t('set.v.qOrig'));
   st.direct = false; st.subsOn = true; st.markers = true; st.ep = true;
   ids = O.more(st).map(function (e) { return e.id; });
   eq(ids, ['quality', 'aspect', 'subs', 'skipIntro', 'skipCredits', 'autoNext', 'sleep', 'problem']);
@@ -559,4 +645,21 @@ test('Pause: Uhr und "Ende um" einmal je Minute, kurz nach der Minutengrenze (TV
   assert.strictEqual(O.minuteWait(new Date(2026, 9, 29, 8, 4, 0, 0)), 60050);
   assert.strictEqual(O.minuteWait(new Date(2026, 9, 29, 8, 4, 59, 900)), 150);
   assert.strictEqual(O.minuteWait(new Date(2026, 9, 29, 8, 4, 30, 0)), 30050);
+});
+
+test('Schmaler Player (Apple Nr. 17, 10-screens 7): N.osd.narrow – Video 16:9 oben (K) bzw. mittig (M), Insel darunter/unten, Knoepfe in zwei Reihen', function () {
+  var O = N.osd, k = O.narrow(546, 942, false), m = O.narrow(836, 1222, true);
+  eq([k.VY, k.VW, k.VH, k.ISY, k.ISW, k.BAR_X, k.BAR_W, k.BAR_Y], [184, 546, 307, 507, 498, 56, 434, 534], 'iPhone hoch: Titel, Video, Insel untereinander');
+  assert.ok(m.VY > 184 && m.ISY + m.ISH <= 1222 - 32 && m.ISY >= m.VY + m.VH + 16, 'iPad hoch: Video mittig, Insel am unteren Rand');
+  // Reihe 1 = Mitte der TV-Reihe (Play mittig), Reihe 2 = rechte Gruppe mittig ueber die sichtbaren Knoepfe
+  assert.strictEqual(O.center('pp', k.osd), 24 + 249);
+  O.narrowRow(k, ['back', 'pp', 'fwd', 'tracks', 'more']);
+  eq([k.osd.by.tracks.x, k.osd.by.more.x, k.osd.by.more.y], [249 - 56, 249 + 8, 148]);
+  assert.strictEqual(O.hit(['back', 'pp', 'fwd', 'tracks', 'more'], 24 + 249 + 8 + 10, 507 + 160, k.osd), 'more');
+  assert.strictEqual(O.hit(['back', 'pp', 'fwd'], 24 + 249, 507 + 100, k.osd), 'pp');
+  assert.strictEqual(O.hit(['back', 'pp', 'fwd'], 640, 458 + 100), 'pp', 'ohne Lage: TV-Raster unveraendert');
+  // Karten: unten rechts im Video, wenn unter der Insel kein Platz ist, sonst darunter
+  assert.strictEqual(k.CBY, k.VY + k.VH - 72);
+  var p = O.narrow(586, 1132, false);
+  assert.strictEqual(p.CBY, p.ISY + 276 + 16 + 168);
 });

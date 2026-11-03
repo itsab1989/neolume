@@ -187,3 +187,34 @@ test('NAV-3.2 Rueckkehr aus dem Player: Fokus auf der gespielten Folge, auch wen
   back({ rk: 'x', video: true, done: true, ep: null });
   assert.strictEqual(o.X().focusedEp().e, 2, 'ohne gespielte Folge (z. B. Trailer): erste ungesehene');
 });
+
+/* Nutzerbefund 03.11. (Smart Control): Vorbeiziehen ueber einen Staffel-Reiter wechselte schon die Staffel. Jetzt: Zeigen = nur
+ * Fokus, Klick waehlt, Klick auf die gewaehlte Staffel = zu den Folgen; OK auf dem gezeigten Reiter waehlt ihn */
+test('DET-3 Zeiger auf Staffel-Reitern: Zeigen fokussiert nur, erst der Klick wechselt die Staffel', function () {
+  var eps2 = [ep(2, 1, true), ep(2, 2)], eps1 = [ep(1, 1, true), ep(1, 2, true), ep(1, 3, true)];
+  var o = open({ rk: '9', type: 'show', title: 'Demo-Serie', lib: 2 }, eps2);
+  find(o.root, 'tab').forEach(function (t, i) { t.offsetLeft = i * 120; });   // Reiter nebeneinander (Messung nach 50 ms)
+  o.answer(/\/902\/children$/, { MediaContainer: { totalSize: 2, Metadata: eps2 } });
+  o.T.tick(2000);
+  o.scr.onKey('DOWN'); o.T.tick(1000);
+  var tabs = find(o.root, 'tab'), cls = function (i) { return ' ' + tabs[i].className + ' '; };
+  assert.strictEqual(o.X().zone(), 'tabs');
+  assert.ok(cls(1).indexOf(' is-cur ') >= 0, 'Staffel 2 gewaehlt');
+  assert.ok(o.scr.pointer(140, 350, 'move'), 'Treffer auf Reiter Staffel 1');
+  o.T.tick(2000);
+  assert.ok(cls(0).indexOf(' is-focus ') >= 0, 'Staffel 1 traegt den Fokus');
+  assert.ok(cls(1).indexOf(' is-cur ') >= 0 && cls(0).indexOf(' is-cur ') < 0, 'Staffel bleibt 2');
+  assert.strictEqual(o.pages('901'), 0, 'nichts fuer Staffel 1 geladen');
+  o.scr.pointer(140, 350, 'click'); o.T.tick(1000);
+  assert.ok(cls(0).indexOf(' is-cur ') >= 0, 'Klick waehlt Staffel 1');
+  assert.strictEqual(o.pages('901'), 1);
+  o.answer(/\/901\/children$/, { MediaContainer: { totalSize: 3, Metadata: eps1 } });
+  o.T.tick(1000);
+  assert.strictEqual(o.X().zone(), 'tabs', 'nach dem Wechsel bleibt der Fokus auf den Reitern');
+  o.scr.pointer(140, 350, 'click'); o.T.tick(1000);
+  assert.strictEqual(o.X().zone(), 'eps', 'Klick auf die gewaehlte Staffel -> Folgen');
+  o.scr.onKey('UP'); o.T.tick(1000);
+  o.scr.pointer(260, 350, 'move'); o.T.tick(1000);
+  o.scr.onKey('ENTER'); o.T.tick(1000);
+  assert.ok(cls(1).indexOf(' is-cur ') >= 0, 'OK auf dem gezeigten Reiter waehlt Staffel 2');
+});

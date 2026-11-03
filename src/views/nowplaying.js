@@ -13,12 +13,37 @@
  * "Balken dehnt sich" (B): ueber dem Balken stehen Titel/Interpret/Kapitel, darunter liegen Zeitzeile und Knopfreihe eng – eine
  * zusaetzliche Leiste haette dort keinen sicheren Platz (TV-Befund 28.10.). */
 (function (N) {
-  var U = N.util, MU = N.music, F = N.fmt, X0 = 600, BY = 488, BAR_X = 600, BAR_W = 536, BAR_Y = 404;
+  var U = N.util, MU = N.music, F = N.fmt, TVG = { X0: 600, BY: 488, BAR_X: 600, BAR_W: 536, BAR_Y: 404 };   // Lagen am TV (flexibel: npGeom)
   N.router.define('nowplaying', function () {
     var s = { rail: N.ui.rail && N.ui.rail.cur || 'home', wheelKeys: ['LEFT', 'RIGHT'], news: 'top' };   // HOME-13: Hinweis oben rechts (frei)   // Seitenleiste sichtbar (Feedback-Regel 3)
+    var X0 = TVG.X0, BY = TVG.BY, BAR_X = TVG.BAR_X, BAR_W = TVG.BAR_W, BAR_Y = TVG.BAR_Y;
     var root, bg, cover, cfb, cfbT, ovT, tiT, arT, alT, chT, nxT, stT, tm0, tm1, barI, lbl, lblT, btnEl = {}, ids = [], fb = 'pp', ppIc, repIc, dots = {}, timer = 0;
     var shown = { art: null, rk: null }, lastSec = -1, hs = [], numB = null, numF = null, acc = null;
     var hv, hvOn = false, lp = null, lpv = null, lpPend = null, lpRaf = false, NP_BAND = { top: BAR_Y - 32, bottom: 548, side: BAR_Y + 16 };   // Schutzzone bis unter die Knopfreihe (Treffer 476–548)
+    /* Flexible Flaeche (nur Apple, 10-screens.md 7): die Ansicht fuellt W x H. Breit (R) wie am TV, senkrecht mittig; flach (H < 720,
+     * iPhone quer) mit Cover 300 und eng gestellter Knopfreihe; schmal und hoch (K·N iPhone hoch, M·N iPad hoch) untereinander:
+     * Cover oben mittig, darunter Texte, Balken und Knopfreihe ueber die Inhaltsbreite (Knoepfe mittig, Luecke passend). G = Lagen;
+     * am TV null und alle Werte wie bisher (X0, BY, BAR_* oben). */
+    var FX = !!(N.screen && N.screen.flex), G = FX ? npGeom() : null, BG = 16, XB = X0;
+    if (G) { X0 = G.tx; BAR_X = G.tx; BAR_W = G.tw - 24; BAR_Y = G.t0 + G.o.bar + 3; BY = G.t0 + G.o.by; NP_BAND = { top: BAR_Y - 32, bottom: BY + 60, side: BAR_Y + 16 }; s.flex = true; }
+    function npGeom() {
+      var V = N.screen.view(), cl = N.screen.cls, R = V.w - (cl.w === 'K' ? 24 : 64), cw = R - 144, VH = V.h;
+      var stk = cl.w === 'K' || cl.w === 'M' && cl.h === 'N', g = { stk: stk };
+      if (stk) {
+        g.o = { ov: 0, ti: 28, ar: 112, al: 148, ch: 180, st: 212, bar: 249, tm: 264, hv: 262, by: 328, lbl: 392, nx: 428 };
+        var cy = cl.w === 'K' ? 32 : 64, rest = 32 + g.o.nx + 24;
+        g.cv = Math.max(200, Math.min(400, cw, VH - cy - rest - 8));
+        g.cy = Math.max(cy, Math.round((VH - g.cv - rest) / 2));
+        g.cx = 144 + Math.round((cw - g.cv) / 2); g.tx = 144; g.tw = cw; g.t0 = g.cy + g.cv + 32;
+      } else {
+        g.o = { ov: 0, ti: 28, ar: 116, al: 156, ch: 192, st: 232, bar: 281, tm: 296, hv: 294, by: 368, lbl: 440, nx: 480 };
+        g.cv = cl.h === 'F' ? 300 : 400; g.cx = 144; g.tx = 144 + g.cv + 56; g.tw = Math.min(560, R - g.tx);
+        g.t0 = cl.h === 'F' ? Math.max(24, Math.round((VH - 504) / 2)) : 120 + Math.max(0, Math.round((VH - 720) / 2));
+        g.cy = g.t0 - 8;
+      }
+      return g;
+    }
+    function put(e, x, y, w) { var st = e.style; if (x !== null) st.left = x + 'px'; if (y !== null) st.top = y + 'px'; if (w) st.width = w + 'px'; }
     function C() { return N.audio.core(); }
     function book() { var c = C(); return !!(c && c.book); }
     function cfg() { return N.session.settings || {}; }
@@ -50,6 +75,14 @@
       nxT = U.txt('div', 'np-nx t-small c2 ell', root, '');
       lbl = U.el('div', 'np-lbl', root); lblT = U.txt('span', '', lbl, '');
       hv = U.txt('div', 'np-hv', root, '', 'display:none');
+      if (G) {                                         // flexibel: Lagen aus G (siehe npGeom)
+        var t0 = G.t0, o = G.o, cs = G.cv + 'px';
+        put(cv, G.cx, G.cy); cv.style.width = cs; cv.style.height = cs; cover.style.width = cs; cover.style.height = cs; cfb.style.width = cs; cfb.style.height = cs;
+        put(ovT.parentNode, G.tx, t0 + o.ov, G.tw); put(tiT.parentNode, G.tx, t0 + o.ti, G.tw); put(arT.parentNode, G.tx, t0 + o.ar, G.tw);
+        put(alT.parentNode, G.tx, t0 + o.al, G.tw); put(chT.parentNode, G.tx, t0 + o.ch, G.tw); put(stT.parentNode, G.tx, t0 + o.st, G.tw);
+        put(tr, G.tx, t0 + o.bar, BAR_W); put(tm0.parentNode, G.tx, t0 + o.tm); put(tm1.parentNode, G.tx + BAR_W - 200, t0 + o.tm);
+        put(hv.parentNode, null, t0 + o.hv); put(lbl, null, t0 + o.lbl); put(nxT.parentNode, G.tx, t0 + o.nx, G.tw);
+      }
       lpv = new N.ui.LoupeView({ parent: root, ox: 0, oy: 0, barTop: BAR_Y - 3, barH: 6, barX: BAR_X, barW: BAR_W, islY: 0, islX: 0, islW: 0 });
       lp = new N.Loupe({ timers: { now: U.now, set: function (f, ms) { return setTimeout(f, ms); }, clear: function (t) { clearTimeout(t); } },
         ok: lpOk, live: function () { var P = N.pointer; return !!(P.rawT && U.now() - P.rawT < P.LIVE); },
@@ -66,7 +99,12 @@
       if (want.join() === ids.join()) return;
       for (var k in btnEl) if (btnEl[k].parentNode) btnEl[k].parentNode.removeChild(btnEl[k]);
       btnEl = {}; dots = {}; ids = want;
-      var x = X0;
+      if (G) {                                         // flexibel: Luecke so, dass alle Knoepfe in die Breite passen (4–16), schmal mittig
+        var n = ids.length, bw = (n - 1) * 48 + 64;
+        BG = Math.max(4, Math.min(16, Math.floor((G.tw - bw) / (n - 1))));
+        XB = G.stk ? G.tx + Math.round((G.tw - bw - (n - 1) * BG) / 2) : G.tx;
+      }
+      var x = XB;
       for (var i = 0; i < ids.length; i++) {
         var id = ids[i], lg = id === 'pp', b = U.el('div', 'pl-b np-b' + (lg ? ' lg' : ''), root, 'left:' + x + 'px;top:' + (lg ? BY - 4 : BY) + 'px');
         b._x = x; b._w = lg ? 64 : 48; b._y = lg ? BY - 4 : BY; b._h = lg ? 56 : 48;
@@ -77,7 +115,7 @@
         }
         if (id === 'shuffle' || id === 'repeat' || id === 'sleep') dots[id] = U.el('i', 'np-dot', b, 'display:none');
         btnEl[id] = b;
-        x += (lg ? 64 : 48) + 16;
+        x += (lg ? 64 : 48) + BG;
       }
       if (ids.indexOf(fb) < 0) fb = 'pp';
       U.cls(btnEl[fb], 'is-focus', true);

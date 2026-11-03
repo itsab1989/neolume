@@ -117,10 +117,27 @@
     var e = this.byIdx[this.f];
     if (e && e.foc !== on) { U.cls(e.r, 'is-focus', on); e.foc = on; }
   };
-  /* Zeiger: y relativ zur Listen-Oberkante (Bildschirm) -> Index oder -1 */
+  /* Freies Scrollen (Finger/Trackpad, N.ui.freeList im Aufrufer; am TV nie): Pixel-Lage px, Fenster ab floor(px/H), EIN Transform.
+   * snap(sc) kehrt auf ganze Zeilen zurueck (erste Taste danach). fpx < 0 = nicht frei */
+  T.fpx = -1;
+  T.maxPx = function () { return Math.max(0, this.items.length - this.use()) * H; };
+  T.setPx = function (px) {
+    var sc = U.clamp(Math.floor(px / H), 0, Math.max(0, this.items.length - 1));
+    this.fpx = px;
+    if (sc !== this.sc) { this.sc = sc; this.render(); }
+    if (this.list.style.webkitTransition !== 'none') this.list.style.webkitTransition = 'none';
+    U.tf(this.list, 0, -Math.round(px * 100) / 100);
+  };
+  /* erste ganz sichtbare Zeile der freien Lage */
+  T.anchor = function () { return U.clamp(Math.ceil(this.fpx / H - 0.01), 0, Math.max(0, this.items.length - this.use())); };
+  T.snap = function (sc) {
+    this.fpx = -1; this.sc = U.clamp(sc, 0, Math.max(0, this.items.length - this.use()));
+    this.render(); this.list.style.webkitTransition = ''; U.tf(this.list, 0, -this.sc * H);
+  };
+  /* Zeiger: y relativ zur Listen-Oberkante (Bildschirm) -> Index oder -1 (frei gescrollt: nach Pixel-Lage) */
   T.hit = function (y) {
     if (y < 0 || y >= this.vis * H) return -1;
-    var i = this.sc + Math.floor(y / H);
+    var i = this.fpx >= 0 ? Math.floor((y + this.fpx) / H) : this.sc + Math.floor(y / H);
     return i < this.items.length ? i : -1;
   };
   T.clear = function () { for (var i = 0; i < this.poolN; i++) this._free(this.pool[i]); this.items = []; this.byIdx = {}; };

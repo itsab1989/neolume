@@ -81,7 +81,7 @@ test('Build: Regel ohne Token, die den Akzent ueberstimmt, wird mit allen Farbkl
   eq(r.errors, []);
   var v = r.css.indexOf('.ac-violet .pl-skip{'), c = r.css.indexOf('.ac-violet .pl-skip.is-focus');
   assert.ok(v > 0 && c > v, 'Kopie steht hinter der Variante');
-  assert.ok(/\.ac-coral \.pl-skip\.is-focus,[^{]*\.ac-green \.pl-skip\.is-focus\{background:#F2F2F2\}/.test(r.css));
+  assert.ok(/\.ac-coral \.pl-skip\.is-focus,[^{]*\.ac-gray \.pl-skip\.is-focus\{background:#F2F2F2\}/.test(r.css));
   assert.ok(r.css.indexOf('.ac-violet .other') < 0, 'fremde Klassen werden nicht kopiert');
   assert.strictEqual(r.stats.copies, 1);
 });
@@ -97,12 +97,15 @@ test('Build: Token in @-Regeln und unbekannte Token sind Fehler; Gates gelten we
   assert.ok(B.css('.a { color: @farbe@; }', PUB).errors.length);
   assert.ok(B.cssErrors('.a { background: @accent@; box-shadow: 0 0 1px #000; }').length);
 });
-test('Build: echtes app.css – jede Token-Regel hat je Farbe eine Variante, Zuwachs < 12 KB, keine Token uebrig', function () {
+/* Budget je Farbe statt fester Summe (02.11., Grau als 8. Farbe): die Varianten wachsen linear mit der Palette (jede Farbe ~2 KB);
+ * der Waechter soll zusaetzliche Token-Regeln/Begleitregeln fangen, nicht eine gewollte neue Palettenfarbe. Je Farbe < 2 KB
+ * (bei 7 Farben 12 KB wie bisher). */
+test('Build: echtes app.css – jede Token-Regel hat je Farbe eine Variante, Zuwachs < 2 KB je Farbe, keine Token uebrig', function () {
   brands().forEach(function (b) {
     var r = B.css(undefined, { accent: b.accent, pointer: b.pointer, accentId: b.accentId });
     eq(r.errors, []);
-    assert.ok(!/@accent@|@pointer@/.test(r.css));
-    assert.ok(r.stats.bytes < 12 * 1024, 'Zuwachs ' + r.stats.bytes);
+    assert.ok(!/@accent@|@pointer@|@badge@/.test(r.css));
+    assert.ok(r.stats.bytes < r.stats.variants * 2048, 'Zuwachs ' + r.stats.bytes + ' bei ' + r.stats.variants + ' Farben');
     var base = B.brandPalette(b).filter(function (p) { return p.base; })[0];
     assert.ok(r.css.indexOf('.focus-ring{') >= 0 && r.css.indexOf('border:4px solid ' + base.color) > 0);
     B.brandPalette(b).forEach(function (p) {
@@ -113,6 +116,53 @@ test('Build: echtes app.css – jede Token-Regel hat je Farbe eine Variante, Zuw
       assert.ok(r.css.indexOf(p.color) > 0);
     });
   });
+});
+
+/* ---------- Farbe der Markierungen (ACC-2): @badge@ ---------- */
+test('Build: @badge@ = Hellgrau (text-1) in der Grundregel, je Palettenfarbe eine Variante .bd-<id> mit nur dieser Deklaration', function () {
+  var r = B.css('.bdg.new { right: 0; border-top: 24px solid @badge@; }\n.bdg.done { width: 24px; background-color: @badge@; }', PUB);
+  eq(r.errors, []);
+  assert.ok(r.css.indexOf('.bdg.new{right:0;border-top:24px solid #F2F2F2}') === 0, r.css.slice(0, 80));
+  B.brandPalette(PUB).forEach(function (p) {
+    assert.ok(r.css.indexOf('.bd-' + p.id + ' .bdg.new{border-top:24px solid ' + p.color + '}') > 0, p.id);
+    assert.ok(r.css.indexOf('.bd-' + p.id + ' .bdg.done{background-color:' + p.color + '}') > 0, p.id);
+  });
+  assert.ok(r.css.indexOf('.ac-violet .bdg') < 0, 'keine Akzent-Varianten fuer Markierungen');
+  assert.strictEqual(r.badge.rules, 2);
+});
+test('Build: echtes app.css – Markierungen (neu, Zahl, gesehen) tragen @badge@, Varianten < 1,5 KB, niemand ueberstimmt sie', function () {
+  brands().forEach(function (b) {
+    var r = B.css(undefined, { accent: b.accent, pointer: b.pointer, accentId: b.accentId });
+    assert.strictEqual(r.badge.rules, 3, b.id);
+    assert.ok(r.badge.bytes < 1536, 'Markierungen ' + r.badge.bytes);
+    ['.bdg.new', '.bdg.count', '.bdg.done'].forEach(function (s) { assert.ok(r.css.indexOf('.bd-amber ' + s + '{') > 0, s); });
+    // Grundfassung unveraendert hellgrau (kein Pixel aendert sich ohne Einstellung)
+    assert.ok(/\.bdg\.new\{[^}]*border-top:24px solid #F2F2F2/.test(r.css));
+    assert.ok(/\.bdg\.done\{[^}]*background-color:#F2F2F2/.test(r.css));
+  });
+  // keine andere Regel setzt Rahmen/Hintergrund der drei Markierungen (sonst braeuchte es Begleitregeln wie beim Akzent)
+  var src = fs.readFileSync(path.join(ROOT, 'src', 'css', 'app.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  var re = /([^{}]+)\{([^}]*)\}/g, m, hits = [];
+  while ((m = re.exec(src))) if (/\.bdg\.(new|count|done)\b/.test(m[1]) && /(border|background)[^:]*:/.test(m[2]) && m[2].indexOf('@badge@') < 0 && !/^\s*\.bdg\.(count|done)\s*$/.test(m[1])) hits.push(m[1].trim());
+  eq(hits, []);
+});
+test('N.accent.badge: Hellgrau = keine Klasse, Palettenfarbe = bd-<id>, unbekannt -> Hellgrau; Einstellung wirkt sofort', function () {
+  var A = N.accent, html = { className: 'tv ac-violet' }, S = N.session;
+  eq(A.badgeIds(), ['light'].concat(A.ids()));
+  assert.strictEqual(A.badgeOf('pink'), 'light'); assert.strictEqual(A.badgeCls('light'), ''); assert.strictEqual(A.badgeCls('blue'), 'bd-blue');
+  assert.strictEqual(N.comfort.DEFAULTS.badgeColor, 'light');
+  ctx.document = { documentElement: html };
+  var old = { settings: S.settings, state: S.state, save: S.save };
+  S.state = { accent: 'violet' }; S.save = function () {};
+  try {
+    S.settings = { accent: 'violet', badgeColor: 'amber' };
+    N.evt.emit('settings:changed', { key: 'badgeColor', value: 'amber' });
+    assert.strictEqual(html.className, 'tv ac-violet bd-amber');
+    S.settings.badgeColor = 'light';
+    N.evt.emit('settings:changed', { key: 'badgeColor', value: 'light' });
+    assert.strictEqual(html.className, 'tv ac-violet', 'Hellgrau = keine Klasse, Akzent bleibt');
+    assert.strictEqual(A.applyBadge('light'), false, 'gleiche Farbe: kein DOM-Zugriff');
+  } finally { S.settings = { accent: 'teal' }; A.sync(); S.settings = old.settings; S.state = old.state; S.save = old.save; delete ctx.document; }
 });
 
 /* ---------- Laufzeit: Einstellung + Anwenden ---------- */
@@ -158,6 +208,7 @@ test('i18n: Name je Palettenfarbe in de und en', function () {
   ['de', 'en'].forEach(function (l) {
     N.i18n.set(l);
     N.accent.ids().forEach(function (id) { var t = N.t('set.v.ac_' + id); assert.ok(t && t !== 'set.v.ac_' + id && t.length <= 14, l + ' ' + id); });
+    assert.ok(N.t('set.v.bdLight').length <= 14);
     assert.ok(N.t('set.accent').length <= 16);
   });
 });

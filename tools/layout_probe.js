@@ -176,7 +176,9 @@
 
   function run() {
     var ar = window.PN_PROBE_AREA;                        // Apple-Fassung (flexible Flaeche): logische Groesse W x H statt 1280 x 720
-    if (ar && ar.w >= 1280 && ar.h >= 720) { W = ar.w; H = ar.h; }
+    if (ar && ar.w > 0 && ar.h > 0) { W = ar.w; H = ar.h; }   // auch schmaler (Hochformat, geteilte Fenster)
+    /* Rand fuer 'edge' (buendige Abdunklung): die Bildflaeche; Apple-Notloesung K·F: der verkleinerte Kasten (ar.edge {x, y, w, h}) */
+    var EA = ar && ar.edge && ar.edge.w > 0 ? ar.edge : { x: 0, y: 0, w: W, h: H };
     var t0 = Date.now(), out = [], items, pe = document.createElement('style');
     pe.textContent = '*{pointer-events:auto!important}';          // elementsFromPoint soll alles sehen
     document.head.appendChild(pe);
@@ -357,7 +359,7 @@
         var eb2 = rr(ee.getBoundingClientRect()), gap = [];
         if (empty(eb2)) continue;
         ee.getAttribute('data-layout-edge').split(/[ ,]+/).forEach(function (sd) {
-          var g = sd === 'l' ? eb2.l : sd === 'r' ? W - eb2.r : sd === 't' ? eb2.t : sd === 'b' ? H - eb2.b : 0;
+          var g = sd === 'l' ? eb2.l - EA.x : sd === 'r' ? EA.x + EA.w - eb2.r : sd === 't' ? eb2.t - EA.y : sd === 'b' ? EA.y + EA.h - eb2.b : 0;
           if (g > 0.5) gap.push({ l: 'links', r: 'rechts', t: 'oben', b: 'unten' }[sd] + ' ' + Math.round(g) + ' px');
         });
         if (gap.length) out.push({ t: 'edge', a: elInfo(ee), r: box(eb2), d: 'Luecke zum Rand: ' + gap.join(', ') });

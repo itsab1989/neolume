@@ -11,13 +11,17 @@
    * entries[i].head: Zwischenueberschrift (nicht waehlbar, der Fokus springt darueber; z. B. Gruppen einer Liste).
    * multi + done {t(n), s(n), min}: eigener letzter Eintrag "Anfragen (2) ›" (Zahl der Haken) – NUR er schliesst mit onDone(ids);
    * unter min Haken gedimmt, die Unterzeile sagt warum. RETURN/Klick daneben = onCancel() (nichts uebernommen). Ohne done wie bisher.
-   * hint: kurze Zeile unter dem Titel (die Hinweisleiste liegt hinter dem Panel), z. B. "OK: an/aus · Zurück: abbrechen". */
+   * hint: kurze Zeile unter dem Titel (die Hinweisleiste liegt hinter dem Panel), z. B. "OK: an/aus · Zurück: abbrechen".
+   * Finger/Maus (caps.scroll 'free'): die Liste scrollt frei unter dem Finger (N.ui.freeList, Schwung, Gummiband, kein Einrasten),
+   * Wischen aendert den Fokus nicht, Tipp waehlt. Zurueck-Pfeil "‹" oben links (nur Finger/Maus, NAV-21), wenn RETURN hier eine
+   * Ebene zurueck fuehrt – also genau dann, wenn die Hinweisleiste "Zurück" zeigt (onCancel ohne multi; back: true/false erzwingt);
+   * er wirkt wie RETURN. Am TV entsteht kein Element (N.input.on false). */
   var VIS = 8;
   /* Panel ueber die ganze Hoehe am rechten Rand (flexible Flaeche, nur ueber Ansichten mit scr.panelFull – Player, Apple Nr. 17):
    * Versatz gegen den mittigen 1280x720-Kasten (x, y) und zusaetzliche Zeilen (n). Sonst (TV, andere Ansichten) alles 0. */
   N.ui.panelFrame = function (step) {
     var S = N.screen, t = N.router && N.router.top ? N.router.top() : null;
-    if (!S || !S.flex || !t || !t.panelFull) return { on: false, x: 0, y: 0, n: 0 };
+    if (!S || !S.flex || !t || !t.panelFull || S.stage().k < 1) return { on: false, x: 0, y: 0, n: 0 };   // verkleinerter Kasten: Panel darin
     var o = S.off();
     return { on: true, x: o.x, y: o.y, n: Math.max(0, Math.floor(2 * o.y / (step || STEP))) };
   };
@@ -36,16 +40,35 @@
     };
     return m;
   };
+  /* Zurueck-Pfeil oben links im Panel (Finger/Maus, Apple Nr. 11/26; Stil wie der Zurueck-Knopf der Editoren .tbk): 48 x 48 bei
+   * Panel-x 24 / y 40, Titel und Hinweiszeile ruecken per CSS nach rechts (.has-bk). Nur auf Geraeten mit umschaltbarer Eingabeart
+   * (N.input.on); sichtbar nur bei .inp-touch/.inp-ptr. Rueckgabe: Element oder null */
+  var BK = { x: 24, y: 40, w: 48 };
+  function backBtn(p, want) {
+    if (!want || !(N.input && N.input.on)) return null;
+    U.cls(p, 'has-bk', true);
+    var b = U.txt('div', 'btn pbk', p, '\u2039').parentNode;
+    b.setAttribute('role', 'button'); b.setAttribute('aria-label', N.t('hint.back'));
+    return b;
+  }
+  /* Treffer (Panel-Koordinaten, je 8 px Rand), nur solange der Pfeil sichtbar ist (Finger/Maus) */
+  function backHit(x, y) { return N.input.direct() && x >= X + BK.x - 8 && x < X + BK.x + BK.w + 8 && y >= BK.y - 8 && y < BK.y + BK.w + 8; }
+  N.ui.panelBack = { el: backBtn, hit: backHit };
   function select(o) {
     var ov = { el: U.el('div', 'layer'), items: [], f: 0, closed: false, off: 0 };
     U.el('div', 'dim', ov.el);                       // Hintergrund leicht abdunkeln: zeigt, was gerade im Fokus ist
     var fr = N.ui.panelFrame(STEP), MAXV = VIS + fr.n, p = N.ui.panelEl(ov.el, fr);
     U.txt('div', 'pt t-h2', p, o.title);
+    var bk = backBtn(p, o.back !== undefined ? !!o.back : !!o.onCancel && !o.multi);
     if (o.hint) U.txt('div', 'phint', p, o.hint);
     var act = o.multi && o.done ? o.done : null, ents = act ? o.entries.concat([{ id: '', act: true, t: '' }]) : o.entries;
     var vis = o.more !== false && ents.length > MAXV ? MAXV - 1 : MAXV;   // NAV-11: Mehr-Hinweis immer, wenn die Liste scrollt (more:false schaltet ab)
     var clip = U.el('div', 'tp-clip', p, 'top:' + TOP + 'px;height:' + (vis * STEP) + 'px'), list = U.el('div', 'tp-list', clip);
     if (vis < MAXV) { ov.up = U.txt('div', 'pmore up', p, '›').parentNode; ov.dn = U.txt('div', 'pmore dn', p, '›', 'top:' + (TOP + vis * STEP + 4) + 'px').parentNode; }
+    function maxPx() { return Math.max(0, ov.items.length - vis) * STEP; }
+    var fl = N.ui.freeList({ el: list, max: maxPx, dim: vis * STEP,
+      hit: function (x, y) { return x - fr.x >= X && y + fr.y >= TOP - 24; },   // ganzes Panel unter dem Titel
+      onSet: function (px) { if (ov.up) { U.cls(ov.up, 'on', px > 0.5); U.cls(ov.dn, 'on', px < maxPx() - 0.5); } } });
     for (var i = 0; i < ents.length; i++) {
       var d = ents[i];
       if (d.act) { ov.act = U.el('div', 'pe two act', list, 'top:' + (i * STEP) + 'px'); ov.actT = U.txt('div', 'lb', ov.act, ''); ov.actS = U.txt('div', 'sb', ov.act, ''); ov.items.push(ov.act); continue; }
@@ -75,7 +98,12 @@
     while (head(ov.f) && ov.f < ov.items.length - 1) ov.f++;
     function setF(i, still) {
       U.cls(ov.items[ov.f], 'is-focus', false); ov.f = i; U.cls(ov.items[i], 'is-focus', true);
-      if (!still) { var off = Math.max(0, Math.min(i - 3, ov.items.length - vis)); if (off !== ov.off) { ov.off = off; U.tf(list, 0, -off * STEP); } }
+      if (!still) {
+        if (fl.keys()) ov.off = -1;                   // nach freiem Scrollen: Taste rastet wieder auf ganze Zeilen
+        var off = Math.max(0, Math.min(i - 3, ov.items.length - vis));
+        if (off !== ov.off) { ov.off = off; U.tf(list, 0, -off * STEP); }
+        fl.sync(ov.off * STEP);
+      }
       if (ov.up) { U.cls(ov.up, 'on', ov.off > 0); U.cls(ov.dn, 'on', ov.off + vis < ov.items.length); }
     }
     function close() { if (!ov.closed) { ov.closed = true; N.router.closeOverlay(ov); } }
@@ -100,13 +128,20 @@
       return k !== 'RETURN';
     };
     ov.wheelKeys = ['UP', 'DOWN'];
+    ov.scrollTop = function () { return fl.top(); };   // An den Anfang (App.scrollTop, Tipp ganz oben / Cmd+Pfeil hoch)
+    ov.pan = function (e) { return fl.pan(e); };     // nicht genommen (kurze Liste, waagerecht): der Router verschluckt den Zug
+    ov.wheel = function (x, y, dx, dy) { fl.wheel(x, y, dy); return true; };
+    ov.pointerDown = function () { fl.down(); };
     ov.pointer = function (x, y, kind) {
+      if (fl.eat(kind)) return true;                  // Tipp in den Schwung: nur anhalten
       x -= fr.x; y += fr.y;                           // volle Hoehe: Panel-Koordinaten (sonst 0)
       if (x < X) { if (kind === 'click') ov.cancel(); return true; }
+      if (bk && backHit(x, y)) { if (kind === 'click') ov.cancel(); return true; }   // Zurueck-Pfeil = RETURN
       if (x < X + 24 || x >= X + 416) return false;
-      var i = N.hit.list(TOP, STEP, H, Math.min(vis, ov.items.length - ov.off), y);
+      var i;
+      if (fl.free) i = fl.idx(y, TOP, STEP, ov.items.length, vis);   // frei gescrollt: auch angeschnittene Zeilen
+      else { i = N.hit.list(TOP, STEP, H, Math.min(vis, ov.items.length - ov.off), y); if (i >= 0) i += ov.off; }
       if (i < 0) return false;
-      i += ov.off;
       if (head(i)) return true;
       if (i !== ov.f) setF(i, true);
       if (kind === 'click') pick(i);

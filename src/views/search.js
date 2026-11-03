@@ -23,10 +23,33 @@
   function view(kind) { return function (params) {   // kind: 'search' | 'discover' (nicht "mode": so heisst unten die Tastatur-Ebene)
     var D = kind === 'discover', PFX = D ? 'disc' : 'search', DELAY = D ? N.disc.DELAY : S.DELAY;
     var s = { rail: kind, wheelKeys: ['LEFT', 'RIGHT'] };
+    /* Flexible Flaeche (nur Apple, N.screen.flex; 10-screens.md 6.3/7): die Ansicht fuellt W x H (Inhaltskante x 144 der Ansicht =
+     * 24/80/144 am Bildschirm je Breitenklasse). R·N wie am TV (Tastatur links, Ergebnisse ab x 560 bis zum rechten Rand).
+     * Flach (H < 720, iPhone quer): Tastatur mit groesseren Tasten in 6 Zeilen (Leerzeichen/Loeschen/abc in einer), sonst wie R.
+     * STK = schmal und hoch (K·N iPhone hoch, M·N iPad hoch): Feld oben ueber die volle Breite, Tastatur darunter (Tasten >= 44 pt),
+     * Ergebnisse unter der Tastatur ueber die volle Breite; Tastatur und Ergebnisse rollen gemeinsam (Feld bleibt stehen). TV: alles
+     * wie bisher (Werte unten = TV-Werte). */
+    var FX = !!(N.screen && N.screen.flex), V = FX ? N.screen.view() : { x: 0, w: 1280, h: 720 }, CL = FX ? N.screen.cls : { w: 'R', h: 'N' };
+    var STK = FX && (CL.w === 'K' || CL.w === 'M' && CL.h === 'N'), FLAT = FX && !STK && CL.h === 'F';
+    var KG = STK ? { KX: 144, KY: 152, KS: CL.w === 'K' ? 72 : 68, KW: CL.w === 'K' ? 64 : 60, merge: true } : FLAT ? { KX: 144, KY: 144, KS: 64, KW: 56, merge: true } : null;
+    var VW = V.w, VH = V.h, RX0 = STK ? 144 : 560, RX1 = FX ? VW - (CL.w === 'K' ? 24 : 64) : 1216, RES_X = STK ? 0 : 416;
+    var CLIP_Y = STK ? 140 : 52, TOPY = CLIP_Y - 4, VB = FX ? N.RowMath.visFor(VH) : N.RowMath.VIS;   // TV: Ausschnitt ab 52, Kopf auf 48
+    var Y0 = STK ? KG.KY + Math.max(S.layout('abc', null, KG).length, S.layout('num', null, KG).length) * KG.KS + 16 : HEAD_Y;   // erste Gruppe
+    var RW = FX ? VW - RES_X : 0, REC_WW = STK ? RX1 - RX0 : REC_W, gCache = {};
+    if (FX) s.flex = true;
+    /* Reihen-Geometrie fuer die Breite der Ergebnisse (nur flexibel): mehr bzw. weniger ganz sichtbare Karten als die feste TV-Tabelle */
+    function rGeom(k) {
+      if (gCache[k]) return gCache[k];
+      var g0 = N.RowMath.geom(k), g = {}, f;
+      for (f in g0) g[f] = g0[f];
+      g.full = Math.max(1, Math.floor((RW - 64 - 144 + (g.step - g.w)) / g.step)); g.visible = Math.ceil((RW - 144) / g.step);
+      return (gCache[k] = g);
+    }
     var root, qT, candEl, candT, caret, bubble, bubbleEls = [], keys = [], keyEls = [], rows = [], mode = 'abc', pos = { r: 0, c: 0, col: 0 };
     var resPg, slots = [], groups = [], tops = [], g = 0, recentEl, recentEls = [], recentHeadT, stateT, stateX, tipT;
     var q = '', t9 = new S.T9(), t9T = 0, reqT = 0, task = null, cache = new N.LRU(20), shownQ = null, zone = 'kbd', rf = 0, ring, off = 0, dead = false, away = false, sugg = [], wlTask = null;
     var recPos = [], recN = 0, recLines = 0, recList = [], clrEl, wCache = {}, clrW = 0;   // Chip-Raster (S.pack), gezeigte Begriffe, gemessene Breiten
+    var fl = null, winT = -2;                         // freies Scrollen der Ergebnisse (Finger/Trackpad, NAV-20; am TV nie)
     var slotGroup = [], colMem = {}, emptyY = HEAD_Y, emptyRec = 0, wlGroup = null, inspIds = [], inspRows = {}, inspTask = null, pendingEmpty = false, onWl = null, wlDirty = false;   // colMem: Spalte je Gruppen-id
 
     /* ---------- Aufbau ---------- */
@@ -40,18 +63,29 @@
       caret = U.el('span', 'caret', qe);
       bubble = U.el('div', 't9b', root, 'display:none');
       for (var i = 0; i < 4; i++) { var b = U.el('span', '', bubble); b.appendChild(document.createTextNode('')); bubbleEls.push(b); }
-      U.txt('div', 'a t-small c2', root, N.t(D ? 'disc.hint' : 'search.hint'), 'left:144px;top:112px;width:400px');
+      if (STK) { f.style.width = (RX1 - 144) + 'px'; qe.style.width = (RX1 - 144 - 64) + 'px'; }   // Feld ueber die volle Breite
+      U.txt('div', 'a t-small c2', root, N.t(D ? 'disc.hint' : 'search.hint'), 'left:144px;top:112px;width:' + (STK ? RX1 - 144 : 400) + 'px');
+      var clip = U.el('div', 'sclip', root);
+      resPg = U.el('div', 'sres', clip);   // Clip ab y 52: vorherige Gruppe verschwindet beim Scrollen ganz
+      if (FX) { clip.style.top = CLIP_Y + 'px'; clip.style.width = VW + 'px'; clip.style.height = (VH - CLIP_Y) + 'px'; resPg.style.top = -CLIP_Y + 'px'; resPg.style.width = VW + 'px'; }
       buildKeys();
-      resPg = U.el('div', 'sres', U.el('div', 'sclip', root));   // Clip ab y 52: vorherige Gruppe verschwindet beim Scrollen ganz
+      fl = N.ui.freeList({ el: resPg, dim: FX ? VH - CLIP_Y - 52 : 600, set: freeSet, max: function () { return groups.length ? Math.max(0, tops[groups.length - 1] - TOPY) : 0; },
+        hit: function (x, y) { return x >= (STK ? 0 : 560) && y >= CLIP_Y; } });
       recentEl = U.el('div', 'srecent', resPg);
+      if (FX) { recentEl.style.left = RX0 + 'px'; recentEl.style.top = Y0 + 'px'; recentEl.style.width = REC_WW + 'px'; }
       recentHeadT = U.txt('div', 'row-head', recentEl, N.t('search.recent'), 'left:0;top:0');
       for (i = 0; i < S.MAX_RECENT; i++) { var c = U.el('div', 'chip srchip', recentEl, 'left:0;top:' + REC_TOP + 'px;display:none'); c.appendChild(document.createTextNode('')); recentEls.push(c); }
       clrEl = U.el('div', 'chip srchip sclr', recentEl, 'left:0;top:' + REC_TOP + 'px');
       clrEl.appendChild(document.createTextNode(N.t('search.clearHistory')));
-      stateT = U.txt('div', 'a t-h2', root, '', 'left:560px;top:48px;width:656px');
-      stateX = U.txt('div', 'a t-body c2', root, '', 'left:560px;top:96px;width:620px');
-      tipT = U.txt('div', 'a t-small c2', root, '', 'left:560px;top:180px;width:620px');
-      for (i = 0; i < NS; i++) { slots.push(new N.ui.Row(resPg, { caption: S.caption })); slotGroup.push(-1); }
+      var sw = FX ? RX1 - RX0 : 656, sx = STK ? sw : FX ? sw - 36 : 620;
+      stateT = U.txt('div', 'a t-h2', root, '', 'left:' + RX0 + 'px;top:' + Y0 + 'px;width:' + sw + 'px');
+      stateX = U.txt('div', 'a t-body c2', root, '', 'left:' + RX0 + 'px;top:' + (Y0 + 48) + 'px;width:' + sx + 'px');
+      tipT = U.txt('div', 'a t-small c2', root, '', 'left:' + RX0 + 'px;top:' + (Y0 + 132) + 'px;width:' + sx + 'px');
+      for (i = 0; i < NS; i++) {
+        var sl = new N.ui.Row(resPg, FX ? { caption: S.caption, w: RW, geom: rGeom } : { caption: S.caption });
+        if (FX) { sl.el.style.left = RES_X + 'px'; sl.el.style.width = RW + 'px'; }
+        slots.push(sl); slotGroup.push(-1);
+      }
       // Naechste Reihe nur angeschnitten (Bilder, ohne Untertitel): Tastenleiste unten rechts ueberdeckt nichts (TV-Test 27.10., F8)
       var fade = U.el('img', 'fade s-fade', root); fade.src = N.assetBase + 'fade-bottom.png';
       U.el('div', 's-fadebg', root);
@@ -69,11 +103,12 @@
     };
     function buildKeys() {
       for (var i = 0; i < keyEls.length; i++) if (keyEls[i].parentNode) keyEls[i].parentNode.removeChild(keyEls[i]);
-      keyEls = []; keys = []; rows = S.layout(mode);
+      keyEls = []; keys = []; rows = S.layout(mode, null, KG);
       for (var r = 0; r < rows.length; r++) {
         var line = [];
         for (var c = 0; c < rows[r].length; c++) {
-          var k = rows[r][c], e = U.el('div', k.w > S.KW ? (k.act === 'del' ? 'key wide del' : 'key wide') : 'key', root, 'left:' + k.x + 'px;top:' + k.y + 'px');
+          var k = rows[r][c], kw = KG ? KG.KW : S.KW, e = U.el('div', k.w > kw ? (k.act === 'del' ? 'key wide del' : 'key wide') : 'key', STK ? resPg : root,   // schmal: Tastatur rollt mit den Ergebnissen
+            'left:' + k.x + 'px;top:' + k.y + 'px' + (KG ? ';width:' + k.w + 'px;height:' + k.h + 'px;line-height:' + k.h + 'px' : ''));
           if (k.act === 'del') N.ui.icon(e, 'backspace');   // Sprite statt U+232B (fehlt in der TV-Schrift, TV-Befund 26.10.)
           e.appendChild(document.createTextNode(k.k || N.t(k.act === 'space' ? 'search.key.space' : k.act === 'del' ? 'search.key.delete' : mode === 'num' ? 'search.key.abc' : 'search.key.num')));
           keyEls.push(e); line.push(e);
@@ -118,7 +153,7 @@
       if (k.k) type(k.k);
       else if (k.act === 'space') type(' ');
       else if (k.act === 'del') del();
-      else { U.cls(keys[pos.r][pos.c], 'is-focus', false); mode = mode === 'num' ? 'abc' : 'num'; pos = { r: S.layout(mode).length - 1, c: 0, col: 0 }; buildKeys(); }
+      else { U.cls(keys[pos.r][pos.c], 'is-focus', false); mode = mode === 'num' ? 'abc' : 'num'; var mg = !!(KG && KG.merge); pos = { r: S.layout(mode, null, KG).length - 1, c: mg ? 2 : 0, col: mg ? 5 : 0 }; buildKeys(); }
     }
 
     /* ---------- Anfrage + Ergebnisse ---------- */
@@ -157,6 +192,7 @@
     function kinds() { var hc = N.session.homeCache(); return N.hubs.libKinds(hc && (hc.alibs || hc.libs) || []); }
     function showState(t, x, tip) {
       clearRows(); U.show(recentEl, false);
+      if (STK && off) setOff(0, true);                // schmal: Text steht unter der Tastatur (rollt nicht mit)
       U.setText(stateT, t); U.setText(stateX, x); U.setText(tipT, tip);
     }
     function clearRows() { if (zone === 'res' || zone === 'recent') toKbd(); for (var i = 0; i < slots.length; i++) { slots[i].clear(); slots[i].setVisible(false); slotGroup[i] = -1; } groups = []; colMem = {}; pendingEmpty = false; }   // Ziffern-Eingabe aus "Zuletzt gesucht": Fokus nicht auf versteckter Liste lassen
@@ -191,7 +227,7 @@
         if (clrEl.offsetWidth) clrW = clrEl.offsetWidth;
       }
       for (i = 0; i < rec.length; i++) ws.push(wCache['#' + rec[i]] || Math.min(300, 34 + rec[i].length * 10));   // ungemessen (verborgen): Schaetzung
-      var pk = S.pack(ws, clrW || 200, REC_W, REC_GAP, REC_LINES);
+      var pk = S.pack(ws, clrW || 200, REC_WW, REC_GAP, REC_LINES);
       recN = pk.n; recPos = pk.pos; recLines = pk.lines; recList = rec.slice(0, recN);
       for (i = 0; i < S.MAX_RECENT; i++) {
         U.show(recentEls[i], i < recN);
@@ -201,7 +237,7 @@
       return recLines;
     }
     /* Anfang der Reihen unter "Zuletzt gesucht" (28 px Luft bis zum naechsten Kopf) */
-    function belowY() { return recN ? HEAD_Y + REC_TOP + recLines * REC_STEP + 16 : HEAD_Y; }
+    function belowY() { return recN ? Y0 + REC_TOP + recLines * REC_STEP + 16 : Y0; }
     /* Liste kuerzer/leer geworden: Reihen darunter nachziehen, ohne sie neu zu bauen */
     function shiftBelow() {
       if (D) { emptyY = belowY(); emptyRec = recN; composeEmpty(); return; }
@@ -331,11 +367,12 @@
       if (!gs.length) { showState(N.t('empty.search.title', { q: qq }), N.t(noneKey || (D ? 'disc.none.text' : 'empty.search.text')), N.t(D ? 'disc.tip' : 'search.tip')); return; }
       showState('', '', '');
       groups = gs;
-      var y = HEAD_Y, ys = [];
+      var y = Y0, ys = [];
       for (var i = 0; i < gs.length; i++) { ys.push(y); y += PITCH[gs[i].kind] || 316; }
       layout(ys);
     }
     function layout(ys) {
+      if (fl) { fl.reset(); winT = -2; }
       tops = ys; colMem = {};
       for (var i = 0; i < slots.length; i++) { slots[i].clear(); slots[i].setVisible(false); slotGroup[i] = -1; }
       g = Math.min(g, Math.max(0, groups.length - 1));
@@ -385,6 +422,31 @@
       else { N.fx.move(resPg); U.tf(resPg, 0, -o); }
     }
 
+    /* ---------- freies Scrollen (N.ui.freeList): Seite folgt dem Finger, Fenster der Reihen-Slots wandert mit ---------- */
+    function freeSet(p) {
+      off = p; U.tf(resPg, 0, -Math.round(p * 100) / 100);
+      var t = topIdx();
+      if (t !== winT) { winT = t; ensureWin(Math.max(0, t)); }
+      if (zone === 'res') ring.hide();
+    }
+    /* erste Taste nach freiem Scrollen: zurueck ins Tasten-Raster; in den Ergebnissen Fokus auf die oberste Reihe im Bild. true = verbraucht */
+    function unfree(k) {
+      if (!fl || !fl.keys()) return false;
+      winT = -2;
+      var t = topIdx();
+      if (zone === 'res' || zone === 'recent') {
+        var gi = t < 0 ? -1 : canFocus(t) ? t : nextG(t, 1);
+        if (gi < 0 && hasRecent()) toRecent(0); else if (gi >= 0) toGroup(gi); else setOff(0, true);
+        return N.keys.isNav(k) || k === 'ENTER';
+      }
+      setOff(t < 0 || STK ? 0 : Math.max(0, tops[t] - TOPY), true);   // Tastatur hat den Fokus: Seite nur einrasten (schmal: Tastatur zeigen)
+      return false;
+    }
+    s.scrollTop = function () { if (!fl.free) fl.sync(off); return fl.top(); };   // An den Anfang (Tipp ganz oben / Cmd+Pfeil hoch)
+    s.pan = function (e) { if (e.phase === 'start' && !fl.free) fl.sync(off); return fl.pan(e); };
+    s.wheel = function (x, y, dx, dy) { if (!fl.free) fl.sync(off); return fl.wheel(x, y, dy); };
+    s.pointerDown = function () { fl.down(); };
+
     /* ---------- Fokus ---------- */
     function placeRing(p) { if (p) ring.to(p.shape, p.x + RES_X, p.y - off); }
     function setKey(p) { U.cls(keys[pos.r][pos.c], 'is-focus', false); pos = p; U.cls(keys[pos.r][pos.c], 'is-focus', true); N.fx.move(keys[pos.r][pos.c]); }
@@ -428,7 +490,7 @@
       if (zone === 'res' && hasSlot(g)) slotOf(g).setFocused(false);
       if (!hasSlot(i) || !hasSlot(i + 1) && groups[i + 1]) ensureWin(i, true);   // ausserhalb des Fensters: nur Reihe i und i+1 sofort
       zone = 'res'; g = i;
-      if (!still) setOff(Math.max(0, tops[i] - HEAD_Y));
+      if (!still) setOff(Math.max(0, tops[i] - TOPY));
       slotOf(g).setFocused(true); slotOf(g).boost();
       placeRing(slotOf(g).ringPos());
       N.idle.add(function () { N.router.refreshHints(); }, 'search-hints');
@@ -465,9 +527,10 @@
     };
 
     /* ---------- Lebenszyklus ---------- */
-    s.enter = function (p) {
+    s.enter = function (p, rs) {
       dead = false; away = false;
       if (p && p.q && !q && shownQ === null) { q = String(p.q).slice(0, 60); changed(); }   // Messlauf (P7): Suchbegriff vorgeben
+      else if (FX && rs && rs.q && !q && shownQ === null) { q = String(rs.q).slice(0, 60); paintField(); run(); }
       if (shownQ === null && !q) {
         if (D && zone === 'res' && groups.length) { if (wlDirty) wlRefocus(); startInsp(); }   // zurueck aus einer Detailseite: Fokus in den Reihen bleibt, Reihen nur auffrischen
         else showEmpty();
@@ -477,7 +540,7 @@
       else if (zone === 'res' && hasSlot(g)) { slotOf(g).refreshItem(slotOf(g).f); placeRing(slotOf(g).ringPos()); }
       N.router.refreshHints();
     };
-    s.leave = function () { away = true; if (t9T) { clearTimeout(t9T); t9T = 0; commitT9(); paintField(); } return null; };
+    s.leave = function () { away = true; if (t9T) { clearTimeout(t9T); t9T = 0; commitT9(); paintField(); } return FX && q ? { q: q } : null; };   // flexibel: Neu-Aufbau nach Groessenwechsel behaelt den Begriff
     s.destroy = function () {
       dead = true;
       if (task) task.abort();
@@ -493,6 +556,7 @@
     function up() { if (params && params.sec) N.app.sectionBack(); else N.router.back(); }
 
     s.onKey = function (k) {
+      if (unfree(k)) return true;                     // erste Taste nach freiem Scrollen setzt nur den Fokus (NAV-17)
       if (N.keys.isDigit(k)) { digit(k); return true; }
       if (k === 'RED') { if (zone === 'recent' && rf < recN) removeRecent(rf); else clearAll(); return true; }
       if (zone === 'kbd') {
@@ -540,7 +604,7 @@
      * -> Rueckkopplung Hover -> Rollen -> anderes Element unter dem Punkt. Jetzt wie Bibliothek/Startseite (NAV-2):
      * ganz sichtbare Reihe = Fokus ohne Rollen; angeschnittene (>= 40 %) erst nach Verweilen bzw. per Klick hereinholen;
      * geblaettert wird ueber Randzonen (pointerEdge/pointerScroll) oder das Rad. Treffer in Seitenkoordinaten (y + off). */
-    var CLIP_Y = 52, RM = N.RowMath;
+    var RM = N.RowMath;
     function ptrRow(y) {
       for (var gi = 0; gi < groups.length; gi++) {
         if (!hasSlot(gi) || !canFocus(gi)) continue;
@@ -555,10 +619,10 @@
       return out;
     }
     /* oberste Gruppe im Bild (ihr Kopf steht auf HEAD_Y); -1 = Anfang (Zuletzt gesucht bzw. erste Gruppe ungerollt) */
-    function topIdx() { var t = -1; for (var i = 0; i < groups.length; i++) if (tops[i] - HEAD_Y <= off) t = i; return t; }
+    function topIdx() { var t = -1; for (var i = 0; i < groups.length; i++) if (tops[i] - TOPY <= off) t = i; return t; }
     function canScroll(d) {
       if (d < 0) return off > 0;
-      for (var i = topIdx() + 1; i < groups.length; i++) if (canFocus(i) && tops[i] + 52 + RM.geom(groups[i].kind).h - off > RM.VIS) return true;
+      for (var i = topIdx() + 1; i < groups.length; i++) if (canFocus(i) && tops[i] + 52 + RM.geom(groups[i].kind).h - off > VB) return true;
       return false;
     }
     function reveal(i, x) {
@@ -569,7 +633,8 @@
       N.pointer.scrolled();                           // Inhalt ist unter dem Punkt gewandert -> Sperre bis zur naechsten Bewegung
     }
     s.pointer = function (x, y, kind) {
-      var p = S.hitKey(rows, x, y);
+      if (fl.eat(kind)) return true;                    // Tipp in den Schwung: nur anhalten
+      var p = STK ? (y >= CLIP_Y ? S.hitKey(rows, x, y + off) : null) : S.hitKey(rows, x, y);   // schmal: Tasten rollen mit
       if (p) {
         N.pointer.holdCancel();
         if (zone !== 'kbd') toKbd(true);
@@ -577,8 +642,8 @@
         if (kind === 'click') keyAct(rows[p.r][p.c]);
         return true;
       }
-      if (x < 560 || y < CLIP_Y) { N.pointer.holdCancel(); return false; }
-      var py = y + off, ci = hasRecent() && y < RM.VIS ? S.hitChip(recPos, x - 560, py - HEAD_Y, REC_TOP, REC_STEP, REC_H) : -1;   // Seitenkoordinaten
+      if (x < RX0 || y < CLIP_Y) { N.pointer.holdCancel(); return false; }
+      var py = y + off, ci = hasRecent() && y < VB ? S.hitChip(recPos, x - RX0, py - Y0, REC_TOP, REC_STEP, REC_H) : -1;   // Seitenkoordinaten
       if (ci >= 0) {
         N.pointer.holdCancel();
         if (zone !== 'recent' || ci !== rf) toRecent(ci, true);
@@ -587,10 +652,15 @@
       }
       var ez = s.pointerEdge(x, y);
       if (ez) { N.pointer.holdCancel(); if (kind === 'click') s.pointerScroll(ez.d); return true; }   // Randzone: rollt (Verweilen/Klick)
-      var hr = y < RM.VIS ? ptrRow(y) : null;
+      var hr = y < VB ? ptrRow(y) : null;
       if (!hr || !hr.v) { N.pointer.holdCancel(); return false; }
       var gi = hr.i, R = slotOf(gi), h = R.hit(x - RES_X);
       if (h < 0) { N.pointer.holdCancel(); return false; }
+      if (fl.free) {                                  // frei gescrollt: auch angeschnittene Reihen, nichts rollt
+        if (zone !== 'res' || g !== gi) toGroup(gi, true);
+        if (kind === 'click') open(R.item(h));
+        return true;
+      }
       if (hr.v === 'part') {                          // angeschnitten: Vorbeiziehen loest nichts aus
         if (kind === 'click') { N.pointer.holdCancel(); reveal(gi, x); open(R.item(h)); return true; }
         N.pointer.hold(function () { var c = ptrRow(N.pointer.y); if (!dead && !away && c && c.i === gi) reveal(gi, N.pointer.x); });   // inzwischen weg (Detailseite): nichts rollen
@@ -605,9 +675,10 @@
     /* Randzonen ueber der Ergebnisbreite: oben y 52–96 (unter dem Ausschnittrand, solange gerollt ist), unten ab RowMath.edgeB bis
      * 656 (ueber der Hinweisleiste), solange darunter noch eine Reihe kommt. Anzeige-Pille mittig. */
     s.pointerEdge = function (x, y) {
-      if (!groups.length || x < 560 || x >= 1216) return null;
-      if (y >= CLIP_Y && y < 96 && canScroll(-1)) return { d: -1, x: 888, y: 76 };
-      if (y >= RM.edgeB(visRows(), CLIP_Y) && y < 656 && canScroll(1)) return { d: 1, x: 888, y: 628 };
+      if (!groups.length || fl.free || x < RX0 || x >= RX1) return null;
+      var mx = Math.round((RX0 + RX1) / 2);
+      if (y >= CLIP_Y && y < CLIP_Y + 44 && canScroll(-1)) return { d: -1, x: mx, y: CLIP_Y + 24 };
+      if (y >= RM.edgeB(visRows(), CLIP_Y) && y < VB + 24 && canScroll(1)) return { d: 1, x: mx, y: VB - 4 };
       return null;
     };
     /* ein Schritt = eine Gruppe (wie ▲/▼ ab der obersten Gruppe im Bild); der Fokus kommt mit (bleibt sichtbar) */

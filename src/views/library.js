@@ -21,7 +21,10 @@
     var lib = params.lib || { id: 0, title: '', type: 'movie' }, coll = params.coll || null, list = params.list || null, once = params.once || null;
     // Seitenleiste markiert die Bibliothek auch in Sammlung/Personenfilter (TV-Befund 26.10.); sub: RETURN geht dort zurueck
     // flexible Flaeche (N.screen, nur Apple): Raster mit mehr Spalten/Zeilen, A–Z-Leiste am rechten Rand (TV: 1280x720, REG_X 1160)
-    var A = N.screen.area(true), regX = REG_X + A.w - 1280;
+    // Breitenklasse M/K (10-screens 6.3): A–Z-Leiste an den rechten Rand (56 statt 120 Abstand), Raster bis davor (A.r)
+    var A = N.screen.view(), slimR = N.screen.flex && N.screen.cls.w !== 'R', regX = REG_X + A.w - 1280 + (slimR ? 56 : 0);
+    if (slimR) A = { x: A.x, y: A.y, w: A.w, h: A.h, r: 88 };
+    if (N.screen.flex && N.screen.foldX()) A = { x: A.x, y: A.y, w: A.w, h: A.h, r: A.r, fold: N.screen.foldX() };   // Duo: Luecke auf dem Falz
     var sub = !!(coll || params.actor || list || once), s = { rail: params.rail || (lib.id ? N.railRows.libId(lib) : null), wheelKeys: ['UP', 'DOWN'], miniX: regX - 16 - 360, news: 'top', flex: true };   // news: HOME-13 Hinweis oben rechts neben dem Titel   // Mini-Player links neben A–Z (F26)
     // Weitere Server (N.srv): Bibliothek eines fremden Servers -> alle Anfragen dorthin, Ansicht-Merken mit eigenem Schluessel
     var srv = lib.srv || '', libKey = srv ? N.srv.skey(srv, lib.id) : lib.id;
@@ -30,7 +33,7 @@
     // Raster folgt senkrecht frei dem Finger/Trackpad (N.kinetic.Drive, kein Einrasten), erste Taste danach: Fokus am Anker
     var caps = N.platform.caps, AHEAD = caps.images === 'fast' ? 3 : 0, FREE = caps.scroll === 'free';
     var drv = null, pan = null, loose = false, eat = false;
-    var G = A.w === 1280 && A.h === 720 && !AHEAD ? N.GridMath : N.GridMath.make('L', false, A, AHEAD), root, titleT, statT, chipBar, chips = [], chipRects = null, grid, ring, sb, amb, regDivs = [], regCur = -1, regFoc = false, regHas = '', bubble, bubbleT, skel, fade;
+    var G = A.w === 1280 && A.h === 720 && !AHEAD ? N.GridMath : N.GridMath.make('L', false, A, AHEAD), root, titleT, statT, chipBar, chipIn, chips = [], chipRects = null, grid, ring, sb, amb, regDivs = [], regCur = -1, regFoc = false, regHas = '', bubble, bubbleT, skel, fade;
     var prefs = null, items = [], n = -1, total = -1, chars = [], pages = {}, gen = 0, tasks = [], collN = -1;
     // M4 Musik/Hoerbuecher: Reiter 'lib' = Kuenstler (Musik) bzw. Buecher (Hoerbuecher), 'alt' = Alben bzw. Autoren; quadratische Karten
     var music = lib.type === 'artist', book = music && N.music.bookLib(lib);
@@ -46,13 +49,19 @@
       root = el;
       // Hintergrund in Bibliotheken (N.ui.Ambient): Ebenen erst bei Bedarf, ganz unten; "Aus" = keine Elemente
       amb = new N.ui.Ambient(root, { lib: lib.id, coll: !!(coll || list), type: function () { return L.typeNum(qlib()); }, items: function () { return items.slice(0, G.PAGE); }, get: get });
-      titleT = U.txt('div', 'a t-h1 ell', root, coll ? coll.title : list ? list.title : lib.title, 'left:144px;top:40px;width:900px');
-      if (srv) U.txt('div', 'a t-label cacc ell', root, N.t('srv.libFrom', { server: lib.srvName || N.srv.name(srv) }), 'left:144px;top:16px;width:900px');   // Herkunft
-      statT = U.txt('div', 'a t-small c2 ell', root, N.t('common.loading'), 'left:144px;top:84px;width:1000px');
-      chipBar = U.el('div', 'lchips', root);
+      titleT = U.txt('div', 'a t-h1 ell', root, coll ? coll.title : list ? list.title : lib.title, 'left:144px;top:40px;width:' + Math.min(900, A.w - 168) + 'px');
+      if (srv) U.txt('div', 'a t-label cacc ell', root, N.t('srv.libFrom', { server: lib.srvName || N.srv.name(srv) }), 'left:144px;top:16px;width:' + Math.min(900, A.w - 168) + 'px');   // Herkunft
+      statT = U.txt('div', 'a t-small c2 ell', root, N.t('common.loading'), 'left:144px;top:84px;width:' + Math.min(1000, A.w - 168) + 'px');
+      chipBar = U.el('div', 'lchips', root, A.w < 1240 ? 'width:' + (A.w - 168) + 'px' : undefined);   // schmale Flaeche: bis zum rechten Rand
+      /* flexibel (nur Apple): Chips in einem Streifen, der waagerecht wischbar ist, wenn sie nicht in die Breite passen (iPhone SE hoch);
+       * der Fokus per Taste holt seinen Chip ins Bild. Am TV liegen die Chips direkt in der Zeile (chipIn = chipBar). */
+      chipIn = chipBar;
+      if (N.screen.flex) { chipBar.style.overflow = 'hidden'; chipIn = U.el('div', 'lchips-in', chipBar); }
       grid = new N.ui.Grid(root);
       if (G !== N.GridMath) grid.setGeom(G);
-      if (FREE) grid.onScroll = function () { ensurePages(); };   // freie Lage: Seiten fuer das neue Fenster holen (Anfrage, kein DOM)
+      // freie Lage: Seiten fuer das neue Fenster holen (Anfrage, kein DOM); A–Z-Leiste zeigt den Buchstaben der obersten Zeile (LIB-11,
+      // nur beim Zeilenwechsel, nur bei anderem Buchstaben zwei Klassen)
+      if (FREE) grid.onScroll = function () { ensurePages(); if (zone === 'grid' && regOn()) paintReg(false); };
       skel = U.el('div', 'skel', root);
       for (var i = 0; i < 5; i++) U.el('i', '', skel, 'left:' + (G.X0 + i * G.SX) + 'px;top:' + G.Y0 + 'px;width:176px;height:264px');
       fade = U.el('img', 'fade fade-frame', root); fade.src = N.assetBase + 'fade-frame.png';   // unter A–Z-Leiste/Sprungbuchstabe: Band ab y 612, Leiste bis 628
@@ -116,10 +125,10 @@
       return d;
     }
     function buildChips() {
-      while (chipBar.firstChild) chipBar.removeChild(chipBar.firstChild);
+      while (chipIn.firstChild) chipIn.removeChild(chipIn.firstChild);
       chips = chipDefs(); chipRects = null;
       for (var i = 0; i < chips.length; i++) {
-        var c = U.el('span', 'chip' + (chips[i].act ? ' act' : ''), chipBar);
+        var c = U.el('span', 'chip' + (chips[i].act ? ' act' : ''), chipIn);
         c.appendChild(document.createTextNode(chips[i].tx || N.t(chips[i].t)));
         chips[i].el = c;
       }
@@ -131,6 +140,19 @@
       if (dead) return;
       chipRects = [];
       for (var i = 0; i < chips.length; i++) chipRects.push([144 + chips[i].el.offsetLeft, chips[i].el.offsetWidth]);
+      if (chipIn !== chipBar) {                         // flexibel: wie weit der Streifen rollen kann
+        var l = chipRects[chipRects.length - 1];
+        chipMax = l ? Math.max(0, l[0] + l[1] - 144 - chipBar.offsetWidth) : 0;
+        chipTo(chipOff);
+      }
+    }
+    var chipOff = 0, chipMax = 0, chipPan = null;
+    function chipTo(v) { chipOff = U.clamp(Math.round(v), 0, chipMax); U.tf(chipIn, -chipOff, 0); U.cls(chipBar, 'lc-r', chipOff < chipMax); U.cls(chipBar, 'lc-l', chipOff > 0); }   // Rand laeuft aus, wo es weitergeht
+    /* Chip i ganz ins Bild holen (Tasten-Fokus; nur, wenn der Streifen rollen kann) */
+    function chipShow(i) {
+      if (!chipMax || !chipRects || !chipRects[i]) return;
+      var a = chipRects[i][0] - 144, b = a + chipRects[i][1], w = chipBar.offsetWidth;
+      if (a < chipOff) chipTo(a); else if (b > chipOff + w) chipTo(b - w);
     }
     function chipIndex(id) { for (var i = 0; i < chips.length; i++) if (chips[i].id === id) return i; return 0; }
 
@@ -292,13 +314,16 @@
 
     /* ---------- Register (SPEC 7.5) ---------- */
     function hideReg() { U.show(regDivs.box, false); }
+    /* Buchstabe der Stelle, an der man ist (LIB-11): fokussierter Titel (TV: die Fokuszeile steht oben am Anker); frei gescrollt
+     * (caps.scroll 'free', Fokus bleibt liegen) der erste Titel der obersten sichtbaren Zeile */
+    function regIdx() { return grid.free ? Math.max(0, Math.min(n - 1, grid.r * G.COLS)) : grid.f; }   // leere Liste: 0, nie -1
     /* Buchstaben ohne Titel abgeschwaecht (einmal je Index), aktueller hervorgehoben (nur alter + neuer umgeklasst) */
     function paintReg(force) {
       if (!regOn()) { hideReg(); return; }
       var has = L.present(chars), i;
       if (has !== regHas) { regHas = has; for (i = 0; i < regDivs.length; i++) regDivs[i].className = has.indexOf(LETTERS.charAt(i)) >= 0 ? 'reg' : 'reg off'; regCur = -1; regFoc = false; }
       U.show(regDivs.box, true);
-      var ch = zone === 'reg' ? regCh : L.letterAt(chars, grid.f, prefs.desc);
+      var ch = zone === 'reg' ? regCh : L.letterAt(chars, regIdx(), prefs.desc);
       if (!force && zone !== 'reg' && ch === regCh && regCur >= 0) return;
       regCh = ch;
       var k = LETTERS.indexOf(ch), foc = zone === 'reg';
@@ -333,7 +358,19 @@
     }
 
     /* ---------- Fokus ---------- */
-    function placeRing(p) { if (p && !railOpen && !sb.on) ring.to(p.shape, p.x, p.y, p.noScale); }
+    /* freies Scrollen, Maus/Trackpad (Apple Nr. 29): Ring scrollt mit der Karte; ist sie oben unter Chips/Titel gewandert (Raster-
+     * Ausschnitt ab y 164), waere er dort zu sehen -> verbergen, bis wieder eine ganze Karte gemeint ist. Tasten/TV: unveraendert */
+    function placeRing(p) {
+      if (!p || railOpen || sb.on) return;
+      if (FREE && N.input.mode !== 'key' && p.y < 164) { ring.hide(); return; }
+      ring.to(p.shape, p.x, p.y, p.noScale);
+    }
+    /* Nr. 29: Raster frei gescrollt -> Ring an die Fokuskarte (selber Frame, ohne Gleiten), Karte unter dem Zeiger neu bestimmen */
+    function ptrScrolled() {
+      if (N.input.mode !== 'pointer' || zone !== 'grid' || n <= 0) return;
+      N.fx.step(true); placeRing(grid.ringPos());
+      if (N.pointer && N.pointer.follow) N.pointer.follow();
+    }
     function updateHints() { N.router.refreshHints(); }
     function afterMove() { ensurePages(); regLater(); N.idle.add(updateHints, 'lib-hints'); amb.focus(cur()); }   // amb: nur merken (Wechsel nach Ruhe)
     function moveTo(i) { placeRing(grid.focusTo(i)); afterMove(); }
@@ -342,6 +379,7 @@
       if (!force && chips[cf]) U.cls(chips[cf].el, 'is-focus', false);
       cf = U.clamp(i, 0, chips.length - 1);
       U.cls(chips[cf].el, 'is-focus', true);
+      if (chipMax) chipShow(cf);
     }
     /* ▲ aus der ersten Reihe: auf den aktiven Reiter (TV-Test 29.10.: landete auf "Sortieren & Filter", ▶ dann auf "Alle abspielen"
      * und ein OK spielte sofort ab). Ohne Reiter: "Sortieren & Filter", sonst der erste Chip. Nie direkt "Alle abspielen". */
@@ -366,7 +404,7 @@
     }
     function toReg() {
       zone = 'reg'; grid.setFocused(false); ring.hide();
-      regCh = L.letterAt(chars, grid.f, prefs.desc);
+      regCh = L.letterAt(chars, regIdx(), prefs.desc);    // startet beim hervorgehobenen Buchstaben (LIB-11), nie oben
       paintReg(true);
       N.router.refreshHints();
     }
@@ -703,7 +741,7 @@
       if (eat) { if (kind === 'click') eat = false; return true; }   // Beruehrung hat den Schwung angehalten: nichts oeffnen
       if (sb.on && zone === 'state') return sb.pointer(x, y, kind);
       if (y >= 120 && y < 152 && chipRects) {
-        for (var i = 0; i < chipRects.length; i++) if (x >= chipRects[i][0] && x < chipRects[i][0] + chipRects[i][1]) {
+        for (var i = 0; i < chipRects.length; i++) if (x + chipOff >= chipRects[i][0] && x + chipOff < chipRects[i][0] + chipRects[i][1] && x < 144 + (chipMax ? chipBar.offsetWidth : 1e4)) {
           if (zone !== 'chips') { zone = 'chips'; paintReg(true); grid.setFocused(false); ring.hide(); setChip(i, true); N.router.refreshHints(); }
           else if (i !== cf) setChip(i);
           if (kind === 'click') chipAct(chips[i].id);
@@ -772,12 +810,14 @@
     function stopPan() { return drv ? drv.stop() : false; }
     function drive() {
       if (!drv) drv = new N.kinetic.Drive({ dim: G.AH - G.Y0, get: function () { return grid.curPy(); }, max: function () { return grid.maxPy(); },
-        set: function (p) { if (N.idle) N.idle.touch(); grid.setPy(p); } });
+        set: function (p) { if (N.idle) N.idle.touch(); grid.setPy(p); ptrScrolled(); } });
       return drv;
     }
     s.pan = function (e) {
+      if (chipPan) { chipTo(chipPan.o - e.dx); if (e.phase === 'end') chipPan = null; return true; }   // Chip-Streifen folgt dem Finger
       if (e.phase === 'start') {
         if (!FREE || !N.kinetic) return false;
+        if (chipMax && e.axis === 'x' && e.y >= 112 && e.y < 160) { chipPan = { o: chipOff }; return true; }
         stopPan(); eat = false; pan = null;
         if (e.axis !== 'y' || n <= 0 || zone === 'reg' || (sb.on && zone === 'state') || e.y < 152) return true;
         if (regOn() && e.x >= regX) return true;          // A–Z-Leiste
@@ -800,6 +840,12 @@
       eat = false; loose = true;
       drive().nudge(dy);
       return true;
+    };
+    /* An den Anfang (App.scrollTop, Tipp ganz oben / Cmd+Pfeil hoch): Raster gleitet nach oben */
+    s.scrollTop = function () {
+      if (!FREE || !N.kinetic || n <= 0 || zone === 'reg') return false;
+      pan = null; loose = true;
+      return drive().to(0);
     };
     /* erste Taste nach freiem Scrollen: Karte am Anker (Zeile oben, Spalte des Fokus), Raster zurueck ins Tastenraster */
     function reanchor() {

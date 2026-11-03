@@ -56,13 +56,20 @@ function drag(a, axis, x, y, dx, dy, ms) {
 
 test('Geometrie: Touch volle Breite mit Spalt oben, Mac mittiges Feld; schmaler als 1280 -> Inhalt verkleinert', function () {
   var G = setup('apple', true).N.ui.card.geom;
-  assert.deepStrictEqual(JSON.parse(JSON.stringify(G(1280, 960, true))), { x: 0, y: 32, w: 1280, h: 928, round: 'top', k: 1, ch: 928, cw: 1280 });
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(G(1280, 960, true))), { x: 0, y: 32, w: 1280, h: 928, round: 'top', k: 1, ch: 928, cw: 1280, cut: 0, narrow: false });
   var m = G(1280, 800, false);
   assert.deepStrictEqual([m.x, m.y, m.w, m.h, m.round, m.k, m.ch, m.cw], [48, 40, 1184, 720, 'all', 0.925, 778, 1280]);
   assert.strictEqual(G(1728, 960, false).w, 1280, 'breites Mac-Fenster: Feld hoechstens 1280, k = 1');
   assert.strictEqual(G(1561, 720, true).cw, 1561, 'iPhone quer: Reihen laufen weiter');
   var p = G(834, 1194, true);                                     // spaeteres Hochformat (Nr. 16): keine feste 1280er-Karte
   assert.strictEqual(p.w, 834); assert.ok(Math.abs(p.k - 834 / 1280) < 1e-9); assert.strictEqual(p.ch, Math.round((1194 - 32) / p.k));
+  // Groessenklassen (10-screens.md 6.3): M und K ohne Verkleinern, Inhaltskante verschoben (cut), M·N Blatt mit 15 % oben frei,
+  // K Vollbild-Blatt (12 px) in schmaler Anordnung – auch mit Maus (schmales Mac-Fenster)
+  var mn = G(960, 1232, true, { w: 'M', h: 'N' }), k = G(586, 1132, false, { w: 'K', h: 'N' }), mf = G(1092, 556, true, { w: 'M', h: 'F' });
+  assert.deepStrictEqual([mn.k, mn.cut, mn.cw, mn.y, mn.h, mn.narrow], [1, 64, 1024, 185, 1047, false]);
+  assert.deepStrictEqual([k.k, k.cut, k.cw, k.y, k.x, k.w, k.narrow], [1, 120, 706, 12, 0, 586, true]);
+  assert.deepStrictEqual([mf.y, mf.cw, mf.ch], [32, 1156, 524]);
+  assert.strictEqual(G(1280, 912, true, { w: 'R', h: 'N' }).cut, 0, 'R wie bisher');
 });
 
 test('Fernseher: keine Karte – scr.card wird ignoriert, Stapel wie immer (Ansicht darunter versteckt)', function () {

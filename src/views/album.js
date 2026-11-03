@@ -5,6 +5,9 @@
  * - Darunter angeschnitten (y 580) die Titel- bzw. Kapitelliste (N.ui.TrackList); ▼ gleitet hin, Info-Block oben, Cover blendet aus.
  *   Hoerbuch als eine Datei mit eingebetteten Kapiteln (M4B): Liste = Kapitel. OK spielt ab dem Titel/Kapitel (Rest = Warteschlange).
  * - Gelb (Hoerbuch): als gehoert/ungehoert markieren (Scrobble des Albums). Gruen: Jetzt laeuft (global, N.audio.key). Blau: Suche.
+ * - Finger/Trackpad (caps.scroll 'free', NAV-20): EIN freier Weg ueber Seite und Liste – die ersten ANCHOR_OFF px schieben die Seite
+ *   (Knoepfe hinaus, Info-Block oben), danach rollt die Titelliste (N.ui.freeList, Schwung, Gummiband, kein Einrasten); Wischen
+ *   aendert den Fokus nicht, Tipp spielt den Titel. Erste Taste danach: Knoepfe bzw. erste ganz sichtbare Zeile, eingerastet.
  * params: {it: album (normalisiert, type 'album')} */
 (function (N) {
   var U = N.util, MU = N.music, F = N.fmt, MINI_ROOM = 2, PEEK = 580, LIST_Y = 624, ANCHOR_OFF = PEEK - 236;
@@ -19,7 +22,7 @@
     s.card = true;                                   // Detailkarte (caps.details 'card'): Album/Hoerbuch in der Karte (N.router prueft die Faehigkeit)
     var root, hero, pg, bar, btns = [], bdefs = [], btnRects = null, blbl, blblT, headT, cntT, list, sb;
     var meta = null, tracks = [], chs = [], rows = [], kind = 'tracks', res = null, zone = 'btn', bf = 0, off = 0, gen = 0, tasks = [], dead = false, away = false;
-    var onTrack = null, onMini = null, jump = { d: '', t: 0 };
+    var onTrack = null, onMini = null, jump = { d: '', t: 0 }, fl = null, heroOn = true;
 
     s.create = function (el) {
       root = el;
@@ -30,6 +33,8 @@
       var hd = U.el('div', 'tl-head t-h2 ell', pg, 'top:' + PEEK + 'px');
       headT = document.createTextNode(N.t(book ? 'mu.row.chapters' : 'mu.row.tracks')); hd.appendChild(headT); cntT = U.txt('span', 'cnt', hd, '');
       list = new N.ui.TrackList(pg, { x: 144, y: LIST_Y, w: 992, vis: 7, full: 6, row: rowView });   // 7. Zeile nur angeschnitten (Band ab y 632)
+      fl = N.ui.freeList({ el: pg, dim: 720, set: freeSet, max: function () { return list.count() ? ANCHOR_OFF + list.maxPx() : 0; },
+        hit: function () { return zone !== 'state'; } });
       hero.makeInfo(root);
       var fade = U.el('img', 'fade', root); fade.src = N.assetBase + 'fade-bottom.png';
       sb = new N.ui.StateBlock(root);
@@ -171,6 +176,33 @@
       return { n: x.idx || i + 1, t: x.title, s: x.artist && x.artist !== art ? x.artist : '', d: x.dur ? MU.clock(x.dur) : '' };
     }
 
+    /* ---------- freies Scrollen: Lage p = Seite (bis ANCHOR_OFF) + Titelliste ---------- */
+    function freeSet(p) {
+      var po = Math.min(p, ANCHOR_OFF), h = po < ANCHOR_OFF / 2;
+      off = po; U.tf(pg, 0, -Math.round(po * 100) / 100);
+      list.setPx(Math.max(0, p - ANCHOR_OFF));
+      if (h !== heroOn) { heroOn = h; hero.hero(h); U.vis(bar, h); if (!h) U.show(blbl, false); }
+    }
+    function keyPx() { return zone === 'list' ? ANCHOR_OFF + list.sc * 56 : 0; }
+    /* erste Taste nach freiem Scrollen: zurueck ins Tasten-Raster (Knoepfe oder erste ganz sichtbare Zeile); true = war frei */
+    function unfree() {
+      if (!fl.keys()) return false;
+      var p = fl.px, z = zone;
+      pg.style.webkitTransition = 'none'; setTimeout(function () { if (!fl.free) pg.style.webkitTransition = ''; }, 60);   // ohne Nachgleiten
+      if (p < ANCHOR_OFF / 2 || !list.count()) { list.snap(0); off = -1; zone = 'x'; if (z === 'list') list.setFocused(false); toBtn(); }
+      else { var a = list.anchor(); list.snap(a); off = -1; if (z !== 'list') { U.cls(btns[bf], 'is-focus', false); zone = 'x'; toList(); } else setOff(ANCHOR_OFF); list.focusTo(a, true); }
+      heroOn = zone === 'btn';
+      return true;
+    }
+    s.scrollTop = function () { if (!fl.free) fl.sync(keyPx()); return fl.top(); };   // An den Anfang (Tipp ganz oben / Cmd+Pfeil hoch)
+    s.pan = function (e) {
+      if (e.phase === 'start' && !fl.free) fl.sync(keyPx());
+      return fl.pan(e);
+    };
+    s.wheel = function (x, y, dx, dy) { if (!fl.free) fl.sync(keyPx()); return fl.wheel(x, y, dy); };
+    s.pointerDown = function () { fl.down(); };
+    s.cardTop = function () { return (fl.free ? fl.px : keyPx()) <= 0.5; };   // Karte nach unten ziehen nur ganz oben
+
     /* ---------- Zonen ---------- */
     function setOff(o) { if (o !== off) { off = o; N.fx.move(pg); U.tf(pg, 0, -o); } }
     function setBtn(i) { U.cls(btns[bf], 'is-focus', false); bf = i; U.cls(btns[bf], 'is-focus', true); N.fx.move(btns[bf]); paintLabel(); }
@@ -280,6 +312,7 @@
     s.railBlur = function () { if (zone === 'btn') { U.cls(btns[bf], 'is-focus', false); U.show(blbl, false); } else if (zone === 'list') list.setFocused(false); };
     s.railFocus = function () { if (zone === 'btn') { U.cls(btns[bf], 'is-focus', true); paintLabel(); } else if (zone === 'list') list.setFocused(true); };
     s.onKey = function (k) {
+      if (unfree() && (N.keys.isNav(k) || k === 'ENTER')) return true;   // erste Taste setzt nur den Fokus (NAV-17)
       if (k === 'BLUE') { N.router.push(N.disc.blueView()); return true; }
       if (zone === 'state') { if (sb.onKey(k)) return true; return k !== 'RETURN'; }
       if (k === 'RETURN') { if (zone === 'list') { toBtn(); return true; } N.router.back(); return true; }
@@ -311,7 +344,19 @@
     };
     s.pointer = function (x, y, kind0) {
       if (sb.on) return sb.pointer(x, y, kind0);
-      var py = y + off;
+      if (fl.eat(kind0)) return true;                     // Tipp in den Schwung: nur anhalten
+      var py = y + off, fr = fl.free;
+      if (fr && py >= 448 && py < 496 && btnRects && py < LIST_Y - 8) {   // frei gescrollt: sichtbare Knoepfe wirken, die Seite bleibt
+        for (var b = 0; b < btnRects.length; b++) if (x >= btnRects[b][0] && x < btnRects[b][0] + btnRects[b][1]) { if (kind0 === 'click') btnAct(bdefs[b].id); return true; }
+        return false;
+      }
+      if (fr) {
+        if (x < 144 || x >= 1136 || y >= 720 || py < LIST_Y) return false;
+        var jf = list.hit(py - LIST_Y);
+        if (jf < 0) return false;
+        if (kind0 === 'click') playRow(jf);
+        return true;
+      }
       if (py >= 448 && py < 496 && btnRects && zone !== 'list') {
         for (var i = 0; i < btnRects.length; i++) if (x >= btnRects[i][0] && x < btnRects[i][0] + btnRects[i][1]) {
           if (zone !== 'btn') toBtn();
@@ -335,12 +380,12 @@
       }
       return false;
     };
-    s.pointerSig = function () { return off + ',' + list.sc; };   // Zeiger-Scroll-Sperre (N.pointer)
+    s.pointerSig = function () { return off + ',' + list.sc + ',' + list.fpx; };   // Zeiger-Scroll-Sperre (N.pointer)
     /* Zeiger-Randzonen der Titelliste (N.ui.TrackList.edge): Streifen ueber der ersten Zeile, angeschnittene Zeile unten bis zur
      * Hinweisleiste. Dazu (DET-9) die Abschnitts-Schritte: unter den Knoepfen ab y 604 zur Liste, ueber der ersten Zeile der ganz
      * oben stehenden Liste zurueck zu den Knoepfen. */
     s.pointerEdge = function (x, y) {
-      if (sb.on || x < 144 || x >= 1136) return null;
+      if (sb.on || fl.free || x < 144 || x >= 1136) return null;
       if (zone !== 'list') return list.count() && y >= N.RowMath.EDGE_B && y < 656 ? { d: 1, x: 640, y: 628 } : null;
       var top = LIST_Y - off, e = N.ui.TrackList.edge(list, top, x, y);
       return e || (y >= top - 32 && y < top ? { d: -1, x: 640, y: top - 16 } : null);

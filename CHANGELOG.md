@@ -5,6 +5,36 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.12] - 2026-11-03
+
+### Added
+- **Choose the colour of the badges.** A new setting under Settings › Display, "Badge colour", sets the colour of the
+  small triangle for new titles, the watched tick and the episode count on the tiles. Light grey stays the default; any
+  accent colour makes them stand out more.
+- **Grey as an accent colour.** The accent colour list now also offers a calm grey. A focused button turns white, so you
+  can still tell it apart from the others at a glance.
+- **"Original" quality.** "Conversion quality" and "Quality over the internet" now start with "Original (no limit)": the
+  server sends the file unchanged whenever the TV can play it. Only if it has to convert, the highest level the TV can
+  handle applies (20 Mbit/s · 1080p). INFO on each row explains exactly what happens.
+
+### Changed
+- **Season tabs react calmly to the pointer.** Moving the pointer of the Smart Control across the season tabs only
+  highlights them; the season changes when you click (or press OK). Before, merely passing over a tab switched the season,
+  which made the page jump around.
+- **The same version everywhere.** For titles with several versions, the detail page, the Home menu and playback now pick
+  exactly the same version for your quality setting.
+
+If a calm, tidy screen makes your evening a little nicer, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
+### Added
+- **Choose the colour of the badges on tiles.** A new setting under Settings › Display, "Badge colour", right below the
+  accent colour, colours the triangle (not watched), the tick (watched) and the episode count on tiles. Light grey stays
+  the default, so nothing changes unless you pick a colour; any accent colour makes them easier to spot on bright posters.
+- **Grey as an accent colour.** The accent colour list now ends with a calm grey.
+- **"Original" quality.** "Quality when converting" and "Quality over the internet" now start with "Original (no limit)":
+  the server sends the file unchanged whenever this device can play it, and converts at the highest step only when it
+  must. Devices that can play 4K also get 40 and 80 Mbit/s 4K steps (the 2014 TV does not show them).
+
 ## [1.0.11] - 2026-11-02
 
 ### Added

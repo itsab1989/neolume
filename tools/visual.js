@@ -758,6 +758,13 @@ function makeSeeds(port) {
   seeds.violet = seed({ accent: 'violet' }, { 'settings-aaaa1111.json': { accent: 'violet' } });
   seeds.coral = seed({ accent: 'coral' }, { 'settings-aaaa1111.json': { accent: 'coral' } });
   seeds.coralPlay = seed({ accent: 'coral' }, { 'settings-aaaa1111.json': { accent: 'coral' } }, cfgPlay);
+  // ACC-1/ACC-2 (02.11.): Grau als Akzentfarbe, Farbe der Markierungen auf Kacheln
+  seeds.gray = seed({ accent: 'gray' }, { 'settings-aaaa1111.json': { accent: 'gray' } });
+  seeds.bdAmber = seed({}, { 'settings-aaaa1111.json': { badgeColor: 'amber' } });
+  seeds.bdBlueEn = seed({ lang: 'en' }, { 'settings-aaaa1111.json': { badgeColor: 'blue' } });
+  seeds.bdGrayViolet = seed({ accent: 'violet' }, { 'settings-aaaa1111.json': { accent: 'violet', badgeColor: 'gray' } });
+  // PLAY-37: Qualitaet "Original (ohne Grenze)" gewaehlt
+  seeds.qOrig = seed({}, { 'settings-aaaa1111.json': { quality: 'orig', qualityRemote: 'orig' } });
   // Hintergrund in Bibliotheken: Farbstimmung (Standard, ohne Eintrag), kraeftiger, Titelbild, Zufallsbild, aus, ohne Hintergrundbilder
   function amb(o, l) { return seed(l ? { lang: l } : {}, { 'settings-aaaa1111.json': o }); }
   seeds.ambMood = amb({}); seeds.ambStrong = amb({ libBgStrength: 'strong' }); seeds.ambArt = amb({ libBg: 'art' });
@@ -810,10 +817,24 @@ var SCENES = [
   { name: 'settings-homesize-panel', seed: 'homeS', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,ENTER' },
   { name: 'settings-homesize-panel-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,ENTER' },          // Einstellung Hintergrundbilder aus -> einfarbig wie bisher
   { name: 'settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT' },
+  // ACC-2 "Farbe der Markierungen" direkt unter der Akzentfarbe: Zeile, Auswahl (DE/EN), INFO
+  { name: 'settings-badge', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-badge-panel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-badge-panel-en', seed: 'bdBlueEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-badge-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-accent-panel-gray', seed: 'gray', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  // PLAY-37: Qualitaet beim Umwandeln / ueber das Internet mit "Original (ohne Grenze)" (TV: kein 4K), INFO
+  { name: 'settings-quality-panel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-quality-panel-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-qremote-panel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-qremote-panel-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-quality-orig', seed: 'qOrig', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-quality-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-quality-info-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
   // DET-3: "Serien-Fortschritt anzeigen" mit Erklaerung (DE/EN)
-  { name: 'settings-seriesprog', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-seriesprog-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-epprog-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-seriesprog', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-seriesprog-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-epprog-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'settings-diag', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT' },
   { name: 'search', seed: 'home', keys: 'BLUE' },
   { name: 'search-123', seed: 'home', keys: 'BLUE,wait600,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
@@ -837,9 +858,9 @@ var SCENES = [
   { name: 'search-recent-sugg-up', seed: 'recent8', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,UP' },
   { name: 'search-recent-ptr', seed: 'recentPtr', keys: 'BLUE,wait600', mwait: 3600, moves: '700:300,700:320,600:160,601:161' },   // Zeiger auf Zeile 2: Fokus ohne Rollen
   { name: 'search-recent-ptr-click', seed: 'recentPtr', keys: 'BLUE,wait600', mwait: 4600, moves: '700:300,700:320,818:116,819:117,click@819:117' },   // Klick auf einen Begriff = OK
-  { name: 'settings-recent', seed: 'recent8', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-recent-panel-en', seed: 'recent8En', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-recent-info', seed: 'recent8', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-recent', seed: 'recent8', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-recent-panel-en', seed: 'recent8En', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-recent-info', seed: 'recent8', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
   { name: 'p4-discover-recent', seed: 'recent8', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT' },
   { name: 'p4-discover', seed: 'home', keys: 'LEFT,UP,ENTER,wait800' },
   { name: 'p4-discover-rail', seed: 'home', keys: 'LEFT,UP' },
@@ -860,14 +881,14 @@ var SCENES = [
   { name: 'p4-insp-rows', seed: 'home', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,DOWN,wait800' },   // Inspiration: Fokus in der 4. Reihe
   { name: 'p4-insp-back', seed: 'home', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,RIGHT,ENTER,wait1200,RETURN,wait900' },   // Detailseite und zurueck: Fokus bleibt in der Reihe
   { name: 'p4-insp-cleared', seed: 'home', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RED,wait1500' },   // Eingabe geloescht -> Reihen wieder da
-  { name: 'p4-insprows', seed: 'insp', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait600' },   // Einstellungen > Inspiration anpassen
-  { name: 'p4-settings-watchlist', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-bluekey', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait600' },   // Blaue Taste oeffnet (31.10.): Auswahl Suche/Entdecken
+  { name: 'p4-insprows', seed: 'insp', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait600' },   // Einstellungen > Inspiration anpassen
+  { name: 'p4-settings-watchlist', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-bluekey', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait600' },   // Blaue Taste oeffnet (31.10.): Auswahl Suche/Entdecken
   // "Nur Titel, die du noch nicht hast" (Entdecken, plex.tv-Reihen ueber den Helfer): Einstellung de/en, mit Weiteren Servern, Reihen mit Filter
-  { name: 'p4-settings-insphide', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600' },
-  { name: 'p4-settings-insphide-info', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600,INFO' },   // INFO: alles erklaert
-  { name: 'p4-settings-insphide-en', seed: 'inspNewEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600' },
-  { name: 'p4-settings-insphide-srv', seed: 'pkgSrvHelper', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600' },   // zweite Zeile: auch Weitere Server
+  { name: 'p4-settings-insphide', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600' },
+  { name: 'p4-settings-insphide-info', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600,INFO' },   // INFO: alles erklaert
+  { name: 'p4-settings-insphide-en', seed: 'inspNewEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600' },
+  { name: 'p4-settings-insphide-srv', seed: 'pkgSrvHelper', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600' },   // zweite Zeile: auch Weitere Server
   { name: 'p4-insp-new', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,wait800' },          // Filter an: nur fremde Titel + Hinweis-Reihe
   { name: 'p4-insp-new-en', seed: 'inspNewEn', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,wait800' },
   { name: 'p4-insp-new-skip', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,wait800' },   // DOWN springt ueber den Hinweis
@@ -923,19 +944,19 @@ var SCENES = [
   // P5 Einstellungen & Komfort
   { name: 'p5-settings-subs', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'p5-settings-anime', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,RIGHT,DOWN' },
-  { name: 'p5-settings-display', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-settings-display', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   // Zeiger-Scrollen beschleunigen (abhaengig von Zeiger-Steuerung): an, Zeiger-Steuerung selbst (Erklaerung mit "Aus: …"), Zeiger aus = grau, englisch
-  { name: 'settings-ptraccel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-ptredge', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // Zeiger blaettert am Rand weiter (TV-Befund 1.0.5)
-  { name: 'settings-ptredge-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
-  { name: 'settings-ptraccel-edgeoff', seed: 'ptrEdgeOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // ausgegraut: erst am Rand weiterblaettern einschalten
-  { name: 'settings-pointer', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-ptraccel-off', seed: 'ptrOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-ptredge-off', seed: 'ptrOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-ptraccel-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-ptredge-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-ptredge-info-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
-  { name: 'settings-pointer-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptraccel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptredge', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // Zeiger blaettert am Rand weiter (TV-Befund 1.0.5)
+  { name: 'settings-ptredge-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-ptraccel-edgeoff', seed: 'ptrEdgeOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // ausgegraut: erst am Rand weiterblaettern einschalten
+  { name: 'settings-pointer', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptraccel-off', seed: 'ptrOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptredge-off', seed: 'ptrOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptraccel-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptredge-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptredge-info-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-pointer-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'p5-settings-help', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN' },
   { name: 'p5-settings-boost', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'p5-keys', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN' },
@@ -977,13 +998,13 @@ var SCENES = [
   { name: 'news-library', seed: 'newsLib', keys: 'LEFT,DOWN,ENTER,wait3500' },
   { name: 'news-player', seed: 'newsPlay', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait8000', mask: CLOCK },
   { name: 'news-player-off', seed: 'newsPlayOff', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait8000', mask: CLOCK },
-  { name: 'news-settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'news-settings-secs-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'news-settings-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
-  { name: 'settings-clockstyle', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-clockstyle-off', seed: 'spoiler', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // Uhr aus: Zeile gedimmt, Satz erklaert warum
-  { name: 'settings-hints-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-hints-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'news-settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'news-settings-secs-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'news-settings-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-clockstyle', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-clockstyle-off', seed: 'spoiler', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // Uhr aus: Zeile gedimmt, Satz erklaert warum
+  { name: 'settings-hints-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-hints-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
   // Akzentfarbe: Einstellung (Farbfeld), Auswahl mit Farbfeldern, Wechsel wirkt sofort; Startseite/Seitenleiste in anderen Farben
   { name: 'accent-setting', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'accent-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN' },
@@ -991,6 +1012,17 @@ var SCENES = [
   { name: 'accent-home-violet', seed: 'violet', keys: 'DOWN' },
   { name: 'accent-rail-coral', seed: 'coral', keys: 'LEFT,DOWN' },
   { name: 'accent-player-coral', seed: 'coralPlay', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,RIGHT,RIGHT,RIGHT', mask: CLOCK },
+  // ACC-1 Grau als 8. Akzentfarbe: Startseite, Seitenleiste, Bibliothek mit Fokus und A–Z-Fokus
+  { name: 'accent-home-gray', seed: 'gray', keys: 'DOWN' },
+  { name: 'accent-rail-gray', seed: 'gray', keys: 'LEFT,DOWN' },
+  { name: 'accent-library-gray', seed: 'gray', keys: 'LEFT,DOWN,ENTER,wait800,DOWN,RIGHT' },
+  { name: 'accent-settings-gray', seed: 'gray', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  // ACC-2 Farbe der Markierungen: Bibliothek (Dreieck, Haken), Serien (Zahl), Startseite; Grau-Markierungen zu Lavendel-Akzent
+  { name: 'badge-library-amber', seed: 'bdAmber', keys: 'LEFT,DOWN,ENTER,wait800,DOWN,RIGHT' },
+  { name: 'badge-shows-amber', seed: 'bdAmber', keys: 'LEFT,DOWN,DOWN,ENTER' },
+  { name: 'badge-home-amber', seed: 'bdAmber', keys: 'DOWN,DOWN' },
+  { name: 'badge-library-blue-en', seed: 'bdBlueEn', keys: 'LEFT,DOWN,ENTER,wait800,DOWN,RIGHT' },
+  { name: 'badge-library-gray-violet', seed: 'bdGrayViolet', keys: 'LEFT,DOWN,ENTER,wait800,DOWN,RIGHT' },
   { name: 'p5-player-subs', seed: 'playsub', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,TOOLS,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,ENTER' },
   { name: 'player-upnext', seed: 'play', keys: 'RIGHT,ENTER,ENTER', mask: [[832, 540, 176, 10]] },   // Countdown-Balken laeuft
   { name: 'player-upnext-osd', seed: 'play', keys: 'RIGHT,ENTER,ENTER,UP', mask: [[832, 334, 176, 10]].concat(CLOCK) },   // OSD sichtbar: Karte ueber der Bedien-Insel
@@ -1009,6 +1041,10 @@ var SCENES = [
   { name: 'library-filter', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,RED,RIGHT,DOWN,ENTER' },
   { name: 'library-reg', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN' },
   { name: 'library-jump', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,7,wait1200' },
+  // LIB-11: nach unten gescrollt -> A–Z hebt den Buchstaben der Fokuszeile hervor (nach 300 ms Ruhe); ▶ in die Leiste startet dort
+  { name: 'library-reg-scrolled', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait800' },
+  { name: 'library-reg-scrolled-enter', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait800,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT' },
+  { name: 'library-reg-scrolled-small', seed: 'home', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RED,RIGHT,RIGHT,DOWN,DOWN,ENTER,RETURN,wait800,DOWN,DOWN,DOWN,DOWN,DOWN,wait800' },
   { name: 'library-shows', seed: 'home', keys: 'LEFT,DOWN,DOWN,ENTER' },
   { name: 'library-view', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,RED,RIGHT,RIGHT' },
   { name: 'library-medium', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,RED,RIGHT,RIGHT,DOWN,ENTER,RETURN,wait800,DOWN' },
@@ -1158,12 +1194,12 @@ var SCENES = [
   { name: 'amb-off', seed: 'ambOff', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,wait1800' },
   { name: 'amb-rm', seed: 'ambRm', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,wait1000' },          // Reduzierte Bewegung: sofortiger Tausch
   { name: 'amb-music', seed: 'ambStrong', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,RIGHT,wait1800' },
-  { name: 'amb-settings', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'amb-settings-panel', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'amb-settings-strength', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'amb-settings-off', seed: 'ambOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'amb-settings-en', seed: 'ambEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'amb-settings-panel-en', seed: 'ambEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'amb-settings', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'amb-settings-panel', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'amb-settings-strength', seed: 'ambMood', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'amb-settings-off', seed: 'ambOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'amb-settings-en', seed: 'ambEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'amb-settings-panel-en', seed: 'ambEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
   { name: 'rail-long', seed: 'longLib', keys: 'LEFT' },
   // Weitere Server: Seitenleiste mit Bibliotheken eines freigegebenen Servers (Herkunft), Bibliothek/Details mit Herkunft,
   // Seitenleiste anpassen, Einstellungszeile, nicht erreichbarer Server (Meldung nur fuer ihn)
@@ -1310,7 +1346,7 @@ function matchAny(name, globs) { return globs.some(function (g) { return globRe(
  * Arbeiten; die volle Suite bleibt Pflicht vor dem Release. Gemeinsam genutzte/unbekannte Dateien (core, css, i18n, ui …) -> alle. */
 var CHANGE_MAP = [
   [/^(docs|design|public|installer|loader)\/|^[^/]+\.md$|^tests\/(?!visual\/|synthetic\/)|^tools\/(?!visual\.js|preview\.html|build\.js|layout)|^src\/dev\//, []],
-  [/^src\/(player\/|views\/player\.js|ui\/loupeview\.js)/, ['player-*', 'p5-player-*', 'accent-player-*', 'book-*', 'music-*']],
+  [/^src\/(player\/|views\/player\.js|ui\/loupeview\.js)/, ['player-*', 'p5-player-*', 'accent-player-*', 'book-*', 'music-*', 'settings-quality*', 'settings-qremote*']],
   [/^src\/(plex\/music\.js|views\/(album|artist|nowplaying)\.js|ui\/(miniplayer|tracklist|trackpanel)\.js)/, ['music-*', 'book-*', 'amb-music']],
   [/^src\/views\/(settings|pinsettings|help)\.js/, ['*settings*', 'p5-keys*', 'p2-*', 'accent-*']],
   [/^src\/(views|plex)\/search\.js|^src\/plex\/subsearch\.js/, ['search*', 'p4-discover*', 'p5-player-subs']],
@@ -1318,10 +1354,10 @@ var CHANGE_MAP = [
   [/^src\/(plex\/inspire\.js|views\/insprows\.js)/, ['p4-insp*', 'p4-settings-insp*']],
   [/^src\/(ui\/saver\.js|core\/saverlogic\.js|plex\/saverlib\.js)/, ['saver-*', 'p5-saver']],
   [/^src\/(views\/(login|profiles|start)\.js|plex\/(login|auth)\.js|ui\/(pinpad|pinlogic)\.js|core\/(apppin|setupfile)\.js)/, ['login', 'profiles', 'pin*', 'p2-*']],
-  [/^src\/(views\/library\.js|plex\/library\.js|ui\/(grid|gridmath)\.js)/, ['library-*', 'amb-*', 'srv-library', 'accent-*']],
+  [/^src\/(views\/library\.js|plex\/library\.js|ui\/(grid|gridmath)\.js)/, ['library-*', 'amb-*', 'srv-library', 'accent-*', 'badge-*']],
   [/^src\/(views\/details\.js|plex\/details\.js|ui\/(dethero|seasonstrip)\.js)/, ['details-*', 'p5-anime-*', 'srv-details*', 'p4-ext-details']],
   [/^src\/(core|ui)\/ambient\.js/, ['amb-*']],
-  [/^src\/core\/accent\.js/, ['accent-*']],
+  [/^src\/core\/accent\.js/, ['accent-*', 'badge-*', 'settings-badge*']],
   [/^src\/plex\/(servers|conntest)\.js/, ['srv-*', 'p5-conntest']],
   [/^src\/plex\/anime\.js/, ['p5-anime-*', 'p5-settings-anime']],
   [/^src\/(views\/home(rows)?\.js|plex\/(homerows|hubs)\.js|ui\/(hero|row|rowmath)\.js)/, ['home*', 'p4-insp*', 'accent-home-*', 'rail-*']],

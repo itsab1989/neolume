@@ -95,6 +95,7 @@
       var e = R.entries[i], lt = e.t && N.t(e.t);
       if (e.t) { e.lbT.parentNode.className = R.longLabel(lt) ? 'lb lb2 clamp' : 'lb'; U.clampText(e.lbT, lt); }   // lbT ist der Textknoten
     }
+    if (N.ui.tabbar) N.ui.tabbar.relabel();
   };
   R.setData = function (profile, libs) { R.profile = profile; R.libs = libs || []; if (R.el) R.build(); };
   R.markCur = function () {
@@ -111,8 +112,11 @@
     U.show(R.el, !!cur);
     if (!cur && R.open_) R.close(true);
     if (cur && cur !== R.cur) { R.cur = cur; R.markCur(); }
+    if (N.ui.tabbar) N.ui.tabbar.sync();            // flexible Flaeche: Leiste unten / Menue-Knopf folgen der Seitenleiste
   };
   R.attached = function () { return !!R.att; };
+  /* flexible Flaeche, Breitenklasse M/K: keine Icon-Spalte (Leiste nur einblendbar, N.ui.tabbar); TV/R: false */
+  R.slim = function () { return !!(N.ui.tabbar && N.ui.tabbar.slim()); };
   /* Eintrag der Seitenleiste zu einer ID (oder null, z. B. ausgeblendet oder Bibliothek verschwunden) */
   R.entry = function (id) { for (var i = 0; i < R.entries.length; i++) if (R.entries[i].id === id) return R.entries[i]; return null; };
   R.isOpen = function () { return R.open_; };

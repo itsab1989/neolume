@@ -80,7 +80,7 @@ Dark theme. Contrast numbers are measured against `bg`. Rules: body text never b
 
 ## Accent palette
 
-The accent colour means focus or progress only. The user picks one of these colours (Settings > Display > Accent colour). In CSS always write @accent@ (not a palette token): tools/build.js fills in the brand default and generates one `.ac-<id>` variant per other colour. Each brand profile (brand/<id>.json) picks its default with `accentId` and may override that colour's value with its own `accent` (that override lives only in the brand profile). Every colour must reach 4.5:1 with on-accent text on it and 4.5:1 on `panel` (tests/accent.test.js). Generated into src/core/accent.js (PALETTE).
+The accent colour means focus or progress only. The user picks one of these colours (Settings > Display > Accent colour). In CSS always write @accent@ (not a palette token): tools/build.js fills in the brand default and generates one `.ac-<id>` variant per other colour. Each brand profile (brand/<id>.json) picks its default with `accentId` and may override that colour's value with its own `accent` (that override lives only in the brand profile). Every colour must reach 4.5:1 with on-accent text on it and 4.5:1 on `panel` (tests/accent.test.js). Generated into src/core/accent.js (PALETTE). The same colours are offered for the badges on cards (Settings > Display > Badge colour, ACC-2; CSS token @badge@, default `text-1`).
 
 | Token | Value | Use |
 |---|---|---|
@@ -91,6 +91,7 @@ The accent colour means focus or progress only. The user picks one of these colo
 | `blue` | `#5AA9FF` | Blue |
 | `teal` | `#2EC4B6` | Teal (default of the public brand) |
 | `green` | `#5CCB7A` | Green |
+| `gray` | `#A9AFB8` | Grey (neutral; darker than text-1 so a focused white button still differs from an unfocused one) |
 
 ## Typography (`@ty.…@`)
 

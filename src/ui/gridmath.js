@@ -25,12 +25,25 @@
     var d = (square ? SQ[size] : SIZES[size]) || (square ? SQ.L : SIZES.L);
     var AW = area && area.w > 0 ? area.w : 1280, AH = area && area.h > 0 ? area.h : 720, VIS = AH - 88;
     var cols = d.cols, after = d.after;
-    if (AW !== 1280 && d.cols > 1) cols = Math.max(1, Math.floor((AW - 288 + d.sx - d.w) / d.sx));   // auch schmaler (Hochformat, Nr. 16)
+    var RES = area && area.r > 0 ? area.r : 144;                         // rechts frei (A–Z-Leiste); schmale Flaeche M/K: 88
+    if ((AW !== 1280 || RES !== 144) && d.cols > 1) cols = Math.max(1, Math.floor((AW - 144 - RES + d.sx - d.w) / d.sx));   // auch schmaler (Hochformat, Nr. 16)
     if (AH > 720) after = d.after + Math.ceil((AH - 720) / d.sy);
+    /* Falz (iPhone Duo halb aufgeklappt, area.fold = x der Mitte in Ansichts-Koordinaten; 10-screens.md 3/6.3): gerade Spaltenzahl,
+     * Raster so verschoben, dass die Luecke zwischen den mittleren Spalten auf dem Falz liegt (keine Karte darauf) */
+    var X0 = 144;
+    if (area && area.fold > 0 && cols >= 2 && d.cols > 1) {
+      cols -= cols % 2;
+      while (cols >= 2) {
+        X0 = Math.round(area.fold - (cols / 2) * d.sx + (d.sx - d.w) / 2);
+        if (X0 >= 144 && X0 + (cols - 1) * d.sx + d.w <= AW - RES) break;
+        cols -= 2;
+      }
+      if (cols < 2) { cols = 1; X0 = 144; }
+    }
     ahead = ahead > 0 ? Math.round(ahead) : 0;
     after += ahead;
     var G = {
-      size: SIZES[size] ? size : 'L', square: !!square, COLS: cols, X0: 144, Y0: 176, W: d.w, H: d.h, SX: d.sx, SY: d.sy, CAP_X: d.capX, CAP_Y: d.capY,
+      size: SIZES[size] ? size : 'L', square: !!square, COLS: cols, X0: X0, Y0: 176, W: d.w, H: d.h, SX: d.sx, SY: d.sy, CAP_X: d.capX, CAP_Y: d.capY,
       TIER: d.tier, CLS: d.cls, NO_SCALE: !!d.noScale, PAGE: 50, BEFORE: 1 + ahead, AFTER: after, AW: AW, AH: AH, VIS: VIS, AHEAD: ahead,
       POOL: (1 + ahead + after + 1) * cols,
       row: function (i) { return Math.floor(i / G.COLS); },

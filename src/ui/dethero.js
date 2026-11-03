@@ -9,6 +9,7 @@
   function DetHero(root, o) {
     o = o || {};
     this.sq = !!o.square; this.on = true; this.needBg = true; this.dead = false; this.chipEls = [];
+    this.hx = o.narrow ? 0 : HERO_X;                 // schmale Karte (Apple, Klasse K): kein Plakat, Info ab der Inhaltskante
     this.bgc = U.el('div', 'full', root, 'display:none');
     this.bg = U.el('img', 'full', root); this.bg.src = N.img.BLANK; this.bg.style.visibility = 'hidden';
     var scrim = U.el('img', 'full', root); scrim.src = N.assetBase + (o.scrim || 'scrim-det.png');   // kraeftiger hinter dem Text (F5/F17; Kuenstler F24)
@@ -24,7 +25,7 @@
     // kompakter Kopf in den Abschnitten: dunkles Band unter dem Text (Feedback-Regel 11, wie details.js)
     this.hdr = U.el('img', 'dtop', root); this.hdr.src = N.assetBase + (o && o.hdr || 'fade-bottom.png');   // o.hdr: Band laeuft nach rechts aus (Filme/Serien)
     var info = this.info = U.el('div', 'dinfo', root);
-    U.tf(info, HERO_X, HERO_Y);
+    U.tf(info, this.hx, HERO_Y);
     this.ovT = U.txt('div', 'd-ov t-label cacc ell', info, '');
     this.tiEl = U.el('div', 'd-ti t-display ell', info); this.tiT = document.createTextNode(''); this.tiEl.appendChild(this.tiT);
     this.meT = U.txt('div', 'd-me t-body c2 ell', info, '');
@@ -87,7 +88,7 @@
   P.hero = function (on) {
     if (this.on === on) return;
     this.on = on; N.fx.move(this.info);
-    U.tf(this.info, on ? HERO_X : 0, on ? HERO_Y : 0);
+    U.tf(this.info, on ? this.hx : 0, on ? HERO_Y : 0);
     U.cls(this.pc, 'out', !on);
     if (this.hdr) U.cls(this.hdr, 'on', !on);
   };

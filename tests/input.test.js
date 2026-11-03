@@ -114,3 +114,22 @@ test('router.pan: Bildschirm nimmt den Zug bis zum Loslassen; ohne pan() nichts;
   assert.strictEqual(R.pan({ phase: 'start', y: 200 }), true, 'offene Seitenleiste nimmt den Zug (Nr. 24: waagerecht schiebt sie zu), die Ansicht bekommt nichts');
   assert.strictEqual(log.length, 0);
 });
+
+test('router.scrollTop (App.scrollTop, Tipp ganz oben): Overlay zuerst, sonst Bildschirm; ohne scrollTop() oder Seitenleiste offen: false', function () {
+  var N = H.load().N, R = N.router, log = [];
+  R.define('a', function () { return { scrollTop: function () { log.push('s'); return true; } }; });
+  R.define('b', function () { return {}; });
+  R.push('a');
+  assert.strictEqual(R.scrollTop(), true);
+  R.push('b');
+  assert.strictEqual(R.scrollTop(), false, 'Ansicht ohne scrollTop');
+  R.back();
+  var ov = { el: {}, scrollTop: function () { log.push('o'); return false; } };
+  R.openOverlay(ov);
+  assert.strictEqual(R.scrollTop(), false, 'Overlay entscheidet (steht schon oben)');
+  R.closeOverlay(ov);
+  N.ui.rail.isOpen = function () { return true; };
+  assert.strictEqual(R.scrollTop(), false, 'offene Seitenleiste: nichts');
+  assert.strictEqual(log.join(), 's,o');
+  assert.strictEqual(typeof N.app.scrollTop, 'function');
+});

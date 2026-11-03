@@ -46,7 +46,10 @@
     IT.hover(null);
     var ov = { el: U.el('div', 'layer'), closed: false, sc: 0, max: 0, tipEl: o.el || null }, off = N.screen && N.screen.flex ? N.screen.off() : { x: 0, y: 0 };
     var A = N.screen ? N.screen.area(true) : { w: 1280, h: 720 };
-    var x = o.flex ? o.x - off.x : o.x, y = o.flex ? o.y - off.y : o.y;   // -> Koordinaten des Overlay-Kastens
+    var sk = N.screen && N.screen.flex ? N.screen.stage().k : 1;
+    var vx = o.flex && N.screen && N.screen.view ? N.screen.view().x : 0;   // Breitenklasse M/K: Ansicht um die Inhaltskante verschoben
+    var x = o.flex ? (o.x + vx - off.x) / sk : o.x, y = o.flex ? (o.y - off.y) / sk : o.y;   // -> Koordinaten des Overlay-Kastens (k < 1: verkleinert)
+    if (sk < 1) { off = { x: 0, y: 0 }; A = { w: 1280, h: 720 }; }   // verkleinerter Kasten: Grenzen = der Kasten selbst
     var pop = U.el('div', 'itip-pop', ov.el), ar = U.el('div', 'itip-ar', pop);
     U.el('i', '', ar);
     U.txt('div', 'itip-t', pop, o.title || '');

@@ -17,7 +17,6 @@
   ];
   var BY = {};
   for (var i = 0; i < BTNS.length; i++) BY[BTNS[i].id] = BTNS[i];
-  var QS = ['20', '12', '8', '4'];
   /* Sprungweite aus einer Einstellung: Zahl (10) oder "zurueck/vor" ("10/30"); Ergebnis in Sekunden, ungueltig -> def */
   function steps(v, def) {
     var m = /^\s*(\d+)\s*\/\s*(\d+)\s*$/.exec(String(v === undefined || v === null ? '' : v));
@@ -32,8 +31,10 @@
      * Raster, in dem die Ansicht rechnet. o = Lage des Kastens (N.screen.off()), h = Hoehe H. how '': obere Haelfte = Titel-Ebene
      * (an der Oberkante, ab dem linken Rand) -> (x, y), untere Haelfte = Bedien-Ebene (an der Unterkante, waagerecht im Kasten)
      * -> (x - o.x, y - 2 o.y); 'low' immer Bedien-Ebene (Ziehen am Balken); 'mid' = Mitte (Laden, Verbindung unterbrochen, Fehler:
-     * im Kasten) -> (x - o.x, y - o.y). Am TV o = 0/0: unveraendert. */
+     * im Kasten) -> (x - o.x, y - o.y). o.k < 1 (N.screen.stage(), Flaeche schmaler/flacher als der Kasten): der ganze Player steht
+     * verkleinert im Kasten -> ((x - o.x) / k, (y - o.y) / k). Am TV o = 0/0: unveraendert. */
     fullPt: function (x, y, o, h, how) {
+      if (o && o.k > 0 && o.k < 1) return { x: (x - o.x) / o.k, y: (y - o.y) / o.k };   // verkleinerter Kasten (schmale Flaeche): alles darin
       if (!o || (!o.x && !o.y)) return { x: x, y: y };
       if (how === 'mid') return { x: x - o.x, y: y - o.y };
       if (how === 'low' || y >= h / 2) return { x: x - o.x, y: y - 2 * o.y };
@@ -91,15 +92,45 @@
       if (key === 'RIGHT' && i < ids.length - 1) return ids[i + 1];
       return cur;
     },
-    /* Zeiger: Knopf unter (x, y) mit 8 px Toleranz (48er Knopf -> 64er Trefferflaeche), sonst null */
-    hit: function (ids, x, y) {
+    /* Zeiger: Knopf unter (x, y) mit 8 px Toleranz (48er Knopf -> 64er Trefferflaeche), sonst null.
+     * g (optional): andere Lage der Insel und Knoepfe {x, y, by: {id: {x, y, w, h}}} (schmaler Player, O.narrow); ohne g die TV-Lagen */
+    hit: function (ids, x, y, g) {
+      var ox = g ? g.x : ISL_X, oy = g ? g.y : ISL_Y, L = g ? g.by : BY;
       for (var i = 0; i < ids.length; i++) {
-        var b = BY[ids[i]], bx = ISL_X + b.x, by = ISL_Y + b.y;
+        var b = L[ids[i]], bx = ox + b.x, by = oy + b.y;
         if (x >= bx - 8 && x < bx + b.w + 8 && y >= by - 8 && y < by + b.h + 8) return ids[i];
       }
       return null;
     },
-    center: function (id) { var b = BY[id]; return ISL_X + b.x + b.w / 2; },
+    center: function (id, g) { var b = (g ? g.by : BY)[id]; return (g ? g.x : ISL_X) + b.x + b.w / 2; },
+    /* Schmaler Player (nur flexible Flaeche, Apple: iPhone hoch K·N, iPad hoch M·N; Nr. 17, 10-screens.md 7) – rein, getestet.
+     * W x H = Flaeche. Oben Zurueck-Knopf + Uhr (Zeile 72), darunter die Titel-Insel; Video 16:9 ueber die volle Breite (K: unter dem
+     * Titel, M: senkrecht mittig); Bedien-Insel darunter (K) bzw. am unteren Rand (M) ueber die Breite: Balken, Zeiten, Reihe 1 = Mitte
+     * (⏮ −x ⏯ +x ⏭), Reihe 2 = rechte Gruppe (Bild in Bild, Kapitel, Ton & UT, Mehr), Label, Kapitelname. -> Lagen in Flaechen-px */
+    narrow: function (W, H, wide) {
+      var m = 24, g = { W: W, H: H, TX: m, TY: wide ? 32 : 16, TW: W - 2 * m, ISX: m, ISW: W - 2 * m, ISH: 276, VW: W, VH: Math.round(W * 9 / 16) };
+      g.VY = wide ? Math.max(g.TY + 168, Math.round((H - g.VH) / 2)) : g.TY + 168;
+      g.ISY = wide ? Math.max(g.VY + g.VH + 16, H - g.ISH - 32) : g.VY + g.VH + 16;
+      g.BAR_X = g.ISX + 32; g.BAR_W = g.ISW - 64; g.BAR_Y = g.ISY + 27; g.LBL_Y = g.ISY + 204; g.CHN_Y = 236;
+      g.MH_Y = g.ISY + g.ISH + 8; g.SKIP_Y = g.VY + g.VH - 64; g.SKX1 = W - m; g.SKX0 = g.SKX1 - 360; g.CX = Math.round(W / 2);
+      var c = Math.round(g.ISW / 2), by = {}, r2 = { pip: 0, chap: 1, tracks: 2, more: 3 };
+      for (var i = 0; i < BTNS.length; i++) {
+        var b = BTNS[i], k = r2[b.id];
+        by[b.id] = k === undefined ? { x: b.x - 576 + c, y: b.y, w: b.w, h: b.h } : { x: c - 120 + k * 64, y: 148, w: b.w, h: b.h };   // Mitte der TV-Reihe = 576
+      }
+      g.osd = { x: g.ISX, y: g.ISY, by: by };
+      var below = g.ISY + g.ISH + 16;                      // Karten (Countdown, letzte Folge): unter der Insel, sonst unten rechts im Video
+      g.UPX = W - m - 400; g.CBY = below + 232 + 16 <= H ? below + 168 : g.VY + g.VH - 8 - 64;
+      g.LOX = Math.round((W - 480) / 2); g.LOY = Math.round((H - 192) / 2);
+      return g;
+    },
+    /* Reihe 2 des schmalen Players mittig ueber die sichtbaren Knoepfe (vis = O.visible …); aendert g.osd.by */
+    narrowRow: function (g, vis) {
+      var r = [], ids = ['pip', 'chap', 'tracks', 'more'], i;
+      for (i = 0; i < ids.length; i++) if (vis.indexOf(ids[i]) >= 0) r.push(ids[i]);
+      var x0 = Math.round(g.ISW / 2 - (r.length * 64 - 16) / 2);
+      for (i = 0; i < r.length; i++) g.osd.by[r[i]].x = x0 + i * 64;
+    },
     /* Kapitel aus den Metadaten: [{n, t, start, end, thumb}] */
     chapters: function (list) {
       var out = [];
@@ -136,17 +167,17 @@
     /* Pause: Wartezeit bis kurz nach der naechsten Minutengrenze (Uhr + "Ende um" einmal je Minute neu, TV-Test 29.10.) */
     minuteWait: function (d) { return 60000 - (d.getSeconds() * 1000 + d.getMilliseconds()) + 50; },
     sleepLeft: function (at, now) { return Math.max(1, Math.ceil((at - now) / 60000)); },
-    /* eine Stufe geringer; direkt abgespielt -> 8 Mbit/s (Umwandlung) */
+    /* eine Stufe geringer (Stufen des Geraets, N.decision.nums); direkt abgespielt -> 8 Mbit/s (Umwandlung); Original wandelt mit
+     * der hoechsten Stufe um -> die naechste darunter; zu hohe Stufe (4K am TV) = hoechste, unbekannte = 12 (N.decision.eff) */
     lower: function (q, direct) {
       if (direct) return '8';
-      var i = QS.indexOf(String(q));
-      return QS[Math.min(QS.length - 1, (i < 0 ? 1 : i) + 1)];
+      var D = N.decision, QS = D.nums(), e = D.eff(q), i = e === D.ORIG ? 0 : QS.indexOf(e);
+      return QS[Math.min(QS.length - 1, i + 1)];
     },
-    QS: QS,
     /* Mehr-Menue: st {version (Klartext, nur bei mehreren Dateien), direct, quality, aspect, subsOn, skipIntro, skipCredits, autoNext, ep, sleep (Text)} -> [{id, t, s}] */
     more: function (st) {
-      var v = function (k) { return N.t('set.v.' + k); }, q = N.decision.QUAL[st.quality] || N.decision.QUAL['12'];
-      var out = [{ id: 'quality', t: N.t('pl.m.quality'), s: st.direct ? N.t('pl.q.orig') : N.t('set.v.q', { n: st.quality, r: q[1] === '1920x1080' ? '1080p' : '720p' }) },
+      var v = function (k) { return N.t('set.v.' + k); }, D = N.decision, q = D.eff(st.quality);
+      var out = [{ id: 'quality', t: N.t('pl.m.quality'), s: st.direct ? N.t('set.v.qOrig') : D.label(q === D.ORIG ? D.top() : q) },
         { id: 'aspect', t: N.t('pl.m.aspect'), s: v(st.aspect === '43' ? 'a43' : st.aspect || 'auto') }];
       if (st.version) out.unshift({ id: 'version', t: N.t('pl.m.version'), s: st.version });   // nur bei mehreren Dateien
       if (st.subsOn) out.push({ id: 'subs', t: N.t('pl.m.subs'), s: v(st.subSize || 'medium') + ' · ' + v(st.subBg || 'dim') });

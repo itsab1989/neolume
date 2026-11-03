@@ -11,10 +11,16 @@
   /* gen:palette – erzeugt aus design/tokens.json (Gruppe accent) von tools/design_doc.js --write; nicht von Hand aendern */
   var PALETTE = [
     ['amber', '#F2A93B'], ['coral', '#FF7A5C'], ['rose', '#F78FB3'], ['violet', '#A78BFA'],
-    ['blue', '#5AA9FF'], ['teal', '#2EC4B6'], ['green', '#5CCB7A']
+    ['blue', '#5AA9FF'], ['teal', '#2EC4B6'], ['green', '#5CCB7A'], ['gray', '#A9AFB8']
   ];
   /* /gen:palette */
-  var RE = /(^|\s)ac-[a-z]+/g, cur = null;
+  var RE = /(^|\s)ac-[a-z]+/g, BRE = /(^|\s)bd-[a-z]+/g, cur = null, bcur = null, LIGHT = 'light';
+  /* Klasse am <html> tauschen (re = Muster der alten Klasse, k = neue oder '') – eine Stil-Neuberechnung, nur bei Wechsel */
+  function swap(re, k) {
+    if (typeof document === 'undefined' || !document.documentElement) return;
+    var h = document.documentElement, c = String(h.className || '').replace(re, '');
+    h.className = (k ? c + ' ' + k : c).replace(/^\s+|\s+$/g, '');
+  }
   var A = {
     PALETTE: PALETTE,
     ids: function () { var o = []; for (var i = 0; i < PALETTE.length; i++) o.push(PALETTE[i][0]); return o; },
@@ -30,9 +36,20 @@
       id = A.of(id);
       if (id === cur) return false;
       cur = id;
-      if (typeof document === 'undefined' || !document.documentElement) return true;
-      var h = document.documentElement, c = String(h.className || '').replace(RE, ''), k = A.cls(id);
-      h.className = (k ? c + ' ' + k : c).replace(/^\s+|\s+$/g, '');
+      swap(RE, A.cls(id));
+      return true;
+    },
+    /* Farbe der Markierungen auf Kacheln (SPEC ACC-2, Einstellung badgeColor): 'light' = Hellgrau (c.text-1, Standard, keine
+     * Klasse) oder eine Palettenfarbe -> Klasse bd-<id> am <html> (tools/build.js badgeCss); Markenfarbe = Wert der Marke */
+    LIGHT: LIGHT,
+    badgeIds: function () { return [LIGHT].concat(A.ids()); },
+    badgeOf: function (id) { return A.valid(id) ? id : LIGHT; },
+    badgeCls: function (id) { id = A.badgeOf(id); return id === LIGHT ? '' : 'bd-' + id; },
+    applyBadge: function (id) {
+      id = A.badgeOf(id);
+      if (id === bcur) return false;
+      bcur = id;
+      swap(BRE, A.badgeCls(id));
       return true;
     },
     /* Farbe des aktiven Profils anwenden und fuer den naechsten Start merken (Startbild/Profilwahl ohne Farbsprung) */
@@ -40,11 +57,12 @@
       var S = N.session, id = A.of(S && S.settings ? S.settings.accent : S && S.state ? S.state.accent : null);
       A.apply(id);
       if (S && S.state && S.settings && S.state.accent !== id) { S.state.accent = id; S.save(); }
+      A.applyBadge(S && S.settings ? S.settings.badgeColor : null);
     }
   };
   if (N.evt) {
     N.evt.on('profile:changed', function () { A.sync(); });
-    N.evt.on('settings:changed', function (d) { if (d && d.key === 'accent') A.sync(); });
+    N.evt.on('settings:changed', function (d) { if (d && (d.key === 'accent' || d.key === 'badgeColor')) A.sync(); });
   }
   N.accent = A;
 })(N);

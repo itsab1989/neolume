@@ -31,7 +31,7 @@
  *   pointerGrab(x, y) -> 'drag' | 'tap' | '' (Finger/Maus-Druck an dieser Stelle: Ziehen an pointerDrag, nur Tippen, Standard),
  *   pointerDrag(phase 'start'|'move'|'end'|'cancel', x, y) -> bool (start: true = uebernommen), touchLong (false = langer
  *   Finger-Druck tut nichts statt TOOLS), pointerDown(x, y) (Finger/Maus gedrueckt: z. B. Schwung anhalten),
- *   wheel(x, y, dx, dy) -> bool (nur caps.scroll 'free': Rad/Trackpad-Weg in App-px, P.wheelPx)
+ *   wheel(x, y, dx, dy) -> bool (nur caps.scroll 'free': Rad/Trackpad-Weg in App-px, P.wheelPx; auch am obersten Overlay)
  * Eingabeart (Entscheidung Apple Nr. 14): EINE Quelle N.input.mode = 'key' | 'pointer' | 'touch' (src/core/input.js); hier gesetzt
  *   aus Maus-Ereignissen (pointer bzw. touch), Tasten setzt App.press. Finger-Ereignisse tragen
  *   e.pnInput = 'touch' (Touch-Schicht der Plattform). Ziehen (P.grab/P.drag): Finger ueber App.grab/App.drag, Maus nur bei
@@ -75,28 +75,39 @@
   }
   /* flexible Flaeche (N.screen, nur Apple): Overlays und Ansichten ohne scr.flex stehen im mittigen 1280x720-Kasten -> ihre
    * Koordinaten sind um dessen Lage verschoben. Am TV immer 0/0. */
-  function stageOff(t, isOv) { return N.screen && N.screen.flex && t && (isOv || !t.flex) ? N.screen.off() : null; }
+  function stageOff(t, isOv) {
+    if (!N.screen || !N.screen.flex || !t) return null;
+    if (isOv) return N.screen.stageFor ? N.screen.stageFor(t) : N.screen.stage();
+    if (!t.flex) return N.screen.stage();
+    var v = N.screen.view();                         // flexible Ansicht: Breitenklasse M/K verschiebt die Inhaltskante
+    return v.x ? { x: v.x, y: 0, k: 1 } : null;
+  }
+  /* Flaechen-Punkt -> Kasten-Punkt (o = stageOff; k < 1: Kasten verkleinert, schmale/flache Flaeche) */
+  function sx(o, x) { return o ? (x - o.x) / o.k : x; }
+  function sy(o, y) { return o ? (y - o.y) / o.k : y; }
   function route(x, y, kind, target) {
     if (kind === 'click' && N.ui.toast && N.ui.toast.tap && N.ui.toast.tap(x, y)) return true;   // Rueckgaengig-Toast antippen (Nr. 26)
     var ov = owner(), o = stageOff(ov, true);
     if (ov) {
-      var hit = ov.pointer ? ov.pointer(o ? x - o.x : x, o ? y - o.y : y, kind, target) : false;
+      var hit = ov.pointer ? ov.pointer(sx(o, x), sy(o, y), kind, target) : false;
       /* Finger/Maus ohne Hinweisleiste (Apple Nr. 26): Tipp neben das Fenster (Dialog, PIN …) = Abbrechen wie RETURN */
-      if (!hit && kind === 'click' && N.input.direct() && ov.box && !N.hit.rect(ov.box[0], ov.box[1], ov.box[2], ov.box[3], o ? x - o.x : x, o ? y - o.y : y)) { N.router.key('RETURN'); return true; }
+      if (!hit && kind === 'click' && N.input.direct() && ov.box && !N.hit.rect(ov.box[0], ov.box[1], ov.box[2], ov.box[3], sx(o, x), sy(o, y))) { N.router.key('RETURN'); return true; }
       return hit;
     }
     if (N.ui.hints.backHit && N.ui.hints.backHit(x, y)) { if (kind === 'click') N.router.key('RETURN'); return true; }   // Zurueck-Knopf (Nr. 26)
-    var rail = N.ui.rail, scr = N.router.top(), cf = N.router.cardFrame ? N.router.cardFrame(scr) : null;
+    var rail = N.ui.rail, scr = N.router.top(), cf = N.router.cardFrame ? N.router.cardFrame(scr) : null, slim = !!(rail && rail.slim && rail.slim());
+    // flexible Flaeche M/K: Menue-Knopf bzw. Leiste unten (unter Karte und offener Seitenleiste)
+    if (slim && !cf && !rail.isOpen() && N.ui.tabbar.pointer(x, y, kind)) return true;
     if (cf && !(rail && rail.isOpen())) {            // Detailkarte (nur caps.details 'card'): Inhalt, X/Pfeil, Flaeche daneben
       var ch = N.ui.card.hit(x, y);
-      if (ch === 'in') { P.holdCancel(); return scr.pointer ? scr.pointer((x - cf.x) / cf.k, (y - cf.y) / cf.k, kind, target) : false; }
-      if (!(ch === 'out' && x < 112 && rail && rail.attached()) && N.router.cardPointer(x, y, kind)) return true;
+      if (ch === 'in') { P.holdCancel(); return scr.pointer ? scr.pointer((x - cf.x) / cf.k + (cf.cut || 0), (y - cf.y) / cf.k, kind, target) : false; }
+      if (!(ch === 'out' && x < 112 && !slim && rail && rail.attached()) && N.router.cardPointer(x, y, kind)) return true;
     }
     if (rail && rail.attached()) {
       if (rail.isOpen()) {
         if (x < 320) return rail.pointer(x, y, kind);
         if (kind === 'move') rail.close();           // Punkt verlaesst das Panel -> einklappen, Fokus zurueck
-      } else if (x < 112 && !(P.arrowsOn && arrowHit(x, y))) {
+      } else if (x < 112 && !slim && !(P.arrowsOn && arrowHit(x, y))) {
         return rail.pointer(x, y, kind);             // Punkt auf der Rail -> ausklappen
       } else if (rail.rest) rail.away();             // Punkt hat die Icon-Spalte verlassen: Darueberfahren klappt wieder auf
 
@@ -107,7 +118,7 @@
       if (d && scr && scr.pointerPage) { scr.pointerPage(d); return true; }
     }
     o = stageOff(scr, false);
-    return scr && scr.pointer ? scr.pointer(o ? x - o.x : x, o ? y - o.y : y, kind, target) : false;
+    return scr && scr.pointer ? scr.pointer(sx(o, x), sy(o, y), kind, target) : false;
   }
   function arrowHit(x, y) {
     var a = P.curArrows;
@@ -143,6 +154,24 @@
     return true;
   };
   P.scrolled = function () { P.lockT = U.now(); P.lx = P.x; P.ly = P.y; };
+  /* Apple Nr. 29 (SPEC NAV-23): Inhalt ist unter dem stehenden Zeiger gewandert (freies Scrollen per Rad/Trackpad samt Schwung).
+   * Die Ansicht setzt den Ring im selben Frame an die Lage ihrer Fokuskarte (er scrollt mit); hier wird hoechstens einmal je Frame
+   * (rAF) der Treffer an der letzten Zeigerstelle neu bestimmt – liegt dort jetzt eine andere Kachel/Zeile, springt die
+   * Hervorhebung dorthin (gleicher Weg wie eine Zeiger-Bewegung). Nur bei Maus/Trackpad (N.input 'pointer') und caps.scroll 'free';
+   * am TV wird follow() nie aufgerufen. Nie die Seitenleiste ausklappen (Zeiger steht nur zufaellig ueber der Icon-Spalte). */
+  var folRaf = false;
+  P.follow = function () {
+    if (folRaf || !P.on || P.x < 0 || N.input.mode !== 'pointer' || N.platform.caps.scroll !== 'free') return;
+    folRaf = true;
+    U.raf(function () {
+      folRaf = false;
+      if (!P.on || N.input.mode !== 'pointer' || P.keyT || P.mdrag || P.dragOn) return;
+      var rl = N.ui.rail;
+      if (!owner() && rl && rl.attached() && (rl.isOpen() || (P.x < 112 && !(rl.slim && rl.slim())))) return;
+      N.fx.step(true);                                 // Ring/Karten springen ohne Gleiten (wie jede Zeiger-Bewegung)
+      route(P.x, P.y, 'move', null);
+    });
+  };
   function process() {
     if (!P.pend) return;
     P.pend = false;
@@ -356,9 +385,11 @@
     P.freeWheel = true;
     N.input.set('pointer');
     if (N.idle) N.idle.touch();
-    var sc = owner() || (N.ui.rail && N.ui.rail.isOpen && N.ui.rail.isOpen()) ? null : N.router.top(), o = stageOff(sc, false);
+    var ov = owner();
+    if (ov && ov.wheel) { var oo = stageOff(ov, true); if (ov.wheel(oo ? x - oo.x : x, oo ? y - oo.y : y, dx, dy)) return true; }   // Overlay mit freier Liste
+    var sc = ov || (N.ui.rail && N.ui.rail.isOpen && N.ui.rail.isOpen()) ? null : N.router.top(), o = stageOff(sc, false);
     var cf = sc && N.router.cardFrame ? N.router.cardFrame(sc) : null;   // Detailkarte: Inhalts-Koordinaten der Karte
-    if (cf) { if (sc.wheel && sc.wheel((x - cf.x) / cf.k, (y - cf.y) / cf.k, dx / cf.k, dy / cf.k)) return true; }
+    if (cf) { if (sc.wheel && sc.wheel((x - cf.x) / cf.k + (cf.cut || 0), (y - cf.y) / cf.k, dx / cf.k, dy / cf.k)) return true; }
     else if (sc && sc.wheel && sc.wheel(o ? x - o.x : x, o ? y - o.y : y, dx, dy)) return true;
     var d = Math.abs(dy) >= Math.abs(dx) ? dy : 0;
     return d ? P.wheel(d) : false;
@@ -386,8 +417,9 @@
       if (P.mdrag) { P.mdrag = false; P.drag('cancel', P.x, P.y); }   // Loslassen ausserhalb des Fensters kam nie an
       N.input.set(kindOf(e)); P.dragDone = false;
       // Beruehrung/Druck haelt freies Scrollen an (Schwung stoppt, iOS-Verhalten); die Ansicht verschluckt dann den Klick selbst
-      var ds = dragScreen();
+      var ds = dragScreen(), dov = owner();
       if (ds && ds.pointerDown) ds.pointerDown(e.clientX, e.clientY);
+      else if (dov && dov.pointerDown) dov.pointerDown(e.clientX, e.clientY);   // Overlay mit freier Liste (N.ui.freeList)
       // Maus/Trackpad (caps.pointer 'mouse', nicht am TV): Druck auf ein Zug-Ziel (Player-Balken) -> Ziehen statt Klick/langer Druck
       if (N.input.mode === 'pointer' && N.platform.caps.pointer === 'mouse' && P.grab(e.clientX, e.clientY) === 'drag' && P.drag('start', e.clientX, e.clientY)) { P.mdrag = true; return; }
       press(true); P.down(e.clientX, e.clientY);
@@ -455,8 +487,8 @@
     var scr = N.router.top(), a = P.active() && !N.router.hasOverlay() && !(N.ui.rail && N.ui.rail.isOpen()) && scr && scr.pointerArrows ? scr.pointerArrows() : null;
     if (!a) { P.hideArrows(); return; }
     // Lage in Wurzel-Koordinaten: am TV links 124, rechts 1236; flexible Flaeche: rechts an der Breite der Ansicht, Kasten verschoben
-    var o = stageOff(scr, false) || { x: 0, y: 0 }, aw = N.screen ? N.screen.area(scr.flex).w : 1280;
-    a = { y: a.y + o.y, h: a.h, left: a.left, right: a.right, lx: 124 + o.x, rx: aw - 44 + o.x };
+    var o = stageOff(scr, false) || { x: 0, y: 0, k: 1 }, aw = N.screen ? N.screen.area(scr.flex).w : 1280;
+    a = { y: a.y * o.k + o.y, h: a.h * o.k, left: a.left, right: a.right, lx: 124 * o.k + o.x, rx: (aw - 44) * o.k + o.x };
     P.curArrows = a;
     var css = 'top:' + (a.y + Math.round(a.h / 2) - 32) + 'px;';
     P.arrows[0].style.cssText = css + 'left:' + a.lx + 'px;display:' + (a.left ? 'block' : 'none');

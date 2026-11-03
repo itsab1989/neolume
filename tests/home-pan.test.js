@@ -69,7 +69,13 @@ function open() {
     s.pan({ phase: 'end', axis: axis, x: x, y: y0, dx: axis === 'x' ? d : 0, dy: axis === 'y' ? d : 0, t: T.now() });
     return out;
   }
-  return { N: N, T: T, s: s, root: root, pg: function () { return tx(pg)[1]; }, strip: function (id) { return tx(stripOf(id))[0]; }, flush: flush, swipe: swipe,
+  /* Neuaufbau derselben Ansicht (Router: Einstellungen -> Startseite, Groessenwechsel): neue Instanz mit restore aus leave() */
+  function rebuild() {
+    var st = s.leave(), s2 = defs.home({}), r2 = c.document.createElement('div');
+    s2.create(r2); s2.enter({}, st);
+    return { s: s2, pg: function () { return tx(all(r2, 'pg')[0])[1]; } };
+  }
+  return { N: N, T: T, s: s, root: root, rebuild: rebuild, pg: function () { return tx(pg)[1]; }, strip: function (id) { return tx(stripOf(id))[0]; }, flush: flush, swipe: swipe,
     details: details, rails: rails, all: all, tops: tops };
 }
 
@@ -137,4 +143,35 @@ test('Erste Taste nach dem Wischen: Fokus auf die Karte am Anker, Seite und Reih
   assert.strictEqual(foc.length, 1);
   a.s.onKey('RIGHT');
   assert.strictEqual(a.strip('c'), -800, 'danach Fokus-Schritte wie am TV');
+});
+
+test('Seitenlage bleibt im gueltigen Bereich: Neuaufbau mit der letzten Reihe im Fokus, erste Taste am Ende (Auftrag 02.11. Punkt 14)', function () {
+  var a = open(), max = a.tops.e + 312 - (720 - 72);                              // letzte Reihe endet ueber der Hinweisleiste
+  assert.ok(a.tops.e - 88 > max, 'Testaufbau: Reihe e am Anker laege hinter dem Ende');
+  a.swipe('y', 600, 700, -3000, 300, 120); a.flush(3000);                         // ganz nach unten
+  assert.strictEqual(a.pg(), -max, 'am Ende');
+  a.s.onKey('DOWN');                                                               // erste Taste: Fokus auf die Reihe am Anker (d)
+  assert.ok(a.pg() >= -max, 'erste Taste: nie hinter das Ende: ' + a.pg());
+  a.s.onKey('DOWN'); a.s.onKey('DOWN');
+  assert.strictEqual(a.pg(), -max, 'letzte Reihe per Taste: Seite am Ende, kein leerer Raum unten');
+  var b = a.rebuild();                                                             // z. B. zurueck aus den Einstellungen
+  assert.strictEqual(b.pg(), -max, 'nach dem Neuaufbau: letzte Reihe unten, nicht am Anker oben');
+  b.s.onKey('UP'); b.s.onKey('UP'); b.s.onKey('UP'); b.s.onKey('UP');
+  assert.strictEqual(b.pg(), 0, 'ganz oben wieder am Anfang');
+});
+
+test('An den Anfang (App.scrollTop: Tipp ganz oben / Cmd+Pfeil hoch): Seite gleitet nach oben, Reihen bleiben; oben = false', function () {
+  var a = open();
+  assert.strictEqual(a.s.scrollTop(), false, 'schon oben: nichts (der Lader macht einen Klick daraus)');
+  a.swipe('y', 600, 700, -900, 300, 120); a.flush(2000);
+  var yc = a.tops.c + 52 + 100 + a.pg();
+  a.swipe('x', 600, yc, -450, 300, 120); a.flush(2000);
+  assert.ok(a.pg() < -500);
+  assert.strictEqual(a.s.scrollTop(), true);
+  a.flush(48); var mid = a.pg();
+  assert.ok(mid < 0 && mid > -900, 'gleitet: ' + mid);
+  a.flush(1000);
+  assert.strictEqual(a.pg(), 0, 'ganz oben');
+  assert.strictEqual(a.strip('c'), -450, 'Reihe bleibt, wo sie war');
+  assert.strictEqual(a.N.router.scrollTop.length, 0);
 });

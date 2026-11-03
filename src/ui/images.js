@@ -28,11 +28,18 @@
   /* Schnelles Geraet (caps.images 'fast', Apple Nr. 13 "Bilder ohne sichtbares Nachladen", 09-perf E2/E3): mehr Downloads gleichzeitig,
    * mehrere Bilder je Frame, keine Pause nach Tasten bzw. waehrend Zug/Schwung (M1 dekodiert ein Plakat in < 1 ms), Bildstufe
    * x caps.screen.scale (Retina, hoechstens 2: Hero 2560x1440). Am TV (Standard 'tv') bleibt alles wie oben. */
-  var SCALE = 1, PLAT = N.platform && N.platform.caps;
+  var SCALE = 1, PLAT = N.platform && N.platform.caps, FAST = false;
   if (PLAT && PLAT.images === 'fast') {
-    MAX_ACTIVE = 8; MAX_IDLE = 10; PER_FRAME = 6; SHOW_PER_FRAME = 4; REST = 0; REST_FAST = 0;
+    MAX_ACTIVE = 8; MAX_IDLE = 10; PER_FRAME = 6; SHOW_PER_FRAME = 4; REST = 0; REST_FAST = 0; FAST = true;
     SCALE = Math.max(1, Math.min(2, Number(PLAT.screen && PLAT.screen.scale) || 1));
   }
+  /* Dekodieren abseits des Hauptthreads (nur FAST; 09-perf Nachtrag A1: am iPad sind dekodierte Plakate beim schnellen Wurf die
+   * Hauptursache langer Bilder – Gegenprobe ohne Bilder 3,2 statt 6,5 ms/s Hitch bei Klein, Gross 29,9 ms/s): der fertige Download
+   * wird per Image.decode() vorab dekodiert (WebKit legt das Ergebnis an den gemeinsamen Bild-Cache-Eintrag der URL), erst dann
+   * bekommt das sichtbare <img> die URL – mit decoding = 'async', damit ein doch verworfenes Ergebnis nie den Frame blockiert.
+   * LRU-Treffer gehen denselben Weg (WebKit verwirft dekodierte Daten unsichtbarer Bilder). Zuweisen hoechstens einmal je Frame
+   * (rAF-Zeitstempel), sonst konnten mehrere Pumpen im selben Frame je SHOW_PER_FRAME Bilder setzen. dec0: Gegenprobe des Messlaufs. */
+  var DECODE = FAST, lastFrame = -1, SHOW_DECODED = 8;
   var jobs = [], ready = [], active = 0, lru = new N.LRU(400), frameT = 0, paused = false, sets = 0, loads = 0;   // sets/loads: Zaehler fuer den Messlauf (P7)
   var dec = null, warmQ = [], warmed = new N.LRU(80), warms = 0, WARM_TTL = 30000;   // Vorab-Dekodieren (s. Kopf); warmed: URL -> Zeit
   /* losgeloestes Bild fuer den Download (Tests ohne DOM: null -> direkt ins <img> wie frueher) */
@@ -99,24 +106,34 @@
   function show(job) {
     var img = job.img;
     if (job.pre) { detach(job.pre); job.pre = null; }
+    if (DECODE && img.decoding !== 'async') img.decoding = 'async';
     detach(img); img.src = job.url; img._pnUrl = job.url; img._pnJob = null; sets++;
     if (job.done) job.done(true);
   }
+  /* FAST: fertig geladenes losgeloestes Bild vorab dekodieren, dann in die Liste der fertigen (Fehler beim Dekodieren: trotzdem) */
+  function decoded(job, pre, fn) {
+    if (!DECODE || !pre.decode) { fn(); return; }
+    var once = false, go = function () { if (!once) { once = true; fn(); } };
+    try { pre.decode().then(go, go); } catch (e) { go(); }
+  }
   function assign(job) {
     var img = job.img;
-    if (lru.has(job.url)) {            // schon geladen: sofort (zaehlt ins Dekodier-Budget)
+    if (lru.has(job.url)) {            // schon geladen: sofort (zaehlt ins Dekodier-Budget); FAST: erst vorab dekodieren
       lru.get(job.url);
-      show(job);
-      return;
+      if (!DECODE || !(job.pre || (job.pre = mkPre()))) { show(job); return; }
     }
     active++;
     job.started = true;
     var pre = job.pre || (job.pre = mkPre());
     if (pre) {
       pre.onload = function () {
-        detach(pre); active--; loads++; lru.set(job.url, 1);
-        if (img._pnJob === job) ready.push(job); else job.pre = null;
-        kick();
+        detach(pre); loads++; lru.set(job.url, 1);
+        decoded(job, pre, function () {
+          if (job.pre !== pre) return;     // inzwischen verworfen (drop hat active schon heruntergezaehlt)
+          active--;
+          if (img._pnJob === job) ready.push(job); else job.pre = null;
+          kick();
+        });
       };
       pre.onerror = function () {
         detach(pre); active--;
@@ -149,14 +166,24 @@
     img.src = job.url;
   }
   function byPrio(a, b) { return a.prio - b.prio || a.seq - b.seq; }
-  function pump() {
+  function pump(ts) {
     frameT = 0;
+    if (DECODE && typeof ts === 'number' && ts > 0) {   // FAST: hoechstens eine Pumpe je Frame
+      if (ts === lastFrame) { kick(); return; }
+      lastFrame = ts;
+    }
     var r = rest(), need = restNeed();
     if (paused || r < need) { if (jobs.length || ready.length || warmNext() >= 0) frameT = setTimeout(pump, paused ? REST : need - r + 10); return; }
     var n = 0, d = 0, i, max = r >= IDLE_REST ? MAX_IDLE : MAX_ACTIVE;
     if (ready.length > 1) ready.sort(byPrio);
-    while (ready.length && n < SHOW_PER_FRAME) { show(ready.shift()); n++; }   // fertige Downloads zuerst sichtbar machen
+    var showMax = DECODE ? SHOW_DECODED : SHOW_PER_FRAME;                         // vorab dekodiert: Zuweisen ist billig
+    while (ready.length && n < showMax) { show(ready.shift()); n++; }            // fertige Downloads zuerst sichtbar machen
     jobs.sort(byPrio);
+    if (DECODE) {                                                                 // FAST: Starten kostet kein Dekodier-Budget mehr
+      while (jobs.length && d < PER_FRAME && active < max) { assign(jobs.shift()); d++; }
+      if ((ready.length || (jobs.length && active < max)) && !frameT) frameT = U.raf(function (t) { frameT = 0; pump(t); });   // sonst weckt onload/decode (kick)
+      return;
+    }
     for (i = 0; i < jobs.length && n < SHOW_PER_FRAME && d < PER_FRAME;) {      // LRU-Treffer duerfen an wartenden Downloads vorbei
       if (lru.has(jobs[i].url)) { assign(jobs.splice(i, 1)[0]); n++; }
       else if (active < max) { assign(jobs.splice(i, 1)[0]); d++; }
@@ -241,6 +268,8 @@
       if (dec) dec.src = BLANK;
     },
     SCALE: SCALE,
+    /* Messlauf (platforms/apple/bench/perf.js, Gegenprobe dec0): Vorab-Dekodieren aus/an (nur FAST) */
+    _decode: function (on) { DECODE = FAST && !!on; },
     _stats: function () { return { queued: jobs.length, ready: ready.length, active: active, cached: lru.size, sets: sets, loads: loads, warms: warms }; },
     _mkPre: function (f) { mkPre = f; },              // Tests: losgeloestes Bild nachbilden
     _dec: function (img) { dec = img; }                // Tests: Dekodierer ohne DOM

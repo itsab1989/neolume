@@ -50,7 +50,7 @@
       if (self.dead) return;
       var m = json && json.MediaContainer && json.MediaContainer.Metadata && json.MediaContainer.Metadata[0];
       if (err || !m) { self.fail(D.errKind(err || { status: 404 }), err ? (err.status || err.type) : 'meta'); return; }
-      var lim = (D.QUAL[self.d.cfg.quality] || D.QUAL['12'])[0];
+      var lim = D.verLimit(self.d.cfg.quality);      // Version: Grenze beim Umwandeln (Original = hoechste Stufe, PLAY-37), wie die Detailseite
       // Anime-Wiedergaberegeln: Version mit japanischer Tonspur bevorzugen (sonst normale Versionswahl)
       var c = self.d.cfg, info = { type: m.type, rk: String(m.ratingKey), showRk: m.grandparentRatingKey ? String(m.grandparentRatingKey) : '', lib: Number(m.librarySectionID) || 0 };
       var preferJa = !!c.anime && !!self.d.isAnime && self.d.isAnime(info, N.versions.anyJa(m.Media));
@@ -115,7 +115,7 @@
   /* Felder fuer die Qualitaetsgrenze (N.decision.cap/query): Einstellungen + Netz */
   P.capOpts = function () {
     var c = this.d.cfg;
-    return { quality: c.quality, wan: !!this.d.wan, qWan: c.qualityRemote, cell: !!this.d.cell, qCell: c.qualityCell };
+    return { quality: c.quality, wan: !!this.d.wan, qWan: c.qualityRemote, cell: !!this.d.cell, qCell: c.qualityCell, vcodec: this.meta ? this.meta.vcodec : '' };
   };
   P.decide = function () {
     var self = this, c = this.d.cfg, M = this.meta;
@@ -130,6 +130,11 @@
       var r = D.parse(json);
       self.r = r;
       if (err || r.mode === 'error') { self.fail(D.errKind(err, r), err ? (err.status || err.type) : r.code + ' ' + r.text); return; }
+      // HEVC darf hier direkt laufen, aber nicht kopiert in den HLS-Strom (caps.codecs.hevcStream false, Apple: braucht fMP4) -> umwandeln
+      if (r.mode === 'stream' && r.vcodec === 'hevc' && N.platform.caps.codecs.hevcStream === false && self.att.ds) {
+        self.log('Decision ' + r.code + ' stream hevc: HLS traegt kein HEVC -> Umwandlung');
+        self.att = { dp: false, ds: false }; self.decide(); return;
+      }
       self.hls = r.mode !== 'direct'; self.base = 0;
       self.subMode = TR.subMode(self.sub, c.ass, self.hls);
       var url;

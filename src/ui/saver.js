@@ -43,10 +43,22 @@
   function onTop(l) {
     if (upper === l || N.config.saverZOnly) return;      // saverZOnly: nur TV-Gegenprobe (Verhalten bis 1.0.7)
     var o = Ls[0] === l ? Ls[1] : Ls[0];
-    el.insertBefore(o.w, l.w);                            // andere Ebene direkt VOR l -> l liegt oben
+    l.w.parentNode.insertBefore(o.w, l.w);                // andere Ebene direkt VOR l -> l liegt oben (Eltern: el bzw. stg)
     upper = l;
   }
   function mark(st) { step = st; stepAt = now(); }
+  /* Flexible Flaeche (nur Apple, 10-screens.md 7): Bild-Ebenen und Teile stehen in einem 1280x720-Kasten stg, der die Flaeche W x H
+   * deckend fuellt (wie object-fit cover, mittig beschnitten – Uebergaenge rechnen weiter in 1280x720); der Info-Block steht nach
+   * seiner Ecke an den echten Raendern der Flaeche (place). Am TV stg = null, alles wie bisher. */
+  var stg = null;
+  /* Groesse der Schoner-Wurzel (= Flaeche; Notloesung K·F: der ganze 1280x720-Kasten) */
+  function flexW() { return root && root.offsetWidth || N.screen.w; }
+  function flexH() { return root && root.offsetHeight || N.screen.h; }
+  function fitFlex() {
+    if (!stg) return;
+    var W = flexW(), H = flexH(), k = Math.max(W / 1280, H / 720), t = 'translate(' + Math.round((W - 1280 * k) / 2) + 'px,' + Math.round((H - 720 * k) / 2) + 'px) scale(' + k + ')';
+    stg.style.webkitTransform = t; stg.style.transform = t;
+  }
   function stuckMs() { return Math.max(120000, interval() * 2 + 15000); }
 
   function now() { return U.now(); }
@@ -105,14 +117,16 @@
     hcT = U.txt('div', 'hc-t', hc, ''); hcD = U.txt('div', 'hc-d', hc, '');
     hcStyle(); hcDate();
     el = U.el('div', 'scs', root, 'display:none');
+    if (N.screen && N.screen.flex) stg = U.el('div', 'scs-st', el);
     for (var i = 0; i < 2; i++) {
-      var w = U.el('div', 'scs-l', el), inn = U.el('div', 'scs-in', w), im = U.el('img', 'scs-img', inn);
+      var w = U.el('div', 'scs-l', stg || el), inn = U.el('div', 'scs-in', w), im = U.el('img', 'scs-img', inn);
       im.src = N.img.BLANK; U.el('div', 'scs-dim', inn);
       var psh = U.el('img', 'scs-psh', inn, 'display:none'); psh.src = N.img.BLANK;   // "Poster und Cover": weicher Schatten unter dem Plakat
       var pst = U.el('img', 'scs-pst', inn, 'display:none'); pst.src = N.img.BLANK;   // ... Plakat scharf ueber dem Grund
       Ls.push({ w: w, inn: inn, img: im, psh: psh, pst: pst, kb: '', pm: false });
     }
-    tilesEl = U.el('div', 'scs-tiles', el, 'display:none');   // Jalousie/Kacheln: Teile erst bei Bedarf
+    tilesEl = U.el('div', 'scs-tiles', stg || el, 'display:none');
+    if (stg) N.evt.on('screen:resized', function () { if (!S.on) return; fitFlex(); ovSig = ''; place(); });   // Jalousie/Kacheln: Teile erst bei Bedarf
     ov = U.el('div', 'scs-ov', el);
     scr = U.el('img', 'scs-scr', ov); scr.src = N.img.BLANK;
     blk = U.el('div', 'scs-blk', ov);
@@ -476,11 +490,18 @@
   function pmSet(r) { pmNow = !!r.x.pm; pmCk = pmNow && r.comp && r.comp.ck || null; }
   function place() {
     var c = SL.info(setting('saverInfo', 'ambient'), cyc), ck0 = pmCk && c.style === 'bigclock' ? pmCk : null, dark = !!c.scr && !pmNow && !night;   // Nachtruhe: Schwarz, keine Abdunklung noetig
-    var sig = c.style + c.r + c.t + c.ty + pmNow + night + (ck0 ? ck0.x - c.x : '');
+    var cx = c.x, cy = c.y, cw = c.w, ch = c.h;
+    if (stg) {                                            // flexibel: Ecke an den Raendern der Flaeche, hoechstens so gross wie sie
+      var W = flexW(), H = flexH();
+      cw = Math.min(c.w, W); ch = Math.min(c.h, H); ck0 = null;   // Grosse Uhr neben dem Plakat: Plakat steht im beschnittenen Kasten -> mittig
+      cx = c.w >= 1280 ? 0 : c.x + c.w / 2 > 640 ? Math.max(0, W - (1280 - c.x - c.w) - cw) : Math.min(c.x, W - cw);
+      cy = c.h >= 720 ? 0 : c.y + c.h / 2 > 360 ? Math.max(0, H - (720 - c.y - c.h) - ch) : Math.min(c.y, H - ch);
+    }
+    var sig = c.style + c.r + c.t + c.ty + pmNow + night + (ck0 ? ck0.x - c.x : '') + (stg ? cw + 'x' + ch : '');
     if (sig !== ovSig) {
       ovSig = sig;
       ov.className = 'scs-ov st-' + c.style + (c.r ? ' r' : '') + (c.t ? ' t' : '');
-      ov.style.width = c.w + 'px'; ov.style.height = c.h + 'px';
+      ov.style.width = cw + 'px'; ov.style.height = ch + 'px';
       var u = dark ? N.assetBase + c.scr : N.img.BLANK;
       if (scr.src !== u) scr.src = u;
       U.show(scr, dark);
@@ -489,7 +510,7 @@
       blk.style.left = ck0 ? ck0.x - c.x + 'px' : ''; blk.style.width = ck0 ? ck0.w + 'px' : '';   // Grosse Uhr + Plakat: Uhr-Platz der Gruppe
       blk.style.right = ck0 ? 'auto' : '';
     }
-    tf(ov, 'translate3d(' + c.x + 'px,' + c.y + 'px,0)');
+    tf(ov, 'translate3d(' + cx + 'px,' + cy + 'px,0)');
   }
   function setInfo(x) {
     var p = SL.infoParts(setting('saverInfo', 'ambient'), clockOn(), night);
@@ -573,7 +594,7 @@
     }
     S.on = true; f = 0; cyc = N.config.saverPos !== undefined ? N.config.saverPos - 1 : N.config.fixedClock ? -1 : Math.floor(Math.random() * 4);   // run() zaehlt vor dem 1. Bild hoch (Tests: Ecke 0 bzw. saverPos)
     rest0(Ls[0]); rest0(Ls[1]); Ls[0].w.style.zIndex = 2; Ls[1].w.style.zIndex = 1; upper = N.config.saverZOnly ? Ls[1] : null; onTop(Ls[0]);   // Gegenprobe: DOM bleibt [0, 1] -> oben liegt Ebene 1
-    ovSig = ''; pmNow = false; pmCk = null; tr(ov, 'none'); op(ov, 1); place();
+    ovSig = ''; pmNow = false; pmCk = null; tr(ov, 'none'); op(ov, 1); fitFlex(); place();
     U.show(hc, false);
     U.setText(ti, ''); U.setText(sb, ''); setInfo(null);
     U.show(el, true);

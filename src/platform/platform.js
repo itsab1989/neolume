@@ -55,6 +55,8 @@
       subsEmbedded: 'sef',     // eingebettete Text-UT: 'sef' (Player zeigt sie, Ereignis 19) | 'vtt' (Textspur) | 'burn'
       codecs: {                // Direktwiedergabe; daraus entsteht X-Plex-Client-Profile-Extra (N.decision)
         hevc: false,
+        // hevcStream: false = HEVC nur Direct Play, nie kopiert in den HLS-Strom (Apple: HLS-HEVC braucht fMP4) -> Umwandlung;
+        // fehlt = wie hevc (N.decision.copyOk, N.Playback.decide)
         h264: { maxBitDepth: 8, maxLevel: 41, maxWidth: 1920, maxHeight: 1088 },
         maxResolution: '1920x1080',
         streamSelection: true, // Tonspur im Direct Play am Geraet waehlen (DirectPlayStreamSelection)

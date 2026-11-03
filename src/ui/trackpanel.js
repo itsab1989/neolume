@@ -1,6 +1,7 @@
 /* N.ui.tracks – Panel "Ton & Untertitel" mit zwei Reitern (SPEC 5.19, 7.11): ◀▶ wechselt den Reiter, ▲▼ die Spur, OK waehlt
  * und schliesst, RETURN schliesst ohne Aenderung. Grün oeffnet auf "Ton", SUBTITLE auf "Untertitel". Unterzeile mit Klartext
  * (Hoerfilm, fuer Hoergeschaedigte, "wird ins Bild eingefuegt"). Mehr als 7 Eintraege: Liste scrollt per translate3d.
+ * Finger/Maus (caps.scroll 'free'): Liste frei scrollbar wie N.ui.panel.select (N.ui.freeList).
  * o: {tracks:{audio, subs}, tab:'a'|'s', hls, ass, onPick(kind, id)} */
 (function (N) {
   var U = N.util, X = 840, TOP = 160, STEP = 72, H = 64, VIS0 = 7;
@@ -15,6 +16,10 @@
     var clip = U.el('div', 'tp-clip', p, fr.on ? 'height:' + VIS * STEP + 'px' : undefined), list = U.el('div', 'tp-list', clip);
     /* Mehr-Hinweis (NAV-11) wie im Panel "Sortieren & Filter" (ui/tabpanel.js): scrollt die Liste, 28 px tiefer und eine Zeile weniger */
     var MT = TOP + 28, more = N.ui.more(p, 'top:' + TOP + 'px', 'top:' + (MT + (VIS - 1) * STEP + 4) + 'px'), vis = VIS, top = TOP;
+    function maxPx() { return Math.max(0, ov.items.length - vis) * STEP; }
+    var fl = N.ui.freeList({ el: list, max: maxPx, dim: function () { return vis * STEP; },
+      hit: function (x, y) { return x - fr.x >= X && y + fr.y >= 152; },   // ganzes Panel unter den Reitern
+      onSet: function (px) { more.set(vis < VIS && px > 0.5, vis < VIS && px < maxPx() - 0.5); } });
     function entries() {
       var T = o.tracks, out = [], i;
       if (ov.tab === 'a') for (i = 0; i < T.audio.length; i++) out.push({ id: T.audio[i].id, t: T.audio[i].label, s: N.tracks.subline(T.audio[i], false), sel: T.audio[i].sel });
@@ -31,6 +36,7 @@
     }
     function render() {
       while (list.firstChild) list.removeChild(list.firstChild);
+      fl.reset();
       ov.items = []; ov.data = entries(); ov.f = 0;
       U.cls(tabs[0], 'is-cur', ov.tab === 'a'); U.cls(tabs[1], 'is-cur', ov.tab === 's');
       for (var i = 0; i < ov.data.length; i++) {
@@ -49,7 +55,7 @@
       if (!ov.items.length) return;
       if (!force) U.cls(ov.items[ov.f], 'is-focus', false);
       ov.f = i; U.cls(ov.items[i], 'is-focus', true);
-      if (!still) { ov.off = Math.max(0, Math.min(i - 3, ov.items.length - vis)); U.tf(list, 0, -ov.off * STEP); }
+      if (!still) { fl.keys(); ov.off = Math.max(0, Math.min(i - 3, ov.items.length - vis)); U.tf(list, 0, -ov.off * STEP); fl.sync(ov.off * STEP); }
       more.set(vis < VIS && ov.off > 0, vis < VIS && ov.off + vis < ov.items.length);
     }
     function close() { if (!ov.closed) { ov.closed = true; N.router.closeOverlay(ov); } }
@@ -68,13 +74,20 @@
       return k !== 'RETURN';
     };
     ov.wheelKeys = ['UP', 'DOWN'];
+    ov.pan = function (e) { return fl.pan(e); };
+    /* An den Anfang (App.scrollTop, Tipp ganz oben / Cmd+Pfeil hoch): N.ui.freeList.top */
+    ov.scrollTop = function () { return fl.top(); };
+    ov.wheel = function (x, y, dx, dy) { fl.wheel(x, y, dy); return true; };
+    ov.pointerDown = function () { fl.down(); };
     ov.pointer = function (x, y, kind) {
+      if (fl.eat(kind)) return true;                  // Tipp in den Schwung: nur anhalten
       x -= fr.x; y += fr.y;                           // volle Hoehe: Panel-Koordinaten (sonst 0)
       if (x < X) { if (kind === 'click') close(); return true; }
       if (y >= 112 && y < 152) { if (kind === 'click') tab(x < X + 176 ? 'a' : 's'); return true; }
-      var off = ov.off || 0, i = N.hit.list(top, STEP, H, Math.min(vis, ov.items.length - off), y);
+      var off = ov.off || 0, i;
+      if (fl.free) i = fl.idx(y, top, STEP, ov.items.length, vis);   // frei gescrollt: auch angeschnittene Zeilen
+      else { i = N.hit.list(top, STEP, H, Math.min(vis, ov.items.length - off), y); if (i >= 0) i += off; }
       if (i < 0) return false;
-      i += off;
       if (i !== ov.f) setF(i, false, true);   // Zeiger: Liste scrollt nicht unter dem Punkt weg
       if (kind === 'click') pick(i);
       return true;

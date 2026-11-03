@@ -33,7 +33,7 @@
      * die ganze Seite (Hintergrund, Info, Knoepfe, Staffeln/Folgen, Reihen) scrollt frei senkrecht (N.kinetic, kein Einrasten,
      * Nr. 18) und beginnt oben (kein Sprung zur Folge). Tasten (Tastatur) fuehren den Fokus wie am TV und rollen die Seite zum
      * Fokus. Waagerechter Zug in einer Reihe verschiebt die Reihe frei (Row px, N.kinetic, wie Startseite); ausserhalb = Router-Geste. */
-    var card = !!(N.ui.card && N.ui.card.on()), cpage = null, cy = 0, ckin = null, cpan = null, canim = 0, cgen = 0, ceat = false, wAcc = 0, wLast = 0;
+    var card = !!(N.ui.card && N.ui.card.on()), NARROW = card && !!N.ui.card.peek().narrow, BTN_X = NARROW ? 144 : 352, cpage = null, cy = 0, ckin = null, cpan = null, canim = 0, cgen = 0, ceat = false, wAcc = 0, wLast = 0;
     /* Reihen in der Karte frei wie auf der Startseite (caps.scroll 'free', Nr. 18/22): Row mit px, N.kinetic.Drive je Reihe {row, d} */
     var RFREE = card && N.platform.caps.scroll === 'free', rdrv = [], epOpen = null;   // epOpen: Folge der offenen Folgen-Ebene
     if (card) s.card = true;
@@ -126,12 +126,12 @@
       if (card) { host = cpage = U.el('div', 'cd-page', root); cpage.style.width = cardW() + 'px'; }
       /* Hintergrund, Poster links (fest, blendet in den Abschnitten aus) und Info-Block: gemeinsame Mechanik N.ui.DetHero
        * (auch Album/Hoerbuch/Kuenstler; Feedback-Regeln 3 und 11) */
-      hero = new N.ui.DetHero(host);
+      hero = new N.ui.DetHero(host, { narrow: NARROW });
       if (card) U.el('div', 'cd-bgfade', host);            // Hintergrundbild laeuft unten in die Kartenfarbe aus
       pg = U.el('div', 'pg', host);
       hero.makeInfo(host, { chips: 2, hdr: 'scrim-hdr.png' });
       var i;
-      bar = U.el('div', 'd-btns', pg);
+      bar = U.el('div', 'd-btns', pg, NARROW ? 'left:' + BTN_X + 'px;width:' + (cardW() - BTN_X - 24) + 'px' : undefined);   // schmal: ab der Inhaltskante
       blbl = U.el('div', 'blbl', pg, 'display:none'); blblT = document.createTextNode(''); blbl.appendChild(blblT);
       if (isShow) {
         sec = U.el('div', 'dsec', pg);               // Abschnitt Staffeln/Folgen: auf dem ersten Bildschirm nur angeschnitten (y 580)
@@ -178,8 +178,7 @@
     /* gewaehlte bzw. automatisch passende Datei (SPEC 7.6, N.versions) */
     function vIndex(rk0, media) {
       if (!media || media.length < 2) return 0;
-      var q = N.decision.QUAL[(N.session.settings || {}).quality] || N.decision.QUAL['12'];
-      return N.versions.choose(rk0, media, q[0]) || 0;
+      return N.versions.choose(rk0, media, N.decision.verLimit((N.session.settings || {}).quality)) || 0;   // wie die Wiedergabe
     }
     /* Folgen-Info nach 300 ms Ruhe (Tasten blaettern ohne Neuzeichnen) */
     function infoLater(x) {
@@ -226,7 +225,7 @@
     function measureButtons() {
       if (dead) return;
       btnRects = [];
-      for (var i = 0; i < btns.length; i++) btnRects.push([352 + btns[i].offsetLeft, btns[i].offsetWidth]);
+      for (var i = 0; i < btns.length; i++) btnRects.push([BTN_X + btns[i].offsetLeft, btns[i].offsetWidth]);
       paintLabel();
     }
     /* Label ueber dem fokussierten Icon-Button (SPEC 5.22): ein Element, left + nodeValue */
@@ -694,7 +693,7 @@
     function memFile() { return 'tracks-' + (N.session.profile ? N.session.profile.uuid : 'x') + '.json'; }
     function chooseVersion() {
       if (!d || d.media.length < 2) return;
-      var vs = N.versions.list(d.media), e = [], lim = (N.decision.QUAL[(N.session.settings || {}).quality] || N.decision.QUAL['12'])[0];
+      var vs = N.versions.list(d.media), e = [], lim = N.decision.verLimit((N.session.settings || {}).quality);
       for (var i = 0; i < vs.length; i++) e.push({ id: String(i), t: vs[i].label, s: vs[i].sub });
       N.ui.panel.select({ title: N.t('menu.version'), entries: e, selected: String(N.versions.choose(d.it.rk, d.media, lim)), onSelect: function (v) {
         N.versions.set(d.it.rk, Number(v)); paintInfo(d.it);
@@ -847,7 +846,7 @@
         switch (k) {
           case 'LEFT': if (tabF > 0) selectSeason(tabF - 1); else N.ui.rail.open(); return true;
           case 'RIGHT': if (tabF < seasons.length - 1) selectSeason(tabF + 1); return true;
-          case 'ENTER': toEps(); return true;
+          case 'ENTER': if (tabF !== sIdx) selectSeason(tabF); else toEps(); return true;   // Zeiger-Fokus auf anderem Reiter: OK waehlt ihn
           case 'YELLOW': if (!seasons[sIdx].virtual) toggleWatched(seasonItem(seasons[sIdx])); return true;
           case 'PLAY': playMain('resume'); return true;
         }
@@ -936,8 +935,11 @@
         }
         for (i = v.first; i <= v.last; i++) if (tx >= tabX[i][0] && tx < tabX[i][0] + tabX[i][1]) {
           if (zone !== 'tabs') toTabs();
-          if (i !== tabF) selectSeason(i);
-          if (kind === 'click') toEps();
+          /* Nutzerbefund 03.11.: Vorbeiziehen wechselte schon die Staffel (unruhig). Zeiger ueber einem Reiter = nur Fokus, erst der
+           * Klick waehlt die Staffel; Klick auf die gewaehlte Staffel = zu den Folgen. Tasten (◀/▶) waehlen weiter sofort. */
+          if (kind !== 'click') { if (i !== tabF) { tabF = i; markTabs(); } }
+          else if (i !== sIdx) selectSeason(i);
+          else toEps();
           return true;
         }
         return false;
@@ -1028,7 +1030,10 @@
       return Math.max(b, 720);
     }
     function cardMax() { return Math.max(0, pageBottom() - cardH()); }
-    function setCy(v) { cy = v; U.tf(cpage, 0, -Math.round(v * 100) / 100); }   // Bruchteile: Feder/Ausklingen ohne Treppenstufen
+    function setCy(v) { cy = v; U.tf(cpage, 0, -Math.round(v * 100) / 100); ptrFollow(); }   // Bruchteile: Feder/Ausklingen ohne Treppenstufen
+    /* Apple Nr. 29 (NAV-23): Inhalt wandert unter dem stehenden Maus-/Trackpad-Zeiger -> Treffer dort neu bestimmen (der Ring liegt in
+     * der Seite und scrollt senkrecht von selbst mit; waagerecht setzt ihn rowDrive) */
+    function ptrFollow() { if (N.input.mode === 'pointer' && N.pointer && N.pointer.follow) N.pointer.follow(); }
     function cardStop() { canim = 0; cgen++; if (ckin) ckin.stop(); }
     function cardRun() { var g = cgen; canim = 1; U.raf(function (ts) { if (g !== cgen || dead) return; if (ckin.step(N.kinetic.frameTime(ts, U.now))) setCy(ckin.pos); if (ckin.ph.length) cardRun(); else cardSettle(); }); }
     /* Ruhe (Nr. 18: kein Einrasten): bleibt, wo sie ausgelaufen ist, innerhalb der Grenzen */
@@ -1098,6 +1103,16 @@
       if (canim) { cardStop(); m = true; }
       if (m) ceat = true;
     };
+    /* An den Anfang (App.scrollTop, Tipp ganz oben / Cmd+Pfeil hoch): Inhalt der Karte gleitet nach oben */
+    s.scrollTop = function () {
+      if (!card || !N.kinetic || dead || !(cy > 0.5)) return false;
+      cardStop(); cpan = null;
+      cpage.style.webkitTransition = 'none';
+      var g = cgen;
+      canim = 1;
+      N.kinetic.tween(cy, 0, function (v) { if (g === cgen && !dead) setCy(v); }, function () { if (g === cgen && !dead) cardSettle(); });
+      return true;
+    };
     s.pan = function (e) {
       if (!card) return false;
       if (e.phase === 'start') {
@@ -1148,7 +1163,13 @@
     function rowDrive(r) {
       for (var i = 0; i < rdrv.length; i++) if (rdrv[i].row === r) return rdrv[i].d;
       var d = new N.kinetic.Drive({ dim: cardW(), get: function () { return r.curPx(); }, max: function () { return r.maxPx(); },
-        set: function (p) { if (N.idle) N.idle.touch(); r.setPx(p); },
+        set: function (p) {
+          if (N.idle) N.idle.touch();
+          r.setPx(p);
+          if (N.input.mode !== 'pointer') return;
+          if (r === epRow ? zone === 'eps' : zone === 'row' && rows[rk] && rows[rk].row === r) { N.fx.step(true); placeRing(r === epRow ? epRing(r.ringPos()) : r.ringPos()); }
+          ptrFollow();
+        },
         end: function () { if (!dead && r === epRow) ensureEpPages(); } });
       rdrv.push({ row: r, d: d });
       return d;
@@ -1186,22 +1207,25 @@
   var EP = { X: 144, Y: 104, W: 608, H: 342, TX: 784, TW: 432, BY: 478 };
   N.router.define('episode', function (params) {
     var x = params.it || {}, srv = x.srv || params.srv || '', s = { card: true, rail: params.rail || 'home' };
+    /* schmale Karte (Apple, Klasse K): Bild ueber die volle Breite, Knoepfe darunter, Text darunter (TY); sonst Bild links, Text rechts */
+    var cg = N.ui.card && N.ui.card.peek ? N.ui.card.peek() : null, E = EP;
+    if (cg && cg.narrow) { var ew = cg.cw - 168, eh = Math.round(ew * 9 / 16); E = { X: 144, Y: 104, W: ew, H: eh, TX: 144, TW: ew, BY: 104 + eh + 32, TY: 104 + eh + 104 }; }
     var root, img, prog, progI, ovT, tiT, meT, deT, deEl, bar, btns = [], bdefs = [], rects = null, bf = 0, meta = null, dead = false, task = null, back = false;
     var onStop = null;
     function get(path, q, cb) { return N.plex.get(path, q, N.srv.o(srv, null), cb); }
     s.create = function (el) {
       root = el; U.cls(root, 'ep-lvl', true);
-      var box = U.el('div', 'card ep-img', root, 'left:' + EP.X + 'px;top:' + EP.Y + 'px;width:' + EP.W + 'px;height:' + EP.H + 'px');
+      var box = U.el('div', 'card ep-img', root, 'left:' + E.X + 'px;top:' + E.Y + 'px;width:' + E.W + 'px;height:' + E.H + 'px');
       var ph = U.txt('div', 'ph fb ' + N.ui.fbClass(x), box, x.epTitle || x.title || ''); ph.parentNode.style.display = x.still ? 'none' : '';
-      img = U.el('img', '', box, 'width:' + EP.W + 'px;height:' + EP.H + 'px'); img.src = N.img.BLANK;
+      img = U.el('img', '', box, 'width:' + E.W + 'px;height:' + E.H + 'px'); img.src = N.img.BLANK;
       if (x.still) N.img.want(img, N.img.url(x.still, 'backdrop'), 0);
       prog = U.el('div', 'prog', box); progI = U.el('i', '', prog);
-      var col = U.el('div', 'ep-txt', root, 'left:' + EP.TX + 'px;top:' + EP.Y + 'px;width:' + EP.TW + 'px');
+      var col = U.el('div', 'ep-txt', root, 'left:' + E.TX + 'px;top:' + (E.TY || E.Y) + 'px;width:' + E.TW + 'px');
       ovT = U.txt('div', 'ep-ov t-label cacc ell', col, '');
       tiT = U.txt('div', 'ep-ti t-h1 clamp', col, '');
       meT = U.txt('div', 'ep-me t-body c2', col, '');
       deT = U.txt('div', 'ep-de t-body c2 clamp', col, ''); deEl = deT.parentNode;
-      bar = U.el('div', 'ep-btns', root, 'left:' + EP.X + 'px;top:' + EP.BY + 'px');
+      bar = U.el('div', 'ep-btns', root, 'left:' + E.X + 'px;top:' + E.BY + 'px');
       onStop = function () { back = true; };
       N.evt.on('playback:stopped', onStop);                // Rueckkehr aus dem Player: Fortschritt neu holen
       paint(); loadMeta();
@@ -1213,7 +1237,7 @@
       U.clampText(deT, N.comfort.summary(meta && meta.sum ? U.extend(U.extend({}, x), { sum: meta.sum }) : x));
       var p = M.progress(x);
       prog.style.display = p > 0 ? 'block' : 'none';
-      if (p > 0) progI.style.width = Math.max(4, Math.round((EP.W - 20) * p)) + 'px';
+      if (p > 0) progI.style.width = Math.max(4, Math.round((E.W - 20) * p)) + 'px';
       buttons();
     }
     function buttons() {
@@ -1222,7 +1246,7 @@
       for (var i = 0; i < bdefs.length; i++) { var b = U.el('div', 'btn inl', bar); b.appendChild(document.createTextNode(bdefs[i].t)); btns.push(b); }
       bf = Math.min(bf, btns.length - 1);
       U.cls(btns[bf], 'is-focus', true);
-      setTimeout(function () { if (dead) return; rects = []; for (var k = 0; k < btns.length; k++) rects.push([EP.X + btns[k].offsetLeft, btns[k].offsetWidth]); }, 50);
+      setTimeout(function () { if (dead) return; rects = []; for (var k = 0; k < btns.length; k++) rects.push([E.X + btns[k].offsetLeft, btns[k].offsetWidth]); }, 50);
     }
     /* volle Folgen-Metadaten (Beschreibung, Erstausstrahlung, aktueller Fortschritt) */
     function loadMeta() {
@@ -1268,7 +1292,7 @@
     };
     /* Zeiger/Tippen (Inhalts-Koordinaten der Karte): Knoepfe ueber einmal gemessene Rechtecke, Beschreibung = ganzer Text */
     s.pointer = function (px, py, kind) {
-      if (rects && py >= EP.BY && py < EP.BY + 48) {
+      if (rects && py >= E.BY && py < E.BY + 48) {
         for (var i = 0; i < rects.length; i++) if (px >= rects[i][0] && px < rects[i][0] + rects[i][1]) {
           if (i !== bf) setBtn(i);
           if (kind === 'click') act(bdefs[i].id);
@@ -1276,7 +1300,7 @@
         }
         return false;
       }
-      if (kind === 'click' && px >= EP.TX && px < EP.TX + EP.TW && py >= EP.Y + deEl.offsetTop && py < EP.Y + deEl.offsetTop + deEl.offsetHeight) { info(); return true; }
+      if (kind === 'click' && px >= E.TX && px < E.TX + E.TW && py >= (E.TY || E.Y) + deEl.offsetTop && py < (E.TY || E.Y) + deEl.offsetTop + deEl.offsetHeight) { info(); return true; }
       return false;
     };
     s.pan = function () { return true; };                 // passt auf eine Kartenhoehe: Zuege nimmt der Router (zurueck, nach unten) bzw. nichts

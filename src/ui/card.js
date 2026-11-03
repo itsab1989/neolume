@@ -12,14 +12,27 @@
 (function (N) {
   var U = N.util, GAP = 32, MAC_X = 48, MAC_Y = 40, CW = 1280, BTN = 60, OPEN_MS = 280, LEVEL_MS = 240;
 
-  /* rein: Karte in einer Flaeche W x H. touch = Finger-Geraet (volle Breite), sonst Maus/Trackpad (mittiges Feld). */
-  function geom(W, H, touch) {
-    var g = touch ? { x: 0, y: GAP, w: W, h: H - GAP, round: 'top' }
+  /* rein: Karte in einer Flaeche W x H. touch = Finger-Geraet (volle Breite), sonst Maus/Trackpad (mittiges Feld).
+   * cls (optional, Groessenklasse der Flaeche, 10-screens.md 6.3): M und K immer volle Breite (auch mit Maus), ohne Verkleinern –
+   * der Inhalt rechnet in einer um cut breiteren Flaeche und ist um cut nach links verschoben (wie N.screen.view: Inhaltskante 80
+   * bzw. 24 statt 144); M·N als Blatt von unten (oben 15 % frei), K als Vollbild-Blatt (oben 12 px); K = narrow (schmale Anordnung
+   * der Details: kein Plakat, Info und Knoepfe ab der Inhaltskante). */
+  var CUT = { M: 64, K: 120 };
+  function geom(W, H, touch, cls) {
+    var cw = cls && CUT[cls.w] ? cls.w : '', g;
+    if (cw) {
+      var top = cw === 'K' ? 12 : cls.h === 'N' ? Math.round(H * 0.15) : GAP;
+      g = { x: 0, y: top, w: W, h: H - top, round: 'top', k: 1, cut: CUT[cw], narrow: cw === 'K' };
+      g.cw = W + g.cut; g.ch = g.h;
+      return g;
+    }
+    g = touch ? { x: 0, y: GAP, w: W, h: H - GAP, round: 'top' }
       : { w: Math.min(CW, W - 2 * MAC_X), y: MAC_Y, h: H - 2 * MAC_Y, round: 'all' };
     if (!touch) g.x = Math.round((W - g.w) / 2);
     g.k = g.w >= CW ? 1 : g.w / CW;
     g.ch = Math.round(g.h / g.k);                   // Inhaltshoehe in App-px (Breite immer 1280)
     g.cw = g.w >= CW ? g.w : CW;                    // Inhaltsbreite: breitere Karte (Touch, breites Fenster) -> Reihen laufen weiter
+    g.cut = 0; g.narrow = false;
     return g;
   }
 
@@ -49,15 +62,21 @@
     U.el('i', '', C.btn); U.el('b', '', C.btn);
     C.layout();
   };
+  /* Geometrie fuer die aktuelle Flaeche (ohne DOM; Ansichten fragen sie beim Aufbau, bevor die Karte angelegt ist) */
+  C.peek = function () {
+    var A = N.screen ? N.screen.area(true) : { w: 1280, h: 720 };
+    return geom(A.w, A.h, !!caps().touch, N.screen && N.screen.flex ? N.screen.cls : null);
+  };
   /* Flaeche geaendert (N.screen) bzw. erstes Oeffnen: Lage und Groesse der Karte, Inhalt in App-px (1280 x ch) */
   C.layout = function () {
     if (!C.el) return null;
-    var A = N.screen ? N.screen.area(true) : { w: 1280, h: 720 }, g = C.g = geom(A.w, A.h, !!caps().touch), st = C.sheet.style;
+    var g = C.g = C.peek(), st = C.sheet.style;
     st.left = g.x + 'px'; st.top = g.y + 'px'; st.width = g.w + 'px'; st.height = g.h + 'px';
     U.cls(C.sheet, 'r-all', g.round === 'all');
-    var bs = C.body.style, sc = 'scale(' + g.k + ')';
+    U.cls(C.sheet, 'narrow', !!g.narrow);
+    var bs = C.body.style, sc = (g.cut ? 'translate(' + (-g.cut) + 'px,0) ' : '') + 'scale(' + g.k + ')';
     bs.width = g.cw + 'px'; bs.height = g.ch + 'px';
-    bs.webkitTransform = bs.transform = g.k === 1 ? '' : sc;
+    bs.webkitTransform = bs.transform = g.k === 1 && !g.cut ? '' : sc;
     for (var c = C.body.firstChild; c; c = c.nextSibling) { c.style.width = g.cw + 'px'; c.style.height = g.ch + 'px'; }
     return g;
   };

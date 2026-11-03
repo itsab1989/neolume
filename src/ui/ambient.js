@@ -6,7 +6,7 @@
  * Zeitpunkt: focus() im Fokusschritt merkt nur den Titel (N.amb.Settle: Flag + hoechstens ein Timer); geladen/gewechselt wird erst
  * nach 600 ms Ruhe (gehaltene Taste: nie), und das Einblenden startet erneut nur in Ruhe (wie der Hero, allein in einem Frame).
  * Reduzierte Bewegung: CSS .rm .amb-b ohne Uebergang = sofortiger Tausch. Modus "Aus": keine Elemente/Ebenen (wie bisher).
- * o: {lib: Bibliotheks-ID, type(): Typnummer fuer /all, items(): geladene Titel (Zufallsbild in Sammlungen / bei Fehler),
+ * o: {moodArt (Startseite: Farbstimmung ohne Farben zeigt das Bild), lib: Bibliotheks-ID, type(): Typnummer fuer /all, items(): geladene Titel (Zufallsbild in Sammlungen / bei Fehler),
  *     get: Anfrage-Funktion wie N.plex.get (Weitere Server: an DEN Server der Bibliothek; Bildpfade tragen dann die Server-Marke)} */
 (function (N) {
   var U = N.util, A = N.amb;
@@ -19,7 +19,7 @@
      * der letzten Taste, eigener Frame) -> nach 600 ms Ruhe holt _apply es nur noch aus dem Speicher und setzt src */
     /* Runde 5 (TV 28.10.: amb.apply im Titelbild-Modus noch 4,4–8,6 ms = Ziel + Bild-URL (Abfrage-Zeichenkette mit Token) + src): auch
      * die URL des Titelbilds rechnet die Idle-Queue vor (self.prep); _apply prueft nur noch den Schluessel und setzt src */
-    this.pre = function () { if (!self.dead && self.on() && self.mode !== 'random') self.prep = self._url(A.target(self.it, self.mode)); };
+    this.pre = function () { if (!self.dead && self.on() && self.mode !== 'random') self.prep = self._url(self._target()); };
     this.prep = null;
   }
   var warmed = false;
@@ -91,7 +91,7 @@
   P._apply = function () {
     if (this.dead || !this.on() || !this.els) return;
     if (U.now() < this.fadeEnd) { this._later(this.fadeEnd - U.now() + 20); return; }   // laufende Ueberblendung abwarten
-    var t = A.target(this.it, this.mode === 'random' ? 'art' : this.mode);
+    var t = this._target();
     if (t.key === this.key) return;
     this.key = t.key;
     var p = this.prep && this.prep.key === t.key && this.prep.str === this.str ? this.prep : this._url(t);   // meist schon im Idle gerechnet
@@ -106,6 +106,13 @@
     };
     img.onerror = function () { img.onload = img.onerror = null; if (gen === self.gen) self.key = ''; };
     this._src(img, url);
+  };
+  /* Ziel fuer den gemerkten Titel. o.moodArt (Startseite mit Kacheln, Apple Nr. 27): Farbstimmung ohne Farben am Titel -> sein Bild
+   * (weich, dunkel) statt des schlichten Grunds, solange "Hintergrundbilder" an ist (Bibliotheken: wie bisher der Grund) */
+  P._target = function () {
+    var t = A.target(this.it, this.mode === 'random' ? 'art' : this.mode);
+    if (t.key === 'base' && this.o.moodArt && this.mode === 'mood' && this.it && (!N.comfort || N.comfort.backgrounds())) t = A.target(this.it, 'art');
+    return t;
   };
   /* eigener Name: das Frame-Protokoll zeigt den Anteil der src-Zuweisung ('amb.src') */
   P._src = function (img, url) { img.src = url; };

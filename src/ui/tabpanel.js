@@ -5,7 +5,8 @@
  * der Zeiger traf aber feste 152-px-Felder (Klick auf "Ansicht" landete meist auf "Filter"), und per Taste war die Reiterzeile
  * nicht erreichbar (nur ◀▶ ohne sichtbaren Fokus). Jetzt: Treffer ueber die einmal gemessenen Reiter-Rechtecke; ▲ auf dem
  * ersten Eintrag fokussiert die Reiterzeile (◀▶ wechselt, ▼/OK zurueck in die Liste); Zeigen auf einen Reiter waehlt ihn
- * (wie die Staffel-Reiter, DET-3).
+ * (wechselt nur die Liste darunter, laedt nichts – anders als die Staffel-Reiter, die erst per Klick wechseln, DET-3).
+ * Finger/Maus (caps.scroll 'free'): Liste frei scrollbar wie N.ui.panel.select (N.ui.freeList); Reiterwechsel beginnt oben.
  * o: {title, tabs:[{t, entries: function () -> [{id, t, s, sel}]}], tab, onPick(tab, id), keys:{TASTE: fn}} */
 (function (N) {
   var U = N.util, X = 840, TOP = 160, STEP = 72, H = 64, VIS = 7, TAB_X = X + 32, TAB_Y = 112, TAB_H = 43;
@@ -39,9 +40,14 @@
     /* Mehr-Hinweis (NAV-11): scrollt die Liste dieses Reiters, liegt sie 28 px tiefer und zeigt eine Zeile weniger – oben (unter den
      * Reitern) und unten bleibt Platz fuer die Pfeile. Lage nur beim Aufbau eines Reiters (render), im Tastenpfad nur visibility */
     var MT = TOP + 28, more = N.ui.more(p, 'top:' + TOP + 'px', 'top:' + (MT + (VIS - 1) * STEP + 4) + 'px'), vis = VIS, top = TOP;
+    function maxPx() { return Math.max(0, ov.items.length - vis) * STEP; }
+    var fl = N.ui.freeList({ el: list, max: maxPx, dim: function () { return vis * STEP; },
+      hit: function (x, y) { return x >= X && y >= TAB_Y + TAB_H; },   // ganzes Panel unter den Reitern
+      onSet: function (px) { more.set(vis < VIS && px > 0.5, vis < VIS && px < maxPx() - 0.5); } });
     function render(keepF) {
       while (list.firstChild) list.removeChild(list.firstChild);
       var f = keepF ? ov.f : -1;
+      if (!keepF || fl.free) { fl.reset(); ov.off = -1; }   // neuer Reiter bzw. frei gescrollt: Lage neu nach der Anker-Regel
       ov.items = []; ov.data = o.tabs[ov.tab].entries(); ov.f = 0;
       for (var i = 0; i < ov.data.length; i++) {
         var d = ov.data[i], e = U.el('div', 'pe' + (d.sel ? ' sel' : '') + (d.s ? ' two' : ''), list, 'top:' + (i * STEP) + 'px');
@@ -78,7 +84,12 @@
       if (!ov.items.length) return;
       if (!force) U.cls(ov.items[ov.f], 'is-focus', false);
       ov.f = i; U.cls(ov.items[i], 'is-focus', ov.zone === 'list');
-      if (!still) { var off = Math.max(0, Math.min(i - 3, ov.items.length - vis)); if (off !== ov.off || force) { ov.off = off; U.tf(list, 0, -off * STEP); } }
+      if (!still) {
+        if (fl.keys()) force = true;                    // nach freiem Scrollen: Taste rastet wieder auf ganze Zeilen
+        var off = Math.max(0, Math.min(i - 3, ov.items.length - vis));
+        if (off !== ov.off || force) { ov.off = off; U.tf(list, 0, -off * STEP); }
+        fl.sync(ov.off * STEP);
+      }
       more.set(vis < VIS && ov.off > 0, vis < VIS && ov.off + vis < ov.items.length);
     }
     function close() { if (!ov.closed) { ov.closed = true; N.router.closeOverlay(ov); } }
@@ -105,7 +116,13 @@
       return k !== 'RETURN';
     };
     ov.wheelKeys = ['UP', 'DOWN'];
+    ov.pan = function (e) { return fl.pan(e); };
+    /* An den Anfang (App.scrollTop, Tipp ganz oben / Cmd+Pfeil hoch): N.ui.freeList.top */
+    ov.scrollTop = function () { return fl.top(); };
+    ov.wheel = function (x, y, dx, dy) { fl.wheel(x, y, dy); return true; };
+    ov.pointerDown = function () { fl.down(); };
     ov.pointer = function (x, y, kind) {
+      if (fl.eat(kind)) return true;                  // Tipp in den Schwung: nur anhalten
       if (x < X) { if (kind === 'click') close(); return true; }
       if (y >= TAB_Y && y < TAB_Y + TAB_H) {
         var t = ov.rects ? N.hit.spans(ov.rects, x) : -1;
@@ -113,9 +130,10 @@
         setZone('tabs'); tab(t);                         // Zeigen waehlt den Reiter (die Liste darunter wechselt, nichts rollt)
         return true;
       }
-      var i = N.hit.list(top, STEP, H, Math.min(vis, ov.items.length - ov.off), y);
+      var i;
+      if (fl.free) i = fl.idx(y, top, STEP, ov.items.length, vis);   // frei gescrollt: auch angeschnittene Zeilen
+      else { i = N.hit.list(top, STEP, H, Math.min(vis, ov.items.length - ov.off), y); if (i >= 0) i += ov.off; }
       if (i < 0) return false;
-      i += ov.off;
       setZone('list');
       if (i !== ov.f) setF(i, false, true);
       if (kind === 'click') pick(i);
