@@ -204,8 +204,8 @@ test('Anwenden: eine Klasse am <html> (andere Klassen bleiben), Profilwechsel + 
     assert.strictEqual(html.className, 'tv x ac-coral');
   } finally { S.settings = old.settings; S.state = old.state; S.save = old.save; delete ctx.document; }
 });
-test('i18n: Name je Palettenfarbe in de und en', function () {
-  ['de', 'en'].forEach(function (l) {
+test('i18n: Name je Palettenfarbe in de, en und nb', function () {
+  ['de', 'en', 'nb'].forEach(function (l) {
     N.i18n.set(l);
     N.accent.ids().forEach(function (id) { var t = N.t('set.v.ac_' + id); assert.ok(t && t !== 'set.v.ac_' + id && t.length <= 14, l + ' ' + id); });
     assert.ok(N.t('set.v.bdLight').length <= 14);

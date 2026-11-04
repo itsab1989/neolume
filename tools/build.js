@@ -213,10 +213,24 @@ function buildCss(cssText, brand) {
 function checkI18n(extra) {
   var ctx = { N: undefined };
   vm.createContext(ctx);
-  ['core/ns.js', 'i18n/strings.de.js', 'i18n/strings.en.js', 'i18n/strings.music.js'].concat(extra || []).forEach(function (f) { vm.runInContext(fs.readFileSync(path.join(SRC, f), 'utf8'), ctx, { filename: f }); });
-  var errs = require('./i18n_rules').check(ctx.N.strings.de, ctx.N.strings.en);
+  ['core/ns.js', 'i18n/strings.de.js', 'i18n/strings.en.js', 'i18n/strings.nb.js', 'i18n/strings.music.js'].concat(extra || []).forEach(function (f) { vm.runInContext(fs.readFileSync(path.join(SRC, f), 'utf8'), ctx, { filename: f }); });
+  var errs = require('./i18n_rules').check(ctx.N.strings.de, ctx.N.strings.en, ctx.N.strings.nb);   // jeder Schluessel auch auf Norwegisch
   errs.forEach(function (e) { fail('i18n: ' + e); });
+  I18N_TABLES = ctx.N.strings;
   return Object.keys(ctx.N.strings.de).length;
+}
+/* Sprachtabellen als eigene Dateien (TV-Leistung 03.11.: der TV parst nur die aktive Sprache statt aller drei): die Text-Module
+ * (i18n/strings*.js, strings*.js der Erweiterungen) kommen nicht in app.js/app.min.js, sondern zusammengefasst je Sprache nach
+ * <OUT>/i18n/<lang>.js ("N.strings.<lang>={…}", JSON, Nicht-ASCII escaped). src/i18n/i18n.js laedt sie (N.i18n.load). */
+var I18N_TABLES = null;
+function isStringsModule(f) { return /(^|\/)strings[^\/]*\.js$/.test(f); }
+function i18nFiles() {
+  var out = {};
+  Object.keys(I18N_TABLES || {}).forEach(function (l) {
+    out[l] = '/* Sprachtabelle ' + l + ' (gebaut aus src/i18n/strings*.js und den Texten der Erweiterungen, tools/build.js). Nicht von Hand bearbeiten. */\n' +
+      'N.strings=N.strings||{};N.strings.' + l + '=' + escapeNonAscii(JSON.stringify(I18N_TABLES[l])) + ';\n';
+  });
+  return out;
 }
 
 /* ---------- lokale Netzwerk-Werte (local.json, git-ignoriert) ----------
@@ -375,6 +389,7 @@ function build() {
   manifest.forEach(function (f, i) {
     var p = pabs[f] || path.join(SRC, f);
     if (!fs.existsSync(p)) { fail('Manifest-Datei fehlt: ' + f); return; }
+    if (isStringsModule(f)) return;                         // Texte: eigene Dateien je Sprache (i18nFiles)
     var chunk = '/* ===== ' + f + ' ===== */\n' + fs.readFileSync(p, 'utf8');
     parts.push(chunk);
     if (!/^dev\//.test(f) || BENCH) rel.push(chunk);       // Release (minifiziert): ohne Entwicklungs-Module (Mess-Bau: mit)
@@ -468,6 +483,9 @@ function build() {
     var previous = fs.existsSync(appPath) ? fs.readFileSync(appPath) : null, prevMin = fs.existsSync(minPath) ? fs.readFileSync(minPath) : null;
     fs.writeFileSync(appPath, code);
     if (min !== null) fs.writeFileSync(minPath, min);
+    var lf = i18nFiles(), ld = path.join(OUT, 'i18n');
+    fs.rmSync(ld, { recursive: true, force: true }); fs.mkdirSync(ld, { recursive: true });
+    Object.keys(lf).forEach(function (l) { es5Gate(lf[l]); fs.writeFileSync(path.join(ld, l + '.js'), lf[l]); });
     // Zeiger-Bilder der Palette fuer diese Marke (Standardfarbe: <pointer>.png der Marke, sonst pointer-<id>.png, je mit -press); fremde aus app/ entfernen
     var mine = [];
     brandPalette(brand).forEach(function (p) { mine.push(p.pointer + '.png', p.pointer + '-press.png'); });
@@ -479,11 +497,11 @@ function build() {
     assets.forEach(function (f) { fs.copyFileSync(path.join(SRC, 'assets', f), path.join(OUT, f)); });
     if (pid !== plat.DEFAULT) platformPackage();
     var gz = require('zlib');
-    console.log(path.relative(ROOT, OUT) + '/app.js: ' + kb(code.length) + ' KB lesbar (' + manifest.length + ' Module, CSS ' + kb(css.length) + ' KB davon Akzent-Varianten ' + kb(cssStats.bytes) + ' KB (' + cssStats.variants + ' Farben x ' + cssStats.tokenRules + ' Regeln, ' + cssStats.copies + ' Begleitregeln), ' + keys + ' Texte je Sprache), ' +
+    console.log(path.relative(ROOT, OUT) + '/app.js: ' + kb(code.length) + ' KB lesbar (' + manifest.length + ' Module, CSS ' + kb(css.length) + ' KB davon Akzent-Varianten ' + kb(cssStats.bytes) + ' KB (' + cssStats.variants + ' Farben x ' + cssStats.tokenRules + ' Regeln, ' + cssStats.copies + ' Begleitregeln), ' + keys + ' Texte je Sprache in i18n/' + Object.keys(lf).map(function (l) { return l + '.js ' + kb(lf[l].length) + ' KB'; }).join(', ') + '), ' +
       'Startdateien: 1 (CSS eingebettet), Bilder: ' + assets.join(', ') + ' – ' + (Date.now() - t0) + ' ms');
     if (min !== null) {
       console.log(path.relative(ROOT, OUT) + '/app.min.js: ' + kb(min.length) + ' KB minifiziert, ' + kb(gz.gzipSync(min).length) + ' KB gzip (Release-Paket, ohne dev/)');
-      if (min.length > 180 * 1024) console.log('HINWEIS: app.min.js > 180 KB (Budget SPEC 16.2) – Rest sind Texte (de/en), CSS und Eigenschaftsnamen, siehe docs/P7-TV-TEST.md.');
+      if (min.length > 180 * 1024) console.log('HINWEIS: app.min.js > 180 KB (Budget SPEC 16.2) – Rest sind CSS und Eigenschaftsnamen (Texte liegen in i18n/<lang>.js), siehe docs/P7-TV-TEST.md.');
     } else console.log('HINWEIS: --no-min – app/app.min.js nicht neu gebaut.');
     // Regressionsschutz: alle Unit-Tests laufen im Build; bei Fehlern bleiben die vorherigen Dateien stehen
     if (process.argv.indexOf('--no-test') < 0) {

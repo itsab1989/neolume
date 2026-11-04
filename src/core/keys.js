@@ -6,6 +6,12 @@
     isNav: function (k) { return k === 'UP' || k === 'DOWN' || k === 'LEFT' || k === 'RIGHT'; },
     isDigit: function (k) { return k !== null && k.length === 1 && k >= '0' && k <= '9'; },
     /* Tastenkappen: aufgedruckter Text, nie uebersetzt */
-    cap: N.platform.keys.cap
+    cap: N.platform.keys.cap,
+    /* Kappe als Text fuer Hilfe/Hinweisleiste; "@schluessel" = Text je Sprache und Eingabeart (Apple, NAV-26); sonst null */
+    label: function (k) {
+      var c = N.platform.keys.cap, v = c && c[k];
+      if (typeof v !== 'string') return null;
+      return v.charAt(0) === '@' ? N.t(v.slice(1)) : v;
+    }
   };
 })(N);

@@ -16,6 +16,7 @@
  "core/sections.js",
  "i18n/strings.de.js",
  "i18n/strings.en.js",
+ "i18n/strings.nb.js",
  "i18n/strings.music.js",
  "i18n/i18n.js",
  "i18n/fmt.js",

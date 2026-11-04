@@ -28,7 +28,7 @@
     // flexible Flaeche (N.screen, nur Apple): angepasste Ansichten fuellen W x H, alle anderen im mittigen 1280x720-Kasten
     if (!entry.card && N.screen && N.screen.flex && scr.el.className) {
       scr.el.className += scr.flex ? ' flex' : ' stage720';
-      if (scr.flex) { var vw = N.screen.view(), es = scr.el.style; es.left = vw.x + 'px'; es.width = vw.w + 'px'; es.height = vw.h + 'px'; }   // Breitenklasse M/K: Inhaltskante, Leiste unten
+      if (scr.flex) { var vw = N.screen.box(), es = scr.el.style; es.left = vw.x + 'px'; es.width = vw.w + 'px'; es.height = vw.h + 'px'; }   // Breitenklasse M/K: Inhaltskante, Leiste unten; Raender: flex.css
     }
     if (scr.create) scr.create(scr.el, entry.params);
     entry.scr = scr;
@@ -52,6 +52,9 @@
   }
   function show(entry) {
     if (entry.dirty) { entry.dirty = false; kill(entry); }   // Flaeche hat sich geaendert (R.relayout): aus restore neu aufbauen
+    /* scr.stale() (nur Apple-Startseite, HOME-18): Anordnung haengt von der Eingabeart/Einstellung ab -> beim naechsten Zeigen neu
+     * aufbauen, aber nur, wenn die Ansicht verdeckt war (nicht unter einer gerade geschlossenen Karte: dort waere der Wechsel zu sehen) */
+    else if (entry.scr && entry.scr.stale && entry.scr.el.style.display === 'none' && entry.scr.stale()) kill(entry);
     var scr = entry.scr || build(entry);
     scr.el.style.display = '';
     paintCard();
@@ -183,6 +186,16 @@
       for (var j = 0; j < overlays.length; j++) N.screen.place(overlays[j]);
       R.settle();
     },
+    /* oberste Ansicht sofort neu aufbauen, wenn sie es verlangt (scr.stale) und nichts darueber liegt (Overlay, Karte) – Startseite
+     * HOME-18: Infobereich beim ersten Zeiger-/Tastengebrauch auf einer noch unbedienten Seite. Fokus bleibt ueber leave/restore */
+    renew: function (scr) {
+      var t = top();
+      if (!t || t.scr !== scr || overlays.length || cardDepth() || !scr.stale || !scr.stale()) return false;
+      /* bewusst in einem Bild (Messung home-hero-first 03.11.: verdeckt aufbauen und ein Bild spaeter zeigen brachte nichts, 36–40 ms
+       * wie vorher; die Kosten sind Stil/Layout/Malen der neuen Ansicht wie bei jedem Aufbau der Startseite, Kacheln 28–29 ms) */
+      hide(t); kill(t); show(t);
+      return true;
+    },
     settle: function () {
       var t = top();
       if (!t || !t.dirty || overlays.length) return;
@@ -258,6 +271,9 @@
       var o = overlays.length ? overlays[overlays.length - 1] : null, t = top();
       var rOpen = !!(N.ui.rail && N.ui.rail.isOpen && N.ui.rail.isOpen()), cur = o || (rOpen ? null : t && t.scr);
       if (N.idle) N.idle.touch();
+      /* flache Flaeche (nur flexibel, Nutzerbefund 03.11.): senkrechter Zug ueber der rollenden Seitenleiste (Spalte oder offen) rollt sie */
+      if (panT === 'railY') { if (e.phase === 'end') panT = null; N.ui.rail.scrollPan(e); return true; }
+      if (!o && e.phase === 'start' && e.axis === 'y' && N.ui.rail && N.ui.rail.scrollPan && N.ui.rail.scrollPan(e)) { panT = 'railY'; return true; }
       /* offene Seitenleiste (Nr. 24): waagerechter Zug schiebt sie live zu (N.ui.rail.pan); andere Zuege nimmt sie, ohne etwas zu tun */
       if (!o && (rOpen || panT === 'rail')) {
         if (e.phase === 'start') { panT = e.axis === 'x' && N.ui.rail.pan && N.ui.rail.pan({ phase: 'start', from: 'open', dx: e.dx, x: e.x, t: e.t }) ? 'rail' : null; return true; }
@@ -265,10 +281,10 @@
         return true;
       }
       // flexible Flaeche (N.screen, nur Apple): Overlays und Ansichten ohne scr.flex stehen im 1280x720-Kasten (wie N.pointer)
-      if (cur && N.screen && N.screen.flex && !o && cur.flex && N.screen.view().x) {   // flexible Ansicht (M/K): Inhaltskante verschoben
-        var vo = N.screen.view().x, c3 = {}, k3;
+      if (cur && N.screen && N.screen.flex && !o && cur.flex && (N.screen.view().x || N.screen.view().y)) {   // flexible Ansicht (M/K, Raender): Inhalt verschoben
+        var vo = N.screen.view(), c3 = {}, k3;
         for (k3 in e) if (Object.prototype.hasOwnProperty.call(e, k3)) c3[k3] = e[k3];
-        c3.x = e.x - vo; e = c3;
+        c3.x = e.x - vo.x; c3.y = e.y - vo.y; e = c3;
       } else if (cur && N.screen && N.screen.flex && (o || (!cur.flex && !R.cardFrame(cur)))) {
         var so = o ? N.screen.stageFor(o) : N.screen.stage(), c2 = {}, k;
         for (k in e) if (Object.prototype.hasOwnProperty.call(e, k)) c2[k] = e[k];

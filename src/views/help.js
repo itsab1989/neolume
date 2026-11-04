@@ -21,9 +21,20 @@
     ['settings', [['NAV', 'nav'], ['OK', 'ok'], ['yellow', 'yellow'], ['INFO', 'info'], ['ret', 'ret']]]
   ];
   var MAXK = 12;
+  /* Tasten, die das Geraet nicht hat, entfallen (NAV-25): EXIT ohne caps.exit, Kappe '' der Plattform (Mac: CH). Am Fernseher
+   * dieselbe Liste (kein neues Array). */
+  function usable(list) {
+    var ex = N.platform.caps.exit !== false;
+    function ok(d) { return !(d[0] === 'EXIT' && !ex) && N.keys.label(d[0]) !== ''; }
+    for (var i = 0; i < list.length; i++) if (!ok(list[i])) return list.filter(ok);
+    return list;
+  }
   /* Kappe in ein Element zeichnen (wie die Hinweisleiste) */
   function cap(parent, k) {
-    var c = COLOR[k];
+    var c = COLOR[k], pc = N.keys.label(k);   // Geraet mit eigener Kappe (Apple-Tastatur/Touch, NAV-25/26): neutrale Text-Kappe
+    if (pc !== null) {
+      U.txt('span', 'kt', parent, pc); return;             // Nutzer 03.11.: auf Apple keine farbigen TV-Kappen, neutrale Kappe in Textbreite
+    }
     if (c) { U.txt('span', 'k ' + c[0], parent, c[1]); return; }
     var e = U.el('span', 'kt', parent);
     if (k === 'ret') { e.className = 'kt ret'; N.ui.icon(e, 'ret', 's1'); return; }
@@ -51,7 +62,7 @@
       U.cls(cats[c], 'is-focus', false); U.cls(cats[c], 'is-cur', false);
       c = i;
       U.cls(cats[c], 'is-focus', true); U.cls(cats[c], 'is-cur', true);
-      var list = KEYS[c][1];
+      var list = usable(KEYS[c][1]);
       for (var k = 0; k < rows.length; k++) {
         var r = rows[k], d = list[k];
         U.show(r.el, !!d);

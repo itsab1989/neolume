@@ -194,6 +194,15 @@
       clearRows(); U.show(recentEl, false);
       if (STK && off) setOff(0, true);                // schmal: Text steht unter der Tastatur (rollt nicht mit)
       U.setText(stateT, t); U.setText(stateX, x); U.setText(tipT, tip);
+      stackState();
+    }
+    /* flexibel (schmale/flache Flaeche, Befund 03.11.: Titel, Text und Tipp ueberlappten, wenn sie umbrechen): untereinander nach
+     * gemessener Hoehe, mindestens die TV-Abstaende (48/84); am TV feste Lagen wie bisher */
+    function stackState() {
+      if (!FX) return;
+      var a = stateT.parentNode, b = stateX.parentNode, c = tipT.parentNode;
+      b.style.top = (a.offsetTop + Math.max(48, a.offsetHeight + 8)) + 'px';
+      c.style.top = (b.offsetTop + Math.max(84, b.offsetHeight + 16)) + 'px';
     }
     function clearRows() { if (zone === 'res' || zone === 'recent') toKbd(); for (var i = 0; i < slots.length; i++) { slots[i].clear(); slots[i].setVisible(false); slotGroup[i] = -1; } groups = []; colMem = {}; pendingEmpty = false; }   // Ziffern-Eingabe aus "Zuletzt gesucht": Fokus nicht auf versteckter Liste lassen
     /* Leerer Zustand: Zuletzt gesucht + Vorschlaege */
@@ -354,7 +363,7 @@
       }
       pendingEmpty = false;
       var none = !emptyRec && !gs.length;
-      U.setText(stateT, none ? N.t('disc.empty.title') : ''); U.setText(stateX, none ? N.t('disc.empty.text') : '');
+      U.setText(stateT, none ? N.t('disc.empty.title') : ''); U.setText(stateX, none ? N.t('disc.empty.text') : ''); stackState();
       var y = emptyY, ys = [];
       for (i = 0; i < gs.length; i++) { ys.push(y); y += PITCH[gs[i].kind] || 316; }
       groups = gs; tops = ys;
@@ -555,8 +564,13 @@
     /* RETURN auf der Tastatur (NAV-5): Bereich aus der Seitenleiste -> N.app.sectionBack, sonst (z. B. Blau) eine Ebene zurueck */
     function up() { if (params && params.sec) N.app.sectionBack(); else N.router.back(); }
 
+    /* Computer-Tastatur (Apple, NAV-26): steht der Fokus auf der Bildschirm-Tastatur, tippen Buchstaben direkt in die Suche;
+     * in den Ergebnissen bleiben sie Tasten (Y = gesehen …). Ruecktaste (DEL) loescht. Am Fernseher kommt das nie. */
+    s.wantsText = function () { return zone === 'kbd'; };
+    s.onText = function (ch) { if (zone !== 'kbd') return false; type(ch); return true; };
     s.onKey = function (k) {
       if (unfree(k)) return true;                     // erste Taste nach freiem Scrollen setzt nur den Fokus (NAV-17)
+      if (k === 'DEL') { if (zone === 'kbd') del(); return true; }
       if (N.keys.isDigit(k)) { digit(k); return true; }
       if (k === 'RED') { if (zone === 'recent' && rf < recN) removeRecent(rf); else clearAll(); return true; }
       if (zone === 'kbd') {

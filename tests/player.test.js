@@ -662,4 +662,9 @@ test('Schmaler Player (Apple Nr. 17, 10-screens 7): N.osd.narrow – Video 16:9 
   assert.strictEqual(k.CBY, k.VY + k.VH - 72);
   var p = O.narrow(586, 1132, false);
   assert.strictEqual(p.CBY, p.ISY + 276 + 16 + 168);
+  // sichere Raender (iPhone hoch: Dynamic Island 91, unten 50; Duo aussen: rechts 122): Zurueck/Uhr und Inseln darin, Video volle Breite
+  var q = O.narrow(586, 1272, false, { t: 91, r: 0, b: 50, l: 0 }), d = O.narrow(678, 986, false, { t: 0, r: 122, b: 50, l: 0 });
+  assert.deepStrictEqual([q.TY, q.TX, q.VW, q.VY], [91 + 16, 24, 586, 91 + 16 + 168]);
+  assert.deepStrictEqual([d.TX + d.TW, d.ISX + d.ISW, d.SKX1, d.VW, d.SR], [678 - 122 - 24, 678 - 122 - 24, 678 - 122 - 24, 678, 122]);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(O.narrow(586, 1132, false, null))), JSON.parse(JSON.stringify(O.narrow(586, 1132, false))));
 });

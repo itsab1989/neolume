@@ -3,9 +3,11 @@
  * - Breitenklasse K (iPhone hoch, halbe iPad-Fenster): Leiste unten (N.screen.TAB_H hoch) mit Start, Mediathek, Suche,
  *   Einstellungen statt der Seitenleiste. "Mediathek" oeffnet die Bibliothek direkt, wenn es nur eine gibt, sonst die Liste der
  *   Seitenleiste (alle Bibliotheken, Profil). Der aktuelle Bereich ist hervorgehoben.
- * - Breitenklasse M (iPad hoch, Duo innen hoch, 2/3-Fenster, iPhone quer): keine feste Spalte; Menue-Knopf oben links blendet die
+ * - M·F (iPhone quer, flache Mac-Fenster; N.screen.nav() 'menu'): keine feste Spalte; Menue-Knopf oben links blendet die
  *   Seitenleiste ein (wie der Rand-Wisch).
- * - R: Seitenleiste wie am TV; beides verborgen.
+ * - R und M·N (iPad quer und hoch, Duo innen, 2/3-Fenster): Seitenleiste wie am TV; beides verborgen (Nutzerbefund 03.11.).
+ * Sichere Raender (N.screen.safe): Leiste unten um den unteren Rand hoeher (Hintergrund bis an den Rand, Reiter darueber), Knopf
+ * um den oberen/linken Rand versetzt.
  * Sichtbar nur auf Bildschirmen mit Seitenleiste (N.ui.rail.attach). Zeiger/Finger: pointer(x, y, kind) in Flaechen-Koordinaten. */
 (function (N) {
   var U = N.util;
@@ -42,8 +44,8 @@
   /* Klasse, Seitenleiste oder Bereich geaendert */
   T.sync = function () {
     if (!T.el) return;
-    var R = N.ui.rail, att = !!(R && R.attached()), w = N.screen.cls.w;
-    T.mode = !att ? '' : w === 'K' ? 'tabs' : w === 'M' ? 'menu' : '';
+    var R = N.ui.rail, att = !!(R && R.attached()), nav = N.screen.nav();
+    T.mode = !att ? '' : nav === 'tabs' ? 'tabs' : nav === 'menu' ? 'menu' : '';
     U.show(T.el, T.mode === 'tabs');
     U.show(T.menu, T.mode === 'menu');
     var cur = T.tabOf(R && R.att);
@@ -54,11 +56,14 @@
   };
   T.relabel = function () {
     if (!T.el) return;
-    for (var i = 0; i < TABS.length; i++) T.items[i].lb.firstChild.nodeValue = N.t(TABS[i].t);
+    // lb ist schon der Textknoten (U.txt) – vorher lb.firstChild: Absturz bei jedem Sprachwechsel (Norwegisch-Pruefung 03.11.)
+    for (var i = 0; i < TABS.length; i++) T.items[i].lb.nodeValue = N.t(TABS[i].t);
     T.menu.setAttribute('aria-label', N.t('nav.menu'));
   };
-  /* ist die Seitenleiste nur einblendbar (M/K: keine Icon-Spalte, kein Aufklappen am Rand per Zeiger)? */
-  T.slim = function () { return !!(T.el && N.screen.flex && N.screen.cls.w !== 'R'); };
+  /* ist die Seitenleiste nur einblendbar (M·F/K: keine Icon-Spalte, kein Aufklappen am Rand per Zeiger)? */
+  T.slim = function () { return !!(T.el && N.screen.flex && N.screen.nav() !== 'rail'); };
+  /* Lage des Menue-Knopfs in der Flaeche (um die sicheren Raender versetzt, flex.css rechnet gleich) */
+  T.menuAt = function () { var f = N.screen.safe; return { x: MENU_X + f.l, y: MENU_Y + f.t }; };
   function libs() { var R = N.ui.rail; return R && R.allLibs ? R.allLibs() : []; }
   T.activate = function (i) {
     var t = TABS[i], R = N.ui.rail;
@@ -75,14 +80,14 @@
   /* Zeiger/Finger in Flaechen-Koordinaten -> true = getroffen (Klick ausgefuehrt) */
   T.pointer = function (x, y, kind) {
     if (!T.el || !T.mode) return false;
-    var A = N.screen.area(true);
+    var A = N.screen.area(true), f = N.screen.safe, m = T.menuAt();
     if (T.mode === 'menu') {
-      if (x < MENU_X - 8 || x >= MENU_X + MENU + 8 || y < MENU_Y - 8 || y >= MENU_Y + MENU + 8) return false;
+      if (x < m.x - 8 || x >= m.x + MENU + 8 || y < m.y - 8 || y >= m.y + MENU + 8) return false;
       if (kind === 'click') { var R = N.ui.rail; if (R && !R.isOpen()) R.open(); }
       return true;
     }
-    if (y < A.h - N.screen.TAB_H) return false;
-    var i = T.hitTab(x, A.w);
+    if (y < A.h - N.screen.TAB_H - f.b) return false;
+    var i = T.hitTab(x - f.l, A.w - f.l - f.r);
     if (i >= 0 && kind === 'click') T.activate(i);
     return true;
   };

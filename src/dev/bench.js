@@ -351,6 +351,11 @@
   ['lib-S', 'lib-M', 'lib-L', 'home'].forEach(function (b) {
     variant('nocapl-' + b.replace('lib-', ''), b, function () { U.cls(document.body, 'nocapl', true); }, function () { U.cls(document.body, 'nocapl', false); });
   });
+  /* Apple (09-perf "lib-S mit Tasten"): Gegenprobe kt0-* = Raster wieder mit CSS-Uebergang bzw. Sprung statt Gleiten per rAF
+   * (N.ui.Grid.KEY_TWEEN; am TV ohnehin aus, dort misst die Variante dasselbe wie lib-*) */
+  ['S', 'M', 'L'].forEach(function (v) {
+    variant('kt0-' + v, 'lib-' + v, function () { N.ui.Grid.KEY_TWEEN = false; }, function () { N.ui.Grid.KEY_TWEEN = true; });
+  });
   /* Hintergrund in Bibliotheken (ui/ambient.js): Raster mit Hintergrund Aus/Farbstimmung/Titelbild (Kosten der Ebenen beim Scrollen,
    * Wechsel erst nach 600 ms Ruhe -> im 160-ms-Takt nie) und amb-fade-* mit 900 ms Takt (jeder Schritt loest nach 600 ms Ruhe einen
    * Wechsel samt 400-ms-Ueberblendung aus; die naechste Taste faellt in die Blende). Einstellung nur im Speicher, danach zurueck. */

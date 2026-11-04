@@ -206,13 +206,17 @@ function libAll(id, q) {
   if (q.get('inProgress') === '1') list = list.filter(function (m) { return m.viewOffset > 0; });
   if (q.get('actor')) list = list.filter(function (m, k) { return k % 4 === 0; });
   if (q.get('genre')) list = list.filter(function (m, k) { return k % 2 === 0; });
+  if (String(id) === '1' && /^nbAbc/.test(curSeed)) NB_ABC.forEach(function (t, k) {   // erfundene norwegische Titel hinter Z (Æ Ø Å)
+    var c = JSON.parse(JSON.stringify(LIB[1][k + 1])); c.ratingKey = String(4900 + k); c.title = c.titleSort = t; c.thumb = '/t/m' + c.ratingKey; c.art = '/a/m' + c.ratingKey; list.push(c);
+  });
   if (/titleSort:desc/.test(sort)) list.reverse();
   else if (/^addedAt|episode.addedAt/.test(sort)) list.sort(function (a, b) { return (b.addedAt || 0) - (a.addedAt || 0); });
   return list;
 }
+var NB_ABC = ['Ærfuglens sang', 'Ærlige Ola', 'Ørkenlys', 'Øyriket', 'Øyriket 2', 'Åkerens hemmelighet', 'Åsgårdsnatt'];
 function firstChars(list) {
   var out = [];
-  list.forEach(function (m) { var c = m.titleSort.charAt(0).toUpperCase(); if (!/[A-Z]/.test(c)) c = '#'; if (out.length && out[out.length - 1].title === c) out[out.length - 1].size++; else out.push({ key: c, title: c, size: 1 }); });
+  list.forEach(function (m) { var c = m.titleSort.charAt(0).toUpperCase(); if (!/[A-ZÆØÅ]/.test(c)) c = '#'; if (out.length && out[out.length - 1].title === c) out[out.length - 1].size++; else out.push({ key: c, title: c, size: 1 }); });
   return { MediaContainer: { size: out.length, Directory: out } };
 }
 function page(list, q) {
@@ -220,10 +224,15 @@ function page(list, q) {
   return { MediaContainer: { size: Math.min(sz, Math.max(0, list.length - st)), totalSize: list.length, offset: st, Metadata: list.slice(st, st + sz) } };
 }
 function findLib(rk) { var all = LIB[1].concat(LIB[2]); for (var i = 0; i < all.length; i++) if (all[i].ratingKey === rk) return all[i]; return null; }
+/* Befund 03.11. (NAV-12): erfundene, absichtlich lange Beschreibung (Seeds longSum*) – die Seite kuerzt auf 2 Zeilen, INFO zeigt sie ganz */
+var LONG_SUM = 'Eine Uhrmacherin erbt die Werkstatt ihres Großvaters in einer kleinen Hafenstadt und findet darin eine Uhr, die rückwärts läuft. Jede Stunde, die sie zurückdreht, öffnet eine Tür in einen anderen Sommer der Stadt.\n\nSie trifft den Leuchtturmwärter, der als Junge verschwand, die Bäckerin, die nie aus dem Urlaub zurückkam, und einen Briefträger, der seit fünfzig Jahren denselben Brief zustellen will. Alle wissen etwas über die Uhr, aber niemand sagt alles.\n\nJe öfter sie die Zeiger bewegt, desto mehr verändert sich die Gegenwart: Häuser stehen plötzlich an anderen Ecken, Freunde erinnern sich an Gespräche, die nie stattgefunden haben, und das Meer kommt jeden Tag ein Stück näher.\n\nErfundener, absichtlich sehr langer Text für den Bildtest: Das INFO-Feld zeigt ihn ganz und blättert mit ▲▼ in Stufen weiter, ohne eine Zeile zu überspringen.\n\nLetzter Absatz: Hier endet die Beschreibung.';
+var LONG_SUM_EN = 'A watchmaker inherits her grandfather\'s workshop in a small harbour town and finds a clock inside that runs backwards. Every hour she turns back opens a door into another summer of the town.\n\nShe meets the lighthouse keeper who vanished as a boy, the baker who never came back from her holiday, and a postman who has been trying to deliver the same letter for fifty years. They all know something about the clock, but nobody tells everything.\n\nThe more she moves the hands, the more the present changes: houses suddenly stand on other corners, friends remember conversations that never happened, and the sea comes a little closer every day.\n\nInvented, deliberately very long text for the visual test: the INFO panel shows all of it and pages on with ▲▼ in steps, never skipping a line.\n\nLast paragraph: this is where the description ends.';
 function libMeta(m) {
   var x = JSON.parse(JSON.stringify(m)), people = ['Mara Lind', 'Jonas Berg', 'Ida Sommer', 'Paul Feld', 'Lea Nord', 'Tom Wiese', 'Ina Kehl', 'Ole Brandt'];
   x.Role = people.map(function (p, k) { return { id: 900 + k, tag: p, role: 'Rolle ' + (k + 1), thumb: '/t/p' + k }; });
   x.Genre = [{ id: 143, tag: 'Abenteuer' }]; x.Director = [{ id: 70, tag: 'Rita Sand' }]; x.studio = 'Teststudio';
+  if (/^manySeasons/.test(curSeed) && x.type === 'show') { x.childCount = 8; x.leafCount = 96; x.viewedLeafCount = 42; }
+  if (/^longSum/.test(curSeed)) x.summary = /En$/.test(curSeed) ? LONG_SUM_EN : LONG_SUM;   // Befund 03.11.: INFO zeigt die ganze Beschreibung, blaettert
   if (x.type === 'movie') {
     x.Media = [{ id: 1, videoResolution: '1080', videoCodec: 'h264', audioCodec: 'ac3', container: 'mkv', Part: [{ id: Number(x.ratingKey), Stream: [
       { id: 1, streamType: 1, codec: 'h264' }, { id: 2, streamType: 2, codec: 'ac3', channels: 6, languageCode: 'ger', selected: true }, { id: 3, streamType: 2, codec: 'aac', channels: 2, languageCode: 'eng' },
@@ -241,15 +250,22 @@ function epMeta(show, s, e) {
     parentRatingKey: String(Number(show.ratingKey) + s), thumb: '/t/e' + rk, duration: 1440000, viewCount: s === 1 && e < 3 ? 1 : 0, viewOffset: s === 1 && e === 3 ? 600000 : 0,
     summary: 'Folge ' + e + ' der Staffel ' + s + '. Synthetischer Text.', originallyAvailableAt: '2023-10-0' + (1 + e % 9) };
 }
+/* Nutzerbefund 03.11. (Seeds manySeasons*): jede Serie mit 8 Staffeln zu je 12 Folgen, Staffel 1-3 gesehen, 4 halb */
+var MANY_SEEN = [0, 12, 12, 12, 6, 0, 0, 0, 0];
 function seasonsOf(show) {
   var out = [];
+  if (/^manySeasons/.test(curSeed)) {
+    for (var ms = 1; ms <= 8; ms++) out.push({ ratingKey: String(Number(show.ratingKey) + ms), type: 'season', index: ms, title: 'Staffel ' + ms, leafCount: 12, viewedLeafCount: MANY_SEEN[ms] });
+    return { MediaContainer: { size: out.length, Metadata: out } };
+  }
   for (var s = 1; s <= show.childCount; s++) out.push({ ratingKey: String(Number(show.ratingKey) + s), type: 'season', index: s, title: 'Staffel ' + s, leafCount: s === 1 && show.ratingKey === '5100' ? 42 : 12, viewedLeafCount: s === 1 ? 2 : 0 });
   if (show.ratingKey === '5100') out.push({ ratingKey: '5109', type: 'season', index: 0, title: 'Specials', leafCount: 2, viewedLeafCount: 0 });
   return { MediaContainer: { size: out.length, Metadata: out } };
 }
 function seasonEps(rk, q) {
   var showRk = String(Math.floor(Number(rk) / 10) * 10), show = findLib(showRk), s = Number(rk) % 10, n = s === 1 && showRk === '5100' ? 42 : s === 9 ? 2 : 12, list = [];
-  for (var e = 1; e <= n; e++) list.push(epMeta(show, s === 9 ? 0 : s, e));
+  if (/^manySeasons/.test(curSeed)) n = 12;
+  for (var e = 1; e <= n; e++) { var em = epMeta(show, s === 9 ? 0 : s, e); if (/^manySeasons/.test(curSeed)) { em.viewCount = e <= MANY_SEEN[s] ? 1 : 0; em.viewOffset = 0; } list.push(em); }
   return page(list, q);
 }
 function search(query) {
@@ -368,6 +384,14 @@ function longSections() {
   s.MediaContainer.Directory[4].title = 'Dokumentationen, Reportagen und Naturfilme';
   return s;
 }
+/* Nutzerbefund 03.11. (Seitenleiste ueberlappt?): viele Bibliotheken, ein langer zweizeiliger Name, dazu Bibliotheken eines weiteren
+ * Servers (Seed manyLibSrv) – mehr Eintraege als die Leiste zeigt (R.MAX 10); erfundene Namen */
+function manySections() {
+  var s = longSections(), d = s.MediaContainer.Directory, extra = ['Konzerte', 'Kinderfilme', 'Klassiker', 'Kurzfilme'];
+  for (var i = 0; i < extra.length; i++) d.push({ key: String(20 + i), type: 'movie', title: extra[i], agent: 'tv.plex.agents.movie', hidden: 0 });
+  s.MediaContainer.size = d.length;
+  return s;
+}
 /* Weitere Server: freigegebener Server eines Freundes als zweiter Mock auf eigenem Port (setup.json erlaubt dort keine Pfade) */
 var FRIEND_MID = 'friend-machine-0001', friendPort = 0;
 function friendSections() {
@@ -424,7 +448,7 @@ function startServer(cb) {
       if (sv) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(solidPng(w, h, /Bright/.test(curSeed) ? [246, 246, 244] : [14, 14, 16])); }
       cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(solidPng(w, h, darken(colorFor(u.searchParams.get('url') || ''), u.searchParams)));
     }
-    if (p === '/library/sections') return json(/^longLib/.test(curSeed) ? longSections() : syn('sections.json'));
+    if (p === '/library/sections') return json(/^longLib/.test(curSeed) ? longSections() : /^manyLib/.test(curSeed) ? manySections() : syn('sections.json'));
     if (p === '/hubs/continueWatching/items' && curSeed === 'cwMore') return json(page(cwMany(), u.searchParams));   // HOME-14: mehr als 20 -> "Alle 31 anzeigen"
     if (p === '/hubs/continueWatching/items') return json(noArt(withVersions(syn('continueWatching.json'))));
     if (p === '/library/onDeck') return json(syn('onDeck.json'));
@@ -573,6 +597,8 @@ function makeSeeds(port) {
     { id: 12, uuid: 'bbbb2222', name: 'Kim', thumb: '', admin: false, restricted: true, pin: false, kind: 'kid' },
     { id: 13, uuid: 'cccc3333', name: 'Robin', thumb: '', admin: false, restricted: true, pin: true, kind: 'teen' }];
   seeds.home = seed(); seeds.en = seed({ lang: 'en' }); seeds.login = seed({ account: null });
+  // Norwegisch (Nutzerwunsch 03.11.): Hauptansichten mit Suffix -nb; nbAbc = Filme mit erfundenen Titeln auf Æ Ø Å (A–Z-Leiste)
+  seeds.nb = seed({ lang: 'nb' }); seeds.loginNb = seed({ account: null, lang: 'nb' }); seeds.nbAbc = seed({ lang: 'nb' });
   seeds.longLib = seed(); seeds.longLibEn = seed({ lang: 'en' });   // F25: lange Bibliotheksnamen
   seeds.multi = seed({ users: multi, lastProfile: 'bbbb2222', pinSwitch: false });
   // Startseite angepasst: Server-Hub zuerst, Weiterschauen aus
@@ -589,7 +615,7 @@ function makeSeeds(port) {
   var cfgPlay = JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', sefFake: 'still', seekDelay: 600000, fixedClock: '21:34', welcome: false });
   seeds.play = seed({}, null, cfgPlay);
   seeds.playsub = seed({}, { 'settings-aaaa1111.json': { ass: 'text' } }, cfgPlay);
-  seeds.playEn = seed({ lang: 'en' }, null, cfgPlay);
+  seeds.playEn = seed({ lang: 'en' }, null, cfgPlay); seeds.playNb = seed({ lang: 'nb' }, null, cfgPlay);
   seeds.bookPlay = seed({}, null, cfgPlay); seeds.bookPlayEn = seed({ lang: 'en' }, null, cfgPlay);   // Jetzt laeuft als Hoerbuch (Kapitel = Titel)
   seeds.playAsym = seed({}, { 'settings-aaaa1111.json': { seekArrows: '10/30', seekFf: '15/30' } }, cfgPlay);   // -10/+30 auf den Knoepfen
   // Schnellspulen (SPEC PLAY-32): Einstellung "Schnell spulen"; trickHls: der Server wandelt um (decision-hevc) -> Spruenge + Hinweis
@@ -658,6 +684,7 @@ function makeSeeds(port) {
   var pkgState = { account: null, server: null, users: null, profiles: {}, lastProfile: 'aaaa1111', protectRemindAt: 4102444800000, startProfile: 'main' };
   seeds.pkgSrv = seed(pkgState) + pkgWith(['http://127.0.0.1:' + friendPort]);
   seeds.pkgSrvMetaFail = seed(pkgState) + pkgWith(['http://127.0.0.1:' + friendPort]);
+  seeds.manyLibSrv = seed(pkgState) + pkgWith(['http://127.0.0.1:' + friendPort]);   // viele/lange Bibliotheken + weiterer Server
   seeds.pkgSrvDown = seed(pkgState, { 'srv-aaaa1111.json': { v: 1, s: { 'friend-machine-0001': { uri: '', ts: 1, libs: [{ id: 1, title: 'Kino', type: 'movie', kind: 'movie' }] } } } }) +
     pkgWith(['http://127.0.0.1:9']);
   // Entdecken mit Helfer (plex.tv-Reihen): Filter "Nur Titel, die du noch nicht hast" an (Standard) / aus; Weitere Server + Helfer
@@ -754,6 +781,8 @@ function makeSeeds(port) {
   var animeOv = { 900: 1, 910: 1 };
   for (var ai = 0; ai < 30; ai++) animeOv[5100 + ai * 10] = 1;
   seeds.anime = seed({}, { 'anime-aaaa1111.json': animeOv });
+  seeds.manySeasons = seed();   // Nutzerbefund 03.11.: Serie mit 8 Staffeln, teils gesehen
+  seeds.longSum = seed(); seeds.longSumEn = seed({ lang: 'en' });   // Befund 03.11.: lange Beschreibung im INFO-Panel
   // Akzentfarbe (N.accent): Profil mit eigener Farbe; state.accent = zuletzt genutzte Farbe (Start ohne Farbsprung)
   seeds.violet = seed({ accent: 'violet' }, { 'settings-aaaa1111.json': { accent: 'violet' } });
   seeds.coral = seed({ accent: 'coral' }, { 'settings-aaaa1111.json': { accent: 'coral' } });
@@ -1057,10 +1086,18 @@ var SCENES = [
   { name: 'library-ptr-band', seed: 'ptrHold', keys: 'LEFT,DOWN,ENTER,wait800,DOWN', mwait: 5000, moves: '600:300,600:320,600:630,600:634' },
   { name: 'details-movie', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER' },
   { name: 'details-movie-cast', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN' },
+  // NAV-12 (Befund 03.11.): INFO zeigt die ganze Beschreibung; laengerer Text blaettert mit DOWN in Stufen (Anfang, Mitte, Endlage)
+  { name: 'details-info-long', seed: 'longSum', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,INFO,wait400' },
+  { name: 'details-info-long-down', seed: 'longSum', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,INFO,wait400,DOWN,wait300' },
+  { name: 'details-info-long-end', seed: 'longSum', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,INFO,wait400,DOWN,DOWN,DOWN,DOWN,wait300' },
+  { name: 'details-info-long-end-en', seed: 'longSumEn', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,INFO,wait400,DOWN,DOWN,DOWN,DOWN,wait300' },
   // Nutzerbefund 30.10.: Fokus in der letzten Reihe (Poster "Aehnliche Titel") – Ring frei ueber der Hinweisleiste (Layout-Art ring)
   { name: 'details-movie-last', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,DOWN,DOWN,DOWN,DOWN,wait800' },
   { name: 'details-show-last', seed: 'home', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait800', mask: [[144, 124, 1000, 26]] },
   { name: 'details-show', seed: 'home', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER' },
+  // Nutzerbefund 03.11. (Apple-Karte): Serie mit 8 Staffeln, teils gesehen – Staffelstreifen + Serien-Balken am TV ganz im Bild (TV unveraendert)
+  { name: 'details-show-seasons8', seed: 'manySeasons', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait1200' },
+  { name: 'details-show-seasons8-tabs', seed: 'manySeasons', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait1200,DOWN,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,wait1200', mask: [[144, 124, 1000, 26]] },
   { name: 'details-show-eps', seed: 'home', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,DOWN', mask: [[144, 124, 1000, 26]] },
   { name: 'details-show-noart', seed: 'home', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,9,9,9,9,wait1500,ENTER,wait800' },
   { name: 'details-show-noart-eps', seed: 'home', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,9,9,9,9,wait1500,ENTER,wait800,DOWN,DOWN', mask: [[144, 124, 1000, 26]] },
@@ -1204,6 +1241,8 @@ var SCENES = [
   // Weitere Server: Seitenleiste mit Bibliotheken eines freigegebenen Servers (Herkunft), Bibliothek/Details mit Herkunft,
   // Seitenleiste anpassen, Einstellungszeile, nicht erreichbarer Server (Meldung nur fuer ihn)
   { name: 'srv-rail', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  // Nutzerbefund 03.11.: viele und lange Bibliotheken plus weiterer Server – Eintraege ueberlappen nie, Einstellungen bleiben frei
+  { name: 'rail-many', seed: 'manyLibSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'srv-library', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait1000' },
   { name: 'srv-details', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait1000,RIGHT,ENTER,wait2500', mask: [[992, 624, 288, 32]] },   // letzte Besetzungsbilder laden mal spaeter
   { name: 'srv-railitems', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
@@ -1242,7 +1281,21 @@ SCENES.push({ name: 'saver-pause-still', seed: 'svPicPauseStill', keys: SV_PAUSE
   { name: 'saver-pause-real', seed: 'svPicPauseReal', keys: SV_PAUSE }, { name: 'saver-pause-poster-en', seed: 'svPicPausePosterEn', keys: SV_PAUSE },
   // hold: Aufnahme nach ms ab Start (PAUSE bei ~4,6 s, Schoner + Bild ~7 s, Wandern nach 5 s Takt ~12,5 s, naechstes ~17,5 s)
   { name: 'saver-pause-poster-pos1', seed: 'svPicPausePosterPos1', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,PAUSE', hold: 10000 },   // Lage 1 (vor dem Wandern)
-  { name: 'saver-pause-poster-pos2', seed: 'svPicPausePosterMove', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,PAUSE', hold: 15000 });   // nach dem Wandern: Lage 2, Plakat mit
+  { name: 'saver-pause-poster-pos2', seed: 'svPicPausePosterMove', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,PAUSE', hold: 15000 });
+/* Norwegisch (Bokmaal, Nutzerwunsch 03.11.): die wichtigsten Ansichten mit Suffix -nb – gleiche Wege wie die deutschen Szenen;
+ * Layout-Pruefung gilt (lange Woerter). library-*-nb mit Titeln auf Æ Ø Å (Leiste # A–Z Æ Ø Å), search-nb mit der Reihe yzæøå. */
+SCENES.push({ name: 'login-nb', seed: 'loginNb', mask: LOGIN_MASK },
+  { name: 'home-nb', seed: 'nb' },
+  { name: 'library-nb', seed: 'nbAbc', keys: 'LEFT,DOWN,ENTER' },
+  { name: 'library-reg-nb', seed: 'nbAbc', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN' },
+  { name: 'library-reg-end-nb', seed: 'nbAbc', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT' + ',DOWN'.repeat(28) + ',wait600' },
+  { name: 'details-movie-nb', seed: 'nb', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER' },
+  { name: 'details-show-nb', seed: 'nb', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,RIGHT,wait800,DOWN' },
+  { name: 'settings-nb', seed: 'nb', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT' },
+  { name: 'settings-lang-nb', seed: 'nb', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,ENTER,wait600' },
+  { name: 'search-nb', seed: 'nb', keys: 'BLUE,wait600,DOWN,DOWN,DOWN,DOWN,RIGHT,RIGHT,RIGHT' },
+  { name: 'search-123-nb', seed: 'nb', keys: 'BLUE,wait600,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'player-osd-nb', seed: 'playNb', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,PAUSE', mask: CLOCK });   // nach dem Wandern: Lage 2, Plakat mit
 
 var running = null;                                          // laufender Firefox (der Worker beendet ihn beim Abbruch)
 function shot(port, sc, done) {
@@ -1262,7 +1315,7 @@ function shot(port, sc, done) {
 }
 
 /* Selbsttest der Layout-Pruefung (tools/layout_selftest.html): genau diese Befunde muessen kommen, sonst ist sie blind */
-var LAYOUT_EXPECT = ['button x-btn x-btn-hint', 'clip x-clip', 'edge x-edge', 'notice x-note x-note-under', 'offscreen x-off', 'overlap x-ov-a x-ov-b', 'panel x-pa x-pb', 'ring x-hints x-ring', 'safe x-safe', 'spill x-spill-btn x-spill-dlg'];
+var LAYOUT_EXPECT = ['button x-btn x-btn-hint', 'clip x-clip', 'clip x-cut', 'edge x-edge', 'notice x-note x-note-under', 'offscreen x-bar', 'offscreen x-off', 'overlap x-ov-a x-ov-b', 'panel x-pa x-pb', 'ring x-hints x-ring', 'safe x-safe', 'spill x-spill-btn x-spill-dlg'];
 function layoutSelftest(port, done) {
   var prof = fs.mkdtempSync(path.join(os.tmpdir(), 'pnvis-')), out = path.join(CUR, 'layout-selftest.png');
   var url = 'file://' + path.join(ROOT, 'tools', 'layout_selftest.html') + '?probe=' + encodeURIComponent('http://127.0.0.1:' + port + '/layout?scene=_selftest');

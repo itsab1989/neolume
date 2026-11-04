@@ -40,7 +40,7 @@
     var s = { rail: null, wheelKeys: ['LEFT', 'RIGHT'], toastHigh: true, news: 'player', touchLong: false, panelFull: true };   // panelFull: Panels ueber die ganze Hoehe (nur flexible Flaeche, Nr. 17)   // news: HOME-13 an der Stelle der Toasts, nur mit newsPlay und ruhigem Bild   // Toasts oben links (NAV-10), nie ueber der Bedien-Insel
     var root, vbg, osdW, top, t1, t2, clk, bot, played, head, segs, cgs, tm0, tm1, skl, chn, spin, spinT, thumb, thImg, thT, skip, skipT, up, upImg, upTi, upIn, upBar, upBtns = [], sub, subT, sb, sbBg;
     var btnEl = {}, ppIc = null, numB = null, numF = null, lbl, lblT, mh, mhItems = [], mhRects = null;
-    var pb = null, sef = null, mk = null, acc = null, item = null, osd = false, osdT = 0, lastSec = -1, queue = null, qTask = null, upF = 0, cdOn = false, skipM = null, btnKind = null;
+    var mutedOn = false, pb = null, sef = null, mk = null, acc = null, item = null, osd = false, osdT = 0, lastSec = -1, queue = null, qTask = null, upF = 0, cdOn = false, skipM = null, btnKind = null;
     var closed = false, cues = null, cueI = -1, subClr = 0, thumbOn = false, thLast = -1, thT0 = 0, thFail = 0, bif = null, bifRaw = null, info = null, onFlush = null, trackMem = null, errOn = false, slow = 0;
     // Fokus im OSD: zone 'btn' | 'bar' | 'skip'; quick = Balken per ◀▶ bei verborgenem OSD (Sammelfenster 600 ms, sonst 1 s)
     // ids = bedienbare Knoepfe (Fokus/Zeiger), vis = sichtbare (gesperrte ⏮/⏭ gedimmt), pn = Modus von ⏮/⏭ ('ep'|'chap'|'item'|'')
@@ -131,7 +131,7 @@
       t1 = U.txt('div', 'pl-t1 ell', ti, ''); t2 = U.txt('div', 'pl-t2 ell', ti, '');
       clk = U.txt('div', 'pl-isl pl-clk', top, '');
       if (N.platform.caps.pointer === 'mouse') {                     // Finger/Maus: Zurueck oben links (am TV nie angelegt)
-        bk = U.el('div', 'pl-isl pl-bk', top); N.ui.icon(bk, 'ret', 's2');
+        bk = U.txt('div', 'pl-isl pl-bk', top, '\u2039').parentNode;   // wie Zurueck in Panels/Ansichten (tback, pbk): ‹ statt TV-Kappe ↵
         bk.setAttribute('role', 'button'); bk.setAttribute('aria-label', N.t('pl.btn.exit'));
       }
       bot = U.el('div', 'pl-isl pl-bot', osdW, 'display:none');
@@ -216,8 +216,8 @@
     /* Schmaler Player an/aus (nur flexible Flaeche): Lagen aller Inseln inline (aus), Video-Feld fuer die Plattform (N.screen.video,
      * Apple-Lader legt das <video> hinein), Balken-Marken neu (Breite) */
     function nar() {
-      var S = N.screen, c = S.cls, on = S.flex && !errOn && c.h === 'N' && (c.w === 'K' || c.w === 'M'), g, k;
-      NG = on ? O.narrow(S.w, S.h, c.w === 'M') : null; G = NG || TVG; g = NG;
+      var S = N.screen, c = S.cls, on = S.flex && c.h === 'N' && (c.w === 'K' || c.w === 'M'), g, k;
+      NG = on ? O.narrow(S.w, S.h, c.w === 'M', S.safe) : null; G = NG || TVG; g = NG;
       U.cls(root, 'pl-nar', on);
       function px(v) { return on ? v + 'px' : ''; }
       function at(e, x, y, w, h) { var st = e.style; st.left = px(x); if (y !== null) st.top = px(y); if (w !== undefined) st.width = px(w); if (h !== undefined) st.height = px(h); }
@@ -230,8 +230,8 @@
       at(chn.parentNode, on && 32, on && g.CHN_Y, on && g.ISW - 64);
       btnPos();
       lbl.style.top = px(on && g.LBL_Y);
-      mh.style.top = px(on && g.MH_Y); mh.style.right = px(on && 24);
-      skip.style.top = px(on && g.SKIP_Y); skip.style.right = px(on && 24);
+      mh.style.top = px(on && g.MH_Y); mh.style.right = px(on && 24 + g.SR);
+      skip.style.top = px(on && g.SKIP_Y); skip.style.right = px(on && 24 + g.SR);
       at(up, on && g.UPX, on && g.CBY - 168); at(last, on && g.UPX, on && g.CBY - 120);
       at(spin, on && Math.round((g.W - 400) / 2), on && g.VY + Math.round((g.VH - 112) / 2));
       at(lostEl, on && g.LOX, on && g.LOY);
@@ -239,6 +239,12 @@
       thumb.style.top = '';
       at(vbg, on && 0, on && g.VY, on && g.VW, on && g.VH);   // Vorschau/Messlauf: Platzhalter im Video-Feld
       S.video = on ? { x: 0, y: g.VY, w: g.VW, h: g.VH } : null;
+      if (lpv) {                                       // Feinauswahl: Balken und Insel der wirksamen Anordnung (offen -> zu)
+        lpEnd();
+        var lo = lpv.o; lo.barTop = G.BAR_Y - 5; lo.barX = G.BAR_X; lo.barW = G.BAR_W; lo.islY = G.ISY; lo.islX = G.ISX; lo.islW = G.ISW;
+      }
+      var sl = on ? S.safe.l : 0, iw = on ? g.W - sl - S.safe.r : 0, ew = on ? Math.min(iw - 48, 720) : 0;
+      sb.fit(on ? { x: Math.round(sl + (iw - ew) / 2), w: ew, H: g.H } : null);   // Fehlerblock schmal: in die (sichere) Breite umbrochen, mittig
       if (sef && sef.relayout) sef.relayout();
       if (segM) buildSegs(segM);
       if (pb) paint(pb.t);
@@ -273,8 +279,21 @@
       if (N.screen && N.screen.video) N.screen.video = null;   // Video-Feld des schmalen Players freigeben
       status = null;
     };
+    /* "Wird gespielt" des Geraets (optional N.platform.player.nowPlaying, Apple: Sperrbildschirm, Kontrollzentrum, Mac-Menueleiste;
+     * SPEC NAV-26): Titel, Serie/Folge, Bild; null = vorbei. Am Fernseher keine Funktion. */
+    function nowPlaying(it) {
+      var f = N.platform.player && N.platform.player.nowPlaying;
+      if (!f) return;
+      try {
+        if (!it) { f(null); return; }
+        var ep = it.type === 'episode';
+        f({ title: ep ? (it.epTitle || it.title) : it.title, artist: ep ? it.title : '', album: ep ? N.t('pl.epTitle', { s: it.s, e: it.e, t: '' }).replace(/ · $/, '') : '',
+          art: it.thumb && N.img && N.img.url ? N.img.url(it.thumb, 'poster') : '' });
+      } catch (e) { N.log('nowPlaying ' + e.message); }
+    }
     function shutdown() {
       closed = true;
+      nowPlaying(null);
       if (offerTm) { clearTimeout(offerTm); offerTm = 0; }
       if (endT) { clearTimeout(endT); endT = 0; }
       if (hintT) { clearTimeout(hintT); hintT = 0; }
@@ -319,10 +338,11 @@
       lpEnd();
       item = it; cues = null; cueI = -1; showSub(''); hideSkip(); hideUp(); hideLast();
       if (xt && xt.item) xt.item(it); bif = null; thFail = 0; slow = 0; chs = []; chI = -2; trickHinted = false; U.vis(trk, false);
-      if (errOn) { errOn = false; if (onRsz) nar(); }   // nach einem Fehler: schmale Anordnung wieder an
+      errOn = false;
       clearLow(); bw = new N.comfort.BufWatch(U.now()); pausedAt = 0; prevSt = ''; hideLost();
       sb.hide(); U.show(sbBg, false);
       U.setText(t1, it.type === 'episode' ? it.title : ''); U.setText(t2, it.type === 'episode' ? N.t('pl.epTitle', { s: it.s, e: it.e, t: it.epTitle || '' }) : it.title);
+      nowPlaying(it);
       pcfg = U.extend(U.extend({}, cfg()), sess);
       subLook();
       var cn = conn(), sv = isrv();
@@ -481,7 +501,8 @@
     }
     function paintClk(pos, d) {
       var now = N.clock.date(), ends = d ? N.t('pl.endsAt', { time: F.clock(new Date(now.getTime() + d - pos)) }) : '';
-      U.setText(clk, cfg().clock === false ? ends : N.comfort.clock(now, N.config.fixedClock) + (ends ? ' · ' + ends : ''));   // P5 set.clock
+      var t = cfg().clock === false ? ends : N.comfort.clock(now, N.config.fixedClock) + (ends ? ' · ' + ends : '');   // P5 set.clock
+      U.setText(clk, mutedOn ? N.t('pl.mutedShort') + (t ? ' · ' + t : '') : t);   // Taste M (Apple): "Ton aus" bleibt sichtbar
     }
     function markerTick(ms) {
       if (lastEnd) return;                           // Karte am echten Ende: spaete Zeit-Ereignisse aendern nichts mehr
@@ -692,6 +713,24 @@
       if (eff('ffrw') === 'trick') tx.push(N.t('pl.btn.normal'), N.t('pl.trick.hls'), N.t('pl.trick.off'), N.t('pl.trick.hls.rw'), N.t('pl.trick.off.rw'));
       for (k = 0; k < tx.length; k++) if (lblW[tx[k]] === undefined) { U.setText(lblMT, tx[k]); var w = lblMT.parentNode.offsetWidth || 0; if (w) lblW[tx[k]] = w; }
     }
+    /* Computer-Tastatur (Apple, Nr. 10, SPEC NAV-26): K/J/L/C/Shift+N/P; M meldet nur den Ton-Stand (der Lader schaltet ihn).
+     * Am Fernseher kommt das nie (keine Lader-Funktion). */
+    s.onCmd = function (cmd, arg) {
+      var A = arrows();
+      if (cmd === 'seekto') { if (typeof arg === 'number' && arg >= 0 && dur()) { showOsd(); seekTo(Math.min(arg * 1000, dur()), false); } return true; }
+      switch (cmd) {
+        case 'toggle': if (pb) pb.toggle(); showOsd(); return true;
+        case 'back': showOsd(); seekBy(-A.b * 1000, true); return true;
+        case 'fwd': showOsd(); seekBy(A.f * 1000, true); return true;
+        case 'subs': showOsd(); tracks('s'); return true;
+        case 'next': if (pn) { showOsd(); stepItem(1); } return true;
+        case 'prev': if (pn) { showOsd(); stepItem(-1); } return true;
+        case 'muted': case 'unmuted':
+          mutedOn = cmd === 'muted'; N.ui.toast.show(N.t(mutedOn ? 'pl.muted' : 'pl.unmuted')); showOsd();
+          if (pb) paintClk(pb.t || 0, dur()); return true;
+      }
+      return false;
+    };
     function activate(id) {
       var st = arrows();                                     // wiederholte Klicks sammeln wie die Tasten (ein Sprung nach 600 ms Ruhe)
       switch (id) {
@@ -721,8 +760,9 @@
         var e = mhItems[i], d = list[i];
         U.show(e.root, !!d);
         if (!d) continue;
-        var col = { green: ['k-green', 'B'], yellow: ['k-yellow', 'C'], blue: ['k-blue', 'D'] }[d.k];
-        e.k.className = col ? 'k ' + col[0] : 'kt'; U.setText(e.kT, col ? col[1] : 'INFO');
+        var col = { green: ['k-green', 'B'], yellow: ['k-yellow', 'C'], blue: ['k-blue', 'D'] }[d.k], lab = N.keys.label(d.k);
+        if (lab !== null) col = null;                     // Apple (NAV-26): neutrale Kappe mit der echten Taste statt Farbquadrat
+        e.k.className = col ? 'k ' + col[0] : 'kt'; U.setText(e.kT, col ? col[1] : lab !== null ? lab : 'INFO');
         U.setText(e.lb, N.t(d.t));
       }
       mh.list = list;
@@ -781,7 +821,7 @@
     }
     function showThumb(ms, w) {
       var x = U.clamp(G.BAR_X + w - 120, G.ISX, G.ISX + G.ISW - 240);
-      if (NG) thumb.style.top = (G.BAR_Y - 202) + 'px';   // schmal: Vorschau ueber dem Balken (im Bild)
+      if (NG) thumb.style.top = (G.BAR_Y - 202 - (lpTab && lpS === 'panel' ? 76 : 0)) + 'px';   // schmal: Vorschau ueber dem Balken bzw. der Lasche (im Bild)
       thumb.style.left = x + 'px';
       U.setText(thT, hms(ms));
       U.show(thumb, true);
@@ -834,17 +874,18 @@
      * Vorschaubilder A); Klick setzt das Ziel ueber das Sammelfenster (ein Sprung), Taste/Wegbewegen nach oben/seitlich schliesst.
      * Schutzzone: das Band reicht bis zur Unterkante der Bedien-Insel (y 638) – solange die Feinauswahl offen ist, reagiert die
      * Knopfreihe (Treffer 530–594) weder auf Zeigen noch auf Klick; ein Klick dort setzt das feine Ziel (TV-Befund 28.10.) ---------- */
-    var LP_BOT = G.ISY + G.ISH;                               // oben: Laschen-Oberkante (A/D) bzw. 32 px ueber der Balkenmitte (B)
+    function lpBot() { return G.ISY + G.ISH; }                // oben: Laschen-Oberkante (A/D) bzw. 32 px ueber der Balkenmitte (B)
     function ptrLive() { var P = N.pointer; return !!(P && P.rawT && U.now() - P.rawT < P.LIVE); }
     function lpHalf() { return N.Loupe.half(dur(), G.BAR_W); }
-    function lpOk() { return !NG && eff('ptrLoupe') === true && N.pointer.enabled() && osd && hov && !!pb && !acc.active() && !N.router.hasOverlay() && !errOn && !lost && lpHalf() > 0; }
+    function lpOk() { return eff('ptrLoupe') === true && N.pointer.enabled() && osd && hov && !!pb && !acc.active() && !N.router.hasOverlay() && !errOn && !lost && lpHalf() > 0; }
     function lpOpen(x) {
       var h = lpHalf(), Lp = N.Loupe;
       if (!h || closed) return;
       lpS = Lp.style(eff('loupeStyle'), { thumbs: thumbOn && !!(pb && pb.meta && pb.meta.partId) });
+      if (NG && lpS === 'film' && G.BAR_W < Lp.STY.film.w) lpS = 'panel';   // schmal: 7 Bilder passen nicht -> Lasche A (gleiche Logik)
       var g = lp.open(Lp.geom({ x: x, barX: G.BAR_X, barW: G.BAR_W, dur: dur(), w: Lp.width(lpS, 480, G.BAR_W), h: h }), chs, 0);
       lpTab = Lp.tab(lpS, g, G.ISY);
-      lpBand = Lp.band(lpS, g, { barY: G.BAR_Y, islY: G.ISY, bottom: LP_BOT, side: G.BAR_Y + 16 });   // seitlich raus nur bis zur Balken-Trefferzone
+      lpBand = Lp.band(lpS, g, { barY: G.BAR_Y, islY: G.ISY, bottom: lpBot(), side: G.BAR_Y + 16 });   // seitlich raus nur bis zur Balken-Trefferzone
       lpBar(true);
       if (lpS === 'film' || (!thumbOn && lpS !== 'stretch')) U.show(thumb, false);   // Zielzeit steht an der Feinleiste bzw. im Bild
       U.cls(thumb, 'lp-panel', lpS === 'panel');                 // A: Vorschaubild ueber der Lasche
@@ -917,7 +958,7 @@
      * Titel-Ebene haengt an der Oberkante, die Bedien-Ebene an der Unterkante, Mitte bleibt im Kasten -> Bildschirm-Punkte
      * umrechnen (N.osd.fullPt). Am TV ohne Wirkung (Versatz 0). full(x, y): Bildschirm-Punkt; ptLow: Zeiger als Bedien-Ebene */
     function full(x, y, how) {
-      if (NG) { if (!errOn) return { x: x, y: y }; var st = N.screen.stage(); return { x: (x - st.x) / st.k, y: (y - st.y) / st.k }; }   // schmal: Flaechen-Punkte; Fehler im Kasten
+      if (NG) return { x: x, y: y };                   // schmal: Flaechen-Punkte (auch der Fehlerblock, N.ui.StateBlock.fit)
       return O.fullPt(x, y, N.screen.stage(), N.screen.h, how || (lost || errOn ? 'mid' : ''));
     }
     function ptLow() { return full(N.pointer.x, N.pointer.y, 'low'); }
@@ -1206,7 +1247,6 @@
       }
       acc.cancel(); hideSpin(); hideSkip(); hideUp(); hideLast(); hideOsd(true);
       errOn = true;
-      if (NG) nar();                                   // schmal: Fehlerblock wie bisher im verkleinerten Kasten
       transparent(false); U.show(sbBg, true);
       var k = e.kind, kids = N.session.isKid(), txt = N.t('pl.err.' + k + '.text');
       if (kids && (k === 'fileMissing' || k === 'server' || k === 'playback')) txt += ' ' + N.t('kids.askAdult');

@@ -253,6 +253,10 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .panel .pe.act.dis.is-focus { background: @c.surface-2@; } .panel .pe.act.dis.is-focus .lb { color: @c.text-1@; } .panel .pe.act.dis.is-focus .sb { color: @c.text-2@; }
 .panel .px { position: absolute; left: 32px; top: 112px; width: 376px; font-size: @ty.body.size@; line-height: @ty.body.lh@; color: @c.text-2@; white-space: pre-line;
   max-height: 520px; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 20; }   /* INFO-Text endet ueber der Hinweisleiste (20 Zeilen, y 632) mit "…" (TV-Befund 28.10.) */
+/* Hilfe-/INFO-Panel (N.ui.panel.help, NAV-12): Text immer ganz; Fenster ueber der Hinweisleiste (20 Zeilen, y 112-632, Hoehe aus JS),
+ * laengerer Text scrollt per translate3d am Text (Befund 03.11.) */
+.panel .pxc { position: absolute; left: 32px; top: 112px; width: 376px; overflow: hidden; }
+.panel .pxc .px { position: relative; left: 0; top: 0; max-height: none; overflow: visible; display: block; }
 
 /* ---------- Login (SPEC 7.1) ---------- */
 .wordmark { position: absolute; left: @l.content-x@; top: 56px; font-size: @ty.h2.size@; line-height: @ty.h2.lh@; font-weight: @ty.h2.weight@; }
@@ -562,7 +566,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
  * Titel-Ebene (blendet mit dem OSD), Tippflaeche >= 44 pt ab Faktor 0,62; nur unter .pl-dir (letzte Eingabe Finger/Maus), dann
  * rueckt die Titel-Insel um 72 + 16 nach rechts. Symbol "ret" in text-1 (32er Raster, mittig) */
 .pl-bk { display: none; left: 0; top: 0; width: 72px; height: 72px; }
-.pl-bk .ic { left: 20px; top: 20px; -webkit-transform: scale(1.5); }   /* Sprite-Pfeil ist fuer Tastenkappen gezeichnet (klein) */
+.pl-bk { text-align: center; font-size: 44px; line-height: 66px; }   /* ‹ wie .tback/.pbk (Nutzerbefund 03.11.: kein TV-Symbol ↵) */
 .pl-dir .pl-bk { display: block; } .pl-dir .pl-ti { left: 88px; }
 /* Bedien-Insel (TV-Befund 27.10. nachmittags): Balken · Zeiten · Knopfreihe · Label unter dem Fokus-Knopf, Raster 32 px Innenrand;
  * Farbtasten-Hinweise als eigene Insel darunter (Lage der Hinweisleiste). Koordinaten muessen zu N.osd passen. */
@@ -776,6 +780,13 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .regcol .reg.off { color: @c.line@; }
 .regcol .reg.cur { height: 17px; border-radius: @r.xs@; font-size: 16px; line-height: 17px; font-weight: 600; color: @c.text-1@; background: @c.surface-3@; }
 .regcol .reg.cur.is-focus { background: @accent@; color: @c.on-accent@; }
+/* A–Z-Leiste mit Finger/Maus (LIB-12, nur Plattformen mit Touch/Maus; am TV nie gesetzt): Zeiger darueber = helle fette Schrift,
+ * Ziehen = Buchstabe in der Leiste wie fokussiert + runde dunkle Anzeige mit Akzent-Buchstabe links neben dem Finger (.azs, Lage inline), "•" = verdichtet */
+.regcol .reg.hov { font-weight: 600; color: @c.text-1@; }   /* hell statt Akzent: Budget der Akzent-Varianten (accent.test) ist ausgeschoepft */
+.azs { position: absolute; left: 0; top: 0; width: 92px; height: 92px; border-radius: 48px; background: @c.surface-1@; border: 2px solid @c.line@;
+  text-align: center; font-size: 56px; line-height: 92px; font-weight: 600; z-index: @z.float@; }   /* Schrift: Klasse cacc (Akzent) */
+.azs.sm { width: 52px; height: 52px; border-radius: 28px; font-size: 32px; line-height: 52px; }
+.azs.no { color: @c.text-3@; }
 /* Hintergrund in Bibliotheken (ui/ambient.js): zwei feste Vollbild-Ebenen ganz unten, nur die obere blendet (Deckkraft) */
 .amb { position: absolute; left: 0; top: 0; width: @l.screen-w@; height: @l.screen-h@; -webkit-transform: translate3d(0,0,0); }
 .amb-b { opacity: 0; -webkit-transition: opacity @mo.slow@ @mo.ease-std@; }

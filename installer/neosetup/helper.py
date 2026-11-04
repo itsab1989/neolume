@@ -455,7 +455,7 @@ class Helper(object):
     # --- TV-facing request handling (pure; LanServer passes method/path/headers/client) ---
     def hello(self):
         d = {'name': 'plex-neo-helper', 'version': VERSION, 'brand': brand.CURRENT.get('slug', ''), 'watchlist': True, 'discover': True,
-             'features': ['watchlist', 'discover', 'servers', 'details'] + (['update'] if self.update_on else [])}
+             'features': ['watchlist', 'discover', 'servers', 'details', 'nb'] + (['update'] if self.update_on else [])}
         for x in self.ext: d['features'] += [f for f in x.features() if f not in d['features']]
         if self.background: d['background'] = True
         return d
@@ -563,7 +563,7 @@ def host_ok(host):
 
 ROUTE_KEYS = {'/watchlist': ('type', 'start', 'size'), '/watchlist/state': ('ids',), 'item': (), 'discover': ('type', 'size'), '/servers': (),
               '/details': ('id', 'lang')}
-LANGS = {'de': 1, 'en': 1}
+LANGS = {'de': 1, 'en': 1, 'nb': 1}     # nb: Norwegian (Bokmål) app language since 03.11.2026; announced as feature 'nb'
 
 
 def check_keys(q, route):

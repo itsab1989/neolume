@@ -268,3 +268,16 @@ test('Genre-Zusatzreihe: stabiler Schluessel ohne Genre-ID, neutraler Name in DE
   assert.strictEqual(N.t('set.hr.name.movie.genre'), 'Top-Filme eines Genres (wechselt)');
   N.i18n.set('en'); assert.strictEqual(N.t('set.hr.name.movie.genre'), 'Top movies of a genre (changes)'); N.i18n.set('de');
 });
+
+test('Norwegisch (03.11.): Anime "NO, sonst EN" / "nur NO", Untertitel "Immer" Norwegisch -> Englisch, Spur-Schluessel no', function () {
+  var t = st([['jpn']], [['eng'], ['nor'], ['ger']]);
+  eq([N.tracks.choose(t, cfg({ anime: true, animeSubs: 'noen' }), null, true).s], [3]);
+  eq([N.tracks.choose(st([['jpn']], [['eng'], ['ger']]), cfg({ anime: true, animeSubs: 'noen' }), null, true).s], [2]);
+  assert.notStrictEqual(N.tracks.choose(st([['jpn']], [['eng']]), cfg({ anime: true, animeSubs: 'no' }), null, true).why, 'anime');
+  var r = N.tracks.choose(st([['eng', '', true]], [['ger'], ['eng'], ['nob']]), cfg({ audioLang: 'no', subs: 'always', subLang: 'no' }), null, false);
+  eq([r.s], [4]);
+  r = N.tracks.choose(st([['eng', '', true]], [['ger'], ['eng']]), cfg({ audioLang: 'no', subs: 'always', subLang: 'no' }), null, false);
+  eq([r.s], [3]);                                        // keine norwegische Spur: Englisch, nicht Deutsch
+  r = N.tracks.choose(st([['eng', '', true]], [['ger'], ['eng']]), cfg({ subs: 'always', subLang: 'en' }), null, false);
+  eq([r.s], [3]);                                        // wie bisher: Englisch gewuenscht und vorhanden
+});

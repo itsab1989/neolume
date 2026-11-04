@@ -114,7 +114,7 @@ test('Groessenklassen (10-screens.md 6.2): Breite K < 800 <= M < 1280 <= R, Hoeh
   assert.deepStrictEqual(J(N.screen.classOf(545, 941)), { w: 'K', h: 'N', id: 'K\u00b7N' });
 });
 
-test('Anordnung je Breitenklasse (10-screens.md 6.3): R wie TV, M Inhalt ab x 80, K ab x 24 + Leiste unten; TV unveraendert', function () {
+test('Anordnung je Breitenklasse (10-screens.md 6.3, Nutzerbefund 03.11.): Seitenleiste ab W 800 (R, M·N, M·F, auch mit Notch), K ab x 24 + Leiste unten; TV unveraendert', function () {
   var N = load().N, size = { w: 1280, h: 912 };
   N.screen.init();
   assert.deepStrictEqual(J(N.screen.view()), { x: 0, y: 0, w: 1280, h: 720 }, 'TV');
@@ -123,13 +123,30 @@ test('Anordnung je Breitenklasse (10-screens.md 6.3): R wie TV, M Inhalt ab x 80
   N.platform.screen.size = function () { return size; };
   N.screen.init();
   assert.deepStrictEqual(J(N.screen.view()), { x: 0, y: 0, w: 1280, h: 912 }, 'R');
+  assert.strictEqual(N.screen.nav(), 'rail');
   size = { w: 960, h: 1232 }; N.evt.emit('screen:changed', size);
-  assert.deepStrictEqual(J(N.screen.view()), { x: -64, y: 0, w: 1024, h: 1232 }, 'M: Kante 144 - 64 = 80');
+  assert.deepStrictEqual(J(N.screen.view()), { x: 0, y: 0, w: 960, h: 1232 }, 'M·N (iPad hoch): Seitenleiste fest, Kante 144 wie TV');
+  assert.strictEqual(N.screen.nav(), 'rail');
+  size = { w: 840, h: 1278 }; N.evt.emit('screen:changed', size);
+  assert.strictEqual(N.screen.nav(), 'rail', 'iPad mini hoch: Seitenleiste fest');
+  size = { w: 1092, h: 556 }; N.evt.emit('screen:changed', size);
+  assert.deepStrictEqual(J(N.screen.view()), { x: 0, y: 0, w: 1092, h: 556 }, 'M·F ohne seitlichen Rand (Mac-Fenster, iPhone SE quer): Seitenleiste fest');
+  assert.strictEqual(N.screen.nav(), 'rail');
+  size = { w: 1272, h: 586, safe: { t: 0, r: 91, b: 31, l: 91 } }; N.evt.emit('screen:changed', size);
+  assert.deepStrictEqual(J(N.screen.view()), { x: 91, y: 0, w: 1272 - 182, h: 586 }, 'M·F mit Notch (iPhone quer): Seitenleiste neben der Notch, Inhalt ab 144 + Rand');
+  assert.strictEqual(N.screen.nav(), 'rail'); assert.strictEqual(N.ui.rail.edge(), 91);
+  // Mac-Fenster (Nutzerbefund 03.11.): Mindestgroesse 960x540 pt (logisch 918x516), Start 1280x720 pt (MacBook Air s 1,148 -> 1114x626),
+  // 1440x900, Vollbild 1512x982 -> immer die Icon-Spalte
+  [[918, 516], [1114, 626], [1254, 784], [1318, 856]].forEach(function (d) {
+    assert.strictEqual(N.screen.navOf(N.screen.classOf(d[0], d[1])), 'rail', 'Mac ' + d.join('x'));
+  });
   size = { w: 586, h: 1132 }; N.evt.emit('screen:changed', size);
   assert.deepStrictEqual(J(N.screen.view()), { x: -120, y: 0, w: 706, h: 1132 - N.screen.TAB_H }, 'K: Kante 24, Leiste unten');
-  // Raster: rechts nur 88 frei (A–Z am Rand) -> Spalten nach Formel; Reihen: mehr Karten als ohne Kante
-  var G = N.GridMath.make('L', false, { w: 1024, h: 1232, r: 88 }), Gm = N.GridMath.make('M', false, { w: 1024, h: 1232, r: 88 });
-  assert.deepStrictEqual([G.COLS, Gm.COLS], [4, 4]);
+  assert.strictEqual(N.screen.nav(), 'tabs');
+  // Raster: rechts nur 88 frei (A–Z am Rand) -> Spalten nach Formel; iPad hoch mit Seitenleiste (960): L 3 / M 4 / S 6, iPad mini (840) 3/3/5
+  var G = N.GridMath.make('L', false, { w: 960, h: 1232, r: 88 }), Gm = N.GridMath.make('M', false, { w: 960, h: 1232, r: 88 });
+  assert.deepStrictEqual([G.COLS, Gm.COLS, N.GridMath.make('S', false, { w: 960, h: 1232, r: 88 }).COLS], [3, 4, 6]);
+  assert.deepStrictEqual(['L', 'M', 'S'].map(function (v) { return N.GridMath.make(v, false, { w: 840, h: 1278, r: 88 }).COLS; }), [3, 3, 5]);
   assert.strictEqual(N.GridMath.make('S', false, { w: 706, h: 1044, r: 88 }).COLS, 4);
 });
 
@@ -175,4 +192,69 @@ test('Falz (iPhone Duo, screen.geometry): gerade Spaltenzahl, Luecke der mittler
   N.screen.init();
   assert.deepStrictEqual(J(N.screen.fold), [{ x: 638, w: 4 }], 'nur senkrechte Streifen');
   assert.strictEqual(N.screen.foldX(), 640);
+});
+
+test('Sichere Raender (Nutzerbefund 03.11.): Flaeche bis an den Rand, Klasse aus der sicheren Flaeche, Inhalt/Kasten/Leiste halten Abstand', function () {
+  var N = load().N, size = { w: 960, h: 1280, safe: { t: 0, r: 0, b: 19, l: 0 } }, got = [];
+  N.platform.caps.screen = { w: 544, h: 516, scale: 2, flex: true };
+  N.platform.screen.size = function () { return size; };
+  N.screen.init();
+  N.evt.on('screen:resized', function (e) { got.push(e.cls); });
+  // iPad hoch (Home-Indikator unten 19): Ansicht reicht bis unten, Kasten mittig in der sicheren Flaeche
+  assert.deepStrictEqual(J(N.screen.safe), { t: 0, r: 0, b: 19, l: 0 });
+  assert.deepStrictEqual(J(N.screen.view()), { x: 0, y: 0, w: 960, h: 1280 });
+  assert.deepStrictEqual(J(N.screen.box()), { x: 0, y: 0, w: 960, h: 1280 });
+  var g = N.screen.stage(); assert.strictEqual(g.k, 0.75); assert.strictEqual(g.y, (1261 - 540) / 2);
+  // nur die Raender aendern sich -> trotzdem screen:resized (Lage der Knoepfe)
+  size = { w: 960, h: 1280, safe: { t: 0, r: 0, b: 0, l: 0 } }; N.evt.emit('screen:changed', size);
+  assert.deepStrictEqual(got, ['M·N']);
+  // iPhone hoch (oben 90, unten 50): K·N, Inhalt unter dem oberen Rand, Leiste unten um den Rand hoeher
+  size = { w: 586, h: 1272, safe: { t: 90, r: 0, b: 50, l: 0 } }; N.evt.emit('screen:changed', size);
+  assert.strictEqual(N.screen.cls.id, 'K·N');
+  assert.deepStrictEqual(J(N.screen.shape()), { cut: 120, bar: N.screen.TAB_H + 50 });
+  assert.deepStrictEqual(J(N.screen.view()), { x: -120, y: 90, w: 706, h: 1272 - 90 - N.screen.TAB_H - 50 });
+  assert.deepStrictEqual(J(N.screen.box()), { x: -120, y: 0, w: 706, h: 1272 - N.screen.TAB_H - 50 });
+  // iPhone 18 Pro Max quer (Notch 90 je Seite): ganze Breite 1390 waere R, die sichere 1210 ist M·F -> Menue-Knopf
+  size = { w: 1390, h: 640, safe: { t: 0, r: 90, b: 31, l: 90 } }; N.evt.emit('screen:changed', size);
+  assert.strictEqual(N.screen.cls.id, 'M·F'); assert.strictEqual(N.screen.nav(), 'rail');
+  assert.deepStrictEqual(J(N.screen.view()), { x: 90, y: 0, w: 1390 - 180, h: 640 });
+  g = N.screen.stage(); assert.ok(g.x >= 90 && g.x + 1280 * g.k <= 1300 + 1e-9 && g.y + 720 * g.k <= 609 + 1e-9, 'Kasten in der sicheren Flaeche');
+  // Unsinn vom System (Raender groesser als die halbe Flaeche) -> keine Raender
+  size = { w: 960, h: 1280, safe: { t: 0, r: 500, b: 0, l: 500 } }; N.evt.emit('screen:changed', size);
+  assert.deepStrictEqual(J(N.screen.safe), { t: 0, r: 0, b: 0, l: 0 });
+});
+
+test('Seitenleiste auf flachen Flaechen (Mac-Mindestfenster, iPhone quer; Nutzerbefunde 03.11.): Abstand 56, rollt, wenn sie nicht passt; TV unveraendert', function () {
+  var N = load().N, R = N.ui.rail, size = { w: 918, h: 516 };
+  N.screen.init();
+  assert.strictEqual(R.flat(), null); assert.deepStrictEqual(J(R.layoutY(6)), { y0: 112, step: 56 }, 'TV');
+  assert.deepStrictEqual(J(R.geo(10)), { set: 636, sMax: 0, clip: 0, top: 0 }, 'TV: Einstellungen 636, rollt nie');
+  N.platform.caps.screen = { w: 544, h: 516, scale: 2, flex: true };
+  N.platform.screen.size = function () { return size; };
+  N.screen.init();
+  assert.deepStrictEqual(J(R.flat()), { y0: 96, end: 424, h: 516 });
+  assert.deepStrictEqual(J(R.layoutY(6)), { y0: 96, step: 56 });
+  assert.deepStrictEqual(J(R.geo(5)), { set: 432, sMax: 0, clip: 424, top: 0 }, '5 Eintraege passen ueber die festen Einstellungen (432), kein Rollen');
+  assert.deepStrictEqual(J(R.geo(6)), { set: 432, sMax: 96 + 5 * 56 + 64 - 384, clip: 384, top: 40 }, 'Einstellungen fest bei 432 (Nutzerentscheidung 03.11.), Eintraege rollen im Ausschnitt 40..384, Pfeil-Baender (40) darueber/darunter');
+  assert.deepStrictEqual(J(R.layoutY(10)), { y0: 96, step: 56 });
+  assert.deepStrictEqual(J(R.geo(10)), { set: 432, sMax: 96 + 9 * 56 + 64 - 384, clip: 384, top: 40 }, '10 Eintraege: rollen ueber dem festen Eintrag');
+  size = { w: 1272, h: 586, safe: { t: 0, r: 91, b: 31, l: 91 } }; N.evt.emit('screen:changed', size);   // iPhone quer: ohne unteren Rand
+  assert.strictEqual(R.flat().h, 555); assert.ok(R.geo(10).sMax > 0); assert.strictEqual(R.edge(), 91);
+  size = { w: 960, h: 1280, safe: { t: 0, r: 0, b: 19, l: 0 } }; N.evt.emit('screen:changed', size);
+  assert.strictEqual(R.flat(), null); assert.deepStrictEqual(J(R.geo(10)), { set: 636 + 1261 - 720, sMax: 0, clip: 0, top: 0 }, 'iPad hoch: unten buendig ueber dem Home-Indikator');
+});
+
+test('Seitenleiste per Maus (Nutzerbefund 03.11.: klappt manchmal nicht auf): Treffer genau bzw. naechster Eintrag; TV nur genau', function () {
+  var N = load().N, R = N.ui.rail;
+  N.screen.init();
+  R.entries = [{ id: 'profile', y: 28 }, { id: 'search', y: 112 }, { id: 'home', y: 168 }, { id: 'settings', y: 636 }];
+  R.sy = 0; R.clip = 0; R.ctop = 0;
+  assert.deepStrictEqual([R.hitY(130, false), R.hitY(163, false), R.hitY(163, true), R.hitY(400, true)], [1, -1, 1, 2], 'Luecke: genau keiner, naechster = Suche; Mitte der Spalte: Start');
+  // flach, gerollt: Ausschnitt 32..392, Einstellungen fest bei 432; weggerollte Eintraege zaehlen nicht
+  R.entries = [{ id: 'profile', y: 28 }, { id: 'search', y: 96 }, { id: 'home', y: 152 }, { id: 'lib-1', y: 208 }, { id: 'settings', y: 432, fixed: true }];
+  R.sy = 100; R.clip = 392; R.ctop = 32;
+  assert.strictEqual(R.hitY(10, true), 1, 'Pfeil-Band oben: naechster sichtbarer Eintrag (Suche ragt noch bis 44 ins Bild, Profil ist weggerollt)');
+  assert.strictEqual(R.hitY(400, true), 4, 'Pfeil-Band unten: Einstellungen (fest)');
+  assert.strictEqual(R.hitY(440, false), 4, 'Einstellungen genau (rollt nicht mit)');
+  assert.strictEqual(R.hitY(60, false), 2, 'gerollt: Start liegt bei 52..100');
 });

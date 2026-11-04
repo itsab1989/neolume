@@ -156,12 +156,12 @@ test('Helfer-Fehler: nicht erreichbar -> "down" (kein Zwischenspeichern), kaputt
   });
 });
 
-test('Zusammenfuehren: Freigabe mit Land schlaegt eine US-Angabe; INFO-Text kuerzt die Beschreibung, nie die Fakten', function () {
+test('Zusammenfuehren: Freigabe mit Land schlaegt eine US-Angabe; INFO-Text zeigt Beschreibung und Fakten ganz (Befund 03.11.)', function () {
   var a = D.infoFromHelper({ contentRating: 'R' }), b = D.emptyInfo(); b.cr = 'de/16';
   assert.strictEqual(D.mergeInfo(a, b).cr, 'de/16');
   assert.strictEqual(D.mergeInfo(D.infoFromHelper({ contentRating: 'de/12' }), b).cr, 'de/12');
   var x = D.infoFromHelper(helperMovie()), long = new Array(120).join('Sehr langer Text. ');
   var t = D.extInfoText({ type: 'movie', year: 1978, title: 'N' }, x, long, 'Hinweis der Erweiterung.');
-  assert.ok(t.length <= 700, t.length);
+  assert.ok(t.indexOf(long) > 0, 'ganze Beschreibung (' + long.length + ' Zeichen) im INFO-Text');
   ['Regie: Rita Regie', 'Erschienen: 25.10.1978', 'Hinweis der Erweiterung.'].forEach(function (s) { assert.ok(t.indexOf(s) >= 0, s + ' fehlt'); });
 });

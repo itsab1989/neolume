@@ -199,3 +199,15 @@ test('Tastatur flexibel (Apple, 10-screens 7): eigenes Raster, Leerzeichen/Loesc
   var tv = S.layout('abc', 'de'); H.eq([tv.length, 'h' in tv[0][0], tv[5][1].x, tv[6][0].w], [7, false, 144 + 180, 172], 'ohne Raster: genau das TV-Ergebnis');
   assert.strictEqual(S.layout('abc', 'de').g, undefined);
 });
+
+test('Tastatur auf Norwegisch (03.11.): Reihe yzæøå auf abc, äöüéß auf 123; T9 2 = abcæå, 6 = mnoø (Deutsch unveraendert)', function () {
+  assert.strictEqual(S.layout('abc', 'nb')[4].map(function (k) { return k.k; }).join(''), 'yzæøå');
+  assert.strictEqual(S.layout('abc', 'nb').length, 7);
+  assert.strictEqual(S.layout('num', 'nb')[3].map(function (k) { return k.k; }).join(''), 'äöüéß');
+  N.i18n.set('nb');
+  assert.strictEqual(S.letters('2'), 'abcæå'); assert.strictEqual(S.letters('6'), 'mnoø'); assert.strictEqual(S.letters('7'), 'pqrs');
+  var t = new S.T9(); t.press('6', 0); t.press('6', 100); t.press('6', 200); var o = t.press('6', 300);
+  assert.strictEqual(o.cand, 'ø');
+  N.i18n.set('de');
+  assert.strictEqual(S.letters('2'), 'abcä'); assert.strictEqual(S.letters('6'), 'mnoö');
+});

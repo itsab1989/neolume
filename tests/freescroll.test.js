@@ -118,3 +118,39 @@ test('Grid (Mediathek S7): Seitenlage frei, Fenster folgt, Zeiger rollt nie, Tas
   assert.strictEqual(g.free, false); assert.strictEqual(ty(), G.offset(2)); assert.strictEqual(g.f, 2 * G.COLS);
   assert.strictEqual(g.ringPos().y, G.Y0, 'Ring am Anker');
 });
+
+test('Grid: Tastenschritt gleitet mit freiem Scrollen per rAF (Apple), am TV EIN Transform wie bisher; Gegenprobe KEY_TWEEN', function () {
+  function mk(platform) {
+    var c = H.load({ fakeTimers: true, platform: platform }), M = c.N, q = [];
+    function El(tag) { this.tagName = tag; this.style = {}; this.childNodes = []; this.className = ''; }
+    El.prototype.appendChild = function (x) { this.childNodes.push(x); x.parentNode = this; return x; };
+    El.prototype.setAttribute = function () {};
+    c.document = { createElement: function (t) { return new El(t); }, createTextNode: function (t) { return { nodeValue: t }; }, body: new El('body') };
+    M.util.raf = function (f) { q.push(f); };
+    var g = new M.ui.Grid(new El('div')), items = [];
+    for (var i = 0; i < 200; i++) items.push({ rk: 'm' + i, type: 'movie', title: 'Demo ' + i, thumb: '' });
+    g.setModel(items, 200, 0); g.focused = true;
+    function frames(n) { for (var k = 0; k < n; k++) { c.timers.tick(20); var f = q.splice(0, q.length); f.forEach(function (x) { x(); }); } }
+    return { g: g, M: M, frames: frames, ty: function () { return Number(/,(-?[\d.]+)px,0\)/.exec(g.pg.style.webkitTransform)[1]); } };
+  }
+  var tv = mk(), G = tv.g.G;
+  tv.frames(5);                                        // Einrasten nach setModel (60 ms) vorbei
+  tv.g.focusTo(G.COLS);
+  assert.strictEqual(tv.ty(), G.offset(1), 'TV: sofort am Ziel (CSS-Uebergang macht die Bewegung)');
+  assert.notStrictEqual(tv.g.pg.style.webkitTransition, 'none');
+  var ap = mk('apple'), g = ap.g;
+  g.focusTo(g.G.COLS);
+  ap.frames(2);
+  var y1 = ap.ty();
+  assert.ok(y1 < 0 && y1 > g.G.offset(1), 'Apple: unterwegs nach dem ersten Frame (' + y1 + ')');
+  assert.strictEqual(g.pg.style.webkitTransition, 'none', 'kein CSS-Uebergang unter dem Gleiten');
+  g.focusTo(2 * g.G.COLS);                             // naechste Taste mitten im Gleiten: weiter von der aktuellen Lage
+  ap.frames(2);
+  assert.ok(ap.ty() < y1, 'setzt an der aktuellen Lage fort');
+  ap.frames(12);
+  assert.strictEqual(ap.ty(), g.G.offset(2), 'am Ziel');
+  ap.M.ui.Grid.KEY_TWEEN = false;
+  g.focusTo(3 * g.G.COLS);
+  assert.strictEqual(ap.ty(), g.G.offset(3), 'Gegenprobe: ein Transform wie am TV');
+  ap.M.ui.Grid.KEY_TWEEN = true;
+});

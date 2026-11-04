@@ -176,10 +176,11 @@
     /* Einstellungen = Standard + eigene Wahl. Gespeichert wird nur, was das Profil selbst gewaehlt hat: So folgen Ton- und
      * Untertitelsprache der Oberflaechensprache, solange das Profil nie eine gewaehlt hat (TV-Test 27.10., F12). */
     applyDefaults: function () {
-      var own = S.own || {}, l = N.i18n.lang() === 'en' ? 'en' : 'de';
+      var own = S.own || {}, l = N.i18n.lang() === 'en' ? 'en' : N.i18n.lang() === 'nb' ? 'no' : 'de';   // Spur-Schluessel (N.tracks.langKey): Norwegisch 'no'
       // Feinauswahl: die Form C "Feinleiste" ('bar') gibt es nicht mehr (TV-Befund 28.10.) -> gespeicherte Wahl entfernen = A (Standard)
       if (own.loupeStyle === 'bar') { delete own.loupeStyle; if (S.profile) N.store.set('settings-' + S.profile.uuid + '.json', own); }
       S.settings = U.extend(U.extend(U.extend({}, DEFAULT_SETTINGS), { audioLang: l, subLang: l }), own);
+      if (own.animeSubs === undefined && l === 'no') S.settings.animeSubs = 'noen';   // Norwegisch: Anime mit norwegischen, sonst englischen UT
       if (own.stillWatching === undefined && S.isKid()) S.settings.stillWatching = 2;   // Kinderprofile: nach 2 Folgen nachfragen (SPEC 7.10)
       // Serien-Balken war bis 28.10. an "Folgen-Fortschritt" gekoppelt: wer das ausgeschaltet hatte, sieht ihn weiter nicht
       if (own.seriesProgress === undefined && own.episodeProgress === false) S.settings.seriesProgress = false;

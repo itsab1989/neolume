@@ -10,6 +10,7 @@
  * params: {it: normalisiertes Item (movie|show|season|episode)} */
 (function (N) {
   var U = N.util, M = N.model, D = N.det, REST = 300, ANCHOR = 340, TMORE = 44, SEC = 248, PEEK = 580, HOLD = 2500;
+  var SS_A = 276, SS_B = 300;                         // schmale Karte: Zeilen des Streifens/Serien-Balkens ueber den Reitern (Abschnitt-px)
   var PITCH = { land: 288, poster: 360, cast: 248 };
   /* Poster-Reihen (Aehnliche Titel, Sammlung) stehen beim Fokus LIFT px hoeher: Karte 264 px ab Anker + 52 endet bei 656, der Ring
    * (Karte + 8 px, Fokus-Vergroesserung 1.08) bei ~675 – ueber dem Text der Hinweisleiste (y 656). Nutzerbefund 30.10. Mit 28 px
@@ -38,6 +39,7 @@
     var RFREE = card && N.platform.caps.scroll === 'free', rdrv = [], epOpen = null;   // epOpen: Folge der offenen Folgen-Ebene
     if (card) s.card = true;
     var root, hero, pg, bar, btns = [], bdefs = [], btnRects = null, blbl, blblT, hideT = 0, sec = null;
+    var RX = 1216, TIGHT = false, TABW = 464;          // rechte Kante von Streifen/Balken, schmale Karte, Breite der Reiter
     var tclip, tstrip, tabEls = [], tabX = [], tabV = null, tmore = [], arrowH = -1, strip, stripT, sbar, sbarT, segs = [], epRow = null, rows = [], ring, sb, bubble, bubbleT;
     var d = null, seasons = [], sIdx = 0, tabF = 0, eps = [], epsTotal = 0, epPages = {}, epWait = {}, seasonCache = new N.LRU(10), gen = 0, tasks = [];
     var zone = 'btn', bf = 0, rk = 0, off = 0, infoFor = null, infoT = 0, seasonT = 0, dead = false, away = false, dirty = false;
@@ -130,6 +132,7 @@
       if (card) U.el('div', 'cd-bgfade', host);            // Hintergrundbild laeuft unten in die Kartenfarbe aus
       pg = U.el('div', 'pg', host);
       hero.makeInfo(host, { chips: 2, hdr: 'scrim-hdr.png' });
+      if (card && !NARROW) hero.fit(cardW());               // Karte M (iPad mini hoch): Zeilen auf die Kartenbreite (am TV keine Karte)
       var i;
       bar = U.el('div', 'd-btns', pg, NARROW ? 'left:' + BTN_X + 'px;width:' + (cardW() - BTN_X - 24) + 'px' : undefined);   // schmal: ab der Inhaltskante
       blbl = U.el('div', 'blbl', pg, 'display:none'); blblT = document.createTextNode(''); blbl.appendChild(blblT);
@@ -145,6 +148,12 @@
         for (i = 0; i < 40; i++) { var sg = U.el('div', 'ss-seg', sbar, 'display:none'); segs.push({ el: sg, fill: U.el('i', '', sg) }); }
         epRow = new N.ui.Row(sec, { noHead: true, caption: D.epCaption, w: card ? cardW() : 0, free: RFREE });
         epRow.setTop(ANCHOR);
+        /* Karte schmaler als 1280 (Apple, Klassen K/M; Nutzerbefund 03.11.: Staffelstreifen und Serien-Balken bei x 1216 lagen ausserhalb
+         * der Karte): rechte Kante RX = sichtbarer Rand; Streifen/Balken samt Text ruecken in zwei Zeilen UEBER die Reiter (zwischen
+         * Knoepfen und Reitern ist Platz), die Reiter bekommen die ganze Breite. Am TV/breiter Karte: RX 1216, alles wie bisher. */
+        if (card) { var cg0 = N.ui.card.g; RX = Math.min(1216, cg0.cw - (cg0.cut ? 144 - cg0.cut : 64)); }
+        TIGHT = RX < 1216;
+        if (TIGHT) { TABW = Math.max(160, RX - 128); tclip.style.width = TABW + 'px'; U.cls(sec, 'ss-tight', true); }
       }
       if (!card) { var fade = U.el('img', 'fade', root); fade.src = N.assetBase + 'fade-bottom.png'; }
       bubble = U.el('div', 'jump', root, 'display:none'); bubbleT = document.createTextNode(''); bubble.appendChild(bubbleT);
@@ -219,7 +228,7 @@
         btns.push(b);
       }
       bf = Math.min(bf, btns.length - 1);
-      if (zone === 'btn' && !away) U.cls(btns[bf], 'is-focus', true);
+      if (zone === 'btn' && !away) { U.cls(btns[bf], 'is-focus', true); btnFit(); }
       setTimeout(measureButtons, 50);
     }
     function measureButtons() {
@@ -354,7 +363,7 @@
     }
     function scrollTabs(jumpNow) {
       if (!tabX.length) return;
-      var v = D.tabView(tabX, tabF, tabV ? tabV.o : 0, 464, TMORE), k;
+      var v = D.tabView(tabX, tabF, tabV ? tabV.o : 0, TABW, TMORE), k;
       if (jumpNow) tstrip.style.webkitTransition = 'none'; else N.fx.move(tstrip);
       U.tf(tstrip, v.shift - v.o, 0);
       for (k = 0; k < tabEls.length; k++) tabEls[k].style.visibility = k < v.first || k > v.last ? 'hidden' : '';
@@ -468,21 +477,27 @@
      *    Folgen auf dem Server (TV-Befund 28.10.: sonst "Folge 1 von 12" mit Balken statt der Felder). Nur Schreiben, kein Messen. */
     function paintStrip() {
       // ganz fehlende Staffel (Katalog der Erweiterung): kein leerer Streifen (TV-Test 29.10.: duenne Linie ohne Text)
-      var st = N.session.settings || {}, se = seasons[sIdx], epOn = !!st.episodeProgress && !!se && !se.virtual, sbl = st.seriesProgress && se ? N.SeasonStrip.seriesBar(baseSeasons, se.index) : { mode: 'none' };   // nur Staffeln vom Server (ohne Katalog-Staffeln der Erweiterung, sonst springt die Zahl)
+      var st = N.session.settings || {}, se = seasons[sIdx], epOn = !!st.episodeProgress && !!se && !se.virtual, sbl = st.seriesProgress && se ? N.SeasonStrip.seriesBar(baseSeasons, se.index, TIGHT ? SW() : 0) : { mode: 'none' };   // nur Staffeln vom Server (ohne Katalog-Staffeln der Erweiterung, sonst springt die Zahl)
       var i;
       if (epOn) {
         var cur = eps[epRow.f], foc = (zone === 'eps' || zone === 'tabs') && cur && !cur.ph ? cur : null, src = D.stripSource(eps);
         var lay = N.SeasonStrip.layout({ enabled: true, size: 'M', episodes: src.full ? src.eps : null, total: se.leaf || src.n, viewed: se.vleaf,
-          next: foc ? foc.e : d && d.ondeck && d.ondeck.s === se.index ? d.ondeck.e : 0, threshold: N.config.watchedThreshold });
+          next: foc ? foc.e : d && d.ondeck && d.ondeck.s === se.index ? d.ondeck.e : 0, threshold: N.config.watchedThreshold, barW: TIGHT ? SW() : 0 });
         strip.render(lay);
-        var x = 1216 - (lay.width || 0);
+        var x = RX - (lay.width || 0);
         strip.el.style.left = x + 'px';
         U.setText(stripT, lay.mode === 'bar' ? lay.text : N.t('ss.countUnwatched', { k: Math.max(0, (se.leaf || 0) - (se.vleaf || 0)), n: se.leaf || 0 }));
-        stripT.parentNode.style.width = Math.max(0, x - 16 - 600) + 'px';
+        if (TIGHT) { strip.el.style.top = (SS_A + 2) + 'px'; stripT.parentNode.style.cssText = 'left:144px;top:' + SS_A + 'px;width:' + Math.max(0, x - 16 - 144) + 'px'; }
+        else stripT.parentNode.style.width = Math.max(0, x - 16 - 600) + 'px';
       } else { strip.render({ mode: 'none' }); U.setText(stripT, ''); }
       U.cls(sec, 'ss-solo', !epOn);
       U.show(sbar, sbl.mode !== 'none');
       U.setText(sbarT, N.SeasonStrip.seriesText(sbl));
+      if (TIGHT) {                                      // schmale Karte: rechtsbuendig an RX, Zeile B (bzw. A, wenn der Streifen aus ist)
+        var ly = epOn ? SS_B : SS_A, bw = sbl.width || SW();
+        sbar.style.cssText = 'left:' + (RX - bw) + 'px;top:' + (ly + 8) + 'px;width:' + bw + 'px' + (sbl.mode === 'none' ? ';display:none' : '');
+        sbarT.parentNode.style.cssText = 'left:144px;top:' + ly + 'px;width:' + Math.max(0, RX - bw - 16 - 144) + 'px;line-height:20px';
+      }
       for (i = 0; i < 40; i++) {
         var sg = segs[i], dd = sbl.mode === 'segments' ? sbl.segments[i] : sbl.mode === 'single' && i === 0 ? { x: 0, w: sbl.width, fill: sbl.fill, sel: true } : null;
         U.show(sg.el, !!dd);
@@ -558,8 +573,17 @@
       else if (zone === 'eps') epRow.setFocused(false);
       else if (zone === 'row' && rows[rk]) rows[rk].row.setFocused(false);
     }
+    /* Karte auf flacher Flaeche (Mac-Fenster ab 516, Befund 03.11.: Knoepfe unten angeschnitten): so weit gerollt, dass die Knopfreihe
+     * (Seite y 448–496) mit 16 Abstand ganz im Bild ist; sonst 0 */
+    /* Karte auf flacher Flaeche (Befund 03.11., iPhone quer mit Tastatur: Fokus-Reihe halb unter der Hinweisleiste): Versatz o mindestens
+     * so gross, dass die Reihe bis bottom (Seiten-y) mit Platz fuer die Hinweisleiste (88) im Bild ist; TV/Seite: o unveraendert */
+    function fitLow(o, bottom) { return card ? Math.max(o, Math.min(cardMax(), bottom + 88 - cardH())) : o; }
+    function btnOff() { return card ? Math.max(0, 512 - cardH()) : 0; }
+    function btnFit() { var bo = btnOff(); if (bo && cpage && cy < bo) cardTo(bo, false); }   // erster Aufbau: Knopfreihe ins Bild
     function toBtn() {
-      leaveZone(); zone = 'btn'; setOff(0); heroInfo(true); ring.hide(); dimButtons(false);
+      var bo = btnOff();
+      leaveZone(); zone = 'btn'; setOff(bo); heroInfo(true); ring.hide(); dimButtons(false);
+      if (N.input.mode !== 'key') btnFit();               // Finger/Maus: auch ohne Tasten einmal ins Bild
       U.cls(btns[bf], 'is-focus', true); paintLabel();
       if (d && infoFor !== d.it) infoLater(d.it);
       if (isShow) N.idle.add(function () { if (!dead) paintStrip(); }, 'det-strip');   // Marker wieder auf der naechsten Folge (nicht die zuletzt fokussierte)
@@ -577,7 +601,7 @@
     function toEps() {
       if (seasonT && epRow && epRow.vis === false) { clearTimeout(seasonT); seasonT = 0; loadSeason(sIdx); }   // Karten der neuen Staffel sofort
       if (!epRow || !epRow.count()) return;
-      leaveZone(); zone = 'eps'; setOff(SEC); heroInfo(false); dimButtons(true); markTabs();
+      leaveZone(); zone = 'eps'; setOff(fitLow(SEC, SEC + 392 + (epRow ? epRow.g.h : 0))); heroInfo(false); dimButtons(true); markTabs();
       epRow.setFocused(true); placeRing(epRing(epRow.ringPos()));
       infoLater(eps[epRow.f]); ensureEpPages();
       N.router.refreshHints();
@@ -585,7 +609,7 @@
     function toRow(i) {
       if (!rows[i]) return;
       leaveZone(); zone = 'row'; rk = i; dimButtons(true);
-      setOff(rowOff(i)); heroInfo(false);
+      setOff(fitLow(rowOff(i), rows[i].top + 52 + rows[i].row.g.capY)); heroInfo(false);
       rows[i].row.setFocused(true); rows[i].row.boost(); placeRing(rows[i].row.ringPos());
       if (d && infoFor !== d.it && !isShow) infoLater(d.it);
       N.router.refreshHints();
@@ -721,7 +745,7 @@
     function showInfo() {
       var x = zone === 'eps' && eps[epRow.f] && !eps[epRow.f].ph ? eps[epRow.f] : d ? d.it : it0;
       if (x.type === 'episode') {
-        var em = epMeta.get(x.rk), text = U.trim(em && em.sum || x.sum, 600);
+        var em = epMeta.get(x.rk), text = U.trim(em && em.sum || x.sum, N.det.MAXI);
         N.ui.panel.help(N.t('det.epTitle', { e: x.e, title: x.epTitle }), text);
         return;
       }
@@ -730,7 +754,7 @@
       if (isShow && seasons.length) {
         var all = 0, seen = 0;
         for (var i = 0; i < seasons.length; i++) if (seasons[i].index !== 0) { all += seasons[i].leaf; seen += seasons[i].vleaf; }
-        t = U.trim(t + '\n\n' + N.t('det.seriesInfo', { k: seen, n: all }), 600);
+        t = U.trim(t + '\n\n' + N.t('det.seriesInfo', { k: seen, n: all }), N.det.MAXI);
       }
       N.ui.panel.help(x.title, t);
     }
@@ -912,7 +936,7 @@
     function ptrAt(x, y) {
       if (y >= RM.VIS) return null;
       var t = targets();
-      for (var i = 0; i < t.length; i++) if (t[i].v && y >= t[i].cy && y < t[i].cy + t[i].h) return t[i].z === 'tabs' && (x < 128 || x >= 592) ? null : t[i];
+      for (var i = 0; i < t.length; i++) if (t[i].v && y >= t[i].cy && y < t[i].cy + t[i].h) return t[i].z === 'tabs' && (x < 128 || x >= 128 + TABW) ? null : t[i];
       return null;
     }
     /* Pfeil ‹/› der Reiterzeile unter x: 0 links, 1 rechts, -1 keiner */
@@ -1022,6 +1046,7 @@
 
     /* ---------- Detailkarte: freie Seite, Treffer, Gesten (nur card) ---------- */
     function cardW() { var g = N.ui.card.g; return g ? g.cw : 1280; }
+    function SW() { return Math.min(336, Math.max(96, Math.round((RX - 144) * 0.45))); }   // Balkenbreite in der schmalen Karte
     function cardH() { var g = N.ui.card.g; return g ? g.ch : 720; }
     /* Unterkante des Inhalts (Seiten-px): letzte Reihe samt Beschriftung, sonst Folgenreihe bzw. erster Bildschirm */
     function pageBottom() {
@@ -1068,7 +1093,7 @@
       }
       var b = bandAt(py);
       if (!b) return false;
-      if (b.z === 'tabs') return x >= 128 && x < 592 ? ptrAct({ z: 'tabs' }, x, kind) : false;
+      if (b.z === 'tabs') return x >= 128 && x < 128 + TABW ? ptrAct({ z: 'tabs' }, x, kind) : false;
       return ptrAct(b.z === 'eps' ? { z: 'eps' } : { z: 'row', i: b.i }, x, kind);
     }
     /* Router (Kartengesten): ganz oben -> Ziehen nach unten schliesst; waagerecht ausserhalb einer Reihe -> zurueck */
@@ -1268,7 +1293,7 @@
       else if (id === 'start') N.details.play(x, 'start');
       else if (id === 'watched') N.watch.toggle(x, { label: x.title, changed: function () { paint(); N.router.refreshHints(); }, reverted: function () { paint(); N.router.refreshHints(); } });
     }
-    function info() { var t = U.trim(meta && meta.sum || x.sum || '', 600); N.ui.panel.help(N.t('det.epTitle', { e: x.e, title: x.epTitle }), t); }
+    function info() { var t = U.trim(meta && meta.sum || x.sum || '', N.det.MAXI); N.ui.panel.help(N.t('det.epTitle', { e: x.e, title: x.epTitle }), t); }
     s.enter = function () { if (back) { back = false; loadMeta(); } N.router.refreshHints(); };
     s.leave = function () { return null; };
     s.destroy = function () { dead = true; if (task) task.abort(); N.evt.off('playback:stopped', onStop); N.img.drop(img); };

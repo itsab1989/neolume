@@ -20,7 +20,7 @@ SCHEMA = 1
 SERVERS_SCHEMA = 1                                      # profiles[i].servers ("Weitere Server"); older apps ignore it
 SAFE_ENTRY = re.compile(r'^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$')
 DEV_ONLY = {'bench.js', 'proto.js'}                     # old prototypes that must not ship
-APP_FILES = re.compile(r'^(app\.js|[A-Za-z0-9_-]+\.(png|gif))$')   # same rule as tools/dev.py
+APP_FILES = re.compile(r'^(app\.js|[A-Za-z0-9_-]+\.(png|gif)|i18n/[a-z]{2}\.js)$')   # same rule as tools/dev.py (i18n/<lang>.js: text tables)
 WIDGET_ID_RE = re.compile(r'^[A-Za-z0-9_]{1,64}$')
 MAX_ZIP = 64 << 20
 
@@ -121,6 +121,11 @@ def base_from_repo(root, icon=None):
     for f in sorted(os.listdir(app)):
         if APP_FILES.match(f) and f != 'app.js':
             with open(os.path.join(app, f), 'rb') as fh: out.append((f, fh.read()))
+    i18n = os.path.join(app, 'i18n')                 # text tables, one file per language (the TV only loads the active one)
+    if not os.path.isdir(i18n): raise PackageError('no_app', 'app/i18n/ (npm run build)')
+    for f in sorted(os.listdir(i18n)):
+        if APP_FILES.match('i18n/' + f):
+            with open(os.path.join(i18n, f), 'rb') as fh: out.append(('i18n/' + f, fh.read()))
     return out
 
 

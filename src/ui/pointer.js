@@ -5,6 +5,7 @@
  *   Gleiten (N.fx.step(true): nur die bewegten Elemente ohne Uebergang), Tasten gleiten weiter.
  * - Hinweisleiste anklickbar (Klick auf einen Eintrag = diese Taste; Smart Control hat z. B. kein TOOLS).
  * - Langes Druecken auf das Touchpad (>= 800 ms) = TOOLS (Optionen) fuer das Element unter dem Punkt; der Klick danach entfaellt.
+ * - Maus/Trackpad (caps.pointer 'mouse'): Rechtsklick/Ctrl-Klick = sofort TOOLS fuer das Element unter dem Zeiger (P.context, NAV-25).
  * - Letzte Eingabe gewinnt: nach einer Taste werden Zeiger-Bewegungen ignoriert, bis sich der Punkt deutlich bewegt (> 16 px).
  * - Klick = OK auf dem Element unter dem Punkt. Blaetter-Pfeile an der fokussierten Reihe nur bei aktivem Zeiger.
  * - Mausrad (falls geliefert) -> Tasten der Zone (Reihe: LINKS/RECHTS, Liste: HOCH/RUNTER), hoechstens alle 150 ms.
@@ -79,8 +80,8 @@
     if (!N.screen || !N.screen.flex || !t) return null;
     if (isOv) return N.screen.stageFor ? N.screen.stageFor(t) : N.screen.stage();
     if (!t.flex) return N.screen.stage();
-    var v = N.screen.view();                         // flexible Ansicht: Breitenklasse M/K verschiebt die Inhaltskante
-    return v.x ? { x: v.x, y: 0, k: 1 } : null;
+    var v = N.screen.view();                         // flexible Ansicht: Breitenklasse M/K und sichere Raender verschieben den Inhalt
+    return v.x || v.y ? { x: v.x, y: v.y, k: 1 } : null;
   }
   /* Flaechen-Punkt -> Kasten-Punkt (o = stageOff; k < 1: Kasten verkleinert, schmale/flache Flaeche) */
   function sx(o, x) { return o ? (x - o.x) / o.k : x; }
@@ -101,13 +102,14 @@
     if (cf && !(rail && rail.isOpen())) {            // Detailkarte (nur caps.details 'card'): Inhalt, X/Pfeil, Flaeche daneben
       var ch = N.ui.card.hit(x, y);
       if (ch === 'in') { P.holdCancel(); return scr.pointer ? scr.pointer((x - cf.x) / cf.k + (cf.cut || 0), (y - cf.y) / cf.k, kind, target) : false; }
-      if (!(ch === 'out' && x < 112 && !slim && rail && rail.attached()) && N.router.cardPointer(x, y, kind)) return true;
+      if (!(ch === 'out' && rail && x < 112 + rail.edge() && !slim && rail.attached()) && N.router.cardPointer(x, y, kind)) return true;
     }
     if (rail && rail.attached()) {
+      var rx = rail.edge ? rail.edge() : 0;          // flexibel: Spalte neben dem linken Rand (Notch quer); TV 0
       if (rail.isOpen()) {
-        if (x < 320) return rail.pointer(x, y, kind);
+        if (x < 320 + rx) return rail.pointer(x - rx, y, kind);
         if (kind === 'move') rail.close();           // Punkt verlaesst das Panel -> einklappen, Fokus zurueck
-      } else if (x < 112 && !slim && !(P.arrowsOn && arrowHit(x, y))) {
+      } else if (x < 112 + rx && !slim && !(P.arrowsOn && arrowHit(x, y))) {
         return rail.pointer(x, y, kind);             // Punkt auf der Rail -> ausklappen
       } else if (rail.rest) rail.away();             // Punkt hat die Icon-Spalte verlassen: Darueberfahren klappt wieder auf
 
@@ -167,7 +169,7 @@
       folRaf = false;
       if (!P.on || N.input.mode !== 'pointer' || P.keyT || P.mdrag || P.dragOn) return;
       var rl = N.ui.rail;
-      if (!owner() && rl && rl.attached() && (rl.isOpen() || (P.x < 112 && !(rl.slim && rl.slim())))) return;
+      if (!owner() && rl && rl.attached() && (rl.isOpen() || (P.x < 112 + (rl.edge ? rl.edge() : 0) && !(rl.slim && rl.slim())))) return;
       N.fx.step(true);                                 // Ring/Karten springen ohne Gleiten (wie jede Zeiger-Bewegung)
       route(P.x, P.y, 'move', null);
     });
@@ -329,6 +331,20 @@
     }, LONG);
   };
   P.up = function () { if (P.longT) { clearTimeout(P.longT); P.longT = 0; } };
+  /* Rechtsklick bzw. Ctrl-Klick (nur caps.pointer 'mouse', NAV-25): sofort Optionen (TOOLS) fuer das Element unter dem Zeiger,
+   * wie der lange Druck. ctrl: ein Ctrl-Klick kann danach noch "click" senden -> wie beim langen Druck verwerfen (P.down setzt
+   * longDone beim naechsten Druck zurueck). Gibt true zurueck, wenn TOOLS ausgeloest wurde. */
+  P.context = function (x, y, ctrl) {
+    P.up();
+    if (!P.on || hintKey(x, y)) return false;
+    P.x = x; P.y = y; P.lockT = 0; thr.cancel(); P.pend = false; edgeStop(); P.holdCancel();
+    P.longDone = !!ctrl;
+    if (N.idle) N.idle.touch();
+    N.fx.step(true);
+    route(x, y, 'move', null);
+    N.router.key('TOOLS');
+    return true;
+  };
   /* Ziehen (Finger: Touch-Schicht ueber App.grab/App.drag; Maus: mousedown bei caps.pointer 'mouse'). grab fragt nur, drag fuehrt
    * aus. Nur am Bildschirm selbst (kein Overlay, keine offene Rail, kein Schoner): dort bleibt alles beim Tippen/Klicken. */
   function dragScreen() {
@@ -387,6 +403,7 @@
     if (N.idle) N.idle.touch();
     var ov = owner();
     if (ov && ov.wheel) { var oo = stageOff(ov, true); if (ov.wheel(oo ? x - oo.x : x, oo ? y - oo.y : y, dx, dy)) return true; }   // Overlay mit freier Liste
+    if (!ov && N.ui.rail && N.ui.rail.wheel && N.ui.rail.wheel(x, y, dy)) return true;   // flach: rollende Seitenleiste unter dem Zeiger
     var sc = ov || (N.ui.rail && N.ui.rail.isOpen && N.ui.rail.isOpen()) ? null : N.router.top(), o = stageOff(sc, false);
     var cf = sc && N.router.cardFrame ? N.router.cardFrame(sc) : null;   // Detailkarte: Inhalts-Koordinaten der Karte
     if (cf) { if (sc.wheel && sc.wheel((x - cf.x) / cf.k + (cf.cut || 0), (y - cf.y) / cf.k, dx / cf.k, dy / cf.k)) return true; }
@@ -414,6 +431,7 @@
     root.addEventListener('mousedown', function (e) {
       if (e && e.preventDefault) e.preventDefault();
       if (!P.on) return;
+      if (e && e.button === 2 && N.platform.caps.pointer === 'mouse') return;   // Sekundaerklick: kommt als contextmenu
       if (P.mdrag) { P.mdrag = false; P.drag('cancel', P.x, P.y); }   // Loslassen ausserhalb des Fensters kam nie an
       N.input.set(kindOf(e)); P.dragDone = false;
       // Beruehrung/Druck haelt freies Scrollen an (Schwung stoppt, iOS-Verhalten); die Ansicht verschluckt dann den Klick selbst
@@ -423,6 +441,14 @@
       // Maus/Trackpad (caps.pointer 'mouse', nicht am TV): Druck auf ein Zug-Ziel (Player-Balken) -> Ziehen statt Klick/langer Druck
       if (N.input.mode === 'pointer' && N.platform.caps.pointer === 'mouse' && P.grab(e.clientX, e.clientY) === 'drag' && P.drag('start', e.clientX, e.clientY)) { P.mdrag = true; return; }
       press(true); P.down(e.clientX, e.clientY);
+    }, false);
+    // Rechtsklick/Ctrl-Klick = Optionen (Maus/Trackpad, NAV-25); das Kontextmenue der WebView entfaellt. Fernseher: kein Ereignis
+    if (N.platform.caps.pointer === 'mouse') root.addEventListener('contextmenu', function (e) {
+      if (e && e.preventDefault) e.preventDefault();
+      if (!P.on || P.mdrag) return;
+      N.input.set(kindOf(e));
+      P.context(e.clientX, e.clientY, !!(e && e.ctrlKey && e.button !== 2));
+      P.refocus();
     }, false);
     root.addEventListener('mouseup', function (e) {
       if (P.mdrag) { P.mdrag = false; P.dragDone = true; P.drag('end', e.clientX, e.clientY); P.refocus(); return; }

@@ -8,13 +8,33 @@
  * Optionale Erweiterungen (nur "Startseite anpassen", C.ext): zusaetzliche Eintraege unten ("Reihe hinzufuegen …", N.ext
  * 'home:adders' / 'home:add') und entfernbare Reihen (Rot, N.ext 'home:removable', mit Rueckfrage).
  * Finger/Maus (caps.scroll 'free'): die Liste scrollt frei unter dem Finger (N.ui.freeList: Schwung, Gummiband, kein Einrasten),
- * Wischen aendert den Fokus nicht, Tipp schaltet; beim Verschieben bleibt Wischen hoch/runter = ein Platz je Schritt (Nr. 26). */
+ * Wischen aendert den Fokus nicht, Tipp schaltet; beim Verschieben bleibt Wischen hoch/runter = ein Platz je Schritt (Nr. 26).
+ * Griff (NAV-27, nur Finger/Maus: N.screen.flex mit caps.touch bzw. caps.pointer 'mouse'; am TV gibt es ihn nicht): jede verschieb-
+ * bare Zeile hat rechts einen Griff; ihn ziehen (Finger ueber App.grab/App.drag, Maus mit gedrueckter Taste) hebt die Zeile an, sie
+ * folgt dem Finger, die anderen ruecken weich nach (nur transform), am Listenrand rollt die Liste selbst, Loslassen legt ab (Tick je
+ * Platzwechsel mit caps.haptic). Weit seitlich daneben = Abbruch. Tipp auf den Griff, langes Druecken bzw. Rechtsklick: Menue "Nach
+ * oben / Nach unten / Ganz nach oben / Ganz nach unten". Tastatur: Cmd+Pfeil hoch/runter, mit Umschalt ganz nach oben/unten. */
 (function (N) {
-  var U = N.util, HR = N.homeRows, X = 144, W = 736, TOP = 112, STEP = 64, VIS = 6, ANCHOR = 2, STALE = 600000;
+  var U = N.util, HR = N.homeRows, TOP = 112, STEP = 64, ANCHOR = 2, STALE = 600000;
   function editor(C) { return function () {
     var s = { rail: null, wheelKeys: ['UP', 'DOWN'], toastLow: true, backBtn: true }, K = C.keys;   // backBtn: Finger/Maus ohne Hinweisleiste (Nr. 26)   // Toast unter der Beschreibung (.hr-desc bis y 608, NAV-10)
     var S = N.session, root, clip, list, desc, stat, els = [], items = [], f = 0, sc = 0, moving = false, cat = null, busy = null, dead = false, more = null, fl = null;
-    var MOD = C.model || HR;                            // Listen-Logik (view/store/move): Startseite/Inspiration N.homeRows, Seitenleiste N.railRows
+    var MOD = C.model || HR;
+    /* Lage (TV: Liste x 144 … 880, 6 Zeilen, "So geht's" rechts bei x 912). Flexible Flaeche schmal oder flach (Nachbefund G 03.11.:
+     * im verkleinerten Kasten war die Schrift am iPhone winzig): Ansicht 1:1 in der Flaeche (scr.flex), Liste ueber die Breite bis 24
+     * vor den Rand, so viele Zeilen wie in die Hoehe passen (Zeile 64 = 44 pt am iPhone), "So geht's" rechts daneben ab 960 Breite,
+     * sonst unter der Liste; Ueberschrift rechts neben dem Zurueck-Knopf. Breit und hoch (R·N) wie am TV im Kasten. */
+    var VA = N.screen.view(), FX = N.screen.flex && (VA.w < 1264 || VA.h < 720), X = 144, W = 736, VIS = 6, TX = 144, HOW = null;
+    if (N.screen.flex) s.reflow = true;                 // ob flexibel, haengt von der Flaeche ab (N.router.relayout)
+    if (FX) {
+      var side = VA.w >= 960, sf = N.screen.safe, sb = N.screen.nav() !== 'tabs' ? sf.b : 0, HH = side ? 0 : 192;
+      s.flex = true;
+      TX = Math.max(144, Math.max(64, sf.l + 16) + 48 + 16 - VA.x);   // Zurueck-Knopf (N.ui.hints.BACK) in Flaechen-px bei 64/40
+      W = side ? VA.w - 168 - 320 : VA.w - 168;
+      VIS = Math.max(3, Math.floor((VA.h - TOP - 24 - sb - HH) / STEP));
+      HOW = side ? { x: X + W + 32, y: TOP, w: 288 } : { x: X + 24, y: TOP + VIS * STEP + 24, w: W - 48, below: true };   // unten: buendig mit den Zeilentexten
+    }
+    var caps = N.platform.caps, GRIP = N.screen.flex && (!!caps.touch || caps.pointer === 'mouse'), dg = null, hap = null, GZ = 64;   // Griff-Zone rechts in der Zeile                            // Listen-Logik (view/store/move): Startseite/Inspiration N.homeRows, Seitenleiste N.railRows
     function locked(it) { return !it.reset && !!(C.locked && C.locked(it)); }   // immer an (z. B. Start in der Seitenleiste)
 
     function saved() { return S.settings && S.settings[C.setting] || null; }
@@ -45,20 +65,22 @@
     /* ---------- Aufbau ---------- */
     s.create = function (el) {
       root = el;
-      U.txt('div', 'a t-h1', root, N.t(K.title), 'left:144px;top:40px;width:720px');
-      clip = U.el('div', 'hr-clip', root);
-      list = U.el('div', 'hr-list', clip);
+      U.txt('div', 'a t-h1' + (FX ? ' ell' : ''), root, N.t(K.title), FX ? 'left:' + TX + 'px;top:40px;width:' + (X + W - TX) + 'px' : 'left:144px;top:40px;width:720px');
+      clip = U.el('div', 'hr-clip', root, FX ? 'left:' + X + 'px;width:' + W + 'px;height:' + (VIS * STEP) + 'px' : undefined);
+      list = U.el('div', 'hr-list', clip, FX ? 'width:' + W + 'px' : undefined);
       fl = N.ui.freeList({ el: list, max: maxPx, dim: VIS * STEP,
-        hit: function (x, y) { return !moving && x >= X && x < X + W + 16 && y >= TOP && y < TOP + VIS * STEP; },
+        hit: function (x, y) { return !moving && !dg && x >= X && x < X + W + 16 && y >= TOP && y < TOP + VIS * STEP; },
         onSet: function (p) { more.set(p > 0.5, p < maxPx() - 0.5); } });
-      var how = U.el('div', 'hr-how', root);
+      var how = U.el('div', 'hr-how', root, HOW ? 'left:' + HOW.x + 'px;top:' + HOW.y + 'px;width:' + HOW.w + 'px' : undefined);
       U.txt('div', 'hr-how-t', how, N.t('set.hr.how.title'));
       U.txt('div', 'hr-how-x', how, N.t(K.how));
       stat = U.txt('div', 'hr-stat', how, '');
-      desc = U.txt('div', 'set-desc hr-desc', root, '');
-      more = N.ui.more(root, 'left:498px;top:84px', 'left:498px;top:498px');   // Mehr-Hinweis (NAV-11) wie in den Einstellungen
+      desc = U.txt('div', 'set-desc hr-desc', root, '', FX ? 'left:' + X + 'px;top:' + (TOP + VIS * STEP + 16) + 'px;width:' + (W - 48) + 'px' : undefined);   // nur mit Tasten sichtbar
+      var mx = X + Math.round(W / 2) - 10;
+      more = N.ui.more(root, 'left:' + mx + 'px;top:84px', 'left:' + mx + 'px;top:' + (TOP + VIS * STEP + 2) + 'px');   // Mehr-Hinweis (NAV-11) wie in den Einstellungen
       cat = S.hubCatalog();
       rebuild(null);
+      if (HOW && HOW.below) how.style.top = (TOP + Math.min(VIS, items.length) * STEP + 24) + 'px';   // kurze Liste: direkt darunter
       if (!C.noCatalog) discover();                   // Seitenleiste: keine Server-Hubs noetig
     };
     /* Liste (neu) aufbauen; keepId: Fokus auf diese Reihe legen */
@@ -82,14 +104,15 @@
      * eines Assistenten/Dialogs (der danach seine eigene Leiste abraeumt) neu */
     function hintsNow() { N.router.refreshHints(); N.idle.add(function () { if (!dead) N.router.refreshHints(); }, 'hr-hints'); }
     function mkRow(i) {
-      var e = { el: U.el('div', 'set-row hr-row', list, 'top:' + (i * STEP) + 'px') };
-      e.lb = U.txt('div', 'lb', e.el, '');
-      e.val = U.txt('div', 'val', e.el, '');
+      var e = { el: U.el('div', 'set-row hr-row', list, 'top:' + (i * STEP) + 'px' + (FX ? ';width:' + W + 'px' : '')) };
+      e.lb = U.txt('div', 'lb' + (FX ? ' ell' : ''), e.el, '', FX ? 'width:' + (W < 640 ? W - 230 : 400) + 'px' : undefined);
+      e.val = U.txt('div', 'val', e.el, '', FX && W < 640 ? 'display:none' : undefined);   // schmal: Bibliothek steht in der ⓘ-Blase
       e.tg = U.el('div', 'toggle', e.el); U.el('i', '', e.tg);
       e.mv = U.el('div', 'mv', e.el); U.el('i', 'up', e.mv); U.el('i', 'dn', e.mv);   // CSS-Dreiecke statt ▲ ▼ (TV-Schrift, Regel 10)
       U.el('div', 'sep', e.el);
       e.tip = N.ui.infotip.icon(e.el);                 // Finger/Maus: ⓘ statt Beschreibungsflaeche (Nr. 28; am TV null)
       if (e.tip) U.cls(e.el, 'itr', true);
+      if (GRIP) { e.gp = U.el('div', 'hr-grip', e.el); U.el('i', '', e.gp); U.el('i', '', e.gp); U.el('i', '', e.gp); U.cls(e.el, 'hgr', true); }   // NAV-27
       return e;
     }
     function paint(i) {
@@ -99,6 +122,7 @@
       U.show(e.tg, !special(it) && !locked(it));
       if (!special(it)) U.cls(e.tg, 'on', it.on);
       U.cls(e.el, 'off', !special(it) && !it.on);
+      if (e.gp) U.show(e.gp, !special(it));
     }
     function scrollFor(i) { return U.clamp(i - ANCHOR, 0, Math.max(0, items.length - VIS)); }
     function maxPx() { return Math.max(0, items.length - VIS) * STEP; }
@@ -195,13 +219,106 @@
     }
     /* Langes Druecken bzw. TOOLS (Finger/Maus haben keine Hinweisleiste, Nr. 26): Verschieben/Entfernen als Menue */
     function actions() {
-      var it = items[f], b = [];
+      var it = items[f], b = [], n = nRows();
       if (!it || special(it)) return;
-      b.push({ id: 'move', t: N.t('hint.move') });
+      if (!GRIP || N.input.mode === 'key') b.push({ id: 'move', t: N.t('hint.move') });
+      if (GRIP) {                                       // NAV-27: Barrierefreiheit ohne Ziehen (am TV nie)
+        if (f > 0) b.push({ id: 'up', t: N.t('set.hr.mv.up') });
+        if (f < n - 1) b.push({ id: 'down', t: N.t('set.hr.mv.down') });
+        if (f > 1) b.push({ id: 'top', t: N.t('set.hr.mv.top') });
+        if (f < n - 2) b.push({ id: 'bottom', t: N.t('set.hr.mv.bottom') });
+      }
       if (removable(it)) b.push({ id: 'remove', t: N.t('hint.removeRow') });
+      if (!b.length) return;
       N.ui.dialog.open({ title: label(it), buttons: b, vertical: true, focus: 0, top: 120,
-        onSelect: function (id) { if (dead) return; if (id === 'move') startMove(); else removeRow(); } });
+        onSelect: function (id) { if (dead) return; if (id === 'move') startMove(); else if (id === 'remove') removeRow(); else if (MV[id]) jumpRow(id, false); } });
     }
+    /* ---------- Verschieben ohne Gelb (NAV-27): Menue und Cmd+Pfeil ---------- */
+    var MV = { up: 1, down: 1, top: 1, bottom: 1 };
+    /* Zeile f nach oben/unten bzw. ganz nach oben/unten; keys: Fokus mit Tasten-Lage (Cmd+Pfeil), sonst Lage bleibt (Menue) */
+    function jumpRow(what, keys) {
+      var n = nRows(), j = what === 'up' ? f - 1 : what === 'down' ? f + 1 : what === 'top' ? 0 : n - 1;
+      if (special(items[f]) || j < 0 || j >= n || j === f) return false;
+      place(f, j, keys);
+      return true;
+    }
+    /* Eintrag i auf Platz j, Zeilen dazwischen neu beschriftet, Fokus auf j, speichern */
+    function place(i, j, keys) {
+      HR.moveTo(items, i, j);
+      for (var k = Math.min(i, j); k <= Math.max(i, j); k++) paint(k);
+      if (keys) { setFocus(j); N.router.refreshHints(); }
+      else { U.cls(els[f].el, 'is-focus', false); f = j; U.cls(els[f].el, 'is-focus', true); U.setText(desc, descText(items[f])); }
+      save();
+    }
+    /* ---------- Ziehen am Griff (NAV-27) ---------- */
+    function stagePt(x, y) {                          // Flaeche -> Ansicht (flexibel: Inhaltskante verschoben; sonst Kasten 1280x720)
+      if (FX) return { x: x - N.screen.view().x, y: y };
+      var g = N.screen.stage(); return { x: (x - g.x) / g.k, y: (y - g.y) / g.k };
+    }
+    function rowAt(y) { if (y < TOP || y >= TOP + VIS * STEP) return -1; var i = Math.floor((y - TOP + scPx()) / STEP); return i >= 0 && i < items.length ? i : -1; }
+    function onGrip(x, y) { var i = rowAt(y); return GRIP && !moving && !dg && i >= 0 && !special(items[i]) && x >= X + W - GZ && x < X + W + 24 ? i : -1; }
+    function shiftRows(i, j) {
+      for (var k = 0; k < nRows(); k++) if (k !== i) { var d = HR.dragShift(k, i, j, STEP), e = els[k]; if (d !== (e.dsh || 0)) { e.dsh = d; U.tf(e.el, 0, d); } }
+    }
+    function dragUpdate() {
+      var away = HR.dragAway(dg.x, X, W, 160), dy = dg.y - dg.y0 + scPx() - dg.p0, j = away ? dg.i : HR.dragTo(dg.i, dy, STEP, nRows());
+      dg.away = away;
+      var el = els[dg.i].el, t = away ? 'translate3d(0,0,0)' : 'translate3d(0,' + Math.round(dy) + 'px,0) scale(1.02)';
+      el.style.webkitTransform = el.style.transform = t;
+      if (j !== dg.j) { if (hap && !away) hap.select(); dg.j = j; shiftRows(dg.i, j); }
+    }
+    function dragTick(ts) {
+      if (!dg) return;
+      var v = dg.away ? 0 : HR.dragAuto(dg.y, TOP, VIS * STEP, 48, 0.9);
+      if (!v) { dg.raf = false; return; }
+      var dt = dg.ts ? Math.min(34, ts - dg.ts) : 16, p = U.clamp(scPx() + v * dt, 0, maxPx());
+      dg.ts = ts;
+      if (p !== scPx()) { fl.set(p); more.set(p > 0.5, p < maxPx() - 0.5); dragUpdate(); }
+      U.raf(dragTick);
+    }
+    function dragEnd(ok) {
+      var z = dg, k;
+      dg = null; hap = null;
+      U.cls(list, 'hr-drag', false); U.cls(els[z.i].el, 'is-lift', false); els[z.i].el.removeAttribute('data-layout-ok');
+      list.style.webkitTransition = 'none';
+      for (k = 0; k < els.length; k++) if (els[k].dsh || k === z.i) { els[k].dsh = 0; els[k].el.style.webkitTransform = els[k].el.style.transform = ''; }
+      if (ok && !z.away && z.j !== z.i) place(z.i, z.j, false);
+      else if (ok && !z.away && !z.moved) actions();   // Tipp auf den Griff ohne Ziehen: Menue
+      fl.settle();
+    }
+    s.pointerGrab = function (x, y) { var p = stagePt(x, y); return onGrip(p.x, p.y) >= 0 ? 'drag' : ''; };
+    s.pointerDrag = function (ph, x, y) {
+      var p = stagePt(x, y);
+      if (ph === 'start') {
+        var i = onGrip(p.x, p.y);
+        if (i < 0) return false;
+        fl.stop(); if (!fl.free) { fl.sync(sc * STEP); fl._loose(); }
+        if (i !== f) { U.cls(els[f].el, 'is-focus', false); f = i; U.cls(els[f].el, 'is-focus', true); U.setText(desc, descText(items[f])); }
+        dg = { i: i, j: i, y0: p.y, p0: scPx(), x: p.x, y: p.y, away: false, moved: false, raf: false, ts: 0 };
+        hap = N.input.mode === 'touch' && N.platform.haptic ? N.platform.haptic : null;
+        if (hap) hap.prepare();
+        U.cls(list, 'hr-drag', true); U.cls(els[i].el, 'is-lift', true);
+        els[i].el.setAttribute('data-layout-ok', 'button,overlap');   // bewusst: angehobene Zeile liegt waehrend des Zugs ueber den anderen
+        return true;
+      }
+      if (!dg) return false;
+      if (ph === 'move') {
+        dg.x = p.x; dg.y = p.y;
+        if (Math.abs(p.y - dg.y0) > 6) dg.moved = true;
+        dragUpdate();
+        if (!dg.raf && HR.dragAuto(dg.y, TOP, VIS * STEP, 48, 0.9)) { dg.raf = true; dg.ts = 0; U.raf(dragTick); }
+        return true;
+      }
+      if (ph === 'end') { dg.x = p.x; dg.y = p.y; dragUpdate(); }
+      dragEnd(ph === 'end');
+      return true;
+    };
+    /* Tastatur (Lader: Cmd+Pfeil, App.shortcut 'moveUp' …): nur ausserhalb des Gelb-Verschiebens und ohne Zug */
+    s.shortcut = function (what) {
+      if (!GRIP || moving || dg) return false;
+      var m = { moveUp: 'up', moveDown: 'down', moveTop: 'top', moveBottom: 'bottom' }[what];
+      return !!m && jumpRow(m, true);
+    };
     /* Erweiterung: hinzugefuegte Reihe entfernen (Rot, Rueckfrage mit Fokus auf "Behalten") */
     function removeRow() {
       var it = items[f];
@@ -238,8 +355,11 @@
     }
 
     /* ---------- Lebenszyklus, Tasten, Zeiger ---------- */
-    s.enter = function () { if (els[f]) U.cls(els[f].el, 'is-focus', true); };
-    s.leave = function () { if (moving) drop(); return null; };
+    s.enter = function (p, r) {                      // r: Stand vor dem Neuaufbau (Drehen/Fenster, N.router.relayout)
+      if (r && r.id && items[f] && items[f].id !== r.id) rebuild(r.id);
+      if (els[f]) U.cls(els[f].el, 'is-focus', true);
+    };
+    s.leave = function () { if (dg) dragEnd(false); if (moving) drop(); return items[f] ? { id: items[f].id } : null; };
     s.destroy = function () { dead = true; if (busy) busy.abort(); };
     s.hints = function () {
       if (moving) return [{ k: 'yellow', t: 'hint.drop' }];
@@ -268,7 +388,7 @@
     };
     /* Finger/Trackpad: frei scrollen (N.ui.freeList); beim Verschieben nicht (false -> Wischen = ein Platz je Schritt) */
     s.scrollTop = function () { return fl.top(); };   // An den Anfang (App.scrollTop, Tipp ganz oben / Cmd+Pfeil hoch)
-    s.pan = function (e) { return fl.pan(e) || (e.phase === 'start' && !moving); };   // kurze Liste/daneben: annehmen, nichts tun
+    s.pan = function (e) { if (dg) return true; return fl.pan(e) || (e.phase === 'start' && !moving); };   // kurze Liste/daneben: annehmen, nichts tun
     s.wheel = function (x, y, dx, dy) { return fl.wheel(x, y, dy); };
     s.pointerDown = function () { fl.down(); };
     /* Finger/Maus (Nr. 28): Treffer auf dem ⓘ (x 824–896, volle Zeilenhoehe) oeffnet nur die Info-Blase mit dem Text der Zeile */
@@ -282,9 +402,10 @@
       if (i < 0) { N.ui.infotip.hover(null); return false; }
       if (moving) { if (kind === 'click') drop(); return true; }
       if (i !== f) { U.cls(els[f].el, 'is-focus', false); f = i; U.cls(els[f].el, 'is-focus', true); U.setText(desc, descText(items[f])); N.router.refreshHints(); }
-      if (tip && els[i].tip && x >= X + W - 56) {
+      if (GRIP && x >= X + W - GZ && !special(items[i])) return true;   // Griff: nur Ziehen (Tipp = Menue ueber pointerDrag)
+      if (tip && els[i].tip && x >= X + W - 56 - (GRIP ? GZ - 8 : 0)) {
         N.ui.infotip.hover(els[i].tip);
-        if (kind === 'click') N.ui.infotip.open({ title: label(items[i]), text: descText(items[i]), x: X + W - 32, y: TOP + i * STEP - scPx() + 32, el: els[i].tip });
+        if (kind === 'click') N.ui.infotip.open({ title: label(items[i]), text: descText(items[i]), x: X + W - 32 - (GRIP ? 56 : 0), y: TOP + i * STEP - scPx() + 32, flex: FX, el: els[i].tip });
         return true;
       }
       N.ui.infotip.hover(null);

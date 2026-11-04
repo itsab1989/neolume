@@ -15,9 +15,11 @@
  *   rail: Markierung der Seitenleiste (Standard: die Bibliothek)} */
 (function (N) {
   var U = N.util, M = N.model, G = N.GridMath, L = N.lib, REST = 300;
-  var REG_X = 1160, REG_Y = 168, REG_STEP = 17, LETTERS = '#ABCDEFGHIJKLMNOPQRSTUVWXYZ', LIST_MAX = 300;
+  var REG_X = 1160, REG_Y = 168, REG_STEP = 17, LETTERS = '#ABCDEFGHIJKLMNOPQRSTUVWXYZ', LIST_MAX = 300;   // LETTERS: je Bildschirm neu (Sprache, N.lib.letters)
 
   N.router.define('library', function (params) {
+    LETTERS = N.lib.letters();                           // Norwegisch: … Z Æ Ø Å (Sprachwechsel baut den Bildschirm neu)
+    REG_STEP = LETTERS.length > 27 ? 15 : 17;             // 30 Zeichen passen nur mit 15 px in die 460 px der Leiste (ueber der Hinweisleiste)
     var lib = params.lib || { id: 0, title: '', type: 'movie' }, coll = params.coll || null, list = params.list || null, once = params.once || null;
     // Seitenleiste markiert die Bibliothek auch in Sammlung/Personenfilter (TV-Befund 26.10.); sub: RETURN geht dort zurueck
     // flexible Flaeche (N.screen, nur Apple): Raster mit mehr Spalten/Zeilen, A–Z-Leiste am rechten Rand (TV: 1280x720, REG_X 1160)
@@ -32,8 +34,11 @@
     // caps.images 'fast' (Apple Nr. 13): 3 Zeilen mehr Vorrat ueber/unter dem Fenster und beim Seiten-Vorladen; caps.scroll 'free' (S7):
     // Raster folgt senkrecht frei dem Finger/Trackpad (N.kinetic.Drive, kein Einrasten), erste Taste danach: Fokus am Anker
     var caps = N.platform.caps, AHEAD = caps.images === 'fast' ? 3 : 0, FREE = caps.scroll === 'free';
+    // A–Z-Leiste mit Finger/Maus (LIB-12): Ziehen ueber die Leiste mit Anzeige, Sprung beim Loslassen; Zeiger darueber hebt hervor (hell, fett).
+    // Nur flexible Flaeche mit Touch oder Maus (Apple) – am TV nie (Fernbedienungs-Zeiger: Klick wie bisher)
+    var AZD = N.screen.flex && (!!caps.touch || caps.pointer === 'mouse');
     var drv = null, pan = null, loose = false, eat = false;
-    var G = A.w === 1280 && A.h === 720 && !AHEAD ? N.GridMath : N.GridMath.make('L', false, A, AHEAD), root, titleT, statT, chipBar, chipIn, chips = [], chipRects = null, grid, ring, sb, amb, regDivs = [], regCur = -1, regFoc = false, regHas = '', bubble, bubbleT, skel, fade;
+    var G = A.w === 1280 && A.h === 720 && !AHEAD ? N.GridMath : N.GridMath.make('L', false, A, AHEAD), root, titleT, statT, chipBar, chipIn, chips = [], chipRects = null, grid, ring, sb, amb, regDivs = [], regCur = -1, regFoc = false, regHas = '', regAi = [], regMap = [], regH = 0, regHov = -1, scrub = null, azs = null, azsT = null, bubble, bubbleT, skel, fade;
     var prefs = null, items = [], n = -1, total = -1, chars = [], pages = {}, gen = 0, tasks = [], collN = -1;
     // M4 Musik/Hoerbuecher: Reiter 'lib' = Kuenstler (Musik) bzw. Buecher (Hoerbuecher), 'alt' = Alben bzw. Autoren; quadratische Karten
     var music = lib.type === 'artist', book = music && N.music.bookLib(lib);
@@ -65,13 +70,20 @@
       skel = U.el('div', 'skel', root);
       for (var i = 0; i < 5; i++) U.el('i', '', skel, 'left:' + (G.X0 + i * G.SX) + 'px;top:' + G.Y0 + 'px;width:176px;height:264px');
       fade = U.el('img', 'fade fade-frame', root); fade.src = N.assetBase + 'fade-frame.png';   // unter A–Z-Leiste/Sprungbuchstabe: Band ab y 612, Leiste bis 628
-      /* A–Z-Leiste: vollstaendiges Alphabet sofort sichtbar (NUTZER-FEEDBACK-REGELN 1), 27 feste Elemente */
-      var reg = U.el('div', 'regcol', root, 'display:none' + (regX !== REG_X ? ';left:' + regX + 'px' : ''));
-      for (i = 0; i < LETTERS.length; i++) {
-        var re = U.el('div', 'reg', reg, 'top:' + (i * REG_STEP) + 'px');
-        re.appendChild(document.createTextNode(LETTERS.charAt(i))); regDivs.push(re);
+      /* A–Z-Leiste: vollstaendiges Alphabet sofort sichtbar (NUTZER-FEEDBACK-REGELN 1), 27 feste Elemente. Flache flexible Flaeche
+       * (LIB-12): reicht die Hoehe bis 16 px ueber der Unterkante nicht, verdichtet (jeder zweite Platz "•", L.azSlots) statt
+       * abgeschnitten; regDivs = Plaetze, regAi = Buchstaben-Index je Platz (-1 = "•"), regMap = Platz je Buchstabe */
+      var slots = N.screen.flex ? L.azSlots(LETTERS, A.h - REG_Y - 16, REG_STEP) : null;
+      if (slots && slots.length >= LETTERS.length) slots = null;
+      regH = (slots ? slots.length : LETTERS.length) * REG_STEP;
+      var reg = U.el('div', 'regcol', root, 'display:none' + (regX !== REG_X ? ';left:' + regX + 'px' : '') + (slots ? ';height:' + regH + 'px' : ''));
+      for (i = 0; i < (slots ? slots.length : LETTERS.length); i++) {
+        var re = U.el('div', slots && slots[i].i < 0 ? 'reg dot' : 'reg', reg, 'top:' + (i * REG_STEP) + 'px' + (REG_STEP !== 17 ? ';height:' + REG_STEP + 'px;line-height:' + REG_STEP + 'px' : ''));
+        re.appendChild(document.createTextNode(slots ? slots[i].t : LETTERS.charAt(i))); regDivs.push(re); regAi.push(slots ? slots[i].i : i);
       }
+      for (i = 0; i < LETTERS.length; i++) regMap.push(slots ? Math.round(i * (slots.length - 1) / (LETTERS.length - 1)) : i);
       regDivs.box = reg;
+      if (AZD) { azs = U.el('div', 'azs cacc', root, 'display:none'); azsT = document.createTextNode(''); azs.appendChild(azsT); }   // Anzeige beim Ziehen
       bubble = U.el('div', 'jump', root, 'display:none' + (A.w !== 1280 ? ';left:' + Math.round(G.X0 + G.width() / 2 - 80) + 'px' : ''));
       bubbleT = document.createTextNode(''); bubble.appendChild(bubbleT);
       ring = new N.ui.Ring(root);
@@ -318,18 +330,34 @@
      * (caps.scroll 'free', Fokus bleibt liegen) der erste Titel der obersten sichtbaren Zeile */
     function regIdx() { return grid.free ? Math.max(0, Math.min(n - 1, grid.r * G.COLS)) : grid.f; }   // leere Liste: 0, nie -1
     /* Buchstaben ohne Titel abgeschwaecht (einmal je Index), aktueller hervorgehoben (nur alter + neuer umgeklasst) */
+    /* Klasse eines Platzes: aktuell (fokussiert bzw. beim Ziehen unter dem Finger) > Zeiger darueber > vorhanden/abgeschwaecht/"•" */
+    function regCls(j) {
+      if (j === regCur) return regFoc ? 'reg cur is-focus' : 'reg cur';
+      var b = regAi[j] < 0 ? 'reg dot' : regHas.indexOf(LETTERS.charAt(regAi[j])) >= 0 ? 'reg' : 'reg off';
+      return j === regHov ? b + ' hov' : b;
+    }
     function paintReg(force) {
       if (!regOn()) { hideReg(); return; }
-      var has = L.present(chars), i;
-      if (has !== regHas) { regHas = has; for (i = 0; i < regDivs.length; i++) regDivs[i].className = has.indexOf(LETTERS.charAt(i)) >= 0 ? 'reg' : 'reg off'; regCur = -1; regFoc = false; }
+      var has = L.present(chars), i, sc = scrub && !scrub.away;
+      if (has !== regHas) { regHas = has; regCur = -1; regFoc = false; for (i = 0; i < regDivs.length; i++) regDivs[i].className = regCls(i); }
       U.show(regDivs.box, true);
-      var ch = zone === 'reg' ? regCh : L.letterAt(chars, regIdx(), prefs.desc);
+      var ch = sc ? scrub.ch : zone === 'reg' ? regCh : L.letterAt(chars, regIdx(), prefs.desc);
       if (!force && zone !== 'reg' && ch === regCh && regCur >= 0) return;
-      regCh = ch;
-      var k = LETTERS.indexOf(ch), foc = zone === 'reg';
-      if (regCur >= 0 && (regCur !== k || regFoc !== foc)) regDivs[regCur].className = has.indexOf(LETTERS.charAt(regCur)) >= 0 ? 'reg' : 'reg off';
-      if (k >= 0) regDivs[k].className = foc ? 'reg cur is-focus' : 'reg cur';
+      if (!sc) regCh = ch;                                  // Ziehen: Tasten-Stand bleibt (Abbruch stellt ihn wieder her)
+      var li = LETTERS.indexOf(ch), k = li >= 0 ? regMap[li] : -1, foc = zone === 'reg' || !!sc, old = regCur;
       regCur = k; regFoc = foc;
+      if (old >= 0 && old !== k) regDivs[old].className = regCls(old);
+      if (k >= 0) regDivs[k].className = regCls(k);
+    }
+    /* Buchstabe unter y (Ansicht): Plaetze der Leiste, verdichtet linear (L.azIndex); TV wie bisher je 17 px */
+    function regAt(y) { return regDivs.length < LETTERS.length ? LETTERS.charAt(L.azIndex(y - REG_Y, regDivs.length, REG_STEP, LETTERS.length)) : LETTERS.charAt(Math.floor((y - REG_Y) / REG_STEP)); }
+    /* Zeiger ueber der Leiste (nur AZD): Platz hell und fett; -1 = keiner */
+    function setHov(j) {
+      if (j === regHov) return;
+      var old = regHov;
+      regHov = j;
+      if (old >= 0 && regDivs[old]) regDivs[old].className = regCls(old);
+      if (j >= 0) regDivs[j].className = regCls(j);
     }
     /* Anzeige nur nach 300 ms Ruhe (nicht im Tastenpfad) */
     function regLater() {
@@ -657,6 +685,7 @@
     s.leave = function () {
       away = true;
       stopPan(); pan = null;
+      if (scrub) { scrub = null; U.show(azs, false); }
       if (regT) { clearTimeout(regT); regT = 0; }
       return { f: grid.f, prefs: params.actor || once || list ? prefs : null };   // nicht gemerkte Ansicht: Stand fuer die Rueckkehr
     };
@@ -749,11 +778,13 @@
         }
         return false;
       }
-      if (regOn() && x >= regX && x < regX + 56 && y >= REG_Y && y < REG_Y + LETTERS.length * REG_STEP) {
-        var lt = LETTERS.charAt(Math.floor((y - REG_Y) / REG_STEP));
+      if (regOn() && x >= regX && x < regX + 56 && y >= REG_Y && y < REG_Y + regH) {
+        var lt = regAt(y);
+        if (AZD && kind === 'move') setHov(regMap[LETTERS.indexOf(lt)]);   // Maus/Trackpad: Buchstabe unter dem Zeiger hell (Klick = Ziehen-Weg)
         if (kind === 'click' && L.present(chars).indexOf(lt) >= 0) jumpTo(lt);
         return true;
       }
+      if (regHov >= 0) setHov(-1);
       if (n <= 0) return false;
       if (FREE) {                                       // freies Scrollen: jede sichtbare Karte (auch angeschnitten), Liste rollt nie
         var jf = grid.hitAt(x, y);
@@ -789,6 +820,55 @@
       grid.scrollBy(1);
       placeRing(grid.focusTo(j, true)); afterMove();
       N.pointer.scrolled();
+    }
+    /* ---------- A–Z-Leiste ziehen (LIB-12, nur AZD) ----------
+     * Finger (Touch-Schicht App.grab/App.drag) bzw. Maus mit gedrueckter Taste (N.pointer, caps.pointer 'mouse') auf der Leiste:
+     * Buchstabe unter dem Finger in der Leiste markiert (wie fokussiert) und gross in einer runden Anzeige LINKS daneben (der Finger
+     * verdeckt die Leiste), die senkrecht mitlaeuft; Maus: kleinere Anzeige naeher an der Leiste. Loslassen springt (jumpTo: fehlt der
+     * Buchstabe, der naechste vorhandene, sanft wie gewohnt). Keine Live-Vorschau im Raster (00-entscheidungen 03.11.). Abbruch: Finger
+     * mehr als AZ_OFF px seitlich neben der Leiste (L.azAway) – Anzeige und Markierung weg, Loslassen tut nichts; zurueck gilt es wieder.
+     * Zug-Zone etwas groesser als die Leiste (links 20, rechts bis zum Rand, oben/unten 16): Finger-Treffer >= 44 pt in der Breite. */
+    var AZ_OFF = { touch: 120, mouse: 80 }, hap = null;
+    function vpt(x) { return N.screen.flex ? x - N.screen.view().x : x; }   // Flaechen- -> Ansichts-Punkt (M/K: Inhaltskante verschoben)
+    function grabAt(x, y) { return AZD && !scrub && regOn() && !(sb.on && zone === 'state') && x >= regX - 20 && y >= REG_Y - 16 && y < REG_Y + regH + 16; }
+    s.pointerGrab = function (x, y) { return grabAt(vpt(x), y) ? 'drag' : ''; };
+    s.pointerDrag = function (ph, x, y) {
+      x = vpt(x);
+      if (ph === 'start') {
+        if (!grabAt(x, y)) return false;
+        stopPan(); eat = false; setHov(-1);
+        scrub = { mouse: N.input.mode === 'pointer', away: false, ch: '' };
+        U.cls(azs, 'sm', scrub.mouse);
+        hap = !scrub.mouse && N.platform.haptic ? N.platform.haptic : null;   // Tick je Buchstabe nur am Finger (caps.haptic)
+        if (hap) hap.prepare();
+        scrubAt(x, y);
+        return true;
+      }
+      if (!scrub) return false;
+      if (ph === 'move') { scrubAt(x, y); return true; }
+      var z = scrub;
+      if (ph === 'end') scrubAt(x, y);
+      scrub = null; U.show(azs, false);
+      if (ph === 'end' && !z.away && z.ch && regOn()) jumpTo(z.ch);
+      else paintReg(true);
+      return true;
+    };
+    function scrubAt(x, y) {
+      var away = L.azAway(x, regX, 56, scrub.mouse ? AZ_OFF.mouse : AZ_OFF.touch);
+      if (away) { if (!scrub.away) { scrub.away = true; U.show(azs, false); paintReg(true); } return; }
+      var ch = LETTERS.charAt(L.azIndex(y - REG_Y, regDivs.length, REG_STEP, LETTERS.length)), back = scrub.away;
+      scrub.away = false;
+      if (ch !== scrub.ch || back) {
+        if (hap && scrub.ch && ch !== scrub.ch) hap.select();   // nur beim Wechsel, nicht schon beim Auflegen
+        scrub.ch = ch;
+        U.setText(azsT, ch);
+        U.cls(azs, 'no', L.present(chars).indexOf(ch) < 0);     // ohne Titel: gedaempft (Loslassen = naechster vorhandener)
+        paintReg(true);
+      }
+      var d = scrub.mouse ? 56 : 96, cy = Math.max(REG_Y, Math.min(REG_Y + regH, y)), ty = Math.max(8, Math.min(A.h - d - 8, cy - d / 2));
+      var tx = regX - (scrub.mouse ? 8 : 36) - d;                 // Finger verdeckt die Leiste: Anzeige links daneben
+      azs.style.webkitTransform = azs.style.transform = 'translate3d(' + tx + 'px,' + Math.round(ty) + 'px,0)';
+      U.show(azs, true);
     }
     s.pointerSig = function () { return grid.r; };
     s.pointerEdge = function (x, y) {

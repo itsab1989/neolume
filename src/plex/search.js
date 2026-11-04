@@ -8,7 +8,13 @@
   /* Englische Oberflaeche: keine Umlaut-Reihe auf abc, Umlaute stehen auf 123 (TV-Test 27.10., F15) */
   var ABC_EN = ['abcdef', 'ghijkl', 'mnopqr', 'stuvwx', 'yz'];
   var NUM_EN = NUM.concat(['äöüß']);
+  /* Norwegische Oberflaeche (Nutzerwunsch 03.11.): eigene Reihe æøå auf abc wie im Deutschen die Umlaute; ä ö ü ß und é auf 123 */
+  var ABC_NB = ['abcdef', 'ghijkl', 'mnopqr', 'stuvwx', 'yzæøå'];
+  var NUM_NB = NUM.concat(['äöüéß']);
   var T9 = { '2': 'abcä', '3': 'def', '4': 'ghi', '5': 'jkl', '6': 'mnoö', '7': 'pqrsß', '8': 'tuvü', '9': 'wxyz', '0': ' ', '1': ".-'" };
+  /* T9 auf Norwegisch wie norwegische Tastentelefone: 2 abcæå, 6 mnoø (Umlaute/ß entfallen) */
+  var T9_NB = U.extend(U.extend({}, T9), { '2': 'abcæå', '6': 'mnoø', '7': 'pqrs', '8': 'tuv' });
+  function t9map() { return N.i18n && N.i18n.lang() === 'nb' ? T9_NB : T9; }
   var GROUPS = [
     { id: 'shows', tk: 'search.group.shows', types: { show: 1 }, kind: 'posterQ' },
     { id: 'movies', tk: 'search.group.movies', types: { movie: 1 }, kind: 'posterQ' },
@@ -24,7 +30,8 @@
      * merge = Leerzeichen, Loeschen und abc/123 in EINER Zeile (je zwei Spalten breit), damit die Tastatur flacher wird. Ohne g das
      * TV-Raster (S.KX …), Ergebnis unveraendert. rows.g = verwendetes Raster (Navigation/Treffer rechnen damit). */
     layout: function (mode, lang, g) {
-      var en = (lang || N.i18n.lang()) === 'en', rows = [], src = mode === 'num' ? (en ? NUM_EN : NUM) : (en ? ABC_EN : ABC), r, c;
+      var l = lang || N.i18n.lang(), rows = [], r, c;
+      var src = mode === 'num' ? (l === 'en' ? NUM_EN : l === 'nb' ? NUM_NB : NUM) : (l === 'en' ? ABC_EN : l === 'nb' ? ABC_NB : ABC);
       var G = g || S, X = G.KX, Y = G.KY, P = G.KS, W = G.KW, h = g ? { h: W } : null;
       for (r = 0; r < src.length; r++) {
         var row = [];
@@ -75,7 +82,7 @@
     },
     /* ---------- T9 (SPEC 5.14): Mehrfachdruck innerhalb 900 ms wechselt den Buchstaben ---------- */
     T9: function () { this.d = ''; this.i = 0; this.t = 0; },
-    letters: function (d) { return T9[d] || ''; },
+    letters: function (d) { return t9map()[d] || ''; },
     /* Anfrage ab 2 Zeichen (ohne Leerzeichen am Rand) */
     query: function (q) { q = String(q || '').replace(/^\s+|\s+$/g, ''); return q.length >= 2 ? q : ''; },
     /* ---------- Ergebnisse ---------- */
@@ -203,7 +210,7 @@
   };
   /* T9-Zustand: press(d, now) -> {cand, letters, idx, commit} ; commit = vorher angefangener Buchstabe, der jetzt feststeht */
   S.T9.prototype.press = function (d, now) {
-    var L = T9[d] || '', out = { commit: '' };
+    var L = t9map()[d] || '', out = { commit: '' };
     if (!L) return out;
     if (this.d === d && now - this.t < S.T9MS) this.i = (this.i + 1) % L.length;
     else { out.commit = this.pending(); this.d = d; this.i = 0; }
@@ -211,7 +218,7 @@
     out.cand = L.charAt(this.i); out.letters = L; out.idx = this.i;
     return out;
   };
-  S.T9.prototype.pending = function () { return this.d ? (T9[this.d] || '').charAt(this.i) : ''; };
+  S.T9.prototype.pending = function () { return this.d ? (t9map()[this.d] || '').charAt(this.i) : ''; };
   /* nach 900 ms Ruhe bzw. vor jeder anderen Eingabe: Kandidat uebernehmen */
   S.T9.prototype.flush = function () { var c = this.pending(); this.d = ''; this.i = 0; return c; };
   S.T9.prototype.active = function () { return !!this.d; };

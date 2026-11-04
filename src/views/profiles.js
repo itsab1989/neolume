@@ -7,13 +7,19 @@
   var U = N.util, STEP = 208, W = 168, Y = 232, BACK = { x: 64, y: 40, w: 160, h: 48 }, OTHER = { w: 200, h: 48 };
   N.router.define('profiles', function (params) {
     var s = {}, tiles = [], users = [], f = 0, ring, other = null, onOther = false, busy = false, x0 = 0, rows = 1, seq = 0, dead = false, subRow = [true, true], back = null;
+    /* Viele Profile auf kleiner Flaeche (nur flexibel, z. B. iPhone SE hoch ab ~10 Profilen): Titel, Kacheln, Hilfe und Knopf liegen in
+     * einem Behaelter (inner), der frei rollt (N.ui.freeList: Finger/Rad); Tasten holen die fokussierte Reihe ins Bild. fl/maxY nur
+     * dann, sonst wie bisher (TV: kein Behaelter). */
+    var inner = null, fl = null, maxY = 0;
     /* Flexible Flaeche (nur Apple, 10-screens.md 7): die Ansicht fuellt W x H; so viele Kacheln je Reihe, wie in die Breite passen
      * (iPhone hoch 2, iPad hoch 4), beliebig viele Reihen, alles senkrecht mittig. Mitte/Rand in Ansichts-Koordinaten (die Ansicht ist
      * bei M/K um die Inhaltskante nach links verschoben, N.screen.view). TV: 6 je Reihe, hoechstens 2 Reihen, Lagen wie bisher. */
-    var FX = !!(N.screen && N.screen.flex), V = FX ? N.screen.view() : null, CX = FX ? -V.x + N.screen.w / 2 : 640;
-    var BK = FX ? { x: -V.x + 24, y: BACK.y, w: BACK.w, h: BACK.h } : BACK;
+    // sichere Raender (N.screen.safe; iPhone quer Notch, Duo Rand seitlich): Mitte, Breite und Zurueck-Knopf in der sicheren Flaeche
+    var FX = !!(N.screen && N.screen.flex), SF = FX ? N.screen.safe : { t: 0, r: 0, b: 0, l: 0 }, SW = FX ? N.screen.w - SF.l - SF.r : 1280;
+    var V = FX ? N.screen.view() : null, CX = FX ? -V.x + SF.l + SW / 2 : 640;
+    var BK = FX ? { x: -V.x + SF.l + 24, y: BACK.y, w: BACK.w, h: BACK.h } : BACK;
     var STP = FX && N.screen.cls.w === 'K' ? 176 : STEP;   // iPhone hoch: 3 Kacheln je Reihe (8 Luecke)
-    var MAXROW = FX ? Math.max(1, Math.min(6, Math.floor((N.screen.w - (STP < STEP ? 24 : 48) + (STP - W)) / STP))) : 6, ROWH = STP < STEP ? 252 : 268, top0 = Y, otherY = 580;
+    var MAXROW = FX ? Math.max(1, Math.min(6, Math.floor((SW - (STP < STEP ? 24 : 48) + (STP - W)) / STP))) : 6, ROWH = STP < STEP ? 252 : 268, top0 = Y, otherY = 580;
     if (FX) s.flex = true;
     /* Unterzeile: Hauptkonto/Kind/Jugendlich */
     function subKey(u) { return u.kind ? 'prof.sub.' + u.kind : ''; }
@@ -42,14 +48,18 @@
         var blockH = 104 + rows * ROWH + (rows === 1 ? 40 : 0) + (st.state.firstPicker ? 72 : 0);
         top0 = Math.max(148, Math.round((V.h - blockH) / 2) + 104);
         otherY = top0 + rows * ROWH + (rows === 1 ? 40 : 8);
+        maxY = Math.max(0, (st.state.firstPicker ? otherY + 48 : top0 + rows * ROWH - 12) + 32 - V.h + SF.b);   // passt nicht -> rollen (ueber dem Home-Indikator)
+        inner = U.el('div', 'prof-in', root, 'position:absolute;left:0;top:0;width:100%;height:100%');
+        if (maxY > 0) fl = N.ui.freeList({ el: inner, max: function () { return maxY; }, dim: V.h, hit: function () { return true; } });
       }
-      U.txt('div', 'a t-h1', root, N.t('prof.title'), FX ? 'left:' + (CX - N.screen.w / 2 + 24) + 'px;top:' + (top0 - 104) + 'px;width:' + (N.screen.w - 48) + 'px;text-align:center'
+      var box = inner || root;
+      U.txt('div', 'a t-h1', box, N.t('prof.title'), FX ? 'left:' + (CX - N.screen.w / 2 + 24) + 'px;top:' + (top0 - 104) + 'px;width:' + (N.screen.w - 48) + 'px;text-align:center'
         : 'left:0;top:128px;width:1280px;text-align:center');
       var tok = s.avTok = st.cachedToken(st.admin()) || (st.state.server && st.state.server.token);
       // Beim Start ist noch kein Profil aktiv (N.plex.base leer) -> Server-Adresse direkt aus dem Zustand
       var base = s.avBase = N.plex.base || (st.state.server && (st.state.server.uri || '').replace(/\/+$/, '')) || '';
       for (var i = 0; i < users.length; i++) {
-        var u = users[i], p = pos(i), t = U.el('div', 'prof', root, 'left:' + p.x + 'px;top:' + p.y + 'px');
+        var u = users[i], p = pos(i), t = U.el('div', 'prof', box, 'left:' + p.x + 'px;top:' + p.y + 'px');
         var av = U.el('div', 'av ' + N.ui.avatarClass(u.name), t);
         av.appendChild(document.createTextNode(N.ui.initial(u.name)));
         if (u.thumb) { var im = U.el('img', '', av); im.src = N.img.BLANK; N.avatars.show(im, { uuid: u.uuid, thumb: u.thumb, tier: 'avatar', url: N.img.avatar(u.thumb, 'avatar', { token: tok, base: base }), prio: 0 }); }   // PROF-11: gespeichertes Bild sofort; TLS 1.2: direkt von plex.tv (ohne PMS)
@@ -60,17 +70,17 @@
         if (u.uuid === st.state.lastProfile) f = i;
       }
       x0 = pos(0).x;
-      if (rows === 1) U.txt('div', 'a t-small c2', root, N.t('prof.help'), FX ? 'left:' + (CX - N.screen.w / 2 + 24) + 'px;top:' + (top0 + 288) + 'px;width:' + (N.screen.w - 48) + 'px;text-align:center'
+      if (rows === 1) U.txt('div', 'a t-small c2', box, N.t('prof.help'), FX ? 'left:' + (CX - N.screen.w / 2 + 24) + 'px;top:' + (top0 + 288) + 'px;width:' + (N.screen.w - 48) + 'px;text-align:center'
         : 'left:0;top:520px;width:1280px;text-align:center');
       if (st.state.firstPicker) {
-        other = U.el('div', 'btn', root, 'left:' + (CX - OTHER.w / 2) + 'px;top:' + otherY + 'px;width:' + OTHER.w + 'px;text-align:center;padding:0');
+        other = U.el('div', 'btn', box, 'left:' + (CX - OTHER.w / 2) + 'px;top:' + otherY + 'px;width:' + OTHER.w + 'px;text-align:center;padding:0');
         other.appendChild(document.createTextNode(N.t('prof.otherAccount')));
       }
-      if (!(params && params.atStart) && N.router.depth() >= 2) {   // aus der App: Zurueck-Knopf (am TV per CSS nie sichtbar)
-        back = U.el('div', 'btn tback', root, 'width:' + BK.w + 'px;text-align:center;padding:0' + (FX ? ';left:' + BK.x + 'px' : ''));
+      if (!(params && params.atStart) && N.router.depth() >= 2) {   // aus der App: Zurueck-Knopf (am TV per CSS nie sichtbar; rollt mit, wenn der Behaelter rollt)
+        back = U.el('div', 'btn tback', fl ? inner : root, 'width:' + BK.w + 'px;text-align:center;padding:0' + (FX ? ';left:' + BK.x + 'px' : ''));
         back.appendChild(document.createTextNode('\u2039 ' + N.t('hint.back')));
       }
-      ring = new N.ui.Ring(root);
+      ring = new N.ui.Ring(box);
     };
     function focusTile(i) {
       if (onOther) { U.cls(other, 'is-focus', false); onOther = false; }
@@ -80,11 +90,27 @@
       N.fx.move(tiles[f].firstChild);
       var p = pos(f);
       ring.to('prof', p.x + 4, p.y + 4);
+      if (fl && !ptrFocus) reveal(p.y - 24, p.y + 240 + 24);
     }
     function focusOther() {
       U.cls(tiles[f], 'is-focus', false); ring.hide();
       U.cls(other, 'is-focus', true); onOther = true;
+      if (fl && !ptrFocus) reveal(otherY - 24, otherY + 48 + 24);
     }
+    /* Tasten: Bereich y0..y1 (Behaelter-px) ins Bild holen; nach freiem Rollen erst einrasten (fl.keys) */
+    var ptrFocus = false;
+    function reveal(y0, y1) {
+      fl.keys();
+      var p = fl.px, v = V.h - SF.b;
+      if (y0 - p < 0) p = y0; else if (y1 - p > v) p = y1 - v;
+      p = Math.max(0, Math.min(maxY, p));
+      if (p !== fl.px) { N.fx.move(inner); U.tf(inner, 0, -p); fl.sync(p); }
+    }
+    /* freies Rollen (App.pan / Rad, N.ui.freeList; am TV nie angelegt) */
+    s.pan = function (e) { return fl ? fl.pan(e) : false; };
+    s.wheel = function (x, y, dx, dy) { return fl ? fl.wheel(x, y, dy) : false; };
+    s.pointerDown = function () { if (fl) fl.down(); };
+    s.scrollTop = function () { return fl ? fl.top() : false; };
     s.enter = function () {
       busy = false;
       focusTile(f);
@@ -174,7 +200,12 @@
     }
     /* Zeiger: Kachel per Index-Mathe (Reihe y, Spalte x) */
     s.pointer = function (x, y, kind) {
+      if (fl) { if (fl.eat(kind)) return true; y += fl.px; }       // gerollt: Behaelter-Punkt (auch der Zurueck-Knopf rollt mit)
       if (back && N.input.direct() && N.hit.rect(BK.x, BK.y, BK.w, BK.h, x, y)) { if (kind === 'click') { if (busy) cancelChoose(); N.router.back(); } return true; }
+      ptrFocus = true;
+      try { return ptrHit(x, y, kind); } finally { ptrFocus = false; }
+    };
+    function ptrHit(x, y, kind) {
       if (other && N.hit.rect(CX - OTHER.w / 2, otherY, OTHER.w, OTHER.h, x, y)) { if (!onOther) focusOther(); if (kind === 'click') askOther(); return true; }
       var row = -1;
       for (var r = 0; r < rows; r++) { var yr = pos(r * MAXROW).y; if (y >= yr && y < yr + 240) row = r; }
@@ -186,7 +217,7 @@
       if (i !== f || onOther) focusTile(i);
       if (kind === 'click') choose(i);
       return true;
-    };
+    }
     s.wheelKeys = ['LEFT', 'RIGHT'];
     return s;
   });

@@ -163,7 +163,7 @@ class AllowList(unittest.TestCase):
         for path, m in (('/watchlist?type=all', 'GET'), ('/watchlist?type=movie&start=0&size=10', 'GET'),
                         ('/watchlist/state?ids=%s,%s' % (A, B), 'GET'), ('/watchlist/' + B, 'PUT'), ('/watchlist/' + B, 'DELETE'),
                         ('/discover/trending?type=movie', 'GET'), ('/discover/new?type=show', 'GET'), ('/discover/soon?type=movie', 'GET'),
-                        ('/details?id=' + A, 'GET'), ('/details?id=%s&lang=en' % B, 'GET')):
+                        ('/details?id=' + A, 'GET'), ('/details?id=%s&lang=en' % B, 'GET'), ('/details?id=%s&lang=nb' % B, 'GET')):
             st, body = h.handle(m, path, hdr(), '10.0.0.50')
             self.assertEqual(st, 200, (path, body))
         self.assertTrue(f.calls)
@@ -508,7 +508,7 @@ class WizardHelper(unittest.TestCase):
         self.w.helper_start()
         self.assertTrue(self.w.public_state()['helper']['running'])
         base = 'http://127.0.0.1:%d' % self.w.update.port
-        with urllib.request.urlopen(base + '/neo-helper', timeout=5) as r: self.assertEqual(json.loads(r.read())['features'], ['watchlist', 'discover', 'servers', 'details'])
+        with urllib.request.urlopen(base + '/neo-helper', timeout=5) as r: self.assertEqual(json.loads(r.read())['features'], ['watchlist', 'discover', 'servers', 'details', 'nb'])
         self.w.update_start()
         with urllib.request.urlopen(base + '/neo-helper', timeout=5) as r: self.assertIn('update', json.loads(r.read())['features'])
         self.w.update_stop()

@@ -169,20 +169,62 @@
     N.router.openOverlay(ov);
     return ov;
   }
-  /* help: Titel + Text (max. 600 Zeichen). RETURN/INFO schliesst */
+  /* help: Titel + Text, immer ganz (NAV-12). Passt er nicht in die Flaeche ueber der Hinweisleiste (20 Zeilen, y 112-632), scrollt
+   * er: am TV ▲▼ seitenweise mit 2 Zeilen Ueberlappung (keine Zeile wird uebersprungen; Lage immer auf ganzen Zeilen, Endlage =
+   * letzte Zeile ganz unten), Mehr-Hinweis ›  oben/unten (NAV-15) nur, wenn dort Text verborgen ist. EIN translate3d am Text je
+   * Schritt, Hoehe EINMAL beim Oeffnen gemessen (kein Lesen im Tastenpfad). Finger/Maus (caps.scroll 'free'): frei dem Finger
+   * folgend ueber N.ui.freeList (Schwung, Gummiband, kein Einrasten); die erste Taste danach rastet auf ganze Zeilen.
+   * Zeiger am TV: Klick auf den unteren/oberen Pfeil blaettert, sonst schliesst ein Klick. RETURN/INFO/OK schliesst wie bisher. */
+  var LH = 26, HROWS = 20, PAGE = HROWS - 2;      // LH = ty.body.lh
+  var PG = {
+    /* rein (getestet): naechste Lage nach ▲/▼ (dir -1/+1) bei Hoechstlage max; Lage und max sind Vielfache von LH */
+    page: function (off, dir, max, rows) { var st = Math.max(1, (rows || HROWS) - 2) * LH; return Math.max(0, Math.min(max, off + dir * st)); },
+    /* rein: Hoechstlage fuer Texthoehe h in einem Fenster von rows Zeilen (auf ganze Zeilen aufgerundet; 0 = passt) */
+    max: function (h, rows) { var v = (rows || HROWS) * LH; return h > v + 1 ? Math.ceil((h - v) / LH) * LH : 0; }
+  };
   function help(title, text) {
-    var ov = { el: U.el('div', 'layer'), closed: false };
+    var ov = { el: U.el('div', 'layer'), closed: false, off: 0, max: 0 };
     U.el('div', 'dim', ov.el);                       // Hintergrund leicht abdunkeln: zeigt, was gerade im Fokus ist
-    var p = N.ui.panelEl(ov.el, N.ui.panelFrame(STEP));
+    var fr = N.ui.panelFrame(STEP), p = N.ui.panelEl(ov.el, fr);
+    var rows = HROWS + Math.floor(2 * fr.y / LH), vh = rows * LH;   // volle Hoehe (Apple-Player): mehr Zeilen
     U.txt('div', 'pt t-h2', p, title);
-    U.txt('div', 'px', p, text);
+    var clip = U.el('div', 'pxc', p, 'height:' + vh + 'px'), tx = U.txt('div', 'px', clip, text).parentNode, more = null;
+    var fl = N.ui.freeList({ el: tx, max: function () { return ov.max; }, dim: vh,
+      hit: function (x, y) { return x - fr.x >= X && y + fr.y >= TOP - 24; },
+      onSet: function (px) { if (more) more.set(px > 0.5, px < ov.max - 0.5); } });
     function close() { if (!ov.closed) { ov.closed = true; N.router.closeOverlay(ov); } }
+    function go(dir) {
+      if (!ov.max) return;
+      if (fl.keys()) ov.off = Math.max(0, Math.min(ov.max, fl.near(LH) * LH));   // nach freiem Scrollen: auf ganze Zeilen
+      var o = PG.page(ov.off, dir, ov.max, rows);
+      if (o !== ov.off) { ov.off = o; U.tf(tx, 0, -o); }
+      fl.sync(ov.off);
+      more.set(ov.off > 0, ov.off < ov.max);
+    }
     ov.cancel = close;
     ov.hints = function () { return [{ k: 'ret', t: 'hint.back' }]; };
-    ov.onKey = function (k) { if (k === 'INFO' || k === 'ENTER') { close(); return true; } return k !== 'RETURN'; };
-    ov.pointer = function (x, y, kind) { if (kind === 'click') close(); return true; };
+    ov.onKey = function (k) {
+      if (k === 'INFO' || k === 'ENTER') { close(); return true; }
+      if (k === 'UP' || k === 'DOWN') { go(k === 'UP' ? -1 : 1); return true; }
+      return k !== 'RETURN';
+    };
+    ov.wheelKeys = ['UP', 'DOWN'];
+    ov.scrollTop = function () { return fl.top(); };
+    ov.pan = function (e) { return fl.pan(e); };
+    ov.wheel = function (x, y, dx, dy) { fl.wheel(x, y, dy); return true; };
+    ov.pointerDown = function () { fl.down(); };
+    ov.pointer = function (x, y, kind) {
+      if (fl.eat(kind)) return true;                  // Tipp in den Schwung: nur anhalten
+      if (kind !== 'click') return true;
+      x -= fr.x; y += fr.y;
+      if (more && x >= X && more.d && y >= TOP + vh) { go(1); return true; }     // Pfeil unten: weiterblaettern
+      if (more && x >= X && more.u && y >= TOP - 40 && y < TOP) { go(-1); return true; }
+      close(); return true;
+    };
     N.router.openOverlay(ov);
+    ov.max = PG.max(tx.offsetHeight || 0, rows);    // EINMAL messen (im Baum); passt der Text, bleibt alles wie bisher
+    if (ov.max) { more = N.ui.more(p, '', 'top:' + (TOP + vh + 4) + 'px'); more.set(false, true); U.tf(tx, 0, 0); }
     return ov;
   }
-  N.ui.panel = { select: select, help: help, wait: wait };
+  N.ui.panel = { select: select, help: help, wait: wait, page: PG.page, maxOff: PG.max };
 })(N);

@@ -12,7 +12,8 @@
 
   var SS = {
     SIZES: SIZES, MAX_CELLS: MAX_CELLS,
-    /* o: {enabled, size:'L'|'M'|'S', episodes:[{index,vc,off,dur}]|null, total, viewed, next (Folgen-index), threshold} */
+    /* o: {enabled, size:'L'|'M'|'S', episodes:[{index,vc,off,dur}]|null, total, viewed, next (Folgen-index), threshold,
+     *     barW (optional: Breite des Balkens im Modus B statt der Groesse, z. B. schmale Detailkarte)} */
     layout: function (o) {
       var sz = SIZES[o.size || 'L'], thr = o.threshold || 0.9, i;
       if (!o.enabled) return { mode: 'none' };
@@ -31,7 +32,7 @@
         return { mode: 'cells', size: o.size || 'L', cells: cells, marker: marker, width: eps.length * sz.step - (sz.step - sz.cw), text: '' };
       }
       // Modus B: Balken aus leafCount/viewedLeafCount (keine 1100 Folgen laden)
-      var viewed = Math.max(0, Math.min(o.viewed || 0, total)), bw = sz.barW;
+      var viewed = Math.max(0, Math.min(o.viewed || 0, total)), bw = o.barW > 0 ? o.barW : sz.barW;
       var out = { mode: 'bar', size: o.size || 'L', width: bw, height: sz.barH, fill: Math.round(bw * viewed / total), marker: null, text: '' };
       if (o.next) {
         var mx = Math.round(bw * (Math.min(o.next, total) - 1) / total);
@@ -116,7 +117,10 @@
       if (c.state !== d.state) { c.el.className = 'ss-c' + (d.state === 'w' ? ' w' : ''); c.state = d.state; }
       c.fill.style.height = (d.state === 'p' ? d.fill : 0) + 'px';
     }
-    if (lay.mode === 'bar') this.barFill.style.width = lay.fill + 'px';
+    if (lay.mode === 'bar') {
+      if (lay.width && lay.width !== (this.bw || this.sz.barW)) { this.bw = lay.width; this.bar.style.width = lay.width + 'px'; }   // schmale Karte: kuerzerer Balken
+      this.barFill.style.width = lay.fill + 'px';
+    }
     var m = lay.marker;
     U.show(this.marker, !!m);
     if (m) this.marker.style.cssText = 'left:' + m.x + 'px;top:' + m.y + 'px;width:' + m.w + 'px;height:' + m.h + 'px';

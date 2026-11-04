@@ -20,6 +20,7 @@
     /* TV-Befund 28.10.: Knopfreihe sprang (eine Erweiterung setzte spaeter einen Knopf davor, Fokus wechselte) und die
      * Freigabe wechselte von der US- auf die deutsche Angabe. Meldet eine Erweiterung, dass ihr Stand noch kommt (xt.pending()), werden die Knoepfe
      * erst gebaut, wenn er da ist (hoechstens HOLD ms), und die Altersfreigabe erst gezeigt, wenn ihre Daten da sind (gleiche Frist). */
+    var NARROW = false, BTN_X = 352, BO = 0;           // BO: Hub der ersten Seite in flacher Karte (0 am TV)
     var HOLD = 2500, holdBtn = false, holdCr = false, holdT = 0;
     var zone = 'btn', off = 0, px = null, sx = null, x = null, hstate = 'loading', bgDone = false, castN = 0;
     /* Schnittstelle fuer eine optionale Erweiterung (N.ext 'extdetails:open'): Knoepfe/Texte neu zeichnen, Daten ergaenzen */
@@ -32,10 +33,20 @@
 
     s.create = function (el) {
       root = el;
-      hero = new N.ui.DetHero(root);
+      /* schmale Karte (Apple, Klasse K; wie views/details.js NARROW): kein Plakat, Info und Knoepfe ab der Inhaltskante, Breite der
+       * Karte (Altbefund 03.11.: Beschreibung lief am iPhone hoch rechts ueber den Rand). Am TV/ohne Karte: NARROW false, alles wie bisher */
+      var cg = N.ui.card && N.ui.card.on() ? N.ui.card.peek() : null;
+      NARROW = !!(cg && cg.narrow);
+      if (NARROW) BTN_X = 144;
+      hero = new N.ui.DetHero(root, { narrow: NARROW });
       pg = U.el('div', 'pg', root);
-      bar = U.el('div', 'd-btns', pg);
+      bar = U.el('div', 'd-btns', pg, NARROW ? 'left:' + BTN_X + 'px;width:' + (cg.cw - BTN_X - 24) + 'px' : undefined);
       hero.makeInfo(root, { chips: 3, line: true });
+      if (NARROW) hero.info.style.width = (cg.cw - 168) + 'px';   // flex.css: Kinder 100 % davon (Elternflaeche hier = Ansicht, nicht Kartenseite)
+      else if (cg) hero.fit(cg.cw);                                // Karte M (iPad mini hoch): Zeilen auf die Kartenbreite
+      /* flache Karte (kleines Mac-Fenster, wie details.js btnOff): Knopfreihe (y 448–496) mit 16 Abstand ins Bild, Info/Plakat mit */
+      BO = cg && N.ui.card.g ? Math.max(0, 512 - N.ui.card.g.ch) : 0;
+      if (BO) { hero.setLift(BO); setOff(BO); }
       hero.setPoster(it.thumb, it.title);
       var fade = U.el('img', 'fade', root); fade.src = N.assetBase + 'fade-bottom.png';
       ring = new N.ui.Ring(root);
@@ -100,15 +111,21 @@
       if (D.watchlistOn() && D.guidOk(it.guid)) bdefs.push({ id: 'wl', t: (xt && xt.wlLabel && xt.wlLabel(D.wl.has(it))) || N.t(D.wl.has(it) ? 'disc.wl.remove' : 'disc.wl.add') });   // Erweiterung: eigener Text
       bdefs.push({ id: 'back', t: N.t('err.btn.back') });
       if (xt && xt.buttons) xt.buttons(bdefs);
+      if (N.input && N.input.on) bdefs.push({ id: 'more', t: '', icon: 'more' });   // Finger/Maus (Apple): "…" › "Infos" wie bei eigenen Titeln (am TV kein Knopf: INFO-Taste)
       btns = []; btnRects = null;
-      for (var i = 0; i < bdefs.length; i++) { var b = U.el('div', 'btn inl', bar); b.appendChild(document.createTextNode(bdefs[i].t)); btns.push(b); }
+      for (var i = 0; i < bdefs.length; i++) {
+        var b = U.el('div', bdefs[i].icon ? 'btn inl ib' : 'btn inl', bar);
+        if (bdefs[i].icon) { N.ui.icon(b, bdefs[i].icon); b.setAttribute('aria-label', N.t('det.btn.more')); } else b.appendChild(document.createTextNode(bdefs[i].t));
+        btns.push(b);
+      }
       bf = Math.min(bf, btns.length - 1);
       if (zone === 'btn' && !N.ui.rail.isOpen()) U.cls(btns[bf], 'is-focus', true);
-      setTimeout(function () { if (dead) return; btnRects = []; for (var k = 0; k < btns.length; k++) btnRects.push([352 + btns[k].offsetLeft, btns[k].offsetWidth]); }, 50);
+      setTimeout(function () { if (dead) return; btnRects = []; for (var k = 0; k < btns.length; k++) btnRects.push([BTN_X + btns[k].offsetLeft, btns[k].offsetWidth]); }, 50);
     }
     function setBtn(i) { U.cls(btns[bf], 'is-focus', false); bf = i; U.cls(btns[bf], 'is-focus', true); N.fx.move(btns[bf]); }
     function act(id) {
       if (id === 'back') { N.router.back(); return; }
+      if (id === 'more') { menu(); return; }
       if (id !== 'wl') { if (xt && xt.button) xt.button(id); return; }
       if (busy) return;
       var on = !D.wl.has(it);
@@ -121,10 +138,15 @@
         buildButtons();
       });
     }
+    /* "…" (nur Finger/Maus): Menue wie bei eigenen Titeln (details.js menu), hier nur "Infos" */
+    function menu() {
+      N.ui.dialog.open({ title: it.title, buttons: [{ id: 'info', t: N.t('menu.info') }], vertical: true, focus: 0, top: 120,
+        onSelect: function (id) { if (id === 'info') info(); } });
+    }
     function info() {
       var note = xt && xt.infoNote ? xt.infoNote() : '';         // Erweiterung: kurzer Hinweis unter der Beschreibung
       var o = xt && xt.paint ? xt.paint() : null;               // Erweiterung: Stand (z. B. "Film · Bald da") statt "Nicht auf deinem Server"
-      N.ui.panel.help(it.title, D.extInfoText(it, x, sumText(), note, o ? { ov: o.ov, state: o.meta } : null), 700);
+      N.ui.panel.help(it.title, D.extInfoText(it, x, sumText(), note, o ? { ov: o.ov, state: o.meta } : null));
     }
 
     /* ---------- Zonen: Knoepfe | Besetzung (Seite rollt wie bei eigenen Titeln) ---------- */
@@ -133,7 +155,7 @@
     function dim(on) { U.cls(bar, 'dim', on); U.vis(bar, !on); }
     function toBtn() {
       if (zone === 'row' && row) row.setFocused(false);
-      zone = 'btn'; setOff(0); hero.hero(true); ring.hide(); dim(false);
+      zone = 'btn'; setOff(BO); hero.hero(true); ring.hide(); dim(false);
       if (btns[bf]) U.cls(btns[bf], 'is-focus', true);
       N.router.refreshHints();
     }
@@ -173,7 +195,7 @@
     };
     s.pointer = function (px0, y, kind) {
       var py = y + off, i;
-      if (!off && py >= 448 && py < 496 && btnRects) {
+      if (off === BO && py >= 448 && py < 496 && btnRects) {
         for (i = 0; i < btnRects.length; i++) if (px0 >= btnRects[i][0] && px0 < btnRects[i][0] + btnRects[i][1]) {
           if (zone !== 'btn') toBtn();
           if (i !== bf) setBtn(i);
@@ -186,7 +208,7 @@
       if (ez) { if (kind === 'click') s.pointerScroll(ez.d); return true; }   // Randzone: rollt (Verweilen/Klick), fokussiert nicht
       /* Besetzung nur, wenn ihr Abschnitt eingerastet ist (NAV-2, DET-9): unter den Knoepfen lugt nur ihr Kopf herein (Karten ab
        * y 632) – frueher rollte schon das Zeigen dorthin die Seite. Hin und zurueck ueber die Randzonen bzw. per Klick. */
-      if (row && N.RowMath.secVis(PEEK + 52 - off, row.g.h, off === PEEK - ANCHOR, off ? ANCHOR - 24 : 0) === 'full' && py >= PEEK + 52 && py < PEEK + 52 + row.g.h && y < N.RowMath.VIS) {
+      if (row && N.RowMath.secVis(PEEK + 52 - off, row.g.h, off === PEEK - ANCHOR, off > BO ? ANCHOR - 24 : 0) === 'full' && py >= PEEK + 52 && py < PEEK + 52 + row.g.h && y < N.RowMath.VIS) {
         var h = row.hit(px0);
         if (h < 0) return false;
         if (zone !== 'row') toRow();
@@ -199,8 +221,8 @@
     /* Randzonen wie bei eigenen Titeln (details.js): oben y 276–332 zurueck zu den Knoepfen, unten ab 604 bis 656 zur Besetzung */
     s.pointerEdge = function (px0, y) {
       if (px0 < 128 || px0 >= 1216) return null;
-      if (off > 0 && y >= 276 && y < 332) return { d: -1, x: 600, y: 304 };
-      if (!off && row && row.count() && y >= N.RowMath.EDGE_B && y < 656) return { d: 1, x: 600, y: 636 };
+      if (off > BO && y >= 276 && y < 332) return { d: -1, x: 600, y: 304 };
+      if (off === BO && row && row.count() && y >= N.RowMath.EDGE_B && y < 656) return { d: 1, x: 600, y: 636 };
       return null;
     };
     s.pointerScroll = function (d) { if (d > 0) toRow(); else toBtn(); };

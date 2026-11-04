@@ -133,3 +133,15 @@ test('Rueckgaengig-Toast: Finger/Maus antippen = dieselbe Taste (Gelb bzw. Rot),
   assert.strictEqual(T.tapSuffix(), '');
   T.hide();
 });
+
+test('Computer ohne Hinweisleiste (caps.hintBar false, NAV-25): Modus immer "aus", auch mit Tasten und Profil-Einstellung', function () {
+  var f = fresh({ hints: 'always' }), N = f.N;
+  assert.strictEqual(N.platform.caps.hintBar, true, 'Standard (TV): Leiste da');
+  N.platform.caps.hintBar = false;
+  assert.strictEqual(N.ui.hints.mode(), 'off');
+  N.ui.hints.wake();
+  assert.ok(f.hid(), 'Leiste versteckt');
+  assert.strictEqual(N.ui.hints.hit(1000, 670), null, 'nicht anklickbar');
+  N.platform.caps.hintBar = true;
+  assert.strictEqual(N.ui.hints.mode(), 'always', 'ohne die Faehigkeit wie bisher');
+});

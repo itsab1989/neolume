@@ -195,7 +195,7 @@ These TVs have a ready-made download:
 
 | TV system | Models | Download | Installation guide | Media servers | Last tested on a real TV | Status |
 |---|---|---|---|---|---|---|
-| **Samsung Smart TV 2014 (Orsay)** | 2014 H series (e.g. UE48H8000, UE40H6400)<br>2014 HU series, 4K (e.g. UE55HU7500) | [Setup program](#download) for your computer – it contains the TV app | [English](docs/INSTALL.md) · [Deutsch](docs/INSTALL.de.md) | Plex | 1.0.12 (2026-11-03, UE48H8000) | ✅ tested on a real TV by the maintainer |
+| **Samsung Smart TV 2014 (Orsay)** | 2014 H series (e.g. UE48H8000, UE40H6400)<br>2014 HU series, 4K (e.g. UE55HU7500) | [Setup program](#download) for your computer – it contains the TV app | [English](docs/INSTALL.md) · [Deutsch](docs/INSTALL.de.md) | Plex | 1.0.13 (2026-11-04, UE48H8000) | ✅ tested on a real TV by the maintainer |
 
 No community port for other TVs yet – yours could be the first: [community ports](PORTS.md).
 <!-- /gen:platforms -->

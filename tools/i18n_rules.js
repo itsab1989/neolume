@@ -18,25 +18,34 @@ var RULES = [
 function limitFor(key) { for (var i = 0; i < RULES.length; i++) if (RULES[i][0].test(key)) return RULES[i][1]; return 0; }
 function placeholders(s) { var m = String(s).match(/\{\w+\}/g) || []; return m.slice().sort().join(','); }
 function forms(v) { return typeof v === 'string' ? [v] : [v.one, v.other]; }
-/* -> Liste von Fehlermeldungen */
-function check(de, en) {
-  var errs = [], k;
-  for (k in de) if (!(k in en)) errs.push('EN fehlt: ' + k);
-  for (k in en) if (!(k in de)) errs.push('DE fehlt: ' + k);
+/* -> Liste von Fehlermeldungen. de = Referenz (Primaersprache), en und optional nb (Norwegisch, Nutzerwunsch 03.11.) muessen
+ * genau dieselben Schluessel, Mehrzahl-Formen und Platzhalter haben; Grenzen und Zeichensatz gelten fuer jede Sprache. */
+function check(de, en, nb) {
+  var errs = [], k, langs = [['en', en]];
+  if (nb) langs.push(['nb', nb]);
+  function chars(name, s, k, lim) {
+    var plain = String(s).replace(/\{\w+\}/g, '');
+    if (lim && plain.length > lim) errs.push('Zu lang (' + name + ' ' + plain.length + '>' + lim + '): ' + k);
+    for (var i = 0; i < s.length; i++) if (!allowedChar(s[i])) errs.push('Zeichen nicht im Font-Subset (' + name + ' U+' + s.charCodeAt(i).toString(16) + '): ' + k);
+  }
+  langs.forEach(function (L) {
+    var name = L[0], o = L[1], up = name.toUpperCase(), tag = name === 'en' ? '' : ' (' + name + ')';
+    for (k in de) if (!(k in o)) errs.push(up + ' fehlt: ' + k);
+    for (k in o) if (!(k in de)) errs.push('DE fehlt' + tag + ': ' + k);
+  });
   for (k in de) {
-    if (!(k in en)) continue;
-    var a = de[k], b = en[k];
-    if (typeof a !== typeof b) { errs.push('Typ (Mehrzahl) ungleich: ' + k); continue; }
-    if (typeof a === 'object' && (!a.one || !a.other || !b.one || !b.other)) errs.push('Mehrzahl braucht one+other: ' + k);
-    var fa = forms(a), fb = forms(b);
-    if (placeholders(fa.join(' ')) !== placeholders(fb.join(' '))) errs.push('Platzhalter ungleich: ' + k);
-    var lim = limitFor(k);
-    [['de', fa], ['en', fb]].forEach(function (p) {
-      p[1].forEach(function (s) {
-        var plain = String(s).replace(/\{\w+\}/g, '');
-        if (lim && plain.length > lim) errs.push('Zu lang (' + p[0] + ' ' + plain.length + '>' + lim + '): ' + k);
-        for (var i = 0; i < s.length; i++) if (!allowedChar(s[i])) errs.push('Zeichen nicht im Font-Subset (' + p[0] + ' U+' + s.charCodeAt(i).toString(16) + '): ' + k);
-      });
+    var a = de[k], fa = forms(a), lim = limitFor(k);
+    if (typeof a === 'object' && (!a.one || !a.other)) errs.push('Mehrzahl braucht one+other: ' + k);
+    fa.forEach(function (s) { chars('de', s, k, lim); });
+    langs.forEach(function (L) {
+      var name = L[0], tag = name === 'en' ? '' : ' (' + name + ')';
+      if (!(k in L[1])) return;
+      var b = L[1][k];
+      if (typeof a !== typeof b) { errs.push('Typ (Mehrzahl) ungleich' + tag + ': ' + k); return; }
+      if (typeof b === 'object' && (!b.one || !b.other)) errs.push('Mehrzahl braucht one+other' + tag + ': ' + k);
+      var fb = forms(b);
+      if (placeholders(fa.join(' ')) !== placeholders(fb.join(' '))) errs.push('Platzhalter ungleich' + tag + ': ' + k);
+      fb.forEach(function (s) { chars(name, s, k, lim); });
     });
   }
   return errs;

@@ -370,3 +370,21 @@ test('Ansicht Web-Anmeldung: Fokus wechselt zwischen den Knoepfen (Klasse am Ele
   assert.ok(v.find(v.N.t('login.web.failed')), 'Hinweis nach Ausnahme der Plattform');
   assert.strictEqual(v.calls.closed, 0);
 });
+
+test('StateBlock schmal (fit): Knoepfe untereinander, Zeiger und ▲▼ treffen sie; fit(null) wieder wie am TV', function () {
+  var ctx = H.load({ fakeTimers: true }), N = ctx.N;
+  ctx.document = MiniDoc();
+  N.router.refreshHints = function () {};
+  var root = ctx.document.createElement('div'), sb = new N.ui.StateBlock(root), sel = [];
+  sb.fit({ x: 24, w: 498, H: 942 });
+  sb.show({ title: 'T', text: 'X', buttons: [{ id: 'a', t: 'A' }, { id: 'b', t: 'B' }], onSelect: function (id) { sel.push(id); } });
+  assert.ok(sb.L && sb.L.stack, 'untereinander bei 498 Breite');
+  assert.strictEqual(sb.btns[0].style.width, '400px');
+  var y = sb.L.y;
+  assert.ok(sb.pointer(100, y + 70, 'click')); assert.deepStrictEqual(sel, ['b'], 'zweiter Knopf 64 tiefer');
+  assert.strictEqual(sb.pointer(100, y + 52, 'click'), false, 'Luecke trifft nichts');
+  sb.onKey('UP'); assert.strictEqual(sb.f, 0, '▲ zum ersten');
+  sb.fit(null);
+  assert.strictEqual(sb.L, null); assert.strictEqual(sb.el.style.left, ''); assert.strictEqual(sb.btns[0].style.width, '');
+  assert.ok(sb.pointer(144 + 316 + 10, 420, 'click'), 'TV-Lagen'); assert.deepStrictEqual(sel, ['b', 'b']);
+});

@@ -34,7 +34,7 @@ test('Minimal-Adapter erfuellt den Vertrag; use() setzt N.platform mit Standard-
 
 test('Standard-caps = heutiges Verhalten des Fernsehers (alles aus, setup.json/Helfer an, SEF)', function () {
   var d = load().N.Platform.defaults();
-  ['tls12', 'touch', 'textInput', 'pip', 'secureStore', 'backgroundAudio', 'webLogin', 'cellular'].forEach(function (k) { assert.strictEqual(d[k], false, k); });
+  ['tls12', 'touch', 'textInput', 'pip', 'secureStore', 'backgroundAudio', 'webLogin', 'cellular', 'haptic'].forEach(function (k) { assert.strictEqual(d[k], false, k); });
   assert.strictEqual(d.setupFile, true); assert.strictEqual(d.helper, true);
   assert.strictEqual(d.trick, 'sef'); assert.strictEqual(d.subsEmbedded, 'sef');
   assert.strictEqual(d.exit, true); assert.strictEqual(d.focusRing, 'always'); assert.strictEqual(d.scroll, 'focus');
@@ -63,6 +63,10 @@ test('Vertrag: fehlende Felder und unsinnige caps werden gemeldet, use() wirft',
   assert.ok(PL.check(bad).indexOf('caps.screen: App-Raster 1280x720, scale > 0') >= 0);
   bad.caps = { tls12: true, setupFile: false, webLogin: true };
   assert.ok(PL.check(bad).indexOf('caps.webLogin braucht auth.web/close') >= 0);
+  bad.caps = { haptic: true };
+  assert.ok(PL.check(bad).indexOf('caps.haptic braucht haptic.prepare/select') >= 0, 'Haptik (LIB-12) nur mit haptic.prepare/select');
+  bad.caps = { haptic: 'ja' };
+  assert.ok(PL.check(bad).indexOf('caps.haptic muss true/false sein') >= 0);
   bad.caps = { focusRing: 'nie', scroll: 'frei', exit: 'nein' };
   var e3 = PL.check(bad);
   assert.ok(e3.indexOf('caps.focusRing muss always|keys sein') >= 0);

@@ -7,7 +7,9 @@
   function tp(p) { return N.srv ? N.srv.tp(p) : p; }   // Weitere Server: Rohpfade mit Server-Marke (Kontext aus N.plex.pms)
   function tags(list, max) { var out = []; for (var i = 0; list && i < list.length && out.length < (max || 99); i++) if (list[i].tag) out.push({ id: list[i].id, t: String(list[i].tag) }); return out; }
   function genreTags(list, max) { var t = tags(list, max); for (var i = 0; i < t.length; i++) t[i].t = N.fmt.genre(t[i].t); return t; }   // F22: App-Sprache
+  var MAXI = 4000;                                   // INFO-Text: nur Sicherheitsgrenze (Beschreibungen kommen mit hoechstens 1500 Zeichen)
   var D = {
+    MAXI: MAXI,
     /* Filmdetails: eine Anfrage (Player nutzt die Metadaten wieder) */
     query: function (type) {
       if (type === 'show') return { includeOnDeck: 1, includeRelated: 1, includeExtras: 1, checkFiles: 0, includeReviews: 0 };
@@ -154,7 +156,7 @@
       }
       return F.join(p);
     },
-    /* "2023-10-06" -> "06.10.2023" (DE) bzw. "10/06/2023" (EN) */
+    /* "2023-10-06" -> "06.10.2023" (DE, NB) bzw. "10/06/2023" (EN) */
     date: function (s) {
       var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || '');
       if (!m) return '';
@@ -197,11 +199,11 @@
       b.push({ id: 'more', t: '', icon: 'more' });
       return b;
     },
-    /* INFO-Panel: volle Beschreibung + Regie, Drehbuch, Studio, Datei (max. 600 Zeichen, SPEC 10.6) */
+    /* INFO-Panel: volle Beschreibung + Regie, Drehbuch, Studio, Datei (NAV-12: ganz; das Panel scrollt, wenn er nicht passt) */
     info: function (it, d) {
       var lines = [];
       if (d && d.tagline) lines.push(d.tagline);
-      if (d && d.sum) lines.push(U.trim(d.sum, 360));
+      if (d && d.sum) lines.push(d.sum);
       var p = [];
       if (d && d.directors.length) p.push(N.t('det.info.director', { names: D.names(d.directors) }));
       if (d && d.writers.length) p.push(N.t('det.info.writer', { names: D.names(d.writers) }));
@@ -210,7 +212,7 @@
       var md = d && d.media && d.media[0];
       if (md) p.push(F.join([String(md.videoResolution || '').toUpperCase(), String(md.videoCodec || '').toUpperCase(), String(md.audioCodec || '').toUpperCase(), md.container ? String(md.container).toUpperCase() : '']));
       if (p.length) lines.push(p.join('\n'));
-      return U.trim(lines.join('\n\n'), 600);
+      return U.trim(lines.join('\n\n'), MAXI);
     },
     names: function (list) { var a = []; for (var i = 0; i < list.length; i++) a.push(list[i].t); return a.join(', '); },
     /* Platzhalter fuer noch nicht geladene Folgen */

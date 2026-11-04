@@ -102,8 +102,8 @@ test('Bibliothek aus "Alle anzeigen": nur fuer diesen Besuch nach Hinzugefuegt, 
   assert.strictEqual(mq.type, 9); assert.strictEqual(mq.sort, 'addedAt:desc,titleSort:asc');
 });
 
-test('Texte: Karte, Hinweis, Statuszusatz, leere Liste in DE und EN', function () {
-  ['de', 'en'].forEach(function (l) {
+test('Texte: Karte, Hinweis, Statuszusatz, leere Liste in DE, EN und NB', function () {
+  ['de', 'en', 'nb'].forEach(function (l) {
     N.i18n.set(l);
     ['home.row.all', 'hint.showAll', 'lib.status.once', 'empty.list.title', 'empty.list.text'].forEach(function (k) { assert.ok(N.t(k) && N.t(k) !== k, l + ' ' + k); });
     assert.ok(/312/.test(N.t('home.row.allN', { n: 312 })));

@@ -8,7 +8,7 @@
   var U = N.util, HERO_X = 208, HERO_Y = 188, REST = 300;
   function DetHero(root, o) {
     o = o || {};
-    this.sq = !!o.square; this.on = true; this.needBg = true; this.dead = false; this.chipEls = [];
+    this.sq = !!o.square; this.on = true; this.lift = 0; this.needBg = true; this.dead = false; this.chipEls = [];
     this.hx = o.narrow ? 0 : HERO_X;                 // schmale Karte (Apple, Klasse K): kein Plakat, Info ab der Inhaltskante
     this.bgc = U.el('div', 'full', root, 'display:none');
     this.bg = U.el('img', 'full', root); this.bg.src = N.img.BLANK; this.bg.style.visibility = 'hidden';
@@ -35,6 +35,23 @@
     if (o && o.line) this.lineT = U.txt('span', 'd-chl t-small c2 ell', ch, '');
     this.chRow = ch;
     return info;
+  };
+  /* Karte flacher als der erste Bildschirm (Apple, kleines Mac-Fenster; Befund 03.11. Strang G: Knoepfe unter der Fensterkante):
+   * Info und Plakat px nach oben, die Ansicht hebt ihre Knopfreihe um dasselbe (wie details.js btnFit). 0 = wie am TV */
+  P.setLift = function (px) {
+    this.lift = px || 0;
+    if (this.on && this.info) U.tf(this.info, this.hx, HERO_Y - this.lift);
+    U.tf(this.pc, 0, -this.lift);
+  };
+  /* Karte schmaler als die Info (Apple, Groessenklasse M: Inhalt cw = Flaeche + 64 breit, Info ab x 352): Zeilen auf die sichtbare
+   * Breite begrenzen (Altbefund 03.11.: Beschreibung lief am iPad mini hoch rechts ueber den Kartenrand). cw = Inhaltsbreite der Karte.
+   * Am TV und in breiten Karten nie aufgerufen bzw. ohne Wirkung (Standardbreiten aus app.css passen). */
+  P.fit = function (cw) {
+    if (!this.info || !(cw > 0)) return;
+    var x = 144 + this.hx, a = cw - x - 24, set = function (el, def) { if (el && a < def) el.parentNode.style.width = Math.max(200, a) + 'px'; };
+    set(this.ovT, 864); set(this.meT, 864); set(this.deT, 620);
+    if (this.tiEl && a < 864) this.tiEl.style.width = Math.max(200, a) + 'px';
+    if (this.chRow && a < 900) this.chRow.style.width = Math.max(200, a) + 'px';
   };
   /* Zeile einer Erweiterung unter der Beschreibung (details.js X/xt.note, z. B. wann die naechste Folge kommt): eigenes Element hinter den
    * Chips, erst beim ersten Text angelegt (ohne Text: kein Element, Seite wie ohne Erweiterung). Kommt der Text spaeter (Daten der
@@ -88,7 +105,7 @@
   P.hero = function (on) {
     if (this.on === on) return;
     this.on = on; N.fx.move(this.info);
-    U.tf(this.info, on ? this.hx : 0, on ? HERO_Y : 0);
+    U.tf(this.info, on ? this.hx : 0, on ? HERO_Y - this.lift : 0);
     U.cls(this.pc, 'out', !on);
     if (this.hdr) U.cls(this.hdr, 'on', !on);
   };

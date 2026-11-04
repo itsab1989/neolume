@@ -94,12 +94,14 @@ test('Folgen: Fokus (angefangen > erste ungesehene), Beschriftung, Ziffernsprung
   assert.strictEqual(D.epIndex(eps, 60, 57), 56);      // noch nicht geladen -> Schaetzung ueber die Position
   assert.strictEqual(D.epIndex(eps, 60, 999), 59);
 });
-test('INFO-Text: Tagline, Beschreibung, Regie, Studio, Datei (max. 600 Zeichen)', function () {
+test('INFO-Text: Tagline, ganze Beschreibung, Regie, Studio, Datei (NAV-12, Befund 03.11.: frueher nach 360 Zeichen gekuerzt)', function () {
   var d = D.parse(MOVIE, {}), t = D.info(d.it, d);
   assert.ok(t.indexOf('Wie schnell?') === 0);
   assert.ok(t.indexOf('Regie: John Singleton') > 0);
   assert.ok(t.indexOf('1080 · H264 · DCA') > 0);
-  assert.ok(t.length <= 600);
+  var long = new Array(80).join('Sehr langer Text. ');
+  d.sum = long; t = D.info(d.it, d);
+  assert.ok(t.indexOf(long) > 0 && t.indexOf('1080 · H264 · DCA') > 0, 'Beschreibung ganz, Fakten danach');
 });
 
 test('Staffel-Reiter: links nie halb abgeschnitten, fokussierter Reiter ganz sichtbar (F14)', function () {

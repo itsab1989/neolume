@@ -133,13 +133,13 @@ class FromRepo(unittest.TestCase):
     def test_base_from_repo(self):
         d = tempfile.mkdtemp()
         try:
-            os.makedirs(os.path.join(d, 'loader', 'icon')); os.makedirs(os.path.join(d, 'app'))
+            os.makedirs(os.path.join(d, 'loader', 'icon')); os.makedirs(os.path.join(d, 'app', 'i18n'))
             os.makedirs(os.path.join(d, 'loader-icons', 'w4')); os.makedirs(os.path.join(d, 'loader-icons', 'original'))
             for n, data in (('loader/boot.js', b"var DEV_HOST = '';"), ('loader/index.html', b'<title>x</title>'), ('loader/widget.info', b''),
                             ('loader/config.xml', b'<x>icon/icon_106x87.png</x><widgetname itemtype="string">x</widgetname>'),
                             ('loader/icon/icon_106x87.png', b'old'), ('loader-icons/original/icon_106x87.png', b'pub'),
                             ('loader-icons/w4/icon_106x87.png', b'new'), ('app/app.js', b'App'), ('app/bench.js', b'x'),
-                            ('app/icons.png', b'p')):
+                            ('app/icons.png', b'p'), ('app/i18n/de.js', b'N.strings.de={}'), ('app/i18n/nb.js', b'N.strings.nb={}'), ('app/i18n/x.txt', b'no')):
                 with open(os.path.join(d, n), 'wb') as f: f.write(data)
             e = dict(package.base_from_repo(d))                      # public brand: icon "original", name in config.xml
             icon = [n for n in e if n.startswith('icon/')][0]
@@ -153,6 +153,7 @@ class FromRepo(unittest.TestCase):
             self.assertEqual(e[icon], b'new')
             self.assertIn(icon.encode(), e['config.xml'])
             self.assertNotIn('bench.js', e)
+            self.assertEqual(e['i18n/de.js'], b'N.strings.de={}'); self.assertIn('i18n/nb.js', e); self.assertNotIn('i18n/x.txt', e)   # Sprachtabellen je Sprache
             self.assertEqual(e['app.js'], b'App')
             with open(os.path.join(d, 'app', 'app.min.js'), 'wb') as f: f.write(b'Min')
             e = dict(package.base_from_repo(d))

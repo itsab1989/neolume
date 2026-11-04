@@ -6,17 +6,24 @@
  *   init(ctx)                                              einmal in App.start, vor N.store.init (ctx vom Lader)
  *   keys{name(code, ev), cap{…}, register(names)}           Tastencode -> Tastenname, Tastenkappen, Laufzeit-Registrierung
  *   store(ctx) -> {read, write, probe}                      Speicher-Backend (synchron, wie heute ctx.store)
- *   player{create(onEvent) -> {exec, close, fake}, close(), surface}   Form wie N.sef
+ *   player{create(onEvent) -> {exec, close, fake}, close(), surface}   Form wie N.sef; optional nowPlaying({title, artist, album, art} | null):
+ *                                                           "Wird gespielt" des Geraets (SPEC NAV-26)
  *   tv{saver(on), exit(), language()}                       Geraete-Dienste
  *   screen{toApp(x, y) -> {x, y}, size()}                    Bildschirm- -> App-Koordinaten (Zeiger/Touch); size() -> {w, h}
- *                                                           logische App-Flaeche, nur mit caps.screen.flex (sonst 1280x720).
+ *                                                           logische App-Flaeche, nur mit caps.screen.flex (sonst 1280x720);
+ *                                                           optional safe {t, r, b, l}: sichere Raender darin (N.screen.safe).
  *                                                           Groessenwechsel meldet die Plattform als N.evt 'screen:changed' {w, h}
  *   caps{…}                                                 Faehigkeiten, an denen der Kern verzweigt (nie am Plattformnamen)
+ *   texts(lang, mode)                                       optional: {schluessel: text} ueberlagert N.t fuer dieses Geraet und
+ *                                                           die Eingabeart mode ('key' | 'pointer' | 'touch'), z. B. Tasten- und
+ *                                                           Geraetenamen (SPEC NAV-26); nur vorhandene Schluessel, gleiche Platzhalter
  *   net{plexTv(httpsUrl) -> url, factory, kind(), native}   Netz-Faehigkeiten; native (optional, sonst null): XHR-Fabrik fuer
  *                                                           Dienste ohne CORS (z. B. Erweiterungen) ueber das Geraet; Kopfzeile
  *                                                           X-Api-Key "pn-secret:<dienst>" setzt dort den Schluessel ein
  *   secret{set, copy, has, remove, clear}                   optional (mit caps.secureStore): Schluessel im sicheren Speicher (nie lesbar),
  *                                                           je (args, cb(err{code}|null, data)); sonst null
+ *   haptic{prepare(), select()}                             nur mit caps.haptic: Auswahl-Tick (prepare beim Auflegen, select je Wechsel,
+ *                                                           ohne Rueckmeldung, ohne Taptic still); sonst null
  *   auth{web(url, cb), close()}                             nur mit caps.webLogin: Plex-Anmeldeseite im System-Anmeldefenster;
  *                                                           cb(err{code}, {closed, reason: 'cancelled'|'closed'}); sonst null
  * Fehlt ein Pflichtfeld, wirft use() (Bau-/Testfehler, nie still). Fehlende caps-Felder bekommen den Orsay-Wert (alles aus),
@@ -37,14 +44,19 @@
       setupFile: true,         // setup.json aus dem App-Paket lesen (Einrichtungsprogramm)
       helper: true,            // Helfer im Heimnetz moeglich (Merkliste, Weitere Server, Anfragen)
       cellular: false,         // Geraet hat Mobilfunk: Zeile "Qualitaet ueber Mobilfunk", Grenze bei Netz ueber Mobilfunk (net.path)
+      haptic: false,           // Auswahl-Tick am Finger (N.platform.haptic), z. B. je Buchstabe beim Ziehen ueber die A–Z-Leiste (LIB-12)
       webLogin: false,         // Anmeldung direkt am Geraet auf app.plex.tv (System-Anmeldefenster, N.platform.auth) statt Code
       saverDefault: 5,         // Standard des App-Bildschirmschoners in Minuten (0 = aus); gilt nur, solange das Profil ihn nicht selbst gesetzt hat
       exit: true,              // die App kann sich selbst beenden (Beenden-Dialog, Hinweis "Beenden"); iOS/iPadOS/macOS-Apps nicht
+      hintBar: true,           // Hinweisleiste mit Tastenkappen; false = nie, auch nicht mit Tasten (Computer: Mac, Nutzer 03.11.):
+                               // Tasten unter Hilfe › Tastenbelegung, Optionen per Rechtsklick (caps.pointer 'mouse'), keine Zeile "Tastenhinweise"
       focusRing: 'always',     // 'always' = Fokus immer sichtbar (TV) | 'keys' = nur nach Tasten; Finger/Maus ohne Rahmen (N.input)
       scroll: 'focus',         // 'focus' = Inhalt folgt dem Fokus (Tasten, Wischen = Schritte) | 'free' = Wischen verschiebt frei (App.pan)
       details: 'page',         // 'page' = Detailansicht als ganze Seite (TV) | 'card' = Karte von unten ueber der abgedunkelten Ansicht,
                                // tiefere Ebenen in der Karte, X/Pfeil oben links, Ziehen nach unten schliesst (N.ui.card, Nr. 9/16)
       home: 'hero',            // Startseite: 'hero' = Infobereich oben (TV) | 'tiles' = nur Kachelreihen ab oben, alle Reihen sichtbar
+      homeHero: false,         // nur mit home 'tiles': Einstellung "Infobereich auf der Startseite" – Infobereich wie am TV ueber frei
+                               // scrollenden Reihen, wenn Zeiger/Tasten bedienen und die Flaeche hoch genug ist (HOME-18)
       cardTap: 'ok',           // Tipper/Klick auf eine Startseiten-Kachel: 'ok' = wie OK (TV) | 'details' = Details oeffnen
       images: 'tv',            // Bildlader: 'tv' = TV-Regeln (4 Downloads, Pausen nach Tasten, 1 Bild je Frame, Groesse = App-Pixel)
                                // | 'fast' = schnelles Geraet (mehr gleichzeitig, keine Pausen, Vorrat voraus, Stufe x screen.scale)
@@ -97,8 +109,9 @@
     if (!p.screen || !isFn(p.screen.toApp)) e.push('screen.toApp fehlt');
     if (!p.net || !isFn(p.net.plexTv) || !isFn(p.net.kind)) e.push('net.plexTv/kind fehlt');
     if (p.net && p.net.factory !== null && p.net.factory !== undefined && !isFn(p.net.factory)) e.push('net.factory muss Funktion oder null sein');
+    if (p.texts !== undefined && p.texts !== null && !isFn(p.texts)) e.push('texts muss Funktion sein');
     var c = mergeCaps(p.caps);
-    ['tls12', 'touch', 'textInput', 'pip', 'secureStore', 'backgroundAudio', 'setupFile', 'helper', 'webLogin', 'cellular', 'exit'].forEach(function (k) {
+    ['tls12', 'touch', 'textInput', 'pip', 'secureStore', 'backgroundAudio', 'setupFile', 'helper', 'webLogin', 'cellular', 'haptic', 'exit', 'hintBar', 'homeHero'].forEach(function (k) {
       if (typeof c[k] !== 'boolean') e.push('caps.' + k + ' muss true/false sein');
     });
     if (['sef', 'seek', 'none'].indexOf(c.trick) < 0) e.push('caps.trick ungueltig');
@@ -109,6 +122,7 @@
     if (['focus', 'free'].indexOf(c.scroll) < 0) e.push('caps.scroll muss focus|free sein');
     if (['page', 'card'].indexOf(c.details) < 0) e.push('caps.details muss page|card sein');
     if (['hero', 'tiles'].indexOf(c.home) < 0) e.push('caps.home muss hero|tiles sein');
+    if (c.homeHero === true && c.home !== 'tiles') e.push('caps.homeHero nur mit caps.home tiles');
     if (['ok', 'details'].indexOf(c.cardTap) < 0) e.push('caps.cardTap muss ok|details sein');
     if (['tv', 'fast'].indexOf(c.images) < 0) e.push('caps.images muss tv|fast sein');
     if (typeof c.screen.flex !== 'boolean') e.push('caps.screen.flex muss true/false sein');
@@ -121,6 +135,7 @@
     if (c.secureStore && !c.tls12) e.push('caps.secureStore ohne tls12 ist nicht vorgesehen');
     if (p.auth && (!isFn(p.auth.web) || !isFn(p.auth.close))) e.push('auth.web/close fehlt');
     if (c.webLogin === true && !p.auth) e.push('caps.webLogin braucht auth.web/close');
+    if (c.haptic === true && (!p.haptic || !isFn(p.haptic.prepare) || !isFn(p.haptic.select))) e.push('caps.haptic braucht haptic.prepare/select');
     if (c.webLogin === true && !c.tls12) e.push('caps.webLogin ohne tls12 ist nicht vorgesehen');
     if (p.net && p.net.native !== null && p.net.native !== undefined && !isFn(p.net.native)) e.push('net.native muss Funktion oder null sein');
     if (p.secret && ['set', 'copy', 'has', 'remove', 'clear'].some(function (k) { return !isFn(p.secret[k]); })) e.push('secret.set/copy/has/remove/clear fehlt');
@@ -140,6 +155,7 @@
       if (p.net.native === undefined) p.net.native = null;
       if (!p.auth) p.auth = null;
       if (!p.secret) p.secret = null;
+      if (!p.caps.haptic || !p.haptic) p.haptic = null;   // Kern fragt nur N.platform.haptic (null = kein Tick)
       N.platform = p;
       return p;
     }

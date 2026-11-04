@@ -13,6 +13,7 @@
     M.t1 = U.txt('div', 'mini-t1 ell', e, ''); M.t2 = U.txt('div', 'mini-t2 ell', e, '');
     M.ic = N.ui.icon(e, 'pause', 's1', 'left:252px;top:16px');
     var k = U.el('span', 'k k-green mini-k', e); k.appendChild(document.createTextNode('B'));
+    if (N.keys.label('green') !== null) k.style.display = 'none';   // Apple (NAV-26): keine farbige TV-Kappe; der Mini-Player ist selbst ein Knopf
     M.bar = U.el('i', '', U.el('div', 'mini-bar', e));
     N.evt.on('audio:track', function () { M.rk = ''; M.update(true); });
     N.evt.on('audio:state', function () { M.update(true); });

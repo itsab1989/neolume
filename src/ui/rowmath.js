@@ -61,6 +61,11 @@
     homeGeom: homeGeom,
     /* Unterkante des zeigbaren Bereichs einer Flaeche der Hoehe H (TV 720 -> VIS 632; darunter Verlauf und Hinweisleiste) */
     visFor: function (H) { return H && H !== 720 ? H - 88 : R.VIS; },
+    /* Infobereich ueber frei scrollenden Kacheln (HOME-18, nur Apple): hoch genug? Unter dem Infobereich (Reihen ab y 348) sollen
+     * mindestens ~1½ Reihen Platz haben (Querformat 288 Kopf zu Kopf: 348 + 432 = 780). Hysterese gegen Flackern beim Fenster-Ziehen:
+     * ein ab HERO_ON (800), aus erst unter HERO_OFF (760); was = letzter Zustand (null = erste Entscheidung) */
+    HERO_ON: 800, HERO_OFF: 760,
+    heroTall: function (H, was) { return was ? H >= R.HERO_OFF : H >= R.HERO_ON; },
     /* Scroll-Index nach der Anker-Regel (Tasten) */
     scroll: function (n, f, full) { return Math.max(0, Math.min(f, n - full)); },
     maxScroll: function (n, full) { return Math.max(0, n - full); },

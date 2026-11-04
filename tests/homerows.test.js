@@ -169,3 +169,31 @@ test('Erweiterungs-Reihen (neutral, N.ext home:*): "x-…" immer aus und hinten,
   eq(M.homeRows.enabled(saved, av), ['x-b', 'cw', 'deck', 'new-1', 'new-2']);
   eq(M.hubs.order(saved, LIBS, LIBS), ['x-b', 'cw', 'deck', 'new-1', 'new-2'], 'Startseite nimmt eingeschaltete Erweiterungs-Reihen');
 });
+
+test('Ziehen am Griff (NAV-27): Zielplatz aus der Strecke, Nachruecken, Selbst-Rollen am Rand, Abbruch seitlich', function () {
+  assert.strictEqual(HR.dragTo(2, 0, 64, 8), 2);
+  assert.strictEqual(HR.dragTo(2, 31, 64, 8), 2, 'weniger als halbe Zeile: bleibt');
+  assert.strictEqual(HR.dragTo(2, 33, 64, 8), 3, 'mehr als halbe Zeile: naechster Platz');
+  assert.strictEqual(HR.dragTo(2, -97, 64, 8), 0);
+  assert.strictEqual(HR.dragTo(2, -1000, 64, 8), 0, 'oben geklemmt');
+  assert.strictEqual(HR.dragTo(2, 1000, 64, 8), 7, 'unten geklemmt (Reset/Hinzufuegen-Zeilen zaehlen nicht)');
+  // Zeile 1 nach 3: 2 und 3 ruecken hoch, 0 und 4 bleiben; Zeile 3 nach 1: 1 und 2 ruecken runter
+  assert.deepStrictEqual([0, 1, 2, 3, 4].map(function (k) { return HR.dragShift(k, 1, 3, 64); }), [0, 0, -64, -64, 0]);
+  assert.deepStrictEqual([0, 1, 2, 3, 4].map(function (k) { return HR.dragShift(k, 3, 1, 64); }), [0, 64, 64, 0, 0]);
+  assert.deepStrictEqual([0, 1, 2].map(function (k) { return HR.dragShift(k, 1, 1, 64); }), [0, 0, 0]);
+  assert.strictEqual(HR.dragAuto(300, 112, 384, 48, 0.9), 0, 'Mitte: rollt nicht');
+  assert.ok(HR.dragAuto(120, 112, 384, 48, 0.9) < 0, 'oberer Rand: nach oben');
+  assert.ok(HR.dragAuto(490, 112, 384, 48, 0.9) > 0, 'unterer Rand: nach unten');
+  assert.ok(HR.dragAuto(112, 112, 384, 48, 0.9) < HR.dragAuto(140, 112, 384, 48, 0.9), 'naeher am Rand = schneller');
+  assert.strictEqual(HR.dragAuto(0, 112, 384, 48, 0.9), -0.9, 'darueber hinaus: hoechstens vmax');
+  assert.strictEqual(HR.dragAuto(720, 112, 384, 48, 0.9), 0.9);
+  assert.strictEqual(HR.dragAway(500, 144, 736, 160), false);
+  assert.strictEqual(HR.dragAway(1030, 144, 736, 160), false, 'knapp rechts daneben');
+  assert.strictEqual(HR.dragAway(1050, 144, 736, 160), true, 'weit rechts: Abbruch');
+  assert.strictEqual(HR.dragAway(-20, 144, 736, 160), true, 'weit links: Abbruch');
+  var l = ['a', 'b', 'c', 'd', 'e'];
+  assert.strictEqual(HR.moveTo(l, 1, 3), 3); assert.deepStrictEqual(l, ['a', 'c', 'd', 'b', 'e']);
+  assert.strictEqual(HR.moveTo(l, 3, 0), 0); assert.deepStrictEqual(l, ['b', 'a', 'c', 'd', 'e']);
+  assert.strictEqual(HR.moveTo(l, 0, 99), 4); assert.deepStrictEqual(l, ['a', 'c', 'd', 'e', 'b']);
+  assert.strictEqual(HR.moveTo(l, 2, 2), 2);
+});

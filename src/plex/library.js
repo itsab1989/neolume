@@ -108,13 +108,15 @@
       return N.t('lib.status.filtered', { k: k, n: n >= 0 ? n : '?', sort: L.sortLabel(prefs, lib), filter: L.filterLabel(prefs) });
     },
     /* ---------- Buchstaben-Register ---------- */
-    /* /firstCharacter -> [{ch, n}] in aufsteigender Reihenfolge ('#' zuerst) */
-    chars: function (json) {
-      var list = json && json.MediaContainer && json.MediaContainer.Directory || [], out = [];
+    /* Buchstaben der Leiste in der App-Sprache: '#', A–Z, auf Norwegisch dahinter Æ Ø Å (Nutzerwunsch 03.11.) */
+    letters: function (lang) { return '#ABCDEFGHIJKLMNOPQRSTUVWXYZ' + ((lang || (N.i18n && N.i18n.lang())) === 'nb' ? 'ÆØÅ' : ''); },
+    /* /firstCharacter -> [{ch, n}] in der Reihenfolge des Servers ('#' zuerst); Zeichen ausserhalb der Leiste zaehlen zu '#' */
+    chars: function (json, lang) {
+      var list = json && json.MediaContainer && json.MediaContainer.Directory || [], out = [], abc = L.letters(lang);
       for (var i = 0; i < list.length; i++) {
         var ch = String(list[i].title || list[i].key || '').toUpperCase(), n = Number(list[i].size) || 0;
         if (!ch || !n) continue;
-        if (!/^[A-Z]$/.test(ch)) ch = '#';
+        if (ch.length !== 1 || ch === '#' || abc.indexOf(ch) < 0) ch = '#';
         if (out.length && out[out.length - 1].ch === ch) out[out.length - 1].n += n; else out.push({ ch: ch, n: n });
       }
       return out;
@@ -127,7 +129,8 @@
     jump: function (chars, letter, desc) {
       var a = L.ordered(chars, desc), off = 0, i, best = -1;
       if (!a.length) return { idx: 0, ch: '' };
-      for (i = 0; i < a.length; i++) {
+      for (i = 0; i < a.length; i++) if (a[i].ch === letter) { best = i; break; }   // vorhanden: genau dort (Server-Reihenfolge)
+      for (i = 0; best < 0 && i < a.length; i++) {
         var cmp = L.cmp(a[i].ch, letter);
         if (desc ? cmp <= 0 : cmp >= 0) { best = i; break; }
       }
@@ -135,7 +138,14 @@
       for (i = 0; i < best; i++) off += a[i].n;
       return { idx: off, ch: a[best].ch };
     },
-    cmp: function (a, b) { if (a === b) return 0; if (a === '#') return -1; if (b === '#') return 1; return a < b ? -1 : 1; },
+    /* Reihenfolge der Leiste ('#', A–Z, Æ Ø Å); unbekannte Zeichen nach Zeichencode dahinter */
+    cmp: function (a, b) {
+      if (a === b) return 0;
+      var abc = L.letters('nb'), x = abc.indexOf(a), y = abc.indexOf(b);
+      if (x >= 0 && y >= 0) return x < y ? -1 : 1;
+      if (x >= 0 || y >= 0) return x >= 0 ? -1 : 1;
+      return a < b ? -1 : 1;
+    },
     /* Buchstabe des Titels an Index idx */
     letterAt: function (chars, idx, desc) {
       var a = L.ordered(chars, desc), off = 0;
@@ -155,6 +165,28 @@
       for (var i = 0; i < a.length; i++) if (a[i].ch === ch) return a[Math.max(0, Math.min(a.length - 1, i + dir))].ch;
       return a.length ? a[0].ch : '';
     },
+    /* ---------- A–Z-Leiste mit Finger/Maus (LIB-12, nur flexible Flaeche) ---------- */
+    /* Plaetze der Leiste: passt das ganze Alphabet (n Zeichen je step px) nicht in avail, wird verdichtet wie bei iOS – ungerade
+     * Anzahl Plaetze (erster und letzter Buchstabe bleiben), jeder zweite ein "•" fuer die uebersprungenen Buchstaben.
+     * -> [{t: Zeichen, i: Buchstaben-Index (bei "•" -1)}], hoechstens n, mindestens 3 */
+    azSlots: function (letters, avail, step) {
+      var n = letters.length, s = Math.floor(avail / step), out = [], j;
+      if (s >= n) { for (j = 0; j < n; j++) out.push({ t: letters.charAt(j), i: j }); return out; }
+      if (s % 2 === 0) s--;
+      if (s < 3) s = 3;
+      for (j = 0; j < s; j++) out.push(j % 2 ? { t: '•', i: -1 } : { t: letters.charAt(Math.round(j * (n - 1) / (s - 1))), i: Math.round(j * (n - 1) / (s - 1)) });
+      return out;
+    },
+    /* Buchstaben-Index unter dy (px ab Oberkante der Leiste) bei slots Plaetzen zu je step px fuer n Buchstaben: Platzmitten zeigen
+     * genau ihren Buchstaben, dazwischen (auch ueber einem "•") linear; ober-/unterhalb der Leiste der erste bzw. letzte */
+    azIndex: function (dy, slots, step, n) {
+      if (n <= 1 || slots <= 1) return 0;
+      var u = Math.max(0, Math.min(slots - 1, dy / step - 0.5));
+      return Math.max(0, Math.min(n - 1, Math.round(u * (n - 1) / (slots - 1))));
+    },
+    /* Abbruchregel beim Ziehen: der Finger ist mehr als off px seitlich neben der Leiste (x0 … x0 + w) -> nicht mehr gemeint
+     * (Anzeige weg, Loslassen springt nicht); zurueck an der Leiste gilt der Zug wieder. Senkrecht nie: oben/unten = erster/letzter */
+    azAway: function (x, x0, w, off) { return x < x0 - off || x > x0 + w + off; },
     /* T9-Ziffernsprung (SPEC 6/7.5): 2 = A, 22 = B, 222 = C, 2222 = A …; 0/1 = '#' */
     t9: function (digit, presses) {
       var s = T9[digit];

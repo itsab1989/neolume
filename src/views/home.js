@@ -22,18 +22,42 @@
    * Breite + PITCH_TILES), die Kachelgroesse gilt dort nicht (Einstellung ausgeblendet) */
   var PITCH_TILES = { land: 312, poster: 400, sq: 312 };
   /* Kacheln dicht (nur flexible Flaeche mit Hoehe unter 720, iPhone quer; 10-screens.md 6.3 M·F): Kachelgroesse M (Querformat 240,
-   * Poster 144, quadratisch 144) und Reihenabstand 24 enger als bei L – statt anderthalb Reihen passen gut zwei ins Bild */
-  var PITCH_DENSE = { land: 264, poster: 328, sq: 256 };
+   * Poster 144, quadratisch 144) und engere Reihen – statt anderthalb Reihen passen gut zwei ins Bild. Reihenabstand = Kopf 52 +
+   * Beschriftungs-Oberkante (capY) + zwei Zeilen (24 + 22) + 16 Luft bis zur naechsten Ueberschrift: Querformat 52+157+46 = 255 -> 272,
+   * Poster 52+238+46 = 336 -> 352, quadratisch 52+166+46 = 264 -> 280 (Nachbefund 03.11.: vorher 264/328/256, der Untertitel der
+   * Poster- und Quadrat-Reihen beruehrte die naechste Ueberschrift; PITCH_TILES hat ueberall >= 16 Luft) */
+  var PITCH_DENSE = { land: 272, poster: 352, sq: 280 };
   var CLIP_T = 80;                                     // Kacheln: Oberkante des Reihen-Ausschnitts (unter der Uhr, ueber dem ersten Kopf)
+  /* Infobereich ueber den Kacheln (Apple Nr. 34, SPEC HOME-18; caps.homeHero + Einstellung homeHero, Standard an): der TV-Hero
+   * (Titel, Infos, Bild der Kachel im Fokus bzw. unter dem Zeiger) steht fest oben, die Reihen darunter rollen frei wie bei den
+   * Kacheln und laufen hinter ihm mit einem weichen Verlauf aus (Ausschnitt ab HT_CLIP, Maske HT_FADE px). Reihen wie am TV
+   * (Groesse L, Beschriftung nur Querformat), erster Kopf bei HT_HEAD. Nur ohne Finger (N.input 'pointer'/'key'), ab Breite M und
+   * wenn die Flaeche hoch genug ist (RowMath.heroTall mit Hysterese: heroWas gilt ueber Neuaufbauten hinweg, Fenster-Ziehen am Mac
+   * schaltet nicht hin und her). Am TV nie (caps.homeHero fehlt). */
+  var HT_HEAD = 348, HT_CLIP = 308, HT_FADE = 40, heroWas = null;
+  function heroWanted(A, keep) {
+    var c = N.platform.caps;
+    if (c.home !== 'tiles' || c.homeHero !== true || !N.screen.flex) return false;
+    var tall = RM.heroTall(A.h, heroWas);
+    if (!keep) heroWas = tall;                          // keep: nur nachsehen (stale), Zustand nicht fortschreiben
+    var st = N.session && N.session.settings;
+    return tall && N.screen.cls.w !== 'K' && N.input.mode !== 'touch' && !(st && st.homeHero === false);
+  }
 
   N.router.define('home', function () {
     var s = { rail: 'home', wheelKeys: ['LEFT', 'RIGHT'], news: 'clock', flex: true };   // HOME-13: Hinweis bei neuen Inhalten rechts unter der Uhr
     var A = N.screen.view(), VIS = RM.visFor(A.h);   // Flaeche (TV 1280x720; flexibel nur Apple: breitere Reihen, Zonen bis unten)
     var caps = N.platform.caps, TILES = caps.home === 'tiles', FREE = caps.scroll === 'free', TAP_DETAILS = caps.cardTap === 'details';
-    var DENSE = TILES && N.screen.flex && N.screen.cls.h === 'F';
-    var HEAD_Y = TILES ? 88 : 320, CARD_Y = HEAD_Y + HEAD_H, PITCH = DENSE ? PITCH_DENSE : PITCH_TILES;   // PITCH nur Kacheln (sonst geom().pitch)
+    /* HT = Infobereich ueber frei scrollenden Kacheln (HOME-18): wie TILES (freie Seite, alle Reihen sichtbar), aber mit Hero und
+     * TV-Reihen; PLAIN = Kacheln ohne Infobereich (Hintergrund Nr. 27, Poster mit Beschriftung) */
+    var HT = TILES && heroWanted(A), PLAIN = TILES && !HT;
+    var DENSE = PLAIN && N.screen.flex && N.screen.cls.h === 'F';
+    var HEAD_Y = HT ? HT_HEAD : TILES ? 88 : 320, CARD_Y = HEAD_Y + HEAD_H, PITCH = DENSE ? PITCH_DENSE : PITCH_TILES;   // PITCH nur Kacheln (sonst geom().pitch)
+    var CLIP = HT ? HT_CLIP : CLIP_T, VIS_T = HT ? HT_CLIP + HT_FADE / 2 : CLIP_T;   // Ausschnitt oben; Zeiger/Ring erst ab VIS_T (darueber: Verlauf, Infobereich)
     /* Reihen-Slots: TV 4 (R-1 … R+2). Kacheln: so viele, wie Reihen auf die Hoehe passen, + Puffer oben/unten (08-touch 1 Punkt 3) */
-    var SLOTS = TILES ? Math.ceil(A.h / Math.min(PITCH.land, PITCH.sq)) + 3 : 4;
+    var SLOTS = HT ? Math.ceil(A.h / Math.min(RM.homeGeom('L', 'land', A.w).pitch, RM.homeGeom('L', 'sq', A.w).pitch)) + 3
+      : TILES ? Math.ceil(A.h / Math.min(PITCH.land, PITCH.sq)) + 3 : 4;
+    var used = false, onMode = null;                                   // HT-Wechsel ohne Neuaufbau nur, solange die Seite unbedient ist (s.stale)
     var root, pg, ring, hero, sb, fade, cue, cueT, cueOn = false, slots = [], rows = [], tops = [], colMem = {}, R = 0;
     var slotRow = [], heroT = 0, task = null, loadedAt = 0, pending = null, interacted = false;
     /* freies Scrollen (caps.scroll 'free', S5/S6): py = Seitenlage (px); loose = Lage frei verschoben (erste Taste setzt den Fokus auf
@@ -52,6 +76,7 @@
      * Kacheln = RowMath.geom fuer die Breite + Reihenabstand PITCH_TILES (je Art einmal kopiert, nie im Fokusschritt) */
     var tileG = {};
     function geom(kind) {
+      if (HT) return RM.homeGeom('L', kind, A.w);      // Infobereich: Reihen wie am TV (Kachelgroesse-Einstellung gibt es auf Apple nicht)
       if (!TILES) return RM.homeGeom(size, kind, A.w);
       var b = PITCH_TILES[kind] ? kind : 'poster';
       if (!tileG[b]) { var g0 = DENSE ? RM.homeGeom('M', b, A.w) : RM.geom(b, A.w), g = {}; for (var f in g0) g[f] = g0[f]; g.base = b; g.size = DENSE ? 'M' : 'L'; g.pitch = PITCH[b]; tileG[b] = g; }
@@ -71,17 +96,18 @@
     /* ---------- Aufbau ---------- */
     s.create = function (el) {
       root = el;
-      hero = TILES ? noHero() : new N.ui.Hero(root);
-      if (TILES && N.ui.Ambient) amb = new N.ui.Ambient(root, { moodArt: true, items: ambItems });   // Ebenen ganz unten (vor dem Ausschnitt)
+      hero = PLAIN ? noHero() : HT ? new N.ui.Hero(root, { w: N.screen.box().w, xf: true, decode: true }) : new N.ui.Hero(root);
+      if (HT) U.cls(root, 'hhero', true);             // flex.css: Bildkasten, Ueberblendung, Verlauf am Ausschnitt
+      if (PLAIN && N.ui.Ambient) amb = new N.ui.Ambient(root, { moodArt: true, items: ambItems });   // Ebenen ganz unten (vor dem Ausschnitt)
       /* Kacheln: die Seite rollt frei nach oben – ueber dem ersten Reihenkopf (y 88) ein ruhiges Band fuer die Uhr (y 32–72).
        * Inhalt wird an CLIP_T abgeschnitten (eigener Ausschnitt, Seite darin um -CLIP_T versetzt; Koordinaten bleiben gleich), damit
        * keine Karte/Haekchen unter oder ueber dem halbdurchsichtigen Uhr-Kasten erscheint. TV: kein Ausschnitt. */
       if (TILES) {
-        var clip = U.el('div', 'hclip', root, 'position:absolute;left:0;top:' + CLIP_T + 'px;width:' + A.w + 'px;height:' + (A.h - CLIP_T) + 'px;overflow:hidden');
-        pg = U.el('div', 'pg', clip, 'top:' + (-CLIP_T) + 'px;height:' + A.h + 'px');
+        var clip = U.el('div', 'hclip', root, 'position:absolute;left:0;top:' + CLIP + 'px;width:' + A.w + 'px;height:' + (A.h - CLIP) + 'px;overflow:hidden');
+        pg = U.el('div', 'pg', clip, 'top:' + (-CLIP) + 'px;height:' + A.h + 'px');
       } else pg = U.el('div', 'pg', root);
       size = sizeSetting();
-      for (var i = 0; i < SLOTS; i++) slots.push(new N.ui.Row(pg, { geom: geom, captions: function (kind) { return TILES || kind === 'land'; }, w: A.w, free: FREE, clipH: TILES ? 400 : 0 }));
+      for (var i = 0; i < SLOTS; i++) slots.push(new N.ui.Row(pg, { geom: geom, captions: function (kind) { return PLAIN || kind === 'land'; }, w: A.w, free: FREE, clipH: PLAIN ? 400 : 0 }));
       fade = U.el('img', 'fade', root); fade.src = N.assetBase + 'fade-bottom.png';
       // HOME-11: fester "darunter geht es weiter"-Hinweis unten links (Glyphe wie .more-dn + Titel der naechsten Reihe), nur wenn
       // deren Kopf nicht im Bild ist (hohe Posterreihe); zeigen/klicken = eine Reihe tiefer. Runde 6: dauerhafte GPU-Ebene (.hmore
@@ -126,7 +152,19 @@
       N.evt.on('library:changed', onChanged);         // HOME-12: neue Titel auf dem Server -> betroffene Reihen an Ort und Stelle
       watchFn = function () { return !dead && !away; };
       N.libwatch.want(watchFn);                       // solange die Startseite oben ist: alle 2 Min. im Leerlauf nachsehen
+      if (TILES && caps.homeHero === true) { onMode = function () { modeChanged(); }; N.evt.on('input:mode', onMode); }
     };
+    /* HOME-18: Eingabeart gewechselt (iPad: Finger <-> Trackpad/Tastatur). Der Infobereich kommt sofort nur, solange die Seite noch
+     * unbedient ist (frisch aufgebaut, nichts gerollt/getippt – es springt nichts); sonst und zurueck zu den Kacheln (Finger) erst beim
+     * naechsten Aufbau der Seite (s.stale: Rueckkehr aus einem anderen Bereich, den Einstellungen …). Grund: am iPad werden Finger
+     * und Trackpad gemischt benutzt (Nr. 28) – die Seite darf unter dem Finger nicht umspringen, der erste Tipp traefe sonst
+     * eine andere Kachel. */
+    function modeChanged() {
+      if (dead || away || used || HT || py !== 0) return;
+      if (N.ui.rail && N.ui.rail.isOpen && N.ui.rail.isOpen()) return;
+      if (heroWanted(A, true)) N.router.renew(s);
+    }
+    s.stale = function () { return TILES && caps.homeHero === true && heroWanted(A, true) !== HT; };
     /* Kacheln ohne Infobereich: Platzhalter mit den Methoden des Hero (alle Aufrufe bleiben, nichts wird gemalt oder geladen) */
     function noHero() { var f = function () {}; return { item: null, set: f, clear: f, refresh: f, setStrip: f, paintOv: f }; }
     /* Hero passend zum Fokus: anderes Element -> neu setzen; gleiches -> Bild auffrischen */
@@ -163,7 +201,7 @@
     function showSkel(on) {
       if (!on) { if (skel) U.show(skel, false); return; }
       if (skel && skelSize !== size) { root.removeChild(skel); skel = null; }   // Kachelgroesse geaendert (nur ohne Inhalt sichtbar)
-      if (!skel && TILES) {                           // Kacheln: nur Reihen-Platzhalter ab oben
+      if (!skel && PLAIN) {                           // Kacheln: nur Reihen-Platzhalter ab oben
         skelSize = size;
         skel = U.el('div', 'skel', root);
         for (var t = 0; t < 3; t++) {
@@ -301,7 +339,7 @@
       var y = TILES ? Math.round(tops[R] + HEAD_H - py) : CARD_Y;      // Kacheln: Reihe kann frei stehen
       /* Kacheln, Maus/Trackpad (Nr. 29): Ring scrollt mit der Karte; ist sie oben unter das Uhr-Band (CLIP_T) bzw. links unter die
        * Inhaltskante (128) gewandert, waere er ueber Uhr bzw. Seitenleiste zu sehen -> verbergen, bis wieder eine ganze Karte gemeint ist */
-      if (TILES && N.input.mode !== 'key' && (y < CLIP_T || p.x < 128)) { ring.hide(); return; }
+      if (TILES && N.input.mode !== 'key' && (y < VIS_T || p.x < 128)) { ring.hide(); return; }
       ring.to(p.shape, p.x, y);
     }
     /* Nr. 29: Seite/Reihe frei gescrollt -> Ring an die Lage der Fokuskarte (selber Frame, ohne Gleiten), Treffer unter dem Zeiger
@@ -318,7 +356,7 @@
     function topTile() {
       for (var r = 0; r < rows.length; r++) {
         var k = r % SLOTS, cy = tops[r] + HEAD_H - py;
-        if (slotRow[k] !== r || cy < CLIP_T) continue;
+        if (slotRow[k] !== r || cy < CLIP) continue;
         var sl = slots[k], g = sl.g;
         if (cy + g.h > A.h) return null;
         for (var i = sl.anchorCol(), n = sl.count(); i < n; i++) {
@@ -346,7 +384,7 @@
 
     /* ---------- Hero (300 ms Ruhe) + Staffelstreifen ---------- */
     function scheduleHero(delay) {
-      if (TILES) return;                              // kein Infobereich: weder Bild noch Staffelstreifen laden
+      if (PLAIN) return;                              // kein Infobereich: weder Bild noch Staffelstreifen laden
       if (heroT) clearTimeout(heroT);
       heroT = setTimeout(function () {
         heroT = 0;
@@ -911,6 +949,7 @@
       if (onPlayed) N.evt.off('playback:stopped', onPlayed);
       if (onScanned) N.evt.off('library:scanned', onScanned);
       if (onChanged) N.evt.off('library:changed', onChanged);
+      if (onMode) N.evt.off('input:mode', onMode);
       if (watchFn) N.libwatch.unwant(watchFn);
       if (task) task.abort(); task = null;
       if (retryT) clearTimeout(retryT);
@@ -921,7 +960,7 @@
     s.railFocus = function () { railOpen = false; if (sb.on) return; if (rows.length) { var sl = slotFor(R); sl.setFocused(true); placeRing(sl.ringPos()); } };
 
     s.onKey = function (k) {
-      interacted = true;
+      interacted = true; used = true;
       if (sb.on) {
         if (sb.onKey(k)) return true;
         if (k === 'LEFT') { N.ui.rail.open(); return true; }
@@ -977,6 +1016,7 @@
       if (!rows.length) return false;
       if (TILES) return tilesPointer(x, y, kind);
       var sl = slotFor(R);
+      if (kind === 'click') used = true;
       if (sl.free && y >= CARD_Y && y < CARD_Y + sl.g.h) {      // Reihe frei verschoben (Hero + freies Scrollen): Treffer per px
         var j = sl.hitAny(x);
         if (j < 0) return false;
@@ -1022,6 +1062,8 @@
     /* Kacheln: Treffer in jeder sichtbaren Reihe (Seitenlage py, Reihenlage px), auch angeschnittene Karten und ihre Beschriftung.
      * Zeiger/Finger setzt nur den (unsichtbaren) Fokus, die Seite rollt nie unter dem Punkt */
     function tilesPointer(x, y, kind) {
+      if (kind === 'click') used = true;
+      if (HT && y < VIS_T) { hov = false; return false; }   // ueber dem Infobereich/Verlauf: Reihen darunter sind nicht zu sehen
       var r = rowAtPage(y + py);
       if (r < 0 || slotRow[r % SLOTS] !== r) { hov = false; return false; }
       var sl = slotFor(r), cy = tops[r] + HEAD_H - py, band = sl.showCaptions() ? sl.g.capY + 48 : sl.g.h;
@@ -1087,7 +1129,7 @@
     s.pan = function (e) {
       if (e.phase === 'start') {
         if (!FREE || !N.kinetic || !rows.length || sb.on) return false;
-        stopAll(); eat = false; pan = null;
+        stopAll(); eat = false; pan = null; used = true;
         if (e.axis === 'x') {
           var r = rowUnder(e.y);
           if (r < 0) return true;                       // ausserhalb einer Reihe: Zug annehmen, nichts tun
@@ -1116,6 +1158,7 @@
     s.wheel = function (x, y, dx, dy) {
       if (!FREE || !N.kinetic || !rows.length || sb.on) return false;
       var now = U.now();
+      used = true;
       if (now - wheelT > 150 || !wheelAx) wheelAx = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
       wheelT = now;
       eat = false;

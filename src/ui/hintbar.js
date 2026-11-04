@@ -4,6 +4,7 @@
  * - brief: sichtbar, wenn ein Bildschirm/Overlay aufgeht (router.refreshHints meldet den Kontextwechsel per wake) und nach
  *   jeder Farbtaste, INFO oder TOOLS (router.key); nach WAKE_MS ausblenden. Nur opacity (kleine Flaeche, Klasse .hid),
  *   ein Timer, kein Layout. Ausgeblendet ist die Leiste nicht anklickbar (hit -> null).
+ * - caps.hintBar false (Mac, Nutzer 03.11., SPEC NAV-25): wie 'off' auf Dauer, die Einstellung gibt es dann nicht.
  * - off: Leiste nie sichtbar. Alle Tasten bleiben unter Hilfe & Info -> Tastenbelegung erklaert (views/help.js).
  * Eintraege, die das Geraet nicht kann, entfallen ueber caps (NEEDS: "Beenden" nur mit caps.exit).
  * Finger/Maus/Trackpad (N.input.direct(), nur caps.focusRing 'keys'; Apple Nr. 23/26): KEINE Hinweisleiste – die Bildschirme
@@ -17,6 +18,7 @@
   H.MODES = ['always', 'brief', 'off'];
   /* Modus aus den Einstellungen des Profils; ohne Profil (Anmeldung, Profilwahl) und bei fehlendem/unbekanntem Wert: immer */
   H.mode = function () {
+    if (N.platform && N.platform.caps && N.platform.caps.hintBar === false) return 'off';   // Geraet ohne Leiste (Mac, NAV-25)
     var s = N.session && N.session.profile ? N.session.settings : null, m = s && s.hints;
     return m === 'brief' || m === 'off' ? m : 'always';
   };
@@ -38,6 +40,8 @@
   H.applyMode = function () { awake = false; H.wake(); };
   H.init = function (parent) {
     H.el = U.el('div', '', parent); H.el.id = 'pn-hints';
+    // Geraet ohne Leiste: Klasse fuer den Lader (Apple flex.css blendet damit auch das dunkle Band unten aus)
+    if (N.platform && N.platform.caps && N.platform.caps.hintBar === false && document.body) U.cls(document.body, 'no-hints', true);
     for (var i = 0; i < MAX; i++) {
       var e = { root: U.el('span', 'hint', H.el, 'display:none') };
       e.k = U.el('span', 'k', e.root); e.kT = document.createTextNode(''); e.k.appendChild(e.kT);
@@ -63,11 +67,25 @@
   H.BACK = BK;
   H.back = function (want) {
     var on = !!want && direct();
+    if (on && H.bk && bkOn) place();                 // gleicher Zustand, aber andere Ansicht/Flaeche: Lage nachfuehren
     if (on === bkOn || (!on && !H.bk)) { bkOn = on; return; }
     bkOn = on;
     if (!H.bk && H.el) { H.bk = U.txt('div', 'btn tback tbk', H.el.parentNode, '\u2039', 'left:' + BK.x + 'px;top:' + BK.y + 'px;width:' + BK.w + 'px;padding:0;text-align:center;border-radius:24px;font-size:36px;line-height:44px').parentNode; }
+    if (H.bk && on) place();
     if (H.bk) U.show(H.bk, on);
   };
+  /* flexible Flaeche: Knopf an derselben Stelle der Ansicht wie am TV (64/40) – steht sie im verkleinerten 1280x720-Kasten (flache/
+   * schmale Flaeche, z. B. "Startseite anpassen" bei iPhone SE quer; Befund Strang M 03.11.: Knopf lag ueber der Ueberschrift),
+   * mit dessen Lage und Faktor; und nie unter den sicheren Raendern (Notch/Dynamic Island). TV: 64/40 */
+  function place() {
+    var S = N.screen, f = S && S.flex ? S.safe : null, sc = f && N.router && N.router.top ? N.router.top() : null;
+    var g = sc && !sc.flex ? S.stage() : { x: 0, y: 0, k: 1 };
+    var x = f ? Math.max(Math.round(g.x + 64 * g.k), f.l + 16) : 64, y = f ? Math.max(Math.round(g.y + 40 * g.k), f.t + 8) : 40;
+    // sehr klein verkleinert (iPhone hoch, k < 0,6): neben der Ueberschrift (x 144·k) ist kein Platz fuer den 48er-Knopf -> darueber
+    if (f && x + BK.w + 8 > g.x + 144 * g.k && g.y + 40 * g.k - 56 >= f.t + 8) y = Math.round(g.y + 40 * g.k - 56);
+    if (x === BK.x && y === BK.y) return;
+    BK.x = x; BK.y = y; H.bk.style.left = x + 'px'; H.bk.style.top = y + 'px';
+  }
   /* Treffer auf dem Zurueck-Knopf (N.pointer, vor der Ansicht) */
   H.backHit = function (x, y) { return bkOn && x >= BK.x - 8 && x < BK.x + BK.w + 8 && y >= BK.y - 8 && y < BK.y + BK.h + 8; };
   H.set = function (list) {
@@ -75,23 +93,26 @@
     apply();                                         // z. B. Profil verlassen (Profilwahl): Modus "immer"
     var sig = '', i;
     for (i = 0; i < list.length; i++) sig += list[i].k + ':' + list[i].t + '|';
-    sig += N.i18n.lang();
+    sig += N.i18n.lang() + (N.platform.texts && N.input ? N.input.mode : '');   // Apple: Kappen je Eingabeart (NAV-26)
     if (sig === H.sig || !H.el) return;
     H.sig = sig;
     for (i = 0; i < MAX; i++) {
       var e = H.items[i], d = list[i];
       if (!d) { e.root.style.display = 'none'; continue; }
       e.root.style.display = '';
-      var c = COLOR[d.k];
+      var c = COLOR[d.k], cl = c ? N.keys.label(d.k) : null;
+      if (c && cl !== null) c = null;                  // Apple (NAV-26): keine Farbquadrate, neutrale Kappe mit der echten Taste/Geste
       if (c) {
         e.k.style.display = ''; e.kt.style.display = 'none';
-        e.k.className = 'k ' + c[0]; U.setText(e.kT, c[1]);
+        e.k.className = 'k ' + c[0]; U.setText(e.kT, N.keys.label(d.k) || c[1]);
       } else {
         e.k.style.display = 'none'; e.kt.style.display = '';
         var ret = d.k === 'ret';
         e.kt.className = ret ? 'kt ret' : 'kt';
-        e.ktIc.style.display = ret ? '' : 'none';
-        U.setText(e.ktT, ret ? '' : (N.keys.cap[d.k] || d.k));
+        var lb = N.keys.label(d.k);
+        e.ktIc.style.display = ret && lb === null ? '' : 'none';
+        if (ret && lb !== null) e.kt.className = 'kt';
+        U.setText(e.ktT, ret && lb === null ? '' : (lb || d.k));
       }
       U.setText(e.lb, N.t(d.t));
     }

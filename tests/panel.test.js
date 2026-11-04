@@ -13,7 +13,7 @@ function setup() {
   N.i18n.set('de');
   N.router.openOverlay = function (o) { ov.push(o); };
   N.router.closeOverlay = function (o) { var i = ov.indexOf(o); if (i >= 0) ov.splice(i, 1); };
-  return { N: N, ov: ov };
+  return { N: N, ov: ov, ctx: ctx };
 }
 function texts(el, out) {
   out = out || [];
@@ -126,4 +126,47 @@ test('Player auf voller Flaeche (Apple Nr. 17): Panel rechts buendig ueber die g
   p.pointer(1004, 2, 'click');
   H.eq(picked, ['i0']);
   N.screen.flex = false; N.screen.w = 1280; N.screen.h = 720;
+});
+
+test('Hilfe-Panel (NAV-12): Blaettern in Stufen mit 2 Zeilen Ueberlappung, Endlage = letzte Zeile ganz unten', function () {
+  var N = setup().N, P = N.ui.panel;
+  assert.strictEqual(P.maxOff(520, 20), 0, 'passt genau: kein Scrollen');
+  assert.strictEqual(P.maxOff(400, 20), 0);
+  assert.strictEqual(P.maxOff(26 * 45, 20), 26 * 25);
+  assert.strictEqual(P.maxOff(26 * 20 + 10, 20), 26, 'angefangene Zeile: ganze Zeile weiter');
+  var m = 26 * 25, o = 0, seen = [o];
+  while (o < m) { o = P.page(o, 1, m, 20); seen.push(o); }
+  H.eq(seen, [0, 468, 650], 'Schritt 18 Zeilen, Ende auf der Hoechstlage');
+  for (var i = 1; i < seen.length; i++) assert.ok(seen[i] - seen[i - 1] <= 18 * 26 && (seen[i] % 26) === 0, 'nie mehr als eine Seite minus 2 Zeilen, ganze Zeilen');
+  assert.strictEqual(P.page(650, -1, m, 20), 182); assert.strictEqual(P.page(182, -1, m, 20), 0); assert.strictEqual(P.page(0, -1, m, 20), 0);
+});
+
+test('Hilfe-Panel: kurzer Text ohne Mehr-Hinweis, UP/DOWN tun nichts, INFO/OK/RETURN schliessen wie bisher', function () {
+  var s = setup(), N = s.N;
+  var h = N.ui.panel.help('T', 'Kurz.');
+  assert.strictEqual(h.max, 0);
+  assert.strictEqual(h.onKey('DOWN'), true); assert.strictEqual(h.off, 0);
+  assert.strictEqual(h.onKey('RETURN'), false, 'RETURN geht an den Router (cancel)');
+  assert.strictEqual(h.onKey('INFO'), true); assert.strictEqual(s.ov.length, 0);
+});
+
+test('Hilfe-Panel: langer Text scrollt mit DOWN/UP in Stufen (ein Transform je Schritt), Mehr-Hinweis oben/unten, Pfeil-Klick blaettert', function () {
+  var s = setup(), N = s.N, mk = s.ctx.document.createElement;
+  s.ctx.document.createElement = function (t) { var e = mk(t); e.offsetHeight = 26 * 45; return e; };   // 45 Zeilen Text
+  var h = N.ui.panel.help('T', 'Lang.'), tf = [];
+  var U = N.util, tf0 = U.tf; U.tf = function (el, x, y) { tf.push(y); tf0(el, x, y); };
+  try {
+    assert.strictEqual(h.max, 650);
+    var more = h.el.childNodes[1].childNodes.filter(function (c) { return /pmore/.test(c.className); });
+    assert.strictEqual(more.length, 2, 'Mehr-Hinweis oben und unten');
+    function on() { return more.map(function (c) { return / on/.test(' ' + c.className); }); }
+    H.eq(on(), [false, true], 'anfangs nur unten');
+    h.onKey('DOWN'); H.eq([h.off, tf], [468, [-468]]); H.eq(on(), [true, true]);
+    h.onKey('DOWN'); H.eq([h.off, tf], [650, [-468, -650]]); H.eq(on(), [true, false], 'Ende: nur oben');
+    h.onKey('DOWN'); assert.strictEqual(tf.length, 2, 'am Ende kein weiterer Transform');
+    h.onKey('UP'); assert.strictEqual(h.off, 182);
+    h.pointer(1000, 650, 'click'); assert.strictEqual(h.off, 650, 'Klick auf den unteren Pfeil blaettert');
+    assert.strictEqual(s.ov.length, 1, 'Panel bleibt offen');
+    h.pointer(1000, 300, 'click'); assert.strictEqual(s.ov.length, 0, 'Klick auf den Text schliesst wie bisher');
+  } finally { U.tf = tf0; }
 });

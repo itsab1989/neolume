@@ -55,18 +55,27 @@
       N.store.init(N.platform.store(ctx));
       N.config.apply(N.store.get('config.json'));
       mark('store');
+      // Sprachtabelle (eigene Datei i18n/<lang>.js, nur die aktive) parallel zu setup.json laden: Sprache aus state.json bzw. TV
+      var pre = N.store.get('state.json'), wait = 2, args = null;
+      function go() { if (--wait === 0) A.boot(args[0], args[1], t0); }
+      N.i18n.load(pre && pre.lang || tvLanguage(), function () { mark('i18n-datei'); go(); });
       N.setupFile.read(ctx, function (pkg, why) {
         mark('setup');
         var st = N.setupFile.timing();   // P7: Datei-Lesen vs. blockierter Hauptthread unterscheiden (docs/P7-TV-TEST.md)
         if (st) marks.push('(setup: io ' + st.io + ', vorab ' + st.early + ', warten ' + st.wait + ', luecke ' + st.gap + (st.show >= 0 ? ', davon onShow ' + st.show : '') + ')');
-        A.boot(pkg, why, t0);
+        args = [pkg, why]; go();
       });
     },
     /* zweiter Teil des Starts, sobald setup.json gelesen ist (lokale Datei, wenige ms; max. 2 s) */
     boot: function (pkg, why, t0) {
-      var st = N.session.load(pkg);
+      var st = N.session.load(pkg), l = st.lang || tvLanguage();
       A.setupError = why || null;
       mark('session');
+      // Sprache weicht von der Vorab-Wahl ab (altes Speicherformat) oder Datei fehlt: noch einmal laden, sonst Deutsch
+      if (!N.strings[l]) { N.i18n.load(l, function (ok) { if (!ok && !N.strings.de) { N.i18n.load('de', function () { A.boot2(pkg, why, t0, st); }); return; } A.boot2(pkg, why, t0, st); }); return; }
+      A.boot2(pkg, why, t0, st);
+    },
+    boot2: function (pkg, why, t0, st) {
       N.i18n.set(st.lang || tvLanguage());
       N.accent.apply(st.accent);                       // zuletzt genutzte Akzentfarbe vor dem ersten Bild (kein Farbsprung)
       mark('i18n');
@@ -169,6 +178,10 @@
       go();
     },
     setLang: function (l) {
+      if (!N.strings[l]) {                              // Tabelle erst laden (eigene Datei); fehlt sie, bleibt die Sprache
+        N.i18n.load(l, function (ok) { if (ok) A.setLang(l); else if (N.ui.toast) N.ui.toast.show(N.t('err.generic.title')); });
+        return;
+      }
       N.session.state.lang = l; N.session.save();
       N.i18n.set(l);
       if (N.session.settings) N.session.applyDefaults();   // Ton/UT-Sprache ohne eigene Wahl folgen der Oberflaeche (F12)
@@ -241,6 +254,46 @@
     scrollTop: function () {
       try { return N.router.scrollTop(); } catch (er) { N.diag.error('scrollTop', er); return false; }
     },
+    /* Kuerzel einer Computer-Tastatur (Lader, Apple Nr. 10): 'search' | 'settings' | 'back' -> true, wenn ausgefuehrt.
+     * Offene Karten/Menues schliessen sich dabei; vor der Anmeldung und im Schoner (beendet ihn nur) nichts. */
+    shortcut: function (what) {
+      try {
+        N.input.set('key');
+        if (N.ui.saver && N.ui.saver.on) { N.ui.saver.key('RETURN'); return true; }
+        if (what === 'back') { N.router.key('RETURN'); return true; }
+        if (/^move/.test(what)) {                                   // Sortier-Listen (NAV-27): nur die oberste Ansicht, kein Overlay/keine offene Leiste
+          var top = N.router.top();
+          return !!(top && top.shortcut && !N.router.hasOverlay() && !(N.ui.rail && N.ui.rail.isOpen && N.ui.rail.isOpen()) && top.shortcut(what));
+        }
+        if (!N.session || !N.session.profile) return false;      // Anmeldung/Profilwahl: nichts
+        if (what === 'search') { N.router.closeAllOverlays(); N.app.navigate('search'); return true; }
+        if (what === 'settings') { N.router.closeAllOverlays(); N.app.navigate('settings'); return true; }
+        return false;
+      } catch (e) { N.diag.error('Kuerzel ' + what, e); return false; }
+    },
+    /* Player-Befehl einer Computer-Tastatur (Lader, Apple Nr. 10): an den Player, wenn er die oberste Ansicht ist (keine Menues
+     * darueber). 'active' fragt nur. -> true, wenn genommen */
+    playerCmd: function (cmd, arg) {
+      try {
+        var t = !N.router.hasOverlay() && N.router.top();
+        if (!t || !t.onCmd) return false;
+        if (cmd === 'active') return true;
+        N.input.set('key');
+        return !!t.onCmd(cmd, arg);
+      } catch (e) { N.diag.error('Player ' + cmd, e); return false; }
+    },
+    /* Nimmt die oberste Ansicht gerade Text an (Suche, Tastatur im Fokus)? Dann gibt der Lader Buchstaben als Text statt als Tasten */
+    wantsText: function () {
+      try { var t = !N.router.hasOverlay() && N.router.top(); return !!(t && t.wantsText && t.wantsText()); } catch (e) { return false; }
+    },
+    /* Ein getipptes Zeichen (Computer-Tastatur) an die oberste Ansicht -> true, wenn angenommen */
+    text: function (ch) {
+      try {
+        N.input.set('key');
+        var t = !N.router.hasOverlay() && N.router.top();
+        return !!(t && t.onText && t.onText(ch));
+      } catch (e) { N.diag.error('Text', e); return false; }
+    },
     /* Rad/Trackpad bei caps.scroll 'free' (Lader): {x, y} App-Koordinaten des Zeigers, {dx, dy} Weg in App-px -> N.pointer.wheelPx */
     wheel: function (e) {
       try { return !!(e && N.pointer.wheelPx(e.x, e.y, e.dx || 0, e.dy || 0)); } catch (er) { N.diag.error('Rad', er); return false; }
@@ -255,5 +308,6 @@
    * fuehrt aus (N.pointer.grab/drag; Player-Balken = Scrubbing, im Player kein Wischen) */
   function grab(x, y) { try { return N.pointer.touchGrab(x, y); } catch (e) { N.diag.error('grab', e); return ''; } }
   function drag(ph, x, y) { try { return N.pointer.touchDrag(ph, x, y); } catch (e) { N.diag.error('drag ' + ph, e); return false; } }
-  window.App = { start: A.start, onKey: A.onKey, press: A.press, flush: A.flush, grab: grab, drag: drag, input: A.input, pan: A.pan, wheel: A.wheel, scrollTop: A.scrollTop, rail: A.rail, railPan: A.railPan };
+  window.App = { start: A.start, onKey: A.onKey, press: A.press, flush: A.flush, grab: grab, drag: drag, input: A.input, pan: A.pan, wheel: A.wheel, scrollTop: A.scrollTop, rail: A.rail, railPan: A.railPan,
+    shortcut: A.shortcut, wantsText: A.wantsText, text: A.text, playerCmd: A.playerCmd };
 })(N);

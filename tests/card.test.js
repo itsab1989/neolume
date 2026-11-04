@@ -70,6 +70,12 @@ test('Geometrie: Touch volle Breite mit Spalt oben, Mac mittiges Feld; schmaler 
   assert.deepStrictEqual([k.k, k.cut, k.cw, k.y, k.x, k.w, k.narrow], [1, 120, 706, 12, 0, 586, true]);
   assert.deepStrictEqual([mf.y, mf.cw, mf.ch], [32, 1156, 524]);
   assert.strictEqual(G(1280, 912, true, { w: 'R', h: 'N' }).cut, 0, 'R wie bisher');
+  // sichere Raender (Nutzerbefund 03.11.): iPhone hoch unter der Dynamic Island, iPhone quer X neben der Notch und Inhalt vor dem
+  // rechten Rand, iPad (nur unten) unveraendert
+  var ih = G(586, 1272, true, { w: 'K', h: 'N' }, { t: 91, r: 0, b: 50, l: 0 }), iq = G(1272, 586, true, { w: 'M', h: 'F' }, { t: 0, r: 91, b: 31, l: 91 });
+  assert.deepStrictEqual([ih.y, ih.cut, ih.cw, ih.bx], [103, 120, 706, undefined]);
+  assert.deepStrictEqual([iq.y, iq.cut, iq.cw, iq.bx], [32, 37, 1272 + 37 - 91, 91]);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(G(960, 1280, true, { w: 'M', h: 'N' }, { t: 0, r: 0, b: 19, l: 0 }))), JSON.parse(JSON.stringify(G(960, 1280, true, { w: 'M', h: 'N' }))));
 });
 
 test('Fernseher: keine Karte – scr.card wird ignoriert, Stapel wie immer (Ansicht darunter versteckt)', function () {

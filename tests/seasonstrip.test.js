@@ -107,3 +107,13 @@ test('Einstellung "Serien-Fortschritt": Standard an, unabhaengig; wer "Folgen-Fo
   assert.strictEqual(N.session.settings.episodeProgress, false);
   N.store.get = g; N.store.set = st;
 });
+
+test('Modus B mit barW (schmale Detailkarte, Nutzerbefund 03.11.): Balken, Fuellung und Marker auf die kuerzere Breite', function () {
+  var l = SS.layout({ enabled: true, size: 'M', total: 100, viewed: 50, next: 51, barW: 200 });
+  assert.strictEqual(l.mode, 'bar'); assert.strictEqual(l.width, 200); assert.strictEqual(l.fill, 100);
+  assert.ok(l.marker.x <= 198 && l.marker.x >= 98);
+  assert.strictEqual(SS.layout({ enabled: true, size: 'M', total: 100, viewed: 50 }).width, 336, 'ohne barW wie bisher');
+  var b = SS.seriesBar([{ index: 1, leaf: 12, vleaf: 12 }, { index: 2, leaf: 12, vleaf: 0 }], 1, 200);
+  var last = b.segments[b.segments.length - 1];
+  assert.strictEqual(last.x + last.w, 200, 'Serien-Balken endet an der kuerzeren Breite');
+});

@@ -49,8 +49,8 @@
     this._fixed();
     this.f = n ? U.clamp(f || 0, 0, n - 1) : 0; this.r = this.G.row(this.f);
     var pg = this.pg;
-    pg.style.webkitTransition = 'none'; U.tf(pg, 0, this.G.offset(this.r));
-    setTimeout(function () { pg.style.webkitTransition = ''; }, 60);
+    pg.style.webkitTransition = 'none'; U.tf(pg, 0, this.G.offset(this.r)); this._still(this.G.offset(this.r));
+    setTimeout(function () { if (!tweenOn()) pg.style.webkitTransition = ''; }, 60);
     this.render(0);
   };
   Grid.prototype.item = function (i) { return this.items[i] || null; };
@@ -155,7 +155,7 @@
       if (old && old !== cur && old.foc) { old.card.className = this.cardCls; old.cap.className = this.capCls; old.foc = false; N.fx.move(old.card); }
       if (cur && !cur.foc) { cur.card.className = this.cardCls + ' is-focus'; cur.cap.className = this.capCls + ' is-focus'; cur.foc = true; N.fx.move(cur.card); }
     }
-    if (moved) { N.fx.move(this.pg); U.tf(this.pg, 0, this.G.offset(r)); }
+    if (moved) this._slide(this.G.offset(r));
     return this.ringPos();
   };
   /* Zeiger-Randzone: Scroll-Zeile um d verschieben, Fokus in den sichtbaren Bereich klemmen (gleiche Spalte) */
@@ -174,9 +174,22 @@
       if (old && old !== cur && old.foc) { old.card.className = this.cardCls; old.cap.className = this.capCls; old.foc = false; }
       if (cur && !cur.foc) { cur.card.className = this.cardCls + ' is-focus'; cur.cap.className = this.capCls + ' is-focus'; cur.foc = true; }
     }
-    N.fx.move(this.pg); U.tf(this.pg, 0, G.offset(r));
+    this._slide(G.offset(r));
     return this.ringPos();
   };
+  /* Seite per Taste/Randzone auf y: am TV EIN Transform (CSS-Uebergang 150 ms, bei Tastenwiederholung ohne). Mit freiem Scrollen
+   * (caps.scroll 'free', Apple; 09-perf "lib-S mit Tasten") gleitet die Seite per rAF wie beim Wischen (N.kinetic.tween, ein Transform je
+   * Frame, auch bei Tastenwiederholung) – derselbe Weg wie der gemessen ruhige Wurf (fling-S); Gegenprobe Grid.KEY_TWEEN = false. */
+  Grid.prototype._slide = function (y) {
+    var pg = this.pg, self = this;
+    if (this.tw) { this.tw(); this.tw = null; }
+    if (!tweenOn()) { N.fx.move(pg); U.tf(pg, 0, y); this.ty = y; return; }
+    var a = this.ty === undefined ? y : this.ty;
+    pg.style.webkitTransition = 'none';
+    if (a === y) { U.tf(pg, 0, y); return; }
+    this.tw = N.kinetic.tween(a, y, function (p) { self.ty = p; U.tf(pg, 0, Math.round(p * 100) / 100); }, function () { self.tw = null; }, { ms: Grid.TWEEN_MS });
+  };
+  Grid.prototype._still = function (y) { if (this.tw) { this.tw(); this.tw = null; } this.ty = y; };   // Lage ohne Gleiten gesetzt
   Grid.prototype.canScroll = function (d) { return d < 0 ? this.r > 0 : this.n > 0 && this.r < this.G.row(this.n - 1); };
   Grid.prototype.ringPos = function () { var G = this.G; return { x: G.X0 + G.col(this.f) * G.SX, y: this.free ? Math.round(G.Y0 + G.row(this.f) * G.SY - this.py) : G.Y0 + (G.row(this.f) - this.r) * G.SY, shape: G.CLS, noScale: G.NO_SCALE }; };
   /* ---- freies Scrollen (caps.scroll 'free', Apple Nr. 12/18): Seitenlage py folgt Finger/Trackpad, EIN Transform je Frame,
@@ -186,6 +199,7 @@
   Grid.prototype.setPy = function (py) {
     if (!this.n) return;
     if (!this.free) { this.free = true; this.pg.style.webkitTransition = 'none'; }
+    this._still(-py);
     this.py = py;
     var r = this.G.rowPx(this.n, py);
     if (r !== this.r) { this.r = r; this.render(0, 1); if (this.onScroll) this.onScroll(r); }
@@ -205,13 +219,13 @@
     var cur = this.byIdx[i];
     if (old && old !== cur && old.foc) { old.card.className = this.cardCls; old.cap.className = this.capCls; old.foc = false; }
     if (this.focused && cur && !cur.foc) { cur.card.className = this.cardCls + ' is-focus'; cur.cap.className = this.capCls + ' is-focus'; cur.foc = true; }
-    if (was) { var pg = this.pg; pg.style.webkitTransition = 'none'; U.tf(pg, 0, this.G.offset(this.r)); setTimeout(function () { pg.style.webkitTransition = ''; }, 60); }
+    if (was) { var pg = this.pg; pg.style.webkitTransition = 'none'; U.tf(pg, 0, this.G.offset(this.r)); this._still(this.G.offset(this.r)); setTimeout(function () { if (!tweenOn()) pg.style.webkitTransition = ''; }, 60); }
     return this.ringPos();
   };
   Grid.prototype._fixed = function () {
     if (!this.free) return;
     this.free = false; this.py = 0;
-    this.pg.style.webkitTransition = '';
+    this.pg.style.webkitTransition = tweenOn() ? 'none' : '';
   };
   Grid.prototype.setFocused = function (on) {
     this.focused = on;
@@ -256,6 +270,8 @@
   /* Haeppchen-Groesse je Frame (P7 perf2: per Messlauf einstellbar, 'chunks' vergleicht Varianten am TV); FAST = waehrend Tastenwiederholung */
   Grid.CHUNK = 1; Grid.CHUNK_FAST = 1;   // perf3: TV 9,8,5 chunk-S1 58,8 / S3 53,5 / S9 50,1 fps
   var BUDGET_MS = 2;                    // caps.images 'fast' (Apple, 09-perf E6): je Frame so viele Karten, wie in 2 ms passen
+  Grid.KEY_TWEEN = true; Grid.TWEEN_MS = 150;   // nur mit caps.scroll 'free' (Apple); 150 ms = mo.base wie der CSS-Uebergang
+  function tweenOn() { return Grid.KEY_TWEEN && !!(N.kinetic && N.kinetic.tween && N.platform && N.platform.caps.scroll === 'free') && !(N.fx && N.fx.reduced()); }
   function chunk() { return N.platform && N.platform.caps.images === 'fast' ? 1e6 : N.fx && N.fx.isFast() ? Grid.CHUNK_FAST : Grid.CHUNK; }
   N.ui.Grid = Grid;
 })(N);

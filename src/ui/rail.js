@@ -9,7 +9,9 @@
   R.init = function (parent) {
     R.el = U.el('div', '', parent, 'display:none'); R.el.id = 'pn-rail';
     var bg = U.el('img', 'rail-bg', R.el); bg.src = N.assetBase + 'rail.png';
-    R.icons = U.el('div', 'a', R.el, 'left:0;top:0');
+    /* flexibel: Icon-Spalte in einem Ausschnitt (flach: rollt ueber dem festen Eintrag "Einstellungen"); am TV direkt wie bisher */
+    R.clipI = N.screen && N.screen.flex ? U.el('div', 'rail-clip', R.el, 'position:absolute;left:0;top:0;width:100%') : null;
+    R.icons = U.el('div', 'a', R.clipI || R.el, 'left:0;top:0');
     R.dim = U.el('div', 'nav-dim', R.el);             // aufgeklappte Leiste: Inhalt rechts leicht abdunkeln
     R.panel = U.el('div', 'nav-panel', R.el);
     R.build();
@@ -25,8 +27,75 @@
   }
   /* Eintraege zwischen Profil (oben) und Einstellungen (unten, y 636): ab y 112 im Abstand 56, bei vielen enger (min. 48) */
   R.layoutY = function (n) {
+    var g = R.flat();
+    if (g) return { y0: g.y0, step: 56 };            // flach: voller Abstand (zweizeilige Namen haben Luft), die Leiste rollt ohnehin
     return { y0: 112, step: Math.max(48, Math.min(56, Math.floor((628 - 112) / Math.max(1, n)))) };
   };
+  /* flache flexible Flaeche (N.screen, Hoehe ohne unteren Rand < 720: Mac-Fenster ab 516, iPhone quer; Nutzerbefunde 03.11.): Eintraege
+   * ab y 96, Abstand 56; passen sie nicht ueber die Einstellungen, rollt die ganze Leiste frei (R.sMax, N.ui.freeList - Finger,
+   * Trackpad/Rad, der Tasten-Fokus holt seinen Eintrag ins Bild). Am TV und ab 720 Hoehe: null (feste Lagen wie bisher). */
+  R.flat = function () {
+    var S = N.screen;
+    if (!S || !S.flex) return null;
+    var h = S.h - S.safe.b - S.safe.t;
+    if (h >= 720) return null;
+    return { y0: 96, end: 636 + h - 720 - 8, h: h };
+  };
+  /* Lage der Einstellungen und Rollweite (rein): n Eintraege nach layoutY; TV/hoch: Einstellungen bei 636 (+ H - 720), sMax 0 */
+  /* Nutzerentscheidung 03.11.: "Einstellungen" bleibt immer sichtbar (fest unten, set), nur die Eintraege darueber rollen in einem
+   * Ausschnitt bis clip (8 ueber den Einstellungen); sMax = Rollweite (letzter Eintrag + 16 Luft). TV/hoch: clip 0, sMax 0. */
+  R.geo = function (n) {
+    var S = N.screen, L = R.layoutY(n), h = S && S.flex ? S.h - S.safe.b - S.safe.t : 720, base = 636 + (S && S.flex ? h - 720 : 0);
+    if (!R.flat()) return { set: base, sMax: 0, clip: 0, top: 0 };
+    var end = n ? L.y0 + (n - 1) * L.step + 48 + 16 : 96, clip = base - 8;
+    if (end - clip <= 0) return { set: base, sMax: 0, clip: clip, top: 0 };
+    // rollt: eigene Baender fuer die Mehr-Pfeile ueber (0..TOP) und unter dem Ausschnitt (clip..set-8), nichts liegt unter ihnen
+    clip = base - 8 - ARW;
+    return { set: base, sMax: Math.max(0, end - clip), clip: clip, top: ARW };
+  };
+  /* linker Rand der Spalte in der Flaeche (flexibel: sicherer Rand, iPhone quer mit Notch; TV 0) */
+  R.edge = function () { return N.screen && N.screen.flex ? N.screen.safe.l : 0; };
+  /* oberer Rand der Eintraege (flexibel: Dynamic Island, iPhone hoch mit offenem Panel; flex.css verschiebt um --st; TV 0) */
+  R.top = function () { return N.screen && N.screen.flex ? N.screen.safe.t : 0; };
+  function visH() { return N.screen.h - N.screen.safe.b - N.screen.safe.t; }
+  R.sy = 0; R.sMax = 0; R.fl = null;
+  var ARW = 40;                                     // Band eines Mehr-Pfeils (28 hoch + Luft; Befund K 03.11.: unten zu knapp ueber "Einstellungen")
+  R.clip = 0; R.ctop = 0;                           // flach: Ausschnitt der rollenden Eintraege ctop..clip (0 = keiner)
+  function scrollSet(p) {
+    var y = -Math.round(p * 100) / 100;
+    R.sy = p; U.tf(R.icons, 0, y);
+    if (R.pin !== R.panel) U.tf(R.pin, 0, y);
+    edges();
+  }
+  /* weicher Verlauf am Rand des Ausschnitts und Mehr-Pfeile (N.ui.more wie in Panels), nur in die Richtung, in die mehr kommt */
+  function edges() {
+    var u = R.sMax > 0 && R.sy > 0.5, d = R.sMax > 0 && R.sy < R.sMax - 0.5, cs = [R.clipI, R.clipP];
+    for (var i = 0; i < cs.length; i++) if (cs[i]) { U.cls(cs[i], 'ft', u); U.cls(cs[i], 'fb', d); }
+    if (R.mI) R.mI.set(u, d);
+    if (R.mP) R.mP.set(u, d);
+  }
+  function scrollTo(p) {
+    p = Math.max(0, Math.min(R.sMax, p));
+    if (R.fl) { R.fl.keys(); R.fl.sync(p); }
+    if (p !== R.sy) scrollSet(p);
+  }
+  /* Eintrag i ins Bild holen (Tasten-Fokus, nur wenn die Leiste rollt; "Einstellungen" steht fest) */
+  function reveal(i) {
+    if (!(R.sMax > 0) || !R.entries[i] || R.entries[i].fixed) return;
+    var e = R.entries[i], h = R.clip || visH(), p = R.sy;
+    if (e.y - p < R.ctop + 8) p = e.y - R.ctop - 8; else if (e.y + 48 - p > h - 8) p = e.y + 56 - h;
+    scrollTo(p);
+  }
+  /* Mehr-Pfeil getroffen (y in Leisten-Koordinaten): -1 oben, 1 unten, 0 nein */
+  function arrowAt(y) {
+    if (!(R.sMax > 0) || !R.mI) return 0;
+    if (R.mI.u && y >= 0 && y < R.ctop) return -1;
+    if (R.mI.d && y >= R.clip && y < R.clip + ARW) return 1;
+    return 0;
+  }
+  /* Zug/Rad ueber der Spalte bzw. der offenen Leiste (N.router.pan, N.pointer.wheelPx; nur wenn sie rollt) */
+  R.scrollPan = function (e) { return !!(R.fl && R.att && R.fl.pan(e)); };
+  R.wheel = function (x, y, dy) { return !!(R.fl && R.att && (R.open_ || !R.slim()) && R.fl.wheel(x, y, dy)); };
   /* P4: optionaler Eintrag "Entdecken" (N.disc.enabled); W1: Reihenfolge und ausgeblendete Eintraege je Profil
    * ("Seitenleiste anpassen", N.railRows) – Start und Einstellungen sind immer da */
   /* Weitere Server: deren Bibliotheken (N.srv, mit srv/srvName) nach den eigenen; Seitenleisten-ID 'xlib-<server>-<id>' */
@@ -37,9 +106,10 @@
   R.order = function () {
     var disc = !!(N.disc && N.disc.enabled()), st = N.session && N.session.settings;
     var ids = N.railRows.enabled(st && st.railItems || null, N.railRows.avail(R.allLibs(), disc));
-    if (ids.length <= R.MAX) return ids;
+    var mx = R.MAX;
+    if (ids.length <= mx) return ids;
     var out = [], n = 0;                            // 'home' bleibt immer (gesperrt), an seiner Stelle
-    for (var i = 0; i < ids.length; i++) { if (ids[i] === 'home') out.push(ids[i]); else if (n < R.MAX - 1) { out.push(ids[i]); n++; } }
+    for (var i = 0; i < ids.length; i++) { if (ids[i] === 'home') out.push(ids[i]); else if (n < mx - 1) { out.push(ids[i]); n++; } }
     return out;
   };
   /* Eintraege neu aufbauen (nur bei Profil-/Bibliothekswechsel oder geaenderter Auswahl, nie im Fokusschritt) */
@@ -55,22 +125,47 @@
       else if (id === 'home') list.push({ id: id, icon: 'home', t: 'nav.home', y: y });
       else if (lib) list.push({ id: id, icon: R.libIcon(lib), label: lib.title, lib: lib, y: y });
     }
-    list.push({ id: 'settings', icon: 'gear', t: 'nav.settings', y: 636 + (N.screen.flex ? N.screen.h - 720 : 0) });   // flexible Flaeche: unten buendig
+    var gy = R.geo(ids.length), FX = !!N.screen.flex;
+    list.push({ id: 'settings', icon: 'gear', t: 'nav.settings', y: gy.set, fixed: FX });   // flexibel: fest unten (ueber dem Home-Indikator), rollt nie mit
     while (R.icons.firstChild) R.icons.removeChild(R.icons.firstChild);
     while (R.panel.firstChild) R.panel.removeChild(R.panel.firstChild);
-    U.el('div', 'nav-sep', R.panel);
+    if (R.fixRi && R.fixRi.parentNode) R.fixRi.parentNode.removeChild(R.fixRi);
+    R.fixRi = null; R.mP = null;
+    /* flexibel: Eintraege des Panels in einem Ausschnitt mit eigenem Behaelter (rollt mit der Icon-Spalte); am TV direkt im Panel */
+    R.clipP = FX ? U.el('div', 'nav-clip', R.panel, 'position:absolute;left:0;top:0;width:100%') : null;
+    R.pin = FX ? U.el('div', 'nav-in', R.clipP, 'position:absolute;left:0;top:0;width:100%;height:0') : R.panel;
+    var sep = U.el('div', 'nav-sep', FX ? R.panel : R.pin);
+    R.sMax = gy.sMax; R.sy = 0; R.clip = gy.clip; R.ctop = gy.top;
+    if (FX) {
+      sep.style.top = (gy.set - 12) + 'px'; sep.style.bottom = 'auto';
+      U.tf(R.icons, 0, 0);
+      // Ausschnitt ctop..clip; der Inhalt behaelt seine Lagen (innen um -ctop verschoben)
+      var cl = gy.clip ? (gy.clip - gy.top) + 'px' : '', ov = gy.clip ? 'hidden' : '', ct = gy.top + 'px', it = (-gy.top) + 'px';
+      R.clipI.style.height = R.clipP.style.height = cl; R.clipI.style.overflow = R.clipP.style.overflow = ov;
+      R.clipI.style.top = R.clipP.style.top = ct; R.icons.style.top = R.pin.style.top = it;
+      // Mehr-Pfeile: Icon-Spalte (Mitte x 72) dauerhaft, Panel (Mitte der Beschriftung) je Aufbau; nur flach sichtbar (edges)
+      if (!R.mI) { R.mI = N.ui.more(R.el, '', ''); R.el.insertBefore(R.mI.up, R.dim); R.el.insertBefore(R.mI.dn, R.dim); }   // unter Abdunklung und Panel
+      R.mI.up.style.cssText = 'left:58px;top:2px'; R.mI.dn.style.cssText = 'left:58px;top:' + (gy.clip + 2) + 'px';   // Band clip..clip+40, Trennlinie bei clip+36, "Einstellungen" ab clip+48
+      R.mP = N.ui.more(R.panel, 'left:146px;top:2px', 'left:146px;top:' + (gy.clip + 2) + 'px');
+      R.icons.setAttribute('data-scroll', gy.sMax > 0 ? '1' : ''); R.pin.setAttribute('data-scroll', gy.sMax > 0 ? '1' : '');
+      if (!R.fl) R.fl = N.ui.freeList({ el: R.icons, set: scrollSet, max: function () { return R.sMax; }, dim: visH,
+        hit: function (x) { return R.sMax > 0 && (R.open_ || !R.slim()) && x < (R.open_ ? NAV_W : 112) + R.edge(); } });
+      R.fl.reset();
+    }
+    edges();
     for (i = 0; i < list.length; i++) {
       var e = list[i];
       if (e.id === 'profile') {
         avatar(R.icons, R.profile);
-        e.ni = U.el('div', 'ni', R.panel, 'top:' + e.y + 'px');
+        e.ni = U.el('div', 'ni', R.pin, 'top:' + e.y + 'px');
         avatar(e.ni, R.profile);
         e.lbT = U.txt('div', 'lb', e.ni, R.profile ? R.profile.name : '');
       } else {
-        e.ri = U.el('div', 'ri', R.icons, 'top:' + e.y + 'px');
+        e.ri = U.el('div', 'ri', e.fixed ? R.el : R.icons, 'top:' + e.y + 'px');   // fester Eintrag: ausserhalb des Ausschnitts
+        if (e.fixed) { R.fixRi = e.ri; R.el.insertBefore(e.ri, R.dim); }   // unter Abdunklung und Panel wie die Spalte
         U.el('div', 'bar', e.ri);
         N.ui.icon(e.ri, e.icon);
-        e.ni = U.el('div', 'ni', R.panel, 'top:' + e.y + 'px');
+        e.ni = U.el('div', 'ni', e.fixed ? R.panel : R.pin, 'top:' + e.y + 'px');
         N.ui.icon(e.ni, e.icon);
         var lt = e.label || N.t(e.t);
         if (e.lib && e.lib.srv) {                      // Weitere Server: Name einzeilig, darunter klein die Herkunft
@@ -115,13 +210,13 @@
     if (N.ui.tabbar) N.ui.tabbar.sync();            // flexible Flaeche: Leiste unten / Menue-Knopf folgen der Seitenleiste
   };
   R.attached = function () { return !!R.att; };
-  /* flexible Flaeche, Breitenklasse M/K: keine Icon-Spalte (Leiste nur einblendbar, N.ui.tabbar); TV/R: false */
+  /* flexible Flaeche, M·F/K (N.screen.nav): keine Icon-Spalte (Leiste nur einblendbar, N.ui.tabbar); TV/R: false */
   R.slim = function () { return !!(N.ui.tabbar && N.ui.tabbar.slim()); };
   /* Eintrag der Seitenleiste zu einer ID (oder null, z. B. ausgeblendet oder Bibliothek verschwunden) */
   R.entry = function (id) { for (var i = 0; i < R.entries.length; i++) if (R.entries[i].id === id) return R.entries[i]; return null; };
   R.isOpen = function () { return R.open_; };
   function idx(id) { for (var i = 0; i < R.entries.length; i++) if (R.entries[i].id === id) return i; return id === 'home' ? 0 : idx('home'); }   // ausgeblendeter Eintrag (W1): Fokus auf Start
-  function setF(i) { U.cls(R.entries[R.f].ni, 'is-focus', false); R.f = i; U.cls(R.entries[i].ni, 'is-focus', true); }
+  function setF(i) { U.cls(R.entries[R.f].ni, 'is-focus', false); R.f = i; U.cls(R.entries[i].ni, 'is-focus', true); reveal(i); }
   /* ◀ von der Inhaltskante: ausklappen, Fokus auf dem aktuellen Eintrag */
   R.open = function (at) {
     if (R.open_ || !R.att) return;
@@ -130,7 +225,9 @@
     var scr = N.router.top();
     if (scr && scr.railBlur) scr.railBlur();
     setF(at === undefined ? idx(R.cur) : at);
-    N.fx.move(R.panel);
+    // flexibel (Maus/Trackpad, Nutzerbefund 03.11.): nicht ueber N.fx.move – jede Zeigerbewegung schaltet N.fx auf "schnell", dann
+    // sprang die Leiste beim Aus- und Einklappen ohne Uebergang (wirkte unruhig, beim Einklappen kurz Reste oben/unten). TV wie bisher.
+    if (!(N.screen && N.screen.flex)) N.fx.move(R.panel);
     U.cls(R.panel, 'open', true);
     U.cls(R.dim, 'on', true);
     N.router.refreshHints();
@@ -168,14 +265,45 @@
   R.rest = false;
   R.pointer = function (x, y, kind) {
     var hit = -1;
-    for (var i = 0; i < R.entries.length; i++) if (y >= R.entries[i].y && y < R.entries[i].y + 48) { hit = i; break; }
+    if (R.fl && R.fl.eat(kind)) return true;          // Tipp in den Schwung der rollenden Leiste: nur anhalten
+    y -= R.top();                                    // oberer Rand (Dynamic Island; sonst 0)
+    var ar = arrowAt(y);
+    if (ar && kind === 'click') { scrollTo(R.sy + ar * 56); return true; }   // Mehr-Pfeil: eine Stufe rollen
+    hit = R.hitY(y, false);
+    /* flexibel (Maus/Trackpad, Nutzerbefund 03.11.: "faehrt manchmal aus, manchmal nicht"): Darueberfahren klappt ueberall in der
+     * Spalte auf – auch zwischen zwei Eintraegen und ueber den Pfeil-Baendern (naechster Eintrag); Klick nur auf einem Eintrag.
+     * TV (Smart-Control-Zeiger): unveraendert nur ueber einem Eintrag. */
+    if (hit < 0 && kind !== 'click' && N.screen && N.screen.flex) hit = R.hitY(y, true);
+    else if (ar) return true;                         // Pfeil-Band ohne Eintrag (TV gibt es nicht)
     if (hit < 0) return false;
-    if (!R.open_ && R.rest && kind !== 'click') return true;
+    if (!R.open_ && R.rest && kind !== 'click') {
+      /* flexibel (Befund K 03.11.: "klappt nach einem Klick nicht wieder auf"): Darueberfahren klappt wieder auf, sobald der Zeiger in
+       * der Spalte deutlich weiterbewegt wurde (24 px seit dem Klick) – ein Zittern direkt nach dem Klick (Grund fuer R.rest, Befund
+       * 29.10.) bleibt ohne Wirkung. TV: wie bisher erst nach Verlassen der Spalte. */
+      var rp = R.restAt;
+      if (!(N.screen && N.screen.flex && rp && (Math.abs(y - rp.y) >= 24 || Math.abs(x - rp.x) >= 24))) return true;
+      R.rest = false;
+    }
     if (!R.open_) R.open(hit); else if (hit !== R.f) setF(hit);
-    if (kind === 'click') { R.activate(hit); R.rest = true; }
+    if (kind === 'click') { R.activate(hit); R.rest = true; R.restAt = { x: x, y: y }; }
     return true;
   };
   R.away = function () { R.rest = false; };
+  /* Eintrag unter y (Leisten-Koordinaten, ohne oberen Rand): genau (Kasten 48 hoch) oder near = der naechste sichtbare (Mitte);
+   * flach zaehlen rollende Eintraege nur im Ausschnitt ctop..clip, "Einstellungen" steht fest. -1 = keiner */
+  R.hitY = function (y, near) {
+    var best = -1, bd = 1e9;
+    for (var i = 0; i < R.entries.length; i++) {
+      var en = R.entries[i], py = en.fixed ? y : y + R.sy;
+      if (!en.fixed && R.clip && (y >= R.clip || y < R.ctop)) { if (!near) continue; }
+      if (!near) { if (py >= en.y && py < en.y + 48) return i; continue; }
+      var sy = en.fixed ? en.y : en.y - R.sy;                 // Lage auf dem Bildschirm
+      if (!en.fixed && R.clip && (sy + 48 <= R.ctop || sy >= R.clip)) continue;   // weggerollt
+      var d = Math.abs(y - (sy + 24));
+      if (d < bd) { bd = d; best = i; }
+    }
+    return near ? best : -1;
+  };
   /* ---- Finger zieht die Leiste (nur Plattformen mit Touch-Lader, Apple Nr. 24; am TV ruft das nie jemand) ----
    * Rand-Wisch (from 'edge'): das Panel folgt dem Finger live (Lage -TRAVEL + dx, ohne Uebergang), die Abdunklung blendet mit ein.
    * Offene Leiste (from 'open'): Zug nach links schiebt sie live hinaus – bis GANZ aus dem Bild (-NAV_W), dann liegt die Icon-Spalte

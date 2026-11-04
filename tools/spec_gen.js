@@ -62,7 +62,8 @@ var SCEN = [
   { id: 'K', name: 'kids/teen profile (setup.json)', admin: false, kind: 'kid', pkg: true },
   { id: 'D', name: 'development build without setup.json, main profile', admin: true, kind: 'main', pkg: false },
   /* extra: only marks rows that no other scenario shows (everything else is as in D) */
-  { id: 'C', name: 'additionally on a device with mobile data (platform capability `cellular`, e.g. a phone; otherwise like D)', admin: true, kind: 'main', pkg: false, cellular: true, extra: true }
+  { id: 'C', name: 'additionally on a device with mobile data (platform capability `cellular`, e.g. a phone; otherwise like D)', admin: true, kind: 'main', pkg: false, caps: { cellular: true }, extra: true },
+  { id: 'H', name: 'additionally on a platform with the info area above the tiles (capabilities `home` = tiles and `homeHero`, e.g. a computer or tablet; otherwise like D)', admin: true, kind: 'main', pkg: false, caps: { home: 'tiles', homeHero: true }, extra: true }
 ];
 function settingsData() {
   var ctx = loadApp(), N = ctx.N;
@@ -105,11 +106,11 @@ function settingsData() {
       users: function () { return users; }, startProfile: viaReal('startProfile'),
       pinSwitchAvailable: viaReal('pinSwitchAvailable'), hasRestricted: viaReal('hasRestricted'), pinSwitchOn: viaReal('pinSwitchOn'),
       setSetting: function () {}, save: function () {} };
-    var caps = N.platform.caps, cell = caps.cellular;
-    caps.cellular = !!sc.cellular;
+    var caps = N.platform.caps, keep = {}, ck;
+    for (ck in sc.caps || {}) { keep[ck] = caps[ck]; caps[ck] = sc.caps[ck]; }   // scenario capabilities (only while building the rows)
     var s = factory();
     var list;
-    try { list = s.__defs(); } finally { caps.cellular = cell; }
+    try { list = s.__defs(); } finally { for (ck in keep) caps[ck] = keep[ck]; }
     list.forEach(function (cat) {
       if (cats.indexOf(cat.id) < 0) cats.push(cat.id);
       cat.rows.forEach(function (d) {
@@ -769,7 +770,7 @@ function genReuse(text) {
 }
 function loadStrings(lang) {
   var ctx = { N: { strings: {} } }; vm.createContext(ctx);
-  ['strings.de.js', 'strings.en.js', 'strings.music.js'].forEach(function (f) { vm.runInContext(rd('src/i18n/' + f), ctx); });
+  ['strings.de.js', 'strings.en.js', 'strings.nb.js', 'strings.music.js'].forEach(function (f) { vm.runInContext(rd('src/i18n/' + f), ctx); });
   return ctx.N.strings[lang] || {};
 }
 /* inventory of the maintained sources a port reads (counts and links generated, so the playbook never points at stale things) */
@@ -807,9 +808,9 @@ function genSources(text) {
     (shotsDe ? ' · ' + shotsDe + ' German ones in `de/`' : '') + ' |');
   var scenes = require(path.join(ROOT, 'tools', 'visual.js')).SCENES.map(function (s) { return s.name; });
   o.push('| Visual-test scenes | ' + raw + 'tools/visual.js | ' + scenes.length + ' screen states (list below) – each one must exist in the port |');
-  var en = loadStrings('en'), de = loadStrings('de');
-  o.push('| UI texts | ' + raw + 'src/i18n/strings.en.js · ' + raw + 'src/i18n/strings.de.js | ' + Object.keys(en).length + ' English / ' + Object.keys(de).length +
-    ' German keys (music texts included); length limit per key prefix in ' + raw + 'tools/i18n_rules.js |');
+  var en = loadStrings('en'), de = loadStrings('de'), nb = loadStrings('nb');
+  o.push('| UI texts | ' + raw + 'src/i18n/strings.en.js · ' + raw + 'src/i18n/strings.de.js · ' + raw + 'src/i18n/strings.nb.js | ' + Object.keys(en).length + ' English / ' + Object.keys(de).length +
+    ' German / ' + Object.keys(nb).length + ' Norwegian (Bokmål) keys (music texts included); length limit per key prefix in ' + raw + 'tools/i18n_rules.js |');
   var groups = {};
   scenes.forEach(function (s) { var g = s.split('-')[0]; (groups[g] = groups[g] || []).push(s); });
   o.push('', '<details><summary>All ' + scenes.length + ' visual-test scenes (grouped by prefix)</summary>', '');

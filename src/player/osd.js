@@ -107,12 +107,15 @@
      * W x H = Flaeche. Oben Zurueck-Knopf + Uhr (Zeile 72), darunter die Titel-Insel; Video 16:9 ueber die volle Breite (K: unter dem
      * Titel, M: senkrecht mittig); Bedien-Insel darunter (K) bzw. am unteren Rand (M) ueber die Breite: Balken, Zeiten, Reihe 1 = Mitte
      * (⏮ −x ⏯ +x ⏭), Reihe 2 = rechte Gruppe (Bild in Bild, Kapitel, Ton & UT, Mehr), Label, Kapitelname. -> Lagen in Flaechen-px */
-    narrow: function (W, H, wide) {
-      var m = 24, g = { W: W, H: H, TX: m, TY: wide ? 32 : 16, TW: W - 2 * m, ISX: m, ISW: W - 2 * m, ISH: 276, VW: W, VH: Math.round(W * 9 / 16) };
+    /* sf (optional): sichere Raender {t, r, b, l} (N.screen.safe; iPhone: Dynamic Island, Duo: Rand seitlich) – Inseln und Knoepfe
+     * innerhalb, das Video weiter ueber die volle Breite */
+    narrow: function (W, H, wide, sf) {
+      var f = sf || {}, st = f.t > 0 ? f.t : 0, sr = f.r > 0 ? f.r : 0, sb = f.b > 0 ? f.b : 0, sl = f.l > 0 ? f.l : 0, IW = W - sl - sr;
+      var m = 24, g = { W: W, H: H, TX: sl + m, TY: st + (wide ? 32 : 16), TW: IW - 2 * m, ISX: sl + m, ISW: IW - 2 * m, ISH: 276, VW: W, VH: Math.round(W * 9 / 16) };
       g.VY = wide ? Math.max(g.TY + 168, Math.round((H - g.VH) / 2)) : g.TY + 168;
-      g.ISY = wide ? Math.max(g.VY + g.VH + 16, H - g.ISH - 32) : g.VY + g.VH + 16;
+      g.ISY = wide ? Math.max(g.VY + g.VH + 16, H - sb - g.ISH - 32) : g.VY + g.VH + 16;
       g.BAR_X = g.ISX + 32; g.BAR_W = g.ISW - 64; g.BAR_Y = g.ISY + 27; g.LBL_Y = g.ISY + 204; g.CHN_Y = 236;
-      g.MH_Y = g.ISY + g.ISH + 8; g.SKIP_Y = g.VY + g.VH - 64; g.SKX1 = W - m; g.SKX0 = g.SKX1 - 360; g.CX = Math.round(W / 2);
+      g.MH_Y = g.ISY + g.ISH + 8; g.SKIP_Y = g.VY + g.VH - 64; g.SKX1 = W - sr - m; g.SKX0 = g.SKX1 - 360; g.CX = Math.round(sl + IW / 2); g.SR = sr;
       var c = Math.round(g.ISW / 2), by = {}, r2 = { pip: 0, chap: 1, tracks: 2, more: 3 };
       for (var i = 0; i < BTNS.length; i++) {
         var b = BTNS[i], k = r2[b.id];
@@ -120,8 +123,8 @@
       }
       g.osd = { x: g.ISX, y: g.ISY, by: by };
       var below = g.ISY + g.ISH + 16;                      // Karten (Countdown, letzte Folge): unter der Insel, sonst unten rechts im Video
-      g.UPX = W - m - 400; g.CBY = below + 232 + 16 <= H ? below + 168 : g.VY + g.VH - 8 - 64;
-      g.LOX = Math.round((W - 480) / 2); g.LOY = Math.round((H - 192) / 2);
+      g.UPX = W - sr - m - 400; g.CBY = below + 232 + 16 <= H - sb ? below + 168 : g.VY + g.VH - 8 - 64;
+      g.LOX = Math.round(sl + (IW - 480) / 2); g.LOY = Math.round(st + (H - st - sb - 192) / 2);
       return g;
     },
     /* Reihe 2 des schmalen Players mittig ueber die sichtbaren Knoepfe (vis = O.visible …); aendert g.osd.by */
@@ -159,7 +162,7 @@
     delayText: function (ms) {
       if (!ms) return N.t('pl.delay.zero');
       var str = String(Math.abs(ms) / 1000);
-      if (N.i18n.lang() === 'de') str = str.replace('.', ',');
+      str = str.replace('.', N.t('fmt.decimal'));
       return N.t('pl.delay.val', { n: (ms > 0 ? '+' : '-') + str }) + ' ' + N.t(ms > 0 ? 'pl.delay.later' : 'pl.delay.earlier');
     },
     DELAYS: [-3000, -2000, -1000, -500, -250, 0, 250, 500, 1000, 2000, 3000],

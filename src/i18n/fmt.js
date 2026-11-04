@@ -1,4 +1,4 @@
-/* N.fmt – Zahlen, Zeiten, Staffel/Folge in beiden Sprachen (SPEC 10.1 Regel 8). Reine Funktionen. */
+/* N.fmt – Zahlen, Zeiten, Staffel/Folge in allen App-Sprachen (DE, EN, NB) (SPEC 10.1 Regel 8). Reine Funktionen. */
 (function (N) {
   var U = N.util;
   /* Haeufige Genre-Tags von Plex/TMDB/TVDB in beiden Sprachen (TV-Test 27.10., F22: "FILM · ADVENTURE" bei deutscher
@@ -13,12 +13,22 @@
     ['Suspense', 'Spannung'], ['Short', 'Kurzfilm'], ['TV Movie', 'TV-Film'], ['Mini-Series', 'Miniserie'],
     ['Game Show', 'Spielshow'], ['Food', 'Kochen'], ['Travel', 'Reisen'], ['Home and Garden', 'Haus & Garten'],
     ['Martial Arts', 'Kampfsport'], ['Film-Noir', 'Film noir'], ['Anime', 'Anime'], ['Erotic', 'Erotik']];
-  var G_DE = {}, G_EN = {};
-  (function () { for (var i = 0; i < GENRES.length; i++) { G_DE[GENRES[i][0].toLowerCase()] = GENRES[i][1]; if (!G_EN[GENRES[i][1].toLowerCase()]) G_EN[GENRES[i][1].toLowerCase()] = GENRES[i][0]; } })();
+  /* Norwegisch (Bokmaal) in derselben Reihenfolge wie GENRES (Nutzerwunsch 03.11.): englische und deutsche Tags -> nb */
+  var NB = ['Action', 'Eventyr', 'Animasjon', 'Biografi', 'Komedie', 'Krim', 'Dokumentar', 'Drama', 'Familie', 'Fantasy', 'Historie',
+    'Skrekk', 'Musikk', 'Musikal', 'Mysterium', 'Romantikk', 'Science fiction', 'Science fiction', 'Thriller', 'Krig', 'Western',
+    'Action og eventyr', 'Sci-fi og fantasy', 'Krig og politikk', 'Barn', 'Barn', 'Nyheter', 'Reality', 'Talkshow', 'Såpeopera', 'Sport',
+    'Spenning', 'Kortfilm', 'TV-film', 'Miniserie', 'Gameshow', 'Mat', 'Reise', 'Hus og hage', 'Kampsport', 'Film noir', 'Anime', 'Erotikk'];
+  var G_DE = {}, G_EN = {}, G_NB = {};
+  (function () {
+    for (var i = 0; i < GENRES.length; i++) {
+      G_DE[GENRES[i][0].toLowerCase()] = GENRES[i][1]; if (!G_EN[GENRES[i][1].toLowerCase()]) G_EN[GENRES[i][1].toLowerCase()] = GENRES[i][0];
+      G_NB[GENRES[i][0].toLowerCase()] = NB[i]; if (!G_NB[GENRES[i][1].toLowerCase()]) G_NB[GENRES[i][1].toLowerCase()] = NB[i];
+    }
+  })();
   var F = {
     /* Genre-Tag in der App-Sprache (bekannte Tags), sonst unveraendert */
     genre: function (t) {
-      var k = String(t || '').toLowerCase(), m = N.i18n.lang() === 'en' ? G_EN : G_DE;
+      var k = String(t || '').toLowerCase(), l = N.i18n.lang(), m = l === 'en' ? G_EN : l === 'nb' ? G_NB : G_DE;
       return m[k] || String(t || '');
     },
     /* Dauer in ms -> "24 Min." / "1 Std. 2 Min." (gerundet auf Minuten, mind. 1 Min.) */
@@ -42,7 +52,8 @@
       return N.t('fmt.rating', { n: (Math.round(Number(r) * 10) / 10).toFixed(1).replace('.', N.t('fmt.decimal')) });
     },
     /* Altersfreigabe: "de/12" -> "FSK 12"; Freigabe eines anderen Landes mit Land davor ("us/R" -> "US: R"), damit eine US-Angabe nie
-     * wie eine FSK aussieht (TV-Test 29.10.: "R" stand da, wo eine Quelle keine deutsche hat); in Englisch ist US das eigene Land (ohne Vorsatz).
+     * wie eine FSK aussieht (TV-Test 29.10.: "R" stand da, wo eine Quelle keine deutsche hat); in Englisch ist US das eigene Land (ohne Vorsatz),
+     * in Norwegisch NO (N.i18n.country).
      * Ohne Land (alte Plex-Daten) unveraendert. */
     rated: function (cr) {
       if (!cr) return '';
@@ -50,7 +61,7 @@
       if (m) return N.t('meta.fsk', { n: m[1] });
       m = /^([a-z]{2})\/(.+)$/.exec(cr);
       if (!m) return cr;
-      return m[1] === (N.i18n && N.i18n.lang() === 'en' ? 'us' : 'de') ? m[2] : m[1].toUpperCase() + ': ' + m[2];
+      return m[1] === (N.i18n ? N.i18n.country() : 'de') ? m[2] : m[1].toUpperCase() + ': ' + m[2];
     },
     /* Teile mit " · " verbinden, leere weglassen */
     join: function (parts) {

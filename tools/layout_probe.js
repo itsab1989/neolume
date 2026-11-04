@@ -2,9 +2,14 @@
  * Wird direkt vor dem Kopflos-Screenshot aufgerufen (onload des Halte-Bildes) und untersucht das sichtbare DOM:
  *   overlap  Text zweier verschiedener Elemente ueberlappt sich (beide an der Stelle sichtbar, nicht verdeckt)
  *   clip     Text wird abgeschnitten: Element mit overflow:hidden ist zu klein (ohne "…"/line-clamp) oder ragt aus einem
- *            abschneidenden Vorfahren heraus, obwohl das Element selbst darin liegt
+ *            abschneidenden Vorfahren heraus, obwohl das Element selbst darin liegt, oder ein umbrechender Absatz (mind. 2 Zeilen)
+ *            wird seitlich vom Rand eines abschneidenden Vorfahren bzw. des Bildschirms mitten in der Zeile abgeschnitten (sein
+ *            Kasten ist breiter als die sichtbare Flaeche, z. B. Beschreibung in einer schmalen Karte; Altbefund 03.11. extdetails)
  *   button   Text liegt ueber einem Bedienelement (Knopf, Karte, Eintrag), zu dem er nicht gehoert
- *   offscreen Text laeuft ueber den Bildschirmrand (1280 x 720; window.PN_PROBE_AREA = {w, h} fuer die flexible Apple-Flaeche)
+ *   offscreen Text laeuft ueber den Bildschirmrand (1280 x 720; window.PN_PROBE_AREA = {w, h} fuer die flexible Apple-Flaeche);
+ *            ebenso Fortschrittsbalken/Abzeichen ohne Text (BAR: Staffelstreifen, Serien-Balken, Balken auf Karten, data-layout-bar),
+ *            die ganz oder teilweise ausserhalb des Bildschirms bzw. eines abschneidenden Vorfahren (Karte) liegen – ausser sie
+ *            sitzen auf einer Karte/einem Knopf, der selbst angeschnitten ist (Reihe laeuft bewusst ueber den Rand)
  *   safe     Text ragt in den Titel-Sicherheitsrand (64 / 36 px)
  *   panel    zwei sichtbare Flaechen (Hintergrundfarbe) derselben Ebene ueberlappen sich teilweise (keine liegt ganz in der
  *            anderen; Overlays mit eigenem z-index wie Dialog/Panel/Leiste liegen bewusst ueber dem Inhalt)
@@ -25,6 +30,7 @@
   var TOL = 2, W = 1280, H = 720, SX = 64, SY = 36;
   var NOTICE = '#pn-toast, [data-layout-notice]';
   var HINTBAR = '#pn-hints, [data-layout-hintbar]', RING = '.focus-ring';
+  var BAR = '.ss-c,.ss-bar,.ss-seg,.d-sbar,.prog,.np-bar,.mini-bar,[data-layout-bar]';   // Balken/Abzeichen ohne Text (Nutzerbefund 03.11.)
   var INTERACTIVE = '.btn,.card,.card-list,.card-list-sq,.chip,.key,.pkey,.ni,.np-b,.pe,.pl-b,.pl-skip,.prof,.set-cat,.set-row,.tab,.tl-row,.del,.ib';
   var csCache = [], opCache = [];
 
@@ -213,6 +219,19 @@
             if (cut && within(ob, c, TOL) && !ellipsized(o, it.clipEl)) d = 'ragt aus ' + path(it.clipEl).split(' > ').pop() + ' heraus und wird abgeschnitten';
           }
         }
+        /* umbrechender Absatz, dessen Zeilen seitlich am Rand der sichtbaren Flaeche (abschneidender Vorfahre geschnitten mit dem
+         * Bildschirm) mitten im Text enden: die Zeile laeuft unsichtbar weiter. Reihen, die bewusst ueber den Rand laufen, haben
+         * einzeilige Beschriftungen (nowrap) und zaehlen hier nicht; "…"/line-clamp hilft nicht, es endet ja AUSSERHALB. */
+        if (!d && /^(normal|pre-wrap|pre-line|break-spaces)$/.test(s.whiteSpace)) {
+          var lim = isect(it.clip, scr), tops = {}, side = '';
+          it.raw.forEach(function (q) { tops[Math.round(q.t)] = 1; });
+          if (Object.keys(tops).length >= 2) it.raw.forEach(function (q) {
+            if (side) return;
+            if (q.r > lim.r + TOL && q.l < lim.r - TOL) side = 'rechts';
+            else if (q.l < lim.l - TOL && q.r > lim.l + TOL) side = 'links';
+          });
+          if (side) d = 'Absatz laeuft ' + side + ' ueber den Rand ' + (it.clipEl && within(rr(it.clipEl.getBoundingClientRect()), scr, TOL) ? 'von ' + path(it.clipEl).split(' > ').pop() : 'des Bildschirms') + ' hinaus (Zeilen abgeschnitten)';
+        }
         if (d && shownIn(o, it.vis[0])) out.push({ t: 'clip', a: info(it), r: info(it).r, d: d });
       });
       /* button */
@@ -300,6 +319,25 @@
             out.push({ t: 'safe', a: info(it), r: info(it).r, d: { l: 'links (64 px)', r: 'rechts (64 px)', t: 'oben (36 px)', b: 'unten (36 px)' }[side] }); done = true;
           }
         });
+      });
+      /* offscreen fuer Balken ohne Text (Nutzerbefund 03.11.: Staffelstreifen/Serien-Balken lagen in der schmalen Karte rechts
+       * ausserhalb): sichtbarer Teil (Schnitt mit abschneidenden Vorfahren und Bildschirm) kleiner als der Balken */
+      /* nur seitlich: unter/ueber dem sichtbaren Teil einer rollenden Seite zu liegen ist gewollt (man rollt hin) */
+      function cutSide(b, c) {
+        var hv = R(Math.max(b.l, c.l), b.t, Math.min(b.r, c.r), b.b);   // waagerechter Schnitt
+        if (w(hv) <= 0.5) return 'ganz';
+        return hv.r < b.r - TOL ? 'rechts' : hv.l > b.l + TOL ? 'links' : '';
+      }
+      Array.prototype.slice.call(document.querySelectorAll(BAR)).forEach(function (e) {
+        if (opacity(e) < 0.1 || okAttr(e, 'offscreen')) return;
+        var b = rr(e.getBoundingClientRect());
+        if (w(b) < 1 || h(b) < 1) return;                // display:none (auch an einem Vorfahren)
+        var side = cutSide(b, isect(clipOf(e).r, scr));
+        if (!side) return;
+        for (var a = e.parentElement; a && a.id !== 'root' && a !== document.body; a = a.parentElement) {   // Karte in einer Reihe: bewusst angeschnitten
+          if (a.matches && a.matches(INTERACTIVE)) { var ab = rr(a.getBoundingClientRect()); if (cutSide(ab, isect(clipOf(a).r, scr))) return; }
+        }
+        out.push({ t: 'offscreen', a: elInfo(e), r: box(b), d: 'Balken ' + (side === 'ganz' ? 'seitlich ganz ausserhalb' : side + ' abgeschnitten') });
       });
       /* panel */
       var panels = [], all = root().getElementsByTagName('*');

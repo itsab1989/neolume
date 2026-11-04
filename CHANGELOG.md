@@ -5,6 +5,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.13] - 2026-11-04
+
+### Added
+- **The whole description in the INFO panel.** INFO on a title now shows its complete description instead of cutting it
+  off mid-sentence. If the text is longer than the panel, a small grey arrow at the bottom says there is more: ▼ moves
+  almost a full page on (the last two lines stay at the top, so you never lose your place), ▲ goes back.
+- **Norwegian (Bokmål) as a third language.** Settings › Display › Language now offers "Norsk bokmål" next to German and
+  English, with Norwegian dates and numbers, Æ Ø Å in the A–Z bar and on the on-screen keyboard, and Norwegian titles
+  and descriptions from your server where it has them. A TV set to Norwegian starts in Norwegian right away.
+
+### Changed
+- **Less to load at start.** The texts of each language now live in their own small file, and the TV only reads the one it needs.
+  The app itself shrank from about 1.6 MB to 1.1 MB, so the TV has less to read every time Neolume starts.
+
+If the whole story now fits on the screen and that made your film night a little better, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.12] - 2026-11-03
 
 ### Added
@@ -25,15 +41,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   exactly the same version for your quality setting.
 
 If a calm, tidy screen makes your evening a little nicer, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
-
-### Added
-- **Choose the colour of the badges on tiles.** A new setting under Settings › Display, "Badge colour", right below the
-  accent colour, colours the triangle (not watched), the tick (watched) and the episode count on tiles. Light grey stays
-  the default, so nothing changes unless you pick a colour; any accent colour makes them easier to spot on bright posters.
-- **Grey as an accent colour.** The accent colour list now ends with a calm grey.
-- **"Original" quality.** "Quality when converting" and "Quality over the internet" now start with "Original (no limit)":
-  the server sends the file unchanged whenever this device can play it, and converts at the highest step only when it
-  must. Devices that can play 4K also get 40 and 80 Mbit/s 4K steps (the 2014 TV does not show them).
 
 ## [1.0.11] - 2026-11-02
 

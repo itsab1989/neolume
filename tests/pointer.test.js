@@ -42,6 +42,20 @@ test('Langes Druecken (>= 800 ms) = TOOLS fuer das Element unter dem Punkt; der 
   assert.deepStrictEqual(c.s.keys.slice(), ['TOOLS']);
 });
 
+test('Rechtsklick (P.context, NAV-25): sofort TOOLS fuer das Element unter dem Zeiger; Ctrl-Klick verwirft den folgenden Klick', function () {
+  var c = setup(), P = c.N.pointer;
+  P.on = true;
+  assert.strictEqual(P.context(300, 400, false), true);
+  assert.deepStrictEqual(c.s.ptr.slice(), ['move@300,400']);
+  assert.deepStrictEqual(c.s.keys.slice(), ['TOOLS']);
+  P.click(300, 400, null);                                     // ohne Ctrl kommt kein Klick hinterher; kaeme einer, wirkt er
+  assert.deepStrictEqual(c.s.ptr.slice(1), ['move@300,400', 'click@300,400']);
+  P.context(300, 400, true); P.click(300, 400, null);          // Ctrl-Klick: der Klick danach entfaellt
+  assert.deepStrictEqual(c.s.keys.slice(), ['TOOLS', 'TOOLS']);
+  assert.strictEqual(c.s.ptr.filter(function (p) { return p.indexOf('click') === 0; }).length, 1);
+  assert.strictEqual(P.context(300, 660, false), false, 'auf der Hinweisleiste nichts');
+});
+
 test('Klick auf die Hinweisleiste = diese Taste (Bildschirm bekommt keinen Zeiger-Klick)', function () {
   var c = setup(), P = c.N.pointer;
   P.click(1100, 668, null);

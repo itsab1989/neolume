@@ -237,7 +237,7 @@
         var va = a[k], vb = b[k];
         o[k] = va && (typeof va !== 'object' || va.length === undefined || va.length) ? va : vb !== undefined ? vb : o[k];
       }
-      var own = N.i18n && N.i18n.lang() === 'en' ? 'us/' : 'de/';                        // Freigabe des eigenen Landes ("de/16" = FSK 16) vor der US-Angabe des Katalogs
+      var own = (N.i18n ? N.i18n.country() : 'de') + '/';                        // Freigabe des eigenen Landes ("de/16" = FSK 16) vor der US-Angabe des Katalogs
       if ((b.cr || '').indexOf(own) === 0 && (a.cr || '').indexOf(own) !== 0) o.cr = b.cr;
       o.src = a.src && b.src ? a.src + '+' + b.src : a.src || b.src;
       return o;
@@ -288,17 +288,19 @@
         if (x.release && x.release.physical) p.push(N.t('disc.det.physical', { date: N.det.date(x.release.physical) }));
         if (x.nextAir) p.push(N.t('disc.det.nextAir', { date: N.det.date(x.nextAir) }));
       }
-      /* Fakten und Hinweis bleiben ganz; die Beschreibung bekommt den Rest der 700 Zeichen (mind. 160) */
-      var tail = [], used;
+      /* Alles ganz (Befund 03.11.: die Beschreibung war hier auf den Rest von 700 Zeichen gekuerzt); das Panel scrollt (NAV-12) */
+      var tail = [];
       if (p.length) tail.push(p.join('\n'));
       if (note) tail.push(note);
-      used = head.join('\n\n').length + tail.join('\n\n').length + 4 * (tail.length + 1);
-      return U.trim(head.concat([U.trim(sum, Math.max(160, Math.min(600, 700 - used)))], tail).join('\n\n'), 700);
+      return U.trim(head.concat(sum ? [sum] : [], tail).join('\n\n'), N.det.MAXI);
     },
     /* Details ueber den Helfer: EINE Anfrage je Titel + Sprache, im Speicher gehalten. cb(err, info|null).
      * Ohne Helfer bzw. Helfer ohne 'details' (aelterer Helfer): sofort cb({type:'nohelper'}) – keine Anfrage. */
     details: function (it, cb) {
-      var hex = D.hexOf(it && it.guid), lang = N.i18n.lang() === 'en' ? 'en' : 'de', key = hex + '|' + lang, v = infoCache.get(key);
+      var hex = D.hexOf(it && it.guid), l = N.i18n.lang(), key, v;
+      // Norwegisch nur mit Helfer, der 'nb' kennt (seit 03.11.2026; aeltere antworten 400) – sonst Englisch statt Deutsch
+      var lang = l === 'en' ? 'en' : l === 'nb' ? (D.helperHas('nb') ? 'nb' : 'en') : 'de';
+      key = hex + '|' + lang; v = infoCache.get(key);
       function later(e, r) { setTimeout(function () { cb(e, r); }, 0); return { abort: function () {} }; }
       if (!HEX.test(hex)) return later({ type: 'guid' }, null);
       if (v) return later(null, v);

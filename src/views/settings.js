@@ -16,10 +16,15 @@
      * Zeilen nacheinander statt nebeneinander (STACK) – erst die Liste der Kategorien, ein Tipp/OK/▶ oeffnet ihre Zeilen ueber die
      * volle Breite mit Zurueck "‹" oben links (RETURN/◀ wie bisher zurueck zu den Kategorien). Am TV nie (1280 breit). */
     var VA = N.screen.view(), STACK = N.screen.flex && VA.w < 1264, LW = STACK ? VA.w - 168 : 736, RX = STACK ? 144 : 464;
-    var EXTRA = Math.max(0, Math.floor((VA.h - 720) / ROW_STEP)), MAXROWS = 6 + EXTRA, DY = EXTRA * ROW_STEP;
+    /* Hoehe: hoeher als 720 -> mehr Zeilen; flach (nur flexibel: Mac-Fenster ab 516, iPhone quer) -> weniger Zeilen, damit die
+     * Beschreibung (bis 608 + DY) ueber dem unteren Rand bleibt (Nutzerbefund 03.11.) */
+    var EXTRA = VA.h >= 720 ? Math.floor((VA.h - 720) / ROW_STEP) : Math.max(-3, Math.floor((VA.h - 624) / ROW_STEP)), MAXROWS = 6 + EXTRA, DY = EXTRA * ROW_STEP;
     var titleT = null, bk = null;
     var cats = [], catEls = [], cTips = [], rowEls = [], desc, zone = 'cat', c = 0, r = 0, list = null, off = 0, more = null;
     var fl = null;                                       // freies Scrollen (nur caps.scroll 'free'): gemeinsame Hilfe N.ui.freeList
+    /* Kategorien rollen (nur flexibel, Nutzerbefund 03.11.: "Hauptauswahl unten abgeschnitten"): Behaelter catIn in einem Ausschnitt
+     * ab CAT_Y - 8 bis 16 ueber dem unteren Rand; fc = eigene freie Liste, catMax = Rollweite (0 = passt). Am TV nichts davon. */
+    var catIn = null, fc = null, catMax = 0, CAT_TOP = CAT_Y - 8, catVis = VA.h - CAT_TOP - 72 - (N.screen.flex && N.screen.nav() !== 'tabs' ? N.screen.safe.b : 0), pz = null;   // ueber Hinweisleiste und Home-Indikator
     function st() { return N.session; }
     /* Zahl der eingeschalteten Reihen (aus Einstellung + bekannten Bibliotheken/Katalog) */
     function homeCount() {
@@ -131,8 +136,8 @@
     function delays() { var o = []; N.osd.DELAYS.forEach(function (ms) { o.push([ms, N.osd.delayText(ms)]); }); return o; }
     /* Ton & Untertitel: erst die drei Grundwahlen, dann Darstellung der Untertitel, zuletzt Technik (ASS, Ton-Ausgabe) */
     function subsRows() {
-      return [choice('audioLang', vals(['de', 'en', 'ja', 'server'])), choice('subs', vals(['off', 'forced', 'foreign', 'always', 'server'])),
-        choice('subLang', vals(['de', 'en'])), toggle('rememberTracks'), choice('subSize', vals(['small', 'medium', 'large', 'xl'])),
+      return [choice('audioLang', vals(['de', 'en', 'no', 'ja', 'server'])), choice('subs', vals(['off', 'forced', 'foreign', 'always', 'server'])),
+        choice('subLang', vals(['de', 'en', 'no'])), toggle('rememberTracks'), choice('subSize', vals(['small', 'medium', 'large', 'xl'])),
         choice('subColor', vals(['white', 'yellow'])), choice('subBg', vals(['none', 'dim', 'solid'])), choice('subPos', vals(['low', 'high'])), choice('subDelay', delays()),
         choice('ass', vals(['burn', 'text'])), toggle('passthrough'), boostRow()];
     }
@@ -149,7 +154,7 @@
         return r;
       }
       var det = choice('animeDetect', vals(['off', 'normal', 'strict'])), show = dimOff(toggle('animeShow')), rules = dimOff(toggle('anime'));
-      return [det, show, rules, dim(choice('animeAudio', vals(['ja', 'de', 'same']))), dim(choice('animeSubs', vals(['off', 'deen', 'de']))),
+      return [det, show, rules, dim(choice('animeAudio', vals(['ja', 'de', 'same']))), dim(choice('animeSubs', vals(N.i18n.lang() === 'nb' ? ['off', 'noen', 'no', 'deen', 'de'] : ['off', 'deen', 'de']))),
         dim(toggle('animeSigns'))];
     }
     /* Akzentfarbe (N.accent): Palette mit Farbfeld, Standardfarbe der Marke zuerst; wirkt sofort (settings:changed) */
@@ -349,7 +354,7 @@
       return { id: 'lang', type: 'list', label: 'set.language', desc: 'set.language.desc', val: function () { return N.t('lang.' + N.i18n.lang()); },
         open: function () {
           N.ui.panel.select({ title: N.t('set.language'), selected: N.i18n.lang(),
-            entries: [{ id: 'de', t: N.t('lang.de') }, { id: 'en', t: N.t('lang.en') }],
+            entries: N.i18n.langs.map(function (l) { return { id: l, t: N.t('lang.' + l) }; }),   // Deutsch, English, Norsk bokmål
             onSelect: function (l) { if (l !== N.i18n.lang()) N.app.setLang(l); } });
         } };
     }
@@ -361,6 +366,7 @@
       return only([langRow(),
         adult && { id: 'homerows', type: 'action', label: 'set.homeRows', desc: 'set.homeRows.desc',   // SPEC 7.3.1 – nicht in Kinderprofilen (7.13)
           val: function () { return N.tn('set.homeRows.val', homeCount()); }, run: function () { N.router.push('homerows'); } },
+        homeHeroRow(S),                                // HOME-18 (nur caps.homeHero, Apple): direkt unter "Startseite anpassen" – auch fuer Kinder
         // W1 "Seitenleiste anpassen": Eintraege umsortieren/ausblenden (Start + Einstellungen bleiben), gleiche Liste wie oben
         adult && { id: 'railitems', type: 'action', label: 'set.railItems', desc: 'set.railItems.desc',
           val: function () { return N.tn('set.railItems.val', N.ui.rail.order().length); }, run: function () { N.router.push('railitems'); } },
@@ -376,8 +382,10 @@
         // TV-Befund 28.10.: Serien-Balken einzeln abschaltbar (vorher an "Folgen-Fortschritt" gekoppelt)
         { id: 'sp', type: 'toggle', label: 'set.seriesProgress', desc: 'set.seriesProgress.desc',
           get: function () { return !!(S.settings && S.settings.seriesProgress); }, set: function (x) { S.setSetting('seriesProgress', x); } },
-        toggle('spoiler'), toggle('clock'), clockStyleRow()].concat(newsRows(), [hintsRow(), recentRow(),
-        { id: 'ptr', type: 'toggle', label: 'set.pointer', desc: 'set.pointer.desc',
+        toggle('spoiler'), toggle('clock'), clockStyleRow()].concat(newsRows(), N.platform.caps.hintBar === false ? [] : [hintsRow()], [recentRow()],
+        // Smart-Control-Zeiger (Fernbedienung): mit echter Maus/Trackpad (caps.pointer 'mouse', Apple) nicht anbieten – "Aus" haette
+        // dort die Maus abgeschaltet, Randzonen braucht freies Rollen nicht (Nutzer 03.11., SPEC NAV-26)
+        N.platform.caps.pointer === 'mouse' ? [] : [{ id: 'ptr', type: 'toggle', label: 'set.pointer', desc: 'set.pointer.desc',
           get: function () { return S.state.pointer !== false; }, set: function (x) { S.state.pointer = x; S.save(); N.pointer.setEnabled(x); } },
         // TV-Befund 1.0.5: Weiterblaettern durch Verweilen am Rand (Randzonen, naechste Reihe der Startseite) abschaltbar
         { id: 'ptredge', type: 'toggle', label: 'set.ptrEdge', desc: 'set.ptrEdge.desc', ddesc: 'set.ptrEdge.off.desc', help: 'help.ptrEdge',
@@ -387,10 +395,17 @@
         { id: 'ptracc', type: 'toggle', label: 'set.ptrAccel', desc: 'set.ptrAccel.desc',
           ddesc: function () { return S.state.pointer === false ? 'set.ptrAccel.off.desc' : 'set.ptrAccel.edge.desc'; },
           disabled: function () { return S.state.pointer === false || S.state.ptrEdge === false; },
-          get: function () { return S.state.ptrAccel !== false; }, set: function (x) { S.state.ptrAccel = x; S.save(); N.pointer.setAccel(x); } },
+          get: function () { return S.state.ptrAccel !== false; }, set: function (x) { S.state.ptrAccel = x; S.save(); N.pointer.setAccel(x); } }], [
         toggle('themeMusic'),                         // Titelmelodie (SPEC v2.2, M3b: Standard aus)
         themeVolRow()
       ]), adult ? discRows() : []));                   // P4 Entdecken + Merkliste (Kinderprofile: nicht vorhanden)
+    }
+    /* Infobereich ueber den Kacheln der Startseite (HOME-18, caps.homeHero): Standard an; wirkt nur mit Zeiger/Tastatur und genug Hoehe
+     * (views/home.js heroWanted), gilt beim naechsten Aufbau der Startseite */
+    function homeHeroRow(S) {
+      if (N.platform.caps.homeHero !== true) return null;
+      return { id: 'homehero', type: 'toggle', label: 'set.homeHero', desc: 'set.homeHero.desc',
+        get: function () { return !(S.settings && S.settings.homeHero === false); }, set: function (x) { S.setSetting('homeHero', x); } };
     }
     /* Kachelgroesse der Startseite (HOME-15): Groß/Mittel/Klein wie die Bibliotheksansicht; Unterzeile = Kacheln je Reihe aus RowMath */
     function homeSizeRow() {
@@ -474,8 +489,17 @@
         bk.setAttribute('role', 'button'); bk.setAttribute('aria-label', N.t('hint.back'));
         bk.appendChild(document.createTextNode('‹'));
       }
+      var cp = root;
+      if (N.screen.flex) {
+        var cc = U.el('div', 'set-cc', root, 'position:absolute;left:0;top:' + CAT_TOP + 'px;width:100%;height:' + catVis + 'px;overflow:hidden');
+        cp = catIn = U.el('div', 'set-ci', cc, 'position:absolute;left:0;top:' + (-CAT_TOP) + 'px;width:100%;height:0');
+        catMax = Math.max(0, CAT_Y + cats.length * CAT_STEP - CAT_STEP + 48 + 8 - (CAT_TOP + catVis));
+        if (catMax > 0) catIn.setAttribute('data-scroll', '1');
+        fc = N.ui.freeList({ el: catIn, max: function () { return catMax; }, dim: catVis,
+          hit: function (x, y) { return catMax > 0 && y >= CAT_TOP && (STACK ? zone !== 'row' && x >= RX - 24 && x < RX + LW + 24 : x >= 144 && x < 444); } });
+      }
       for (var i = 0; i < cats.length; i++) {
-        var ce = U.el('div', 'set-cat', root, 'top:' + (CAT_Y + i * CAT_STEP) + 'px' + (STACK ? ';width:' + LW + 'px' : ''));
+        var ce = U.el('div', 'set-cat', cp, 'top:' + (CAT_Y + i * CAT_STEP) + 'px' + (STACK ? ';width:' + LW + 'px' : ''));
         U.el('span', 'bar', ce);
         ce.appendChild(document.createTextNode(N.t('set.cat.' + cats[i].id)));
         catEls.push(ce);
@@ -533,9 +557,23 @@
     /* ---- freies Scrollen (App.pan, N.ui.freeList) ---- */
     function maxPx() { return Math.max(0, rowsOf().length - MAXROWS) * ROW_STEP; }
     /* Kategorien, kurze Liste: Zug annehmen und nichts tun (kein Rueckfall auf Fokus-Schritte) */
-    s.pan = function (e) { fl.pan(e); return true; };
-    s.wheel = function (x, y, dx, dy) { return fl.wheel(x, y, dy); };
-    s.pointerDown = function () { fl.down(); };
+    s.pan = function (e) {
+      if (e.phase === 'start') { pz = fc && fc.pan(e) ? fc : fl; if (pz === fl) fl.pan(e); return true; }
+      if (pz) pz.pan(e);
+      if (e.phase === 'end') pz = null;
+      return true;
+    };
+    s.wheel = function (x, y, dx, dy) { return !!(fc && fc.wheel(x, y, dy)) || fl.wheel(x, y, dy); };
+    s.pointerDown = function () { fl.down(); if (fc) fc.down(); };
+    /* Kategorie i ins Bild holen (Tasten-Fokus; nur wenn die Kategorien rollen) */
+    function catReveal(i) {
+      if (!fc || !(catMax > 0)) return;
+      var y = CAT_Y + i * CAT_STEP, p = fc.px;
+      if (y - p < CAT_TOP + 8) p = y - CAT_TOP - 8; else if (y + 48 - p > CAT_TOP + catVis - 8) p = y + 56 - CAT_TOP - catVis;
+      p = Math.max(0, Math.min(catMax, p));
+      fc.keys(); fc.sync(p); U.tf(catIn, 0, -p);
+    }
+    function cy() { return fc ? fc.px : 0; }             // gerollte Kategorien (sonst 0)
     /* An den Anfang (App.scrollTop, Tipp ganz oben / Cmd+Pfeil hoch): Zeilenliste gleitet nach oben (N.ui.freeList.top) */
     s.scrollTop = function () { return fl.top(); };
     function paintRow(i) {
@@ -573,7 +611,7 @@
       if (d) N.ui.infotip.open({ title: N.t(d.label), text: infoText(d), x: TIP_X, y: ROW_Y + i * ROW_STEP - scrollPx() + 32, flex: true, el: rowEls[i].tip });
     }
     function catTip(i) {
-      N.ui.infotip.open({ title: N.t('set.cat.' + cats[i].id), text: N.t(catKey(i)), x: TIP_CX, y: CAT_Y + i * CAT_STEP + 24, flex: true, el: cTips[i] });
+      N.ui.infotip.open({ title: N.t('set.cat.' + cats[i].id), text: N.t(catKey(i)), x: TIP_CX, y: CAT_Y + i * CAT_STEP + 24 - cy(), flex: true, el: cTips[i] });
     }
     function descKey(d) { return d.disabled && d.disabled() && d.ddesc ? (typeof d.ddesc === 'function' ? d.ddesc() : d.ddesc) : d.desc; }
     function focusCat(i) {
@@ -582,6 +620,7 @@
       if (i !== c) showCat(i);
       zone = 'cat';
       U.cls(catEls[c], 'is-focus', true);
+      catReveal(c);
       setDesc();
       page();
     }
@@ -634,10 +673,10 @@
      * x 1136–1216, je volle Zeilenhoehe >= 44 pt) oeffnet nur die Info-Blase – kein Umschalten, keine Auswahl */
     s.pointer = function (x, y, kind) {
       var i, tip = N.ui.infotip.on();
-      if (fl.eat(kind)) return true;                      // Tipper in den Schwung: nur anhalten (wo er gerade ist)
+      if (fl.eat(kind) || (fc && fc.eat(kind))) return true;   // Tipper in den Schwung: nur anhalten (wo er gerade ist)
       if (STACK) return stackPointer(x, y, kind, tip);
       if (x >= 144 && x < (tip ? 444 : 424)) {
-        i = N.hit.list(CAT_Y, CAT_STEP, tip ? CAT_STEP : 48, cats.length, tip ? y + 4 : y);
+        i = y < CAT_TOP && fc ? -1 : N.hit.list(CAT_Y, CAT_STEP, tip ? CAT_STEP : 48, cats.length, (tip ? y + 4 : y) + cy());
         if (i < 0) { N.ui.infotip.hover(null); return false; }
         if (tip && cTips[i] && x >= 376) { N.ui.infotip.hover(cTips[i]); if (kind === 'click') catTip(i); return true; }
         N.ui.infotip.hover(null);
@@ -669,7 +708,7 @@
       var i;
       if (x < RX - 24 || x >= RX + LW + 24) { N.ui.infotip.hover(null); return false; }
       if (zone !== 'row') {
-        i = N.hit.list(CAT_Y, CAT_STEP, tip ? CAT_STEP : 48, cats.length, tip ? y + 4 : y);
+        i = y < CAT_TOP && fc ? -1 : N.hit.list(CAT_Y, CAT_STEP, tip ? CAT_STEP : 48, cats.length, (tip ? y + 4 : y) + cy());
         if (i < 0) { N.ui.infotip.hover(null); return false; }
         if (tip && cTips[i] && x >= RX + LW - 64) { N.ui.infotip.hover(cTips[i]); if (kind === 'click') catTip(i); return true; }
         N.ui.infotip.hover(null);

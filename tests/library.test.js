@@ -116,6 +116,37 @@ test('Register: Sprung-Offsets (aufsteigend/absteigend), fehlender Buchstabe -> 
   assert.strictEqual(L.regStep(c, 'A', 1, false), 'B');
   assert.strictEqual(L.regStep(c, '#', -1, false), '#');
 });
+var AZ = '#ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+test('A–Z ziehen (LIB-12): Buchstabe aus der Hoehe – volle Leiste je 17 px wie der TV-Klick, ober-/unterhalb geklemmt', function () {
+  for (var dy = 0; dy < 27 * 17; dy++) assert.strictEqual(L.azIndex(dy, 27, 17, 27), Math.floor(dy / 17), 'dy ' + dy);
+  assert.strictEqual(L.azIndex(-40, 27, 17, 27), 0, 'ueber der Leiste: #');
+  assert.strictEqual(L.azIndex(900, 27, 17, 27), 26, 'unter der Leiste: Z');
+  assert.strictEqual(AZ.charAt(L.azIndex(13 * 17 + 8, 27, 17, 27)), 'M');
+});
+test('A–Z verdichtet (LIB-12): flache Flaeche -> ungerade Platzzahl, "•" dazwischen, erster/letzter bleiben, jeder Buchstabe erreichbar', function () {
+  assert.strictEqual(L.azSlots(AZ, 459, 17).length, 27, 'passt: alle 27');
+  assert.strictEqual(L.azSlots(AZ, 600, 17).length, 27);
+  var s = L.azSlots(AZ, 546 - 168 - 16, 17);                 // iPhone SE quer (M·F 972x546): 362 px -> 21 Plaetze
+  assert.strictEqual(s.length, 21);
+  assert.ok(s.length * 17 <= 362, 'Leiste endet ueber dem Rand');
+  assert.strictEqual(s[0].t, '#'); assert.strictEqual(s[20].t, 'Z');
+  s.forEach(function (x, j) { assert.strictEqual(x.t === '•', j % 2 === 1, 'Platz ' + j); });
+  s.forEach(function (x, j) { if (x.i >= 0) assert.strictEqual(L.azIndex(j * 17 + 8.5, s.length, 17, 27), x.i, 'Platzmitte zeigt ihren Buchstaben ' + x.t); });
+  var seen = {};
+  for (var dy = 0; dy < s.length * 17; dy++) seen[L.azIndex(dy, s.length, 17, 27)] = 1;
+  assert.strictEqual(Object.keys(seen).length, 27, 'alle Buchstaben unter dem Finger erreichbar (auch unter "•")');
+  for (dy = 1; dy < s.length * 17; dy++) assert.ok(L.azIndex(dy, s.length, 17, 27) >= L.azIndex(dy - 1, s.length, 17, 27), 'monoton');
+  assert.strictEqual(L.azSlots(AZ, 20, 17).length, 3, 'mindestens # • Z');
+  assert.strictEqual(L.azSlots(AZ, 17 * 10, 17).length, 9, 'gerade Zahl -> eins weniger');
+});
+test('A–Z Abbruchregel (LIB-12): weit seitlich neben der Leiste = nicht mehr gemeint, auf/nahe der Leiste schon', function () {
+  assert.strictEqual(L.azAway(1180, 1160, 56, 120), false, 'auf der Leiste');
+  assert.strictEqual(L.azAway(1041, 1160, 56, 120), false, 'knapp innerhalb links');
+  assert.strictEqual(L.azAway(1039, 1160, 56, 120), true, 'mehr als 120 links daneben');
+  assert.strictEqual(L.azAway(1337, 1160, 56, 120), true, 'rechts daneben (ausserhalb der Flaeche)');
+  assert.strictEqual(L.azAway(1100, 1160, 56, 80), false, 'Maus: 80');
+  assert.strictEqual(L.azAway(1079, 1160, 56, 80), true);
+});
 test('T9-Erstbuchstabe: 2 = A, 22 = B, 222 = C, 2222 = A, 7777 = S, 0/1 = #', function () {
   assert.strictEqual(L.t9('2', 1), 'A');
   assert.strictEqual(L.t9('2', 2), 'B');
@@ -146,4 +177,20 @@ test('normList: librarySectionID vom Container, wenn die Eintraege keine tragen 
   assert.strictEqual(l[0].lib, 2); assert.strictEqual(l[0].kind, 'show');
   assert.strictEqual(l[1].lib, 1);
   assert.strictEqual(N.model.normList([{ ratingKey: '3', type: 'movie' }], {})[0].lib, 0);
+});
+
+test('A–Z auf Norwegisch (03.11.): Leiste # A–Z Æ Ø Å, Æ/Ø/Å eigene Buchstaben, Sprung auch bei Server-Reihenfolge mit Å bei A', function () {
+  assert.strictEqual(L.letters('de'), '#ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+  assert.strictEqual(L.letters('nb'), '#ABCDEFGHIJKLMNOPQRSTUVWXYZÆØÅ');
+  var FCN = { MediaContainer: { Directory: [{ title: '#', size: 2 }, { title: 'A', size: 5 }, { title: 'B', size: 3 }, { title: 'Z', size: 1 }, { title: 'Æ', size: 2 }, { title: 'ø', size: 4 }, { title: 'Å', size: 6 }] } };
+  var c = L.chars(FCN, 'nb');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c)).map(function (x) { return x.ch; }), ['#', 'A', 'B', 'Z', 'Æ', 'Ø', 'Å']);
+  assert.strictEqual(L.jump(c, 'Ø', false).idx, 13);
+  assert.strictEqual(L.jump(c, 'Å', false).idx, 17);
+  assert.strictEqual(L.letterAt(c, 13, false), 'Ø');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(L.chars(FCN, 'de'))).map(function (x) { return x.ch; }), ['#', 'A', 'B', 'Z', '#']);   // Deutsch wie bisher: alles ausser A–Z = #
+  var odd = L.chars({ MediaContainer: { Directory: [{ title: 'A', size: 2 }, { title: 'Å', size: 1 }, { title: 'B', size: 3 }] } }, 'nb');
+  assert.strictEqual(L.jump(odd, 'B', false).idx, 3);    // Server sortiert Å zu A: Sprung trifft trotzdem die echte Stelle
+  assert.strictEqual(L.jump(odd, 'C', false).ch, 'Å');   // fehlender Buchstabe: naechster in Leisten-Reihenfolge
+  assert.strictEqual(L.cmp('Z', 'Æ'), -1); assert.strictEqual(L.cmp('Ø', 'Å'), -1); assert.strictEqual(L.cmp('#', 'A'), -1);
 });

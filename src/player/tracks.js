@@ -121,7 +121,7 @@
       return T.norm(a, s, curA, curS, why);
     },
     /* Anime-Regel (SPEC 10.4 set.animeAudio/animeSubs/animeSigns; P5) -> {a, s} oder null (keine Regel greift, normale Wahl).
-     * Japanisch: JPN-Ton + Untertitel (DE, sonst EN | nur DE | aus); ohne passende Untertitel nur bei "aus" (sonst wie bisher keine Regel).
+     * Japanisch: JPN-Ton + Untertitel (DE, sonst EN | nur DE | NO, sonst EN | nur NO | aus); ohne passende Untertitel nur bei "aus" (sonst wie bisher keine Regel).
      * Deutsch/"Wie oben": Ton in der Sprache; bei deutschem Ton mit "Schilder-Untertitel" die Signs-&-Songs-Spur (DE, nur fremde Stellen). */
     anime: function (st, cfg) {
       var A = st.audio, S = st.subs, F = T.find, aa = cfg.animeAudio || 'ja', ms = cfg.animeSubs || 'deen';
@@ -130,7 +130,8 @@
         var ja = F(A, function (x) { return x.lang === 'ja' && !x.ad; });
         if (!ja) return null;
         if (ms === 'off') return { a: ja.id, s: 0 };
-        var sub = F(S, full('de')) || (ms === 'deen' ? F(S, full('en')) : null);
+        var pl = ms === 'noen' || ms === 'no' ? 'no' : 'de';    // Norwegisch (noen/no, nur in der norwegischen Oberflaeche waehlbar)
+        var sub = F(S, full(pl)) || (ms === 'deen' || ms === 'noen' ? F(S, full('en')) : null);
         return sub ? { a: ja.id, s: sub.id } : null;
       }
       var lang = aa === 'same' ? cfg.audioLang : aa;
@@ -166,7 +167,7 @@
         return ff ? ff.id : 0;
       }
       if (mode === 'always') {
-        var want = cfg.subLang || 'de', other = want === 'de' ? 'en' : 'de';
+        var want = cfg.subLang || 'de', other = want === 'en' ? 'de' : 'en';      // Rueckfall: Deutsch <-> Englisch, Norwegisch -> Englisch
         var ps = F(S, function (x) { return x.lang === want && !x.forced && !x.hi; }) || F(S, function (x) { return x.lang === other && !x.forced && !x.hi; });
         return ps ? ps.id : 0;
       }

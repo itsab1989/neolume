@@ -137,6 +137,35 @@
       var t = list[i]; list[i] = list[j]; list[j] = t;
       return j;
     },
+    /* Eintrag i an Stelle j (0 … n-1) setzen, die dazwischen ruecken nach (Ziehen, "Ganz nach oben/unten"); Rueckgabe j */
+    moveTo: function (list, i, j) {
+      j = Math.max(0, Math.min(list.length - 1, j));
+      if (i === j || i < 0 || i >= list.length) return i;
+      var t = list.splice(i, 1)[0];
+      list.splice(j, 0, t);
+      return j;
+    },
+    /* ---------- Ziehen am Griff (NAV-27, nur Finger/Maus) – reine Rechnung, getestet ---------- */
+    /* Zielplatz: Start i, Finger dy px seit dem Auflegen (Listen-Lage eingerechnet), Zeilenhoehe step, n verschiebbare Zeilen.
+     * Gewechselt wird, sobald die gezogene Zeile die halbe Nachbarzeile ueberdeckt */
+    dragTo: function (i, dy, step, n) { return Math.max(0, Math.min(n - 1, i + Math.round(dy / step))); },
+    /* Versatz der Zeile k (Ansicht, px), solange Zeile i auf Platz j gezogen wird: dazwischen liegende ruecken eine Zeile nach */
+    dragShift: function (k, i, j, step) {
+      if (k === i) return 0;
+      if (j > i && k > i && k <= j) return -step;
+      if (j < i && k < i && k >= j) return step;
+      return 0;
+    },
+    /* Selbst-Rollen am Listenrand: Finger y in der sichtbaren Liste (top … top + h); innerhalb zone px am Rand rollt die Liste,
+     * je naeher am Rand (und darueber hinaus), desto schneller, hoechstens vmax px/ms. <0 = nach oben, 0 = nicht */
+    dragAuto: function (y, top, h, zone, vmax) {
+      var a = (top + zone - y) / zone, b = (y - (top + h - zone)) / zone;
+      if (a > 0) return -vmax * Math.min(1, a);
+      if (b > 0) return vmax * Math.min(1, b);
+      return 0;
+    },
+    /* Abbruch: Finger mehr als off px seitlich neben der Liste (x0 … x0 + w) -> Zeile kehrt zurueck, Loslassen legt nichts um */
+    dragAway: function (x, x0, w, off) { return x < x0 - off || x > x0 + w + off; },
     /* Startseite: verfuegbar sind Grundreihen, Neu je Film/Serien-Bibliothek und eingeschaltete Hubs, deren Bibliothek
      * es noch gibt (welche Hubs der Server liefert, zeigt erst die Antwort) */
     homeAvail: function (saved, libs, alibs) {

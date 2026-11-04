@@ -3,13 +3,22 @@
  * Textblock als Dauer-Ebene, Wechsel nach 300 ms Fokus-Ruhe (Aufrufer), Opacity 0 -> 1 in 120 ms.
  * Tausch-Gate: Bild laedt ins versteckte <img>; sichtbar wird es nur, wenn seit >= 300 ms keine Taste kam, allein in einem Frame. */
 (function (N) {
-  var U = N.util, M = N.model, REST = 300;
-  function Hero(parent) {
-    this.imgs = [U.el('img', 'hero-img', parent), U.el('img', 'hero-img', parent)];
+  var U = N.util, M = N.model, REST = 300, XF_MS = 340;   // XF_MS: Ueberblendung 300 ms (flex.css .hero-bg) + Rand
+  /* o (nur Apple, Infobereich ueber Kacheln HOME-18; TV ruft ohne o – alles wie bisher): w = Breite der Flaeche -> Bild und Scrim in
+   * einem Kasten w x w·9/16 oben (statt Vollbild; darunter der Grund), xf = Wechsel als Ueberblendung, decode = vor dem Zeigen
+   * vorab dekodieren (img.decode, kein Dekodieren im Frame des Wechsels) */
+  function Hero(parent, o) {
+    this.o = o || {};
+    var bg = parent;
+    if (this.o.w) bg = this.bg = U.el('div', 'hero-bg', parent, 'width:' + this.o.w + 'px;height:' + Math.ceil(this.o.w * 9 / 16) + 'px');
+    this.imgs = [U.el('img', 'hero-img', bg), U.el('img', 'hero-img', bg)];
     this.imgs[0].src = N.img.BLANK; this.imgs[1].src = N.img.BLANK;
-    this.cur = -1; this.url = ''; this.gen = 0; this.retryT = 0;
-    var scrim = U.el('img', 'full', parent);
+    this.cur = -1; this.url = ''; this.gen = 0; this.retryT = 0; this.xfT = 0;
+    var scrim = U.el('img', 'full', bg);
     scrim.src = N.assetBase + 'scrim.png';
+    /* o.decode: Scrim erst zeigen, wenn er dekodiert ist (sonst dekodiert WebKit die 1280x720-PNG im ersten Frame des Aufbaus);
+     * bis dahin steht ohnehin noch kein Bild darunter */
+    if (this.o.decode && scrim.decode) { U.vis(scrim, false); scrim.decode().then(function () { U.vis(scrim, true); }, function () { U.vis(scrim, true); }); }
     var t = this.txt = U.el('div', 'hero-txt', parent);
     this.ov = U.txt('div', 'hero-ov t-label cacc ell', t, '');
     this.ti = U.txt('div', 'hero-ti t-display ell', t, '');
@@ -74,14 +83,19 @@
     this.url = url;
     var gen = ++this.gen;
     if (this.retryT) { clearTimeout(this.retryT); this.retryT = 0; }
-    if (!url) { if (this.cur >= 0) { U.vis(this.imgs[this.cur], false); this.cur = -1; } return; }
+    if (!url) {
+      if (this.cur >= 0) { U.vis(this.imgs[this.cur], false); this.cur = -1; }
+      if (this.o.xf) { if (this.xfT) { clearTimeout(this.xfT); this.xfT = 0; } U.vis(this.imgs[0], false); U.vis(this.imgs[1], false); }   // Blende lief noch
+      return;
+    }
     var next = this.imgs[this.cur === 0 ? 1 : 0];
     next.onload = function () {
       next.onload = next.onerror = null;
       if (gen !== self.gen) return;
       N.img.fit(next, soft);                 // im verdeckten Puffer: unscharfes Poster mittig beschneiden bzw. Art zuruecksetzen
-      self._trySwap(gen, next);
+      if (self.o.decode && next.decode) next.decode().then(go, go); else go();
     };
+    function go() { if (gen === self.gen) self._trySwap(gen, next); }
     next.onerror = function () { next.onload = next.onerror = null; };
     // Gleiche URL im verdeckten Puffer (z. B. Titel zuvor schon gezeigt): kein neues onload -> direkt tauschen (TV-Befund 26.10.)
     if (next.src === url && next.complete && next.naturalWidth) { next.onload = next.onerror = null; N.img.fit(next, soft); this._trySwap(gen, next); return; }
@@ -99,9 +113,24 @@
   /* eigener Name, damit das Frame-Protokoll des Messlaufs den Tausch zeigt ('Hero.swap') */
   Hero.prototype._swap = function (next) {
     var old = this.cur >= 0 ? this.imgs[this.cur] : null;
+    this.cur = this.imgs[0] === next ? 0 : 1;
+    if (this.o.xf && !N.fx.reduced()) { this._xfade(next, old); return; }
     U.vis(next, true);
     if (old && old !== next) U.vis(old, false);
-    this.cur = this.imgs[0] === next ? 0 : 1;
+  };
+  /* Ueberblendung (o.xf): neues Bild oben (Klasse xf-top) mit Deckkraft 0 -> 1 (CSS-Uebergang, eine Ebene), das alte bleibt darunter
+   * stehen und wird erst danach verborgen – nie ein Loch zum Grund. Folgt ein Wechsel waehrend der Blende, gilt der neue. */
+  Hero.prototype._xfade = function (next, old) {
+    var self = this;
+    if (this.xfT) { clearTimeout(this.xfT); this.xfT = 0; }
+    U.cls(next, 'xf-top', true); if (old && old !== next) U.cls(old, 'xf-top', false);
+    next.style.opacity = '0';
+    U.vis(next, true);
+    U.raf(function () { if (self.imgs[self.cur] === next) next.style.opacity = '1'; });
+    this.xfT = setTimeout(function () {
+      self.xfT = 0;
+      if (old && old !== next && self.imgs[self.cur] !== old) U.vis(old, false);
+    }, XF_MS);
   };
   /* Bild wiederherstellen (nach Overlay, Bildschirmtastatur, Fokus-Rueckkehr): Orsay-WebKit zeichnet das nicht
    * zusammengesetzte Hero-<img> nach dem Entfernen einer Vollbild-Ebene teils nicht neu bzw. verwirft das dekodierte Bild.

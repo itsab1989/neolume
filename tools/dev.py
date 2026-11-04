@@ -26,7 +26,7 @@ import hashlib, argparse, datetime, http.server, ipaddress, json, os, re, sys, t
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST, LOADER, APP, LOGS = (os.path.join(ROOT, d) for d in ('dist', 'loader', 'app', 'logs'))
-APP_FILES = re.compile(r'^(app\.js|[A-Za-z0-9_-]+\.(png|gif))$')       # nur das, was der TV braucht
+APP_FILES = re.compile(r'^(app\.js|[A-Za-z0-9_-]+\.(png|gif)|i18n/[a-z]{2}\.js)$')       # nur das, was der TV braucht (i18n/<lang>.js: Sprachtabellen)
 LOG_MAX_REQ, LOG_MAX_FILE = 1 << 20, 5 << 20
 
 
@@ -180,6 +180,10 @@ def build(mac_ip, dev=True, icon=None, setup=None, readable=False, brand=None, a
         print('Paket: app.js = app/%s (%d KB)' % (src, os.path.getsize(os.path.join(APP, src)) // 1024))
         for f in sorted(os.listdir(APP)):          # Bilder der lokalen Rueckfall-Kopie
             if APP_FILES.match(f) and f != 'app.js': z.write(os.path.join(APP, f), f)
+        langs = sorted(os.listdir(os.path.join(APP, 'i18n'))) if os.path.isdir(os.path.join(APP, 'i18n')) else []
+        if not langs: sys.exit('app/i18n/ fehlt – zuerst "npm run build" (Sprachtabellen je Sprache)')
+        for f in langs:                            # Sprachtabellen (der TV laedt nur die aktive)
+            if APP_FILES.match('i18n/' + f): z.write(os.path.join(APP, 'i18n', f), 'i18n/' + f)
     # ACHTUNG: Der User-App-Sync des TVs ENTFERNT alle eigenen Apps, die nicht in dieser Liste stehen.
     # Deshalb stehen alle Apps aus local.json "extraApps" mit in der Liste.
     entries = [(brand['widgetId'], xml_text(brand['name']), pkg, os.path.getsize(out))]
