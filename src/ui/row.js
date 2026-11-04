@@ -40,7 +40,7 @@
     e.card = U.el('div', 'card card-land', s, 'display:none');
     e.ph = U.txt('div', 'ph', e.card, ''); e.phEl = e.ph.parentNode; e.phc = 'ph';
     e.img = U.el('img', '', e.card);
-    e.img.src = N.img.BLANK;
+    e.img.src = N.img.BLANK; e.img.pnCover = true;   // Bild fuellt die Karte ohne Verzerrung (N.img boxFit)
     e.badge = U.el('div', 'bdg', e.card);
     e.badgeT = document.createTextNode('');
     e.badge.appendChild(e.badgeT);

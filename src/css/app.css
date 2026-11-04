@@ -495,10 +495,12 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .scs-in.pm .scs-dim, .scs-tiles.pm i { display: none; }
 .scs-ov { position: absolute; left: 0; top: 0; z-index: 5; -webkit-transform: translate3d(0,0,0); }
 .scs-scr { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.scs-pc { position: absolute; left: 0; top: 0; background-repeat: no-repeat; }   /* Ambient: Abdunklung nach dem Text (SL.ambPieces) */
 .scs-blk { position: absolute; left: @l.safe-x@; bottom: 56px; width: 640px; }
 .scs-ov.r .scs-blk { left: auto; right: @l.safe-x@; text-align: right; } .scs-ov.t .scs-blk { bottom: auto; top: 56px; }
 .scs-ck { font-size: 72px; line-height: 80px; font-weight: 300; color: @c.text-1@; }
-.scs-ti { font-size: 28px; line-height: 36px; font-weight: 600; color: @c.text-1@; margin-top: 2px; }
+.scs-ti { font-size: 28px; line-height: 36px; font-weight: 600; color: @c.text-1@; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-ambient .scs-ti { max-height: 72px; white-space: normal; text-overflow: clip; word-wrap: break-word; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* lange Titel: 2 Zeilen, dann "…" */
 .scs-sb { font-size: @ty.title.size@; line-height: @ty.title.lh@; color: @c.text-soft@; }
 /* Klassisch: die bisherige Insel (Kasten 360 breit, 72 % deckend) */
 .st-classic .scs-blk { width: 320px; padding: 12px 20px 14px; border-radius: @r.xl@; background: @c.bg-72@; }

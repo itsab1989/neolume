@@ -8,7 +8,7 @@
  * nur mit Zeiger-Steuerung, Einstellung waehrend des Laufs an; Darstellung A Lasche = Standard, frueher 'loupe-panel'),
  * loupe-stretch / loupe-film (dasselbe in den anderen Darstellungen, SPEC PLAY-31; film misst nur mit Vorschaubildern des ersten Films den Filmstreifen, sonst das Panel), leak (Details Film/Serie, Bibliothek, Suche, Einstellungen, Musik, Player je Runde
  * oeffnen/schliessen, Standard 10 Runden, 'leak:20'; nur auf Wunsch: 'leak' bzw. 'all,leak'), saver-<uebergang> (nur auf Wunsch:
- * 'saver' bzw. Ziffern 9,8,4 = alle Uebergaenge mit Frame-Protokoll). */
+ * 'saver' bzw. Ziffern 9,8,4 = alle Uebergaenge mit Frame-Protokoll + saver-amb: 8 Info-Wechsel mit kurzem/langem Titel). */
 (function (N) {
   var U = N.util, BM = N.benchMath, GAP = 160, SEQ = ['9', '8', '7'], SEQ_MS = 4000;
   var run = null, seq = 0, seqT = 0, tm = null;
@@ -550,6 +550,31 @@
       });
     };
   });
+  /* Ambient-Abdunklung nach dem Text (04.11.): Schoner mit Stil Ambient, dann 8 Info-Wechsel im 1,5-s-Takt, abwechselnd kurzer und langer
+   * (2-zeiliger) Titel, jede Ecke zweimal; Frame-Messer ueber alles + je Wechsel die Zeit fuer Lage/Text/Messen/Stuecke (benchInfo) */
+  SAVERS.push('saver-amb');
+  S['saver-amb'] = function (done) {
+    var Sv = N.ui.saver, st = N.session.settings || {}, old = st.saverInfo, my = run, ms = { k: [], l: [] }, i = 0;
+    var X = [{ title: 'Glühwurm', sub: 'Film · 2021' }, { title: 'Die unglaublich lange Reise des kleinen Leuchtturmwärters bis ans Ende der Welt', sub: 'Film · 2021' }];
+    function end() { st.saverInfo = old; Sv.stop(); later(800, done); }
+    function stat(a) { var s = 0, m = 0; a.forEach(function (v) { s += v; m = Math.max(m, v); }); return a.length ? Math.round(s / a.length) + '/' + Math.round(m) : 'n/a'; }
+    st.saverInfo = 'ambient';
+    home();
+    later(1500, function () {
+      Sv.bench('cut', function (go) {
+        if (!go) { log('bench saver-amb: uebersprungen (kein Bild)'); end(); return; }
+        (function step() {
+          if (run !== my || my.stop || i >= 8) return;
+          (i % 2 ? ms.l : ms.k).push(Sv.benchInfo(X[i % 2])); i++;
+          later(1500, step);
+        })();
+        measureFor('saver-amb', 8 * 1500 + 500, function () {
+          log('bench saver-amb info (avg/max ms): short ' + stat(ms.k) + ', long ' + stat(ms.l) + ', img ' + JSON.stringify(N.img._stats()));
+          end();
+        });
+      });
+    });
+  };
   var NAMES = ['home', 'home-hero', 'home-M', 'home-S', 'lib-L', 'lib-M', 'lib-S', 'lib-list', 'details-movie', 'details-show', 'search', 'discover', 'player-osd', 'loupe', 'loupe-stretch', 'loupe-film', 'leak', 'xtab'].concat(CHUNKS, SAVERS, HVARS, RVARS);
 
   function waitHome(my, tries, fn) {

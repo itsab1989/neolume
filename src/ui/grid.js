@@ -34,7 +34,7 @@
     var e = {}, s = this.pg;
     e.card = U.el('div', this.cardCls || 'card', s, 'display:none');
     e.ph = U.txt('div', 'ph', e.card, ''); e.phEl = e.ph.parentNode; e.phc = 'ph';
-    e.img = U.el('img', '', e.card); e.img.src = N.img.BLANK;
+    e.img = U.el('img', '', e.card); e.img.src = N.img.BLANK; e.img.pnCover = true;   // ohne Verzerrung (N.img boxFit)
     e.badge = U.el('div', 'bdg', e.card); e.badgeT = document.createTextNode(''); e.badge.appendChild(e.badgeT);
     e.prog = U.el('div', 'prog', e.card); e.progI = U.el('i', '', e.prog);
     e.cap = U.el('div', this.capCls || 'cap', s, 'display:none');

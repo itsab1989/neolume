@@ -399,6 +399,54 @@ test('Seitenleiste: nach Klick auf einen Eintrag bleibt sie zu, auch wenn der Pu
   });
 });
 
+/* Nutzerbefund iPad 04.11. (Maus/Trackpad, "jumpy"), nur flexible Flaeche: Absicht vor dem Aufklappen, Frist vor dem Einklappen */
+test('Seitenleiste flexibel: Vorbeischiessen klappt nicht auf, Verweilen bzw. Bewegung nach links schon; knapp daneben erst nach der Frist zu', function () {
+  var ctx = H.load({ fakeTimers: true }), N = ctx.N, T = ctx.timers, R = N.ui.rail, seen = [];
+  N.router._reset(T.now);
+  N.ui.hints = { el: null, set: function () {}, refresh: function () {}, hit: function () { return null; } };
+  function el() { return { className: '', style: {} }; }
+  R.el = el(); R.panel = el(); R.dim = el(); R.att = 'home'; R.cur = 'home'; R.f = 0;
+  R.entries = [{ id: 'profile', y: 28, ni: el() }, { id: 'home', y: 112, ni: el() }, { id: 'lib-1', y: 168, ni: el() }, { id: 'settings', y: 636, ni: el() }];
+  N.app = { navigate: function () { return true; } };
+  N.router.define('x', function () { return { rail: 'home', flex: true, create: function () {}, onKey: function () { return true }, pointer: function (x, y, k) { seen.push(k + '@' + x); return true; } }; });
+  N.router.reset('x');
+  N.screen.flex = true; N.screen.safe = { t: 0, r: 0, b: 0, l: 0 }; N.screen.h = 720; N.screen.view = function () { return { x: 0, y: 0 }; };
+  var P = N.pointer;
+  function at(x, y, ms) { P.move(x, y); T.tick(ms === undefined ? 45 : ms); }   // Zeiger-Takt 40 ms
+  at(400, 300, 300);
+  // (1) auf dem Weg zum ersten Plakat 24 px in die Spalte und nach 60 ms zurueck: bleibt zu (TV/vorher: klappte sofort auf)
+  at(88, 300, 60); at(200, 300, 300);
+  assert.strictEqual(R.isOpen(), false, 'Vorbeischiessen klappt nicht auf');
+  // (2) in der Spalte verweilen: nach OPEN_DWELL auf
+  at(90, 300, R.OPEN_DWELL - 50);
+  assert.strictEqual(R.isOpen(), false, 'noch in der Absichts-Frist');
+  T.tick(60);
+  assert.strictEqual(R.isOpen(), true, 'nach ' + R.OPEN_DWELL + ' ms in der Spalte offen');
+  // (3) knapp neben das Panel und zurueck: bleibt offen, die Ansicht bekommt nichts
+  seen = [];
+  at(330, 300, 60); at(250, 300, 300);
+  assert.strictEqual(R.isOpen(), true, 'zurueck in der Frist: bleibt offen');
+  // (4) knapp daneben bleiben: nach GRACE zu, danach hebt der Zeiger die Ansicht an seiner Stelle hervor
+  at(340, 300, R.GRACE - 60);
+  assert.strictEqual(R.isOpen(), true, 'in der Frist offen');
+  T.tick(100);
+  assert.strictEqual(R.isOpen(), false, 'nach der Frist zu');
+  assert.ok(seen.indexOf('move@340') >= 0, 'Ansicht bekommt die Zeigerstelle: ' + seen.join(' '));
+  // (5) schnelle deutliche Bewegung nach links in der Spalte: sofort auf; weit hinaus: sofort zu
+  at(110, 300, 45); at(70, 300, 0);
+  assert.strictEqual(R.isOpen(), true, 'Bewegung nach links (' + R.OPEN_LEFT + ' px) klappt sofort auf');
+  T.tick(45); at(700, 300, 0);
+  assert.strictEqual(R.isOpen(), false, 'weit hinaus: sofort zu');
+  // (6) Flattern an der Kante der Spalte (104 <-> 120 alle 20 ms): kein Auf und Zu
+  T.tick(300);
+  for (var i = 0; i < 20; i++) at(i % 2 ? 120 : 104, 300, 20);
+  T.tick(10);
+  assert.strictEqual(R.isOpen(), false, 'Flattern an der Kante klappt nicht auf');
+  // (7) Klick in der Spalte wirkt sofort (wie bisher)
+  at(400, 300, 300); P.click(60, 190, null);
+  assert.strictEqual(R.isOpen(), false, 'Klick: Eintrag gewaehlt, Leiste zu');
+});
+
 /* Ziehen und Eingabeart (SPEC PLAY-34, Entscheidung Apple Nr. 14/15): der Bildschirm entscheidet ueber pointerGrab/pointerDrag */
 function dragRig() {
   var ctx = H.load({ fakeTimers: true }), N = ctx.N, T = ctx.timers;

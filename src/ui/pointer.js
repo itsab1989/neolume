@@ -107,11 +107,15 @@
     if (rail && rail.attached()) {
       var rx = rail.edge ? rail.edge() : 0;          // flexibel: Spalte neben dem linken Rand (Notch quer); TV 0
       if (rail.isOpen()) {
-        if (x < 320 + rx) return rail.pointer(x - rx, y, kind);
-        if (kind === 'move') rail.close();           // Punkt verlaesst das Panel -> einklappen, Fokus zurueck
+        if (x < 320 + rx) { rail.keep(); return rail.pointer(x - rx, y, kind); }
+        /* Punkt verlaesst das Panel -> einklappen, Fokus zurueck. Flexibel (Maus/Trackpad): knapp daneben erst nach einer kurzen
+         * Frist (rail.leave; zurueck ins Panel = bleibt offen), danach hebt der Zeiger die Ansicht unter sich hervor; ein Klick in
+         * der Frist klappt nur ein. TV: sofort wie bisher. */
+        if (kind === 'move') { if (rail.leave(x - rx, refollow)) return true; }
+        else if (rail.graceT) { rail.close(); return true; }
       } else if (x < 112 + rx && !slim && !(P.arrowsOn && arrowHit(x, y))) {
         return rail.pointer(x, y, kind);             // Punkt auf der Rail -> ausklappen
-      } else if (rail.rest) rail.away();             // Punkt hat die Icon-Spalte verlassen: Darueberfahren klappt wieder auf
+      } else if (rail.rest || rail.hov) rail.away(); // Punkt hat die Icon-Spalte verlassen: Darueberfahren klappt wieder auf, Absicht verworfen
 
     }
     if (N.ui.mini && N.ui.mini.pointer(x, y, kind)) return true;   // M4: Mini-Player (Klick = Jetzt laeuft)
@@ -122,6 +126,8 @@
     o = stageOff(scr, false);
     return scr && scr.pointer ? scr.pointer(sx(o, x), sy(o, y), kind, target) : false;
   }
+  /* nach dem verzoegerten Einklappen der Seitenleiste: Treffer an der letzten Zeigerstelle neu (wie eine Bewegung) */
+  function refollow() { if (P.on && P.x >= 0 && !owner()) { N.fx.step(true); route(P.x, P.y, 'move', null); } }
   function arrowHit(x, y) {
     var a = P.curArrows;
     if (!a || y < a.y || y >= a.y + a.h) return 0;

@@ -222,6 +222,8 @@
     if (R.open_ || !R.att) return;
     if (N.input && N.input.swipe) return;            // Nr. 22: ein Finger-Wisch (Pfeil vom Lader) schiebt den Fokus nie in die Seitenleiste
     R.open_ = true; R.rest = false;
+    hoverStop();
+    fxMark();
     var scr = N.router.top();
     if (scr && scr.railBlur) scr.railBlur();
     setF(at === undefined ? idx(R.cur) : at);
@@ -234,8 +236,10 @@
   };
   /* einklappen; silent = ohne Fokus-Rueckgabe (Bildschirmwechsel) */
   R.close = function (silent) {
+    hoverStop(); R.keep();
     if (!R.open_) return;
     R.open_ = false;
+    fxMark();
     U.cls(R.panel, 'open', false);
     U.cls(R.dim, 'on', false);
     U.cls(R.entries[R.f].ni, 'is-focus', false);
@@ -276,6 +280,7 @@
     if (hit < 0 && kind !== 'click' && N.screen && N.screen.flex) hit = R.hitY(y, true);
     else if (ar) return true;                         // Pfeil-Band ohne Eintrag (TV gibt es nicht)
     if (hit < 0) return false;
+    if (!R.open_ && soft() && kind !== 'click' && !(R.rest && !moved(x, y))) return intent(x, y);   // Maus/Trackpad: Absicht abwarten
     if (!R.open_ && R.rest && kind !== 'click') {
       /* flexibel (Befund K 03.11.: "klappt nach einem Klick nicht wieder auf"): Darueberfahren klappt wieder auf, sobald der Zeiger in
        * der Spalte deutlich weiterbewegt wurde (24 px seit dem Klick) – ein Zittern direkt nach dem Klick (Grund fuer R.rest, Befund
@@ -288,7 +293,52 @@
     if (kind === 'click') { R.activate(hit); R.rest = true; R.restAt = { x: x, y: y }; }
     return true;
   };
-  R.away = function () { R.rest = false; };
+  R.away = function () { R.rest = false; hoverStop(); };
+  /* ---- Maus/Trackpad (nur flexibel, Nutzerbefund iPad 04.11.: "fuehlt sich jumpy an"): ruhig wie macOS/iPadOS ----
+   * Gemessen (platforms/apple/tools/railhover.js): die Leiste klappte beim ersten Ereignis in der Spalte auf (5 ms) und beim ersten
+   * Ereignis neben dem Panel zu (1 ms) – 10 pt zu weit und zurueck hiess zu und nicht wieder auf; der Fokusring der Ansicht
+   * verschwand bzw. erschien im ersten Bild, waehrend Panel und Abdunklung noch glitten. Jetzt:
+   * - Absicht beim Aufklappen: erst nach OPEN_DWELL ms in der Spalte (Vorbeischiessen auf dem Weg zum ersten Plakat klappt nicht
+   *   auf), sofort bei deutlicher Bewegung nach links in der Spalte (OPEN_LEFT px seit dem Eintritt) – das ist der klare Wunsch.
+   * - Schliessen: neben dem Panel erst nach GRACE ms (zurueck ins Panel = bleibt offen); weiter als FAR px daneben sofort.
+   * - Ring und Abdunklung blenden mit (Klasse rail-fx am body, CSS platforms/apple/loader/flex.css), Kurven/Dauern dort.
+   * TV (Smart-Control-Zeiger): unveraendert sofort auf/zu, soft() ist dort nie wahr. */
+  var OPEN_DWELL = 120, OPEN_LEFT = 32, GRACE = 160, FAR = 96, FX_MS = 260;
+  R.OPEN_DWELL = OPEN_DWELL; R.OPEN_LEFT = OPEN_LEFT; R.GRACE = GRACE; R.FAR = FAR;
+  function soft() { return !!(N.screen && N.screen.flex); }
+  function moved(x, y) { var rp = R.restAt; return !!(rp && (Math.abs(y - rp.y) >= 24 || Math.abs(x - rp.x) >= 24)); }
+  R.hov = null;                                       // {x, y, t: Zeitgeber} seit dem Eintritt in die Spalte
+  function hoverStop() { if (R.hov && R.hov.t) clearTimeout(R.hov.t); R.hov = null; }
+  function intent(x, y) {
+    var h = R.hov;
+    if (R.rest) R.rest = false;                        // nach einem Klick deutlich weiterbewegt (24 px): wieder wie Eintritt
+    if (!h) {
+      h = R.hov = { x0: x, x: x, y: y, t: 0 };
+      h.t = setTimeout(function () { if (R.hov === h) { R.hov = null; openAt(h.y); } }, OPEN_DWELL);
+      return true;
+    }
+    h.x = x; h.y = y;
+    if (h.x0 - x >= OPEN_LEFT) { hoverStop(); openAt(y); }
+    return true;
+  }
+  function openAt(y) { if (R.open_ || (N.router.hasOverlay && N.router.hasOverlay())) return; var hit = R.hitY(y, true); if (hit >= 0) R.open(hit); }   // inzwischen Dialog offen: nichts
+  /* Zeiger neben dem offenen Panel (x in Leisten-Koordinaten). done: nach dem verzoegerten Schliessen (Zeiger hebt die Ansicht
+   * unter sich wieder hervor). -> true = Ereignis verbraucht (Panel bleibt in der Frist offen), false = zu, Ansicht bekommt es */
+  R.leave = function (x, done) {
+    if (!soft() || x >= NAV_W + FAR) { R.close(); return false; }
+    if (!R.graceT) R.graceT = setTimeout(function () { R.graceT = 0; if (R.open_) { R.close(); if (done) done(); } }, GRACE);
+    return true;
+  };
+  /* Zeiger wieder ueber dem Panel: Frist aufheben */
+  R.keep = function () { if (R.graceT) { clearTimeout(R.graceT); R.graceT = 0; } };
+  R.graceT = 0;
+  var fxT = 0;
+  function fxMark() {
+    if (!soft() || typeof document === 'undefined' || !document.body) return;
+    U.cls(document.body, 'rail-fx', true);
+    if (fxT) clearTimeout(fxT);
+    fxT = setTimeout(function () { fxT = 0; U.cls(document.body, 'rail-fx', false); }, FX_MS);
+  }
   /* Eintrag unter y (Leisten-Koordinaten, ohne oberen Rand): genau (Kasten 48 hoch) oder near = der naechste sichtbare (Mitte);
    * flach zaehlen rollende Eintraege nur im Ausschnitt ctop..clip, "Einstellungen" steht fest. -1 = keiner */
   R.hitY = function (y, near) {

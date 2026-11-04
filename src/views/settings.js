@@ -8,7 +8,7 @@
  * dem Finger und laeuft frei aus (N.kinetic, kein Einrasten – Nr. 18; Gummiband an den Enden), der Fokus bleibt; Wischen ueber den Kategorien tut nichts. Nur Tippen setzt
  * den Fokus. Ein Tipper in den laufenden Schwung haelt ihn an (kein Klick). */
 (function (N) {
-  var U = N.util, CAT_Y = 112, CAT_STEP = 56, ROW_Y = 112, ROW_STEP = 64;
+  var U = N.util, CAT_Y = 112, CAT_STEP = 56, ROW_Y = 112, ROW_STEP = 64, CAT_MORE = 32;   // CAT_MORE: Band fuer ▼ unter rollenden Kategorien
   N.router.define('settings', function (params) {
     var s = { rail: 'settings', wheelKeys: ['UP', 'DOWN'], flex: true };
     /* flexible Flaeche (N.screen, nur Apple): die Liste nutzt die Hoehe – je 64 px mehr eine Zeile mehr (TV: 6 Zeilen).
@@ -24,7 +24,7 @@
     var fl = null;                                       // freies Scrollen (nur caps.scroll 'free'): gemeinsame Hilfe N.ui.freeList
     /* Kategorien rollen (nur flexibel, Nutzerbefund 03.11.: "Hauptauswahl unten abgeschnitten"): Behaelter catIn in einem Ausschnitt
      * ab CAT_Y - 8 bis 16 ueber dem unteren Rand; fc = eigene freie Liste, catMax = Rollweite (0 = passt). Am TV nichts davon. */
-    var catIn = null, fc = null, catMax = 0, CAT_TOP = CAT_Y - 8, catVis = VA.h - CAT_TOP - 72 - (N.screen.flex && N.screen.nav() !== 'tabs' ? N.screen.safe.b : 0), pz = null;   // ueber Hinweisleiste und Home-Indikator
+    var catIn = null, fc = null, catMax = 0, catMore = null, CAT_TOP = CAT_Y - 8, catVis = VA.h - CAT_TOP - 72 - (N.screen.flex && N.screen.nav() !== 'tabs' ? N.screen.safe.b : 0), pz = null;   // ueber Hinweisleiste und Home-Indikator
     function st() { return N.session; }
     /* Zahl der eingeschalteten Reihen (aus Einstellung + bekannten Bibliotheken/Katalog) */
     function homeCount() {
@@ -493,9 +493,12 @@
       if (N.screen.flex) {
         var cc = U.el('div', 'set-cc', root, 'position:absolute;left:0;top:' + CAT_TOP + 'px;width:100%;height:' + catVis + 'px;overflow:hidden');
         cp = catIn = U.el('div', 'set-ci', cc, 'position:absolute;left:0;top:' + (-CAT_TOP) + 'px;width:100%;height:0');
-        catMax = Math.max(0, CAT_Y + cats.length * CAT_STEP - CAT_STEP + 48 + 8 - (CAT_TOP + catVis));
-        if (catMax > 0) catIn.setAttribute('data-scroll', '1');
+        function catOver() { return Math.max(0, CAT_Y + cats.length * CAT_STEP - CAT_STEP + 48 + 8 - (CAT_TOP + catVis)); }
+        catMax = catOver();
+        /* rollt die Liste: unten ein eigenes Band fuer den Mehr-Pfeil (wie unter der Zeilenliste), die letzte Kategorie endet darueber */
+        if (catMax > 0) { catVis -= CAT_MORE; cc.style.height = catVis + 'px'; catMax = catOver(); catIn.setAttribute('data-scroll', '1'); }
         fc = N.ui.freeList({ el: catIn, max: function () { return catMax; }, dim: catVis,
+          onSet: function (p) { if (catMore) catMore.set(p > 0.5, p < catMax - 0.5); },
           hit: function (x, y) { return catMax > 0 && y >= CAT_TOP && (STACK ? zone !== 'row' && x >= RX - 24 && x < RX + LW + 24 : x >= 144 && x < 444); } });
       }
       for (var i = 0; i < cats.length; i++) {
@@ -529,6 +532,13 @@
        * ueber der ersten Zeile, ▼ zwischen Liste (bis y 496) und Beschreibung (ab y 528), mittig ueber der Liste */
       var mx = STACK ? 144 + Math.round(LW / 2) - 10 : 818;
       more = N.ui.more(root, 'left:' + mx + 'px;top:84px', 'left:' + mx + 'px;top:' + (498 + DY) + 'px');
+      /* Mehr-Hinweis der Kategorien (Nutzerbefund 04.11.: kleine Fenster, erste Ebene ohne Pfeile): nur wenn sie rollen; ▲ ueber der
+       * ersten Kategorie, ▼ im Band unter der Liste, mittig ueber der Spalte */
+      if (fc && catMax > 0) {
+        var cx = STACK ? mx : 144 + 140 - 10;
+        catMore = N.ui.more(root, 'left:' + cx + 'px;top:84px', 'left:' + cx + 'px;top:' + (CAT_TOP + catVis + 2) + 'px');
+        catMore.set(false, true);
+      }
     };
     /* schmal (STACK): nur die Seite der Zone zeigen – Kategorien oder die Zeilen einer Kategorie (mit Zurueck und ihrem Namen) */
     function page() {
@@ -537,6 +547,7 @@
       for (var i = 0; i < catEls.length; i++) U.show(catEls[i], !rowsOn);
       U.show(s.clipEl, rowsOn); U.show(desc.parentNode, rowsOn); U.show(bk, rowsOn);
       if (!rowsOn) more.set(false, false);
+      if (catMore) { if (rowsOn) catMore.set(false, false); else catMore.set(cy() > 0.5, cy() < catMax - 0.5); }
       var t = rowsOn ? N.t('set.cat.' + cats[c].id) : N.t('set.title');
       titleT.parentNode.style.left = rowsOn ? '208px' : '144px';
       titleT.parentNode.style.width = (rowsOn ? LW - 64 : LW) + 'px';
@@ -572,6 +583,7 @@
       if (y - p < CAT_TOP + 8) p = y - CAT_TOP - 8; else if (y + 48 - p > CAT_TOP + catVis - 8) p = y + 56 - CAT_TOP - catVis;
       p = Math.max(0, Math.min(catMax, p));
       fc.keys(); fc.sync(p); U.tf(catIn, 0, -p);
+      if (catMore && (!STACK || zone !== 'row')) catMore.set(p > 0.5, p < catMax - 0.5);
     }
     function cy() { return fc ? fc.px : 0; }             // gerollte Kategorien (sonst 0)
     /* An den Anfang (App.scrollTop, Tipp ganz oben / Cmd+Pfeil hoch): Zeilenliste gleitet nach oben (N.ui.freeList.top) */
@@ -614,13 +626,15 @@
       N.ui.infotip.open({ title: N.t('set.cat.' + cats[i].id), text: N.t(catKey(i)), x: TIP_CX, y: CAT_Y + i * CAT_STEP + 24 - cy(), flex: true, el: cTips[i] });
     }
     function descKey(d) { return d.disabled && d.disabled() && d.ddesc ? (typeof d.ddesc === 'function' ? d.ddesc() : d.ddesc) : d.desc; }
-    function focusCat(i) {
+    /* still: Zeiger (Hover, auch nach dem Rollen unter dem stehenden Zeiger) – die Liste laeuft nicht unter dem Punkt weg (wie
+     * focusRow; Nutzerbefund 04.11.: Kategorien sprangen beim Ueberfahren, Rollen ging nicht) */
+    function focusCat(i, still) {
       if (zone === 'row') U.cls(rowEls[r].el, 'is-focus', false);
       U.cls(catEls[c], 'is-focus', false);
       if (i !== c) showCat(i);
       zone = 'cat';
       U.cls(catEls[c], 'is-focus', true);
-      catReveal(c);
+      if (!still) catReveal(c);
       setDesc();
       page();
     }
@@ -681,7 +695,7 @@
         if (tip && cTips[i] && x >= 376) { N.ui.infotip.hover(cTips[i]); if (kind === 'click') catTip(i); return true; }
         N.ui.infotip.hover(null);
         if (x >= 424) return false;
-        if (zone !== 'cat' || i !== c) focusCat(i);
+        if (zone !== 'cat' || i !== c) focusCat(i, true);
         return true;
       }
       if (x >= 464 && x < (tip ? 1216 : 1200)) {
@@ -712,7 +726,7 @@
         if (i < 0) { N.ui.infotip.hover(null); return false; }
         if (tip && cTips[i] && x >= RX + LW - 64) { N.ui.infotip.hover(cTips[i]); if (kind === 'click') catTip(i); return true; }
         N.ui.infotip.hover(null);
-        if (i !== c) focusCat(i); else if (zone !== 'cat') focusCat(i);
+        if (i !== c || zone !== 'cat') focusCat(i, true);
         if (kind === 'click') focusRow(0);                // Tipp oeffnet die Kategorie
         return true;
       }

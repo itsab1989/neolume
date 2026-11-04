@@ -95,6 +95,16 @@ function gradPng(w, h, f) {
   }
   return writePng(w, h, px);
 }
+/* Plakat in falschem Seitenverhaeltnis (Seed wideCover): Kreis mittig auf Grund -> verzerrt waere er eine Ellipse, beschnitten bleibt
+ * er rund (der PMS liefert mit minSize=1 das Bild mindestens so gross wie angefragt, schneidet aber nicht zu) */
+function ringPng(w, h, rgb) {
+  var px = Buffer.alloc(w * h * 4), r = Math.min(w, h) * 0.3, cx = w / 2, cy = h / 2;
+  for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+    var d = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy)), on = d < r && d > r * 0.7, o = (y * w + x) * 4;
+    px[o] = on ? 245 : rgb[0]; px[o + 1] = on ? 245 : rgb[1]; px[o + 2] = on ? 240 : rgb[2]; px[o + 3] = 255;
+  }
+  return writePng(w, h, px);
+}
 function solidPng(w, h, rgb) { var px = Buffer.alloc(w * h * 4); for (var i = 0; i < w * h; i++) { px[i * 4] = rgb[0]; px[i * 4 + 1] = rgb[1]; px[i * 4 + 2] = rgb[2]; px[i * 4 + 3] = 255; } return writePng(w, h, px); }
 
 /* reiner Vergleich (auch fuer Tests): -> {diff, ratio, mask(px)} */
@@ -333,6 +343,11 @@ function helperRoute(p, q) {
 function inspHubs(lib) {
   function h(id, ctx, type, list) { return { hubIdentifier: id, context: 'hub.' + ctx, type: type, title: id, size: list.length, Metadata: list }; }
   var L = LIB[lib] || [];
+  if (lib === '1' && curSeed === 'wideCover') {   // Nutzerbefund iPad 04.11.: Plakat in anderem Seitenverhaeltnis (erfundene Titel)
+    var T = JSON.parse(JSON.stringify(L.slice(2, 12)));
+    T[1].thumb = '/t/wide' + T[1].ratingKey; T[2].thumb = '/t/tall' + T[2].ratingKey;
+    return { MediaContainer: { size: 1, Hub: [h('movie.topunwatched.1', 'movie.topunwatched', 'movie', T)] } };
+  }
   if (lib === '1') return { MediaContainer: { size: 2, Hub: [h('movie.topunwatched.1', 'movie.topunwatched', 'movie', L.slice(2, 12)), h('movie.recentlyreleased.1', 'movie.recentlyreleased', 'movie', L.slice(8, 16))] } };
   return { MediaContainer: { size: 3, Hub: [h('tv.startwatching.2', 'tv.startwatching', 'show', L.slice(4, 10)), h('tv.rediscover.2', 'tv.rediscover', 'show', L.slice(0, 3)),
     h('tv.toprated.2', 'tv.toprated', 'show', L.slice(1, 8))] } };
@@ -434,6 +449,7 @@ function startServer(cb) {
     if (p === '/photo/:/transcode') {
       var w = Math.min(1280, Number(u.searchParams.get('width')) || 100), h = Math.min(720, Number(u.searchParams.get('height')) || 100);
       var src = u.searchParams.get('url') || '';
+      if (/^\/t\/(wide|tall)/.test(src)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(/wide/.test(src) ? ringPng(Math.min(1280, Math.round(h * 1.6)), h, [70, 90, 150]) : ringPng(w, Math.round(w * 2), [150, 80, 70])); }
       // SAV-5 (Seeds svPic*): Poster als buntes Bild im Plakat-Format 2:3 (unscharf: wie am PMS abgedunkelt) – kein zweifarbiges
       // Ersatzbild, dessen harte Mittelkante im Schoner wie ein Fehler aussieht; Hintergrundbilder: ungerade rk = Standbild (unruhig), gerade = echt
       if (/^svPic/.test(curSeed) && /^\/t\//.test(src)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(gradPng(w, Math.round(w * 1.5), function (c) { return darken(c, u.searchParams); })); }
@@ -469,6 +485,9 @@ function startServer(cb) {
         pa.MediaContainer.librarySectionID = Number(ls[1]);
         pa.MediaContainer.Metadata = pa.MediaContainer.Metadata.map(function (m) { var c = JSON.parse(JSON.stringify(m)); delete c.librarySectionID; return c; });
         if (/^sv[A-Z].*Long/.test(curSeed)) pa.MediaContainer.Metadata.forEach(function (m) { m.title = 'Die unglaublich lange Reise des kleinen Leuchtturmwärters ' + m.title + ' bis ans Ende der Welt'; });
+        // Nutzerbefund 04.11. (Ambient-Abdunklung): kurzer Titel aus einem Wort, mittlerer Titel (~35 Zeichen, eine Zeile)
+        if (/^sv[A-Z].*Short/.test(curSeed)) pa.MediaContainer.Metadata.forEach(function (m) { m.title = 'Glühwurm'; });
+        if (/^sv[A-Z].*Mid/.test(curSeed)) pa.MediaContainer.Metadata.forEach(function (m) { m.title = 'Die Prinzessin und die sieben Raben'; });
         if (/^svPic/.test(curSeed)) pa.MediaContainer.Metadata.forEach(function (m) { if (m.art) m.art = '/library/metadata/' + m.ratingKey + '/art/1'; });   // SAV-5: PMS-Pfade
         if (q.get('addedAt>>') !== null) return json(newsItems(ls[1], q));   // HOME-13: neu seit dem gemerkten Stand
         return json(pa);
@@ -599,6 +618,7 @@ function makeSeeds(port) {
   seeds.home = seed(); seeds.en = seed({ lang: 'en' }); seeds.login = seed({ account: null });
   // Norwegisch (Nutzerwunsch 03.11.): Hauptansichten mit Suffix -nb; nbAbc = Filme mit erfundenen Titeln auf Æ Ø Å (A–Z-Leiste)
   seeds.nb = seed({ lang: 'nb' }); seeds.loginNb = seed({ account: null, lang: 'nb' }); seeds.nbAbc = seed({ lang: 'nb' });
+  seeds.wideCover = seed();   // Entdecken: Plakat breiter bzw. schmaler als 2:3 (Nutzerbefund iPad 04.11.)
   seeds.longLib = seed(); seeds.longLibEn = seed({ lang: 'en' });   // F25: lange Bibliotheksnamen
   seeds.multi = seed({ users: multi, lastProfile: 'bbbb2222', pinSwitch: false });
   // Startseite angepasst: Server-Hub zuerst, Weiterschauen aus
@@ -742,6 +762,13 @@ function makeSeeds(port) {
         JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, saverMs: 1500, saverPos: k }));
     });
   });
+  // Ambient auf hellem Bild (Nutzerbefund 04.11.: Abdunklung zu breit): kurzer/mittlerer/langer Titel in verschiedenen Ecken
+  [['svBrightAmbientShort', 0], ['svBrightAmbientShortPos2', 2], ['svBrightAmbientMidPos1', 1], ['svBrightAmbientMidPos3', 3], ['svBrightAmbientLongPos1', 1], ['svBrightAmbientLongPos3', 3]].forEach(function (v) {
+    seeds[v[0]] = seed({}, { 'settings-aaaa1111.json': { saverInfo: 'ambient', saverLibs: [1], saverFx: 'cut' } },
+      JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, saverMs: 1500, saverPos: v[1] }));
+  });
+  seeds.svBrightNoclockShortPos2 = seed({}, { 'settings-aaaa1111.json': { saverInfo: 'ambient', saverLibs: [1], saverFx: 'cut', clock: false } },
+    JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, saverMs: 1500, saverPos: 2 }));
   seeds.svBrightNoclockLongEn = seed({ lang: 'en' }, { 'settings-aaaa1111.json': { saverInfo: 'ambient', saverLibs: [1], saverFx: 'cut', clock: false } }, svCfg);
   seeds.svBusyOff = seed({}, { 'settings-aaaa1111.json': { saverInfo: 'off', saverLibs: [1], saverFx: 'cut' } }, svCfg);
   seeds.svDarkFade = seed({}, { 'settings-aaaa1111.json': { saverLibs: [1] } }, svCfg);   // Standard: Ueberblenden + Ambient
@@ -893,6 +920,7 @@ var SCENES = [
   { name: 'p4-discover-recent', seed: 'recent8', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT' },
   { name: 'p4-discover', seed: 'home', keys: 'LEFT,UP,ENTER,wait800' },
   { name: 'p4-discover-rail', seed: 'home', keys: 'LEFT,UP' },
+  { name: 'p4-discover-cover', seed: 'wideCover', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,wait800' },   // Plakat 2. breiter, 3. schmaler als 2:3: mittig beschnitten, Kreis bleibt rund
   { name: 'p4-discover-ptr', seed: 'ptrHold', keys: 'LEFT,UP,ENTER,wait1500', mwait: 5200, moves: '800:300,800:320,800:470,801:472' },   // Zeiger auf der zweiten Reihe: kein Rollen
   { name: 'p4-discover-results', seed: 'home', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT' },
   { name: 'p4-discover-ext', seed: 'home', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN' },
@@ -1000,6 +1028,11 @@ var SCENES = [
   { name: 'p5-welcome', seed: 'welcome', keys: 'wait3500' },
   { name: 'p5-saver', seed: 'saver', keys: 'wait6000' },
   { name: 'saver-noclock-bright-en', seed: 'svBrightNoclockLongEn', keys: 'wait6000' },   // "Uhrzeit anzeigen" aus: nur Titel + Zeile
+  { name: 'saver-noclock-bright-short-pos2', seed: 'svBrightNoclockShortPos2', keys: 'wait6000' },
+  // Ambient auf hellem Bild (Nutzerbefund 04.11.): Abdunklung so breit wie Uhr bzw. Titel, lange Titel auf 2 Zeilen
+  { name: 'saver-ambient-bright-short', seed: 'svBrightAmbientShort', keys: 'wait6000' }, { name: 'saver-ambient-bright-short-pos2', seed: 'svBrightAmbientShortPos2', keys: 'wait6000' },
+  { name: 'saver-ambient-bright-mid-pos1', seed: 'svBrightAmbientMidPos1', keys: 'wait6000' }, { name: 'saver-ambient-bright-mid-pos3', seed: 'svBrightAmbientMidPos3', keys: 'wait6000' },
+  { name: 'saver-ambient-bright-long-pos1', seed: 'svBrightAmbientLongPos1', keys: 'wait6000' }, { name: 'saver-ambient-bright-long-pos3', seed: 'svBrightAmbientLongPos3', keys: 'wait6000' },
   { name: 'saver-off-busy', seed: 'svBusyOff', keys: 'wait6000' },
   { name: 'saver-fade-done', seed: 'svDarkFade', keys: 'wait7000' },                   // Standard (Ueberblenden) nach dem ersten Bild
   // Einstellungen: Schoner-Zeilen, Auswahl Uebergang/Einblendung, Mehrfachauswahl Bibliotheken

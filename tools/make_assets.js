@@ -107,7 +107,6 @@ if (process.argv.indexOf('--saver') >= 0) { saverScrims(); process.exit(0); }
  *   Uhr im Filmplakat) a >= 0,45 fuer 4,5:1 (vorher bis 0,8 – wirkte als dunkle Wolke). tests/saver.test.js prueft die Deckkraft
  *   der fertigen Bilder an den Textstellen. Glocken: [Mitte x, Mitte y, Halbachse x, Halbachse y] (Ecke: ab der Bildecke, y nach oben). */
 function scrimCfg() { return {   // als Funktion: --saver laeuft oben, bevor var-Zuweisungen hier ausgefuehrt sind
-  corner: { w: 1000, h: 460, peak: 0.7, k: 2.5, win: 90, g: [[0, 0, 420, 230], [420, 60, 300, 150]] },     // Ambient (Ecke unten links)
   minimal: { w: 420, h: 200, peak: 0.66, k: 3, win: 60, g: [[110, 72, 170, 78]] },                        // Nur kleine Uhr
   clock: { w: 1200, h: 600, peak: 0.62, k: 2, win: 90, g: [[480, 300, 230, 135], [720, 300, 230, 135]] },   // Grosse Uhr: zwei Glocken = flacher, kein Ei
   band: { w: 1280, h: 520, peak: 0.5, y1: 310 }                                                               // Leisten unten (s. scrimBand)
@@ -121,6 +120,19 @@ function scrimSoft(c, x, y, edges) {
   if (edges.l) w *= smoother(x / c.win); if (edges.r) w *= smoother((c.w - x) / c.win);
   if (edges.t) w *= smoother(y / c.win); if (edges.b) w *= smoother((c.h - y) / c.win);
   return c.peak * (1 - Math.exp(-c.k * f)) * w;
+}
+/* Ambient (Nutzerbefund 04.11.: der Eck-Schatten scrim-saver[-br|-tr|-tl].png reichte bei jedem Titel bis x ~950): weiche Stuecke
+ * hinter Uhr und Text, so lang wie die Zeilen – Form, Werte und Zusammensetzung siehe src/core/saverlogic.js AMB/ambPieces/ambField
+ * (von dort gelesen, eine Quelle). scrim-saver-a{u,d,c,z,z2}[-r].png, Alpha mit +-1/2 Stufe Rauschen. */
+function ambScrims(out) {
+  var N0 = {}; new Function('N', fs.readFileSync(path.join(ROOT, 'src', 'core', 'saverlogic.js'), 'utf8'))(N0);
+  var L = N0.saverLogic;
+  ['u', 'd', 'c', 'z', 'z2'].forEach(function (k) {
+    [false, true].forEach(function (r) {
+      var S = L.ambSize(k);
+      out(L.ambImg(k, r), S[0], S[1], function (x, y) { return L.ambField(k, r, x, y); });
+    });
+  });
 }
 /* Ecke unten links: x ab der Ecke nach rechts, yb ab der Unterkante nach oben; aussen liegen rechts (x = w) und oben (yb = h) */
 function scrimCorner(c, x, yb) { return scrimSoft(c, x, yb, { r: 1, b: 1 }); }
@@ -141,7 +153,8 @@ function saverScrims() {
   }
   /* Je Ecke ein fertig gespiegeltes Bild (unten links = ohne Zusatz, -br/-tr/-tl): keine CSS-Spiegelung (TV-Befund 28.10.: Luecke
    * zwischen Schatten und Rand in manchen Ecken). Minimal: eigene, kleine Bilder (-m…) in Anzeigegroesse 420x200 */
-  [['corner', 'scrim-saver'], ['minimal', 'scrim-saver-m']].forEach(function (k) {
+  ambScrims(out);
+  [['minimal', 'scrim-saver-m']].forEach(function (k) {
     var c = SAVER_SCRIM[k[0]], W = c.w, H = c.h;
     out(k[1] + '.png', W, H, function (x, y) { return scrimCorner(c, x, H - y); });
     out(k[1] + '-br.png', W, H, function (x, y) { return scrimCorner(c, W - x, H - y); });

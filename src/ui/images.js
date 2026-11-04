@@ -101,13 +101,34 @@
     st.left = c.x + 'px'; st.top = c.y + 'px'; st.width = c.w + 'px'; st.height = c.h + 'px';
   }
 
+  /* Kasten fuellen ohne Verzerrung (Nutzerbefund iPad 04.11.: ein Plakat in anderem Seitenverhaeltnis als 2:3 wirkte waagerecht
+   * gestaucht). Der PMS liefert mit minSize=1 das Bild mindestens so gross wie angefragt, schneidet aber NICHT zu (s. bg): ein
+   * breiteres Bild kam z. B. als 264 hoch und 300 breit und wurde per CSS auf 176x264 gezerrt. Nur <img> mit img.pnCover (Karten
+   * der Reihen/Raster, Plakat der Detailseite – Kasten = Bildstufe, die Karte schneidet mit overflow:hidden): steht das Bild um
+   * mehr als 1 px ueber, mittig beschnitten wie object-fit: cover (Lage/Groesse inline, Kasten aus width/height der Anfrage geteilt
+   * durch SCALE). Bilder im richtigen Format (alle ueblichen) bekommen keine Stilzuweisung -> am TV pixelgleich und ohne Kosten. */
+  var BOX_RE = /[?&]width=(\d+)&height=(\d+)/;
+  function boxFit(img, u, nw, nh) {
+    if (!img.pnCover) return;
+    var m = nw > 0 && nh > 0 ? BOX_RE.exec(u) : null, st = img.style;
+    if (m) {
+      var W = Math.round(m[1] / SCALE), H = Math.round(m[2] / SCALE), c = cover(nw, nh, W, H);
+      if (c.w - W > 1 || c.h - H > 1) {
+        st.left = c.x + 'px'; st.top = c.y + 'px'; st.width = c.w + 'px'; st.height = c.h + 'px'; img._pnFit = 1;
+        return;
+      }
+    }
+    unfit(img);
+  }
+  function unfit(img) { if (img._pnFit) { img._pnFit = 0; var st = img.style; st.left = st.top = st.width = st.height = ''; } }
+
   function detach(img) { img.onload = img.onerror = null; }
   /* Download fertig (losgeloest) bzw. LRU-Treffer -> ins sichtbare <img> (zaehlt ins Dekodier-Budget) */
   function show(job) {
     var img = job.img;
-    if (job.pre) { detach(job.pre); job.pre = null; }
+    if (job.pre) { if (!job.nw && job.pre.naturalWidth) { job.nw = job.pre.naturalWidth; job.nh = job.pre.naturalHeight; } detach(job.pre); job.pre = null; }
     if (DECODE && img.decoding !== 'async') img.decoding = 'async';
-    detach(img); img.src = job.url; img._pnUrl = job.url; img._pnJob = null; sets++;
+    detach(img); boxFit(img, job.url, job.nw, job.nh); img.src = job.url; img._pnUrl = job.url; img._pnJob = null; sets++;
     if (job.done) job.done(true);
   }
   /* FAST: fertig geladenes losgeloestes Bild vorab dekodieren, dann in die Liste der fertigen (Fehler beim Dekodieren: trotzdem) */
@@ -119,7 +140,8 @@
   function assign(job) {
     var img = job.img;
     if (lru.has(job.url)) {            // schon geladen: sofort (zaehlt ins Dekodier-Budget); FAST: erst vorab dekodieren
-      lru.get(job.url);
+      var sz = lru.get(job.url);       // [Breite, Hoehe] des geladenen Bildes (boxFit), 1 ohne Groesse
+      if (sz && sz.length) { job.nw = sz[0]; job.nh = sz[1]; }
       if (!DECODE || !(job.pre || (job.pre = mkPre()))) { show(job); return; }
     }
     active++;
@@ -127,7 +149,7 @@
     var pre = job.pre || (job.pre = mkPre());
     if (pre) {
       pre.onload = function () {
-        detach(pre); loads++; lru.set(job.url, 1);
+        detach(pre); loads++; job.nw = pre.naturalWidth || 0; job.nh = pre.naturalHeight || 0; lru.set(job.url, job.nw ? [job.nw, job.nh] : 1);
         decoded(job, pre, function () {
           if (job.pre !== pre) return;     // inzwischen verworfen (drop hat active schon heruntergezaehlt)
           active--;
@@ -149,7 +171,8 @@
       return;
     }
     img.onload = function () {
-      detach(img); active--; img._pnJob = null; lru.set(job.url, 1); loads++;
+      detach(img); active--; img._pnJob = null; loads++;
+      job.nw = img.naturalWidth || 0; job.nh = img.naturalHeight || 0; lru.set(job.url, job.nw ? [job.nw, job.nh] : 1); boxFit(img, job.url, job.nw, job.nh);
       if (job.done) job.done(true);
       kick();
     };
@@ -224,7 +247,7 @@
       if (old) {
         if (old.url === u) { old.prio = Math.min(old.prio, prio); old.done = done; return; }
         N.img.drop(img);
-      } else if (img._pnUrl && img._pnUrl !== u) { img.src = BLANK; img._pnUrl = null; }
+      } else if (img._pnUrl && img._pnUrl !== u) { img.src = BLANK; img._pnUrl = null; unfit(img); }
       var job = { img: img, url: u, prio: prio || 0, done: done, seq: seq++ };
       img._pnJob = job;
       jobs.push(job);
@@ -245,7 +268,7 @@
         }
         img._pnJob = null;
       }
-      if (img._pnUrl && !keep) { img.src = BLANK; img._pnUrl = null; }
+      if (img._pnUrl && !keep) { img.src = BLANK; img._pnUrl = null; unfit(img); }
     },
     pause: function (on) { paused = !!on; if (!paused) kick(); },
     /* Vorab-Dekodieren (s. Kopf): Dekodierer einmal anlegen (App-Start, Chrome-Ebene); warm(urls) ersetzt die Liste (wichtigste zuerst) */

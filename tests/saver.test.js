@@ -389,8 +389,8 @@ test('Einblendung buendig (TV-Befund 28.10.): jede Abdunklung erreicht die Raend
         var g = e === 'l' ? c.x : e === 'r' ? 1280 - c.x - c.w : e === 't' ? c.y : 720 - c.y - c.h;
         assert.strictEqual(g, 0, st + ' Lage ' + i + ': Luecke ' + g + ' px am Rand ' + e);
       });
-      if (c.scr && st !== 'bigclock') assert.ok(c.edge.length >= 2, st + ' Lage ' + i + ': Abdunklung muss am Rand liegen');
-      if (/^scrim-saver(-[bt][lr])?\.png$/.test(c.scr)) assert.strictEqual(c.scr, 'scrim-saver' + (c.r || c.t ? '-' + (c.t ? 't' : 'b') + (c.r ? 'r' : 'l') : '') + '.png');
+      if ((c.scr || c.amb) && st !== 'bigclock') assert.ok(c.edge.length >= 2, st + ' Lage ' + i + ': Abdunklung muss am Rand liegen');
+      if (c.amb) assert.ok(!c.scr && c.w === 1000 && c.h === 460, 'Ambient: Stuecke statt eines Eckbilds');
     }
   });
   var ty = {}; for (var i = 0; i < 4; i++) ty[L.info('lower', i).ty] = 1;
@@ -604,17 +604,13 @@ test('Schoner-Abdunklungen: Text auf weissem Bild >= 4,5:1, weich bis 0 an jedem
   }
   var T1 = 242, TS = 212;                                // text-1, text-soft
   ['', '-br', '-tr', '-tl'].forEach(function (s) {
-    var c = readPngAlpha(path.join(A, 'scrim-saver' + s + '.png')), m = readPngAlpha(path.join(A, 'scrim-saver-m' + s + '.png'));
+    var m = readPngAlpha(path.join(A, 'scrim-saver-m' + s + '.png'));
     function X(img, x) { return /r/.test(s) ? img.w - 1 - x : x; }
     function Y(img, yb) { return /t/.test(s) ? yb : img.h - 1 - yb; }
     function box(img, x0, yb0, x1, yb1, t) { var xa = X(img, x0), xb = X(img, x1), ya = Y(img, yb0), yb = Y(img, yb1);
       return minContrast(img, Math.min(xa, xb), Math.min(ya, yb), Math.max(xa, xb), Math.max(ya, yb), t); }
-    // Ambient: Block ab safe-x 64, 56 px vom Rand; Uhr bis x 230 und 202 hoch, Titel bis x 704, Zeile darunter (text-soft)
-    assert.ok(box(c, 64, 122, 230, 202, T1) >= 4.5, 'Ambient Uhr ' + s);
-    assert.ok(box(c, 64, 86, 704, 120, T1) >= 4.5, 'Ambient Titel ' + s);
-    assert.ok(box(c, 64, 56, 400, 84, TS) >= 4.5, 'Ambient Zeile ' + s);
     assert.ok(box(m, 64, 48, 160, 92, T1) >= 4.5, 'Nur kleine Uhr ' + s);
-    [c, m].forEach(function (img) {                       // aussen liegende Raender: 0 (hoechstens 1 Stufe Rauschen)
+    [m].forEach(function (img) {                       // aussen liegende Raender: 0 (hoechstens 1 Stufe Rauschen)
       for (var i = 0; i < img.h; i++) assert.ok(img.a(X(img, img.w - 1), i) <= 1 / 255, 'Rand seitlich ' + s);
       for (i = 0; i < img.w; i++) assert.ok(img.a(i, Y(img, img.h - 1)) <= 1 / 255, 'Rand oben/unten ' + s);
     });
@@ -643,9 +639,98 @@ test('Schoner-Abdunklungen: Text auf weissem Bild >= 4,5:1, weich bis 0 an jedem
   for (i = 0; i < k.w; i++) row.push([i, 300]);
   for (i = 0; i < k.h; i++) col.push([600, i]);
   smooth(k, row); smooth(k, col);
-  var c0 = readPngAlpha(path.join(A, 'scrim-saver.png')), diag = [];
-  for (i = 0; i < 460; i++) diag.push([Math.round(i * 999 / 459), 459 - i]);
-  smooth(c0, diag);
+});
+
+/* Ambient (Nutzerbefund 04.11.: die Abdunklung reichte bei jedem Titel weit ueber die Bildmitte, neben der Uhr unnoetig breit, lange Titel
+ * bis an ihren Rand): Glocken je Zeile (SL.ambPieces) aus den fertigen PNGs zusammengesetzt wie im Browser (senkrecht gestreckt, waagrecht
+ * beschnitten, 1 - (1-a1)(1-a2)…), fuer kurze/lange Uhr, kurze bis lange Titel auf 1 und 2 Zeilen, mit/ohne Uhr bzw. Zeile, in allen 4 Ecken.
+ * Masse wie app.css: Behaelter 1000 x 460, Block 64 px vom Seitenrand und 56 px vom Rand, Uhr 80 hoch, Titel 2 + 36 je Zeile, Zeile 28. */
+test('Schoner Ambient: Abdunklung folgt dem Text – lesbar auf Weiss, oben schmal, endet kurz hinter der Zeile, buendig, ohne Stufe', function () {
+  var path = require('path'), Adir = path.join(__dirname, '..', 'src', 'assets'), M = L.AMB, imgs = {};
+  function img(nm) { return imgs[nm] || (imgs[nm] = readPngAlpha(path.join(Adir, nm))); }
+  ['u', 'd', 'c', 'z', 'z2'].forEach(function (k) { [false, true].forEach(function (r) { var p = img(L.ambImg(k, r)); eq(L.ambSize(k), [p.w, p.h]); }); });
+  function lum(v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+  function con(a, text) { return (lum(text) + 0.05) / (lum(255 * 0.65 * (1 - a)) + 0.05); }   // weisses Bild nach saver-dim 0,35
+  var T1 = 242, TS = 212, W = 1000, H = 460, n = 0, TAIL = M.offt + M.hx.tail, worstNear = 0, worstC = 99;
+  function scene(r, t, wc, wt, lines, ws) {
+    var ck = null, ti = null, sb = null, y = t ? 56 : H - 56, rows = [], l, tb;
+    if (t) {
+      if (wc) { ck = { top: y }; y += 82; }
+      if (wt) { ti = { top: y, bot: y + 36 * lines }; y += 36 * lines; }
+      if (ws) { sb = { top: y, bot: y + 28 }; y += 28; }
+      tb = y;
+    } else {
+      tb = y;
+      if (ws) { y -= 28; sb = { top: y, bot: y + 28 }; }
+      if (wt) { y -= 36 * lines; ti = { top: y, bot: y + 36 * lines }; y -= 2; }
+      if (wc) ck = { top: y - 80 };
+    }
+    if (ck) { ck.e = 64 + wc; rows.push({ x1: ck.e, y0: ck.top + 14, y1: ck.top + 66, c: T1, n: 'Uhr' }); }
+    if (ti) { ti.e = 64 + wt; for (l = 0; l < lines; l++) rows.push({ x1: ti.e, y0: ti.top + 8 + 36 * l, y1: ti.top + 30 + 36 * l, c: T1, n: 'Titel' }); }
+    if (sb) { sb.e = 64 + ws; rows.push({ x1: sb.e, y0: sb.top + 6, y1: sb.top + 22, c: TS, n: 'Zeile' }); }
+    var ps = L.ambPieces({ w: W, h: H, r: r, t: t, ck: ck, ti: ti, sb: sb, tb: tb });
+    ps.forEach(function (p) {
+      var dh = Number(p.size.split(' ')[1].replace('px', ''));
+      assert.ok(p.w <= M.iw && p.img === L.ambImg(p.k, r) && p.size.indexOf(M.iw + 'px ') === 0, 'Stueck ' + JSON.stringify(p));
+      var o = p.k === 'd' ? p.h - dh : /px$/.test(p.pos) ? Number(p.pos.split(' ')[1].replace('px', '')) : 0;   // Lage des Bilds im Stueck
+      assert.ok(o <= 0 && o + dh >= p.h && p.y >= 0 && p.y + p.h <= H, 'Bild deckt das ganze Stueck, Stueck im Behaelter ' + JSON.stringify(p));
+      assert.ok(p.pos.indexOf(r ? 'left ' : 'right ') === 0 && (p.k === 'd' ? /bottom$/ : /(top|-\d+px)$/).test(p.pos), p.pos);
+      p.dh = dh; p.o = o;
+    });
+    /* Deckkraft an (x, y), x = Abstand vom Seitenrand; Bild senkrecht auf dh gestreckt, oben bzw. unten (d) buendig, waagrecht beschnitten */
+    function alpha(x, yy) {
+      var keep = 1;
+      ps.forEach(function (p) {
+        if (yy < p.y || yy >= p.y + p.h || x >= p.w) return;
+        var im = img(p.img), ix = r ? p.w - 1 - x : M.iw - p.w + x;
+        var iy = Math.min(im.h - 1, Math.max(0, Math.floor((yy - p.y - p.o + 0.5) * im.h / p.dh)));
+        keep *= 1 - im.a(ix, iy);
+      });
+      return 1 - keep;
+    }
+    var tag = (t ? 't' : 'b') + (r ? 'r' : 'l') + ' Uhr ' + wc + ' Titel ' + wt + '/' + lines + ' Zeile ' + ws, x, yy;
+    rows.forEach(function (q) {                           // jeder Buchstabe >= 4,5:1, bis ans Zeilenende (nie ueber den Rand der Abdunklung)
+      for (yy = q.y0; yy <= q.y1; yy += 2) for (x = 64; x <= q.x1; x += 4) {
+        var c = con(alpha(x, yy), q.c);
+        worstC = Math.min(worstC, c);
+        if (c < 4.5) assert.fail(tag + ': ' + q.n + ' bei x ' + x + ', y ' + yy + ' nur ' + c.toFixed(2) + ':1');
+      }
+    });
+    var eMax = Math.max(ck ? ck.e : 0, ti ? ti.e : 0, sb ? sb.e + M.offs : 0);
+    for (yy = 0; yy < H; yy += 3) assert.ok(alpha(Math.ceil(eMax + TAIL), yy) <= 1 / 255, tag + ': endet spaetestens ' + TAIL + ' px hinter dem Text');
+    if (ck && ti && wt - wc >= 300) {                     // oben schmal: neben der Uhr kaum Schatten, auch bei langem Titel
+      var far = alpha(ck.e + 120, ck.top + 30);
+      worstNear = Math.max(worstNear, far);
+      assert.ok(far <= 0.15, tag + ': neben der Uhr zu dunkel (' + far.toFixed(2) + ')');
+    }
+    var near = t ? ck || ti || sb : sb || ti || ck, edgeY = t ? 0 : H - 1;
+    rows.forEach(function (q) { for (yy = q.y0; yy <= q.y1; yy += 2) assert.ok(alpha(0, yy) >= alpha(64, yy) - 2 / 255, tag + ': Seitenrand y ' + yy); });   // bis an den Seitenrand
+    for (x = 0; x < near.e - 32; x += 8) assert.ok(alpha(x, edgeY) >= 0.4, tag + ': Bildschirmrand x ' + x + ' ' + alpha(x, edgeY).toFixed(2));
+    for (x = 0; x < W; x += 5) if (alpha(x, t ? H - 1 : 0) > 1 / 255) assert.fail(tag + ': gegenueberliegende Kante nicht 0');
+    /* keine Stufe: Steigung ueber 4 px hoechstens 3 Stufen je Pixel, von Pixel zu Pixel hoechstens 6 (bis zu 5 Bilder mit je +-1/2 Stufe Rauschen) */
+    function smooth(pts) {
+      var v = pts.map(function (q) { return alpha(q[0], q[1]) * 255; });
+      for (var j = 1; j < v.length; j++) {
+        if (Math.abs(v[j] - v[j - 1]) > 6) assert.fail(tag + ': Stufe bei ' + pts[j] + ' (' + Math.round(v[j] - v[j - 1]) + ')');
+        if (j >= 4 && Math.abs(v[j] - v[j - 4]) / 4 > 3) assert.fail(tag + ': zu steil bei ' + pts[j] + ' (' + ((v[j] - v[j - 4]) / 4).toFixed(1) + ' je px)');
+      }
+    }
+    var pts;
+    [32, 64 + (wc || 0) + 40, eMax + 20].forEach(function (cx) { pts = []; for (yy = 0; yy < H; yy++) pts.push([cx, yy]); smooth(pts); });
+    rows.concat([{ y0: edgeY, y1: edgeY }]).forEach(function (q) { pts = []; var cy = (q.y0 + q.y1) >> 1; for (x = 0; x < W; x++) pts.push([x, cy]); smooth(pts); });
+    n++;
+  }
+  [false, true].forEach(function (r) {
+    [false, true].forEach(function (t) {
+      [[166, 80, 1, 110], [166, 300, 1, 110], [166, 640, 1, 110], [166, 640, 2, 110], [240, 120, 1, 110], [140, 520, 2, 330], [166, 60, 1, 330]].forEach(function (v) { scene(r, t, v[0], v[1], v[2], v[3]); });
+      scene(r, t, 166, 0, 1, 0);                         // nur die Uhr (Nachtruhe, ohne Profil)
+      scene(r, t, 0, 400, 1, 110); scene(r, t, 0, 640, 2, 110);   // "Uhrzeit anzeigen" aus
+      scene(r, t, 166, 300, 1, 0);                       // Titel ohne Zeile
+    });
+  });
+  assert.strictEqual(n, 44);
+  if (process.env.PN_AMB_DEBUG) console.log('Ambient: schlechtester Kontrast ' + worstC.toFixed(2) + ':1, neben der Uhr hoechstens ' + worstNear.toFixed(3));
+  eq(L.ambPieces({ w: W, h: H, r: false, t: false, ck: null, ti: null, sb: null }), []);
 });
 
 test('Info-Block blendet erst ueber dem NEUEN Bild ein (TV-Test 29.10.: neuer Titel ueber dem alten Bild); Schnitt im selben Frame', function () {
@@ -720,7 +805,7 @@ test('Nachtruhe: nach der eingestellten Zeit keine Bilder mehr, beide Ebenen und
   assert.strictEqual(e.all('scs-tiles')[0].style.display, 'none');
   e.S._tiles().forEach(function (t) { assert.strictEqual(t.style.backgroundImage, 'none'); });
   var ti = e.all('scs-ti')[0];
-  assert.strictEqual(ti.style.display, 'none', 'kein Titel'); assert.strictEqual(ti.childNodes[0].nodeValue, '');
+  assert.strictEqual(ti.style.display, 'none', 'kein Titel'); assert.strictEqual(ti.childNodes[0].childNodes[0].nodeValue, '');
   assert.notStrictEqual(e.all('scs-ck')[0].style.display, 'none', 'Uhr bleibt');
   var ov = e.all('scs-ov')[0], pos = ov.style.webkitTransform;
   e.run(25000);
@@ -873,7 +958,7 @@ function pairCheck(set, cfg, loadMs, minutes, stillEvery, failEvery) {
   var ti = e.all('scs-ti')[0], ov = e.all('scs-ov')[0];
   for (var t = 0; t < minutes * 60000; t += 100) {
     T.tick(100); if (t % 1000 === 0) e.S._tick();
-    var st = e.S._state(), title = ti.childNodes[0].nodeValue, m = /Demo (\d+)/.exec(title || '');
+    var st = e.S._state(), title = ti.childNodes[0].childNodes[0].nodeValue, m = /Demo (\d+)/.exec(title || '');
     if (st.busy || !m || String(ov.style.opacity) !== '1') continue;
     /* wie der TV (Kamera 30.10.): z-index wird nicht beachtet, oben liegt die Ebene, die im DOM spaeter steht; ist sie durchsichtig
      * (Deckkraft 0), sieht man die darunter. Ebene = .scs-l, Bild darin .scs-img bzw. Plakat .scs-pst */

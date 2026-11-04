@@ -6,7 +6,7 @@
  *   echter Art, 1280x720 blur=8 quality=95 (Einstellung "Schoner-Bilder unscharf" aus: scharf). Ohne Profil nur die Uhr.
  * - Bildwechsel alle 10/20/30/60 s mit Uebergang (N.saverLogic.fx). Aufbau, alles nur waehrend der Schoner sichtbar ist:
  *   zwei gestapelte Bild-Ebenen (.scs-l Huelle: Clip + Vorhang, .scs-in: GPU-Ebene mit Bild + Abdunklung 0,35), oben der Info-Block
- *   (.scs-ov: Abdunklung scrim-saver.png + Uhr/Titel/Zeile, eine Ebene). Das naechste Bild laedt in die HINTERE Ebene (unter der
+ *   (.scs-ov: Abdunklung + Uhr/Titel/Zeile, eine Ebene; Ambient: Stuecke .scs-pc, die dem Text folgen, s. fitAmb). Das naechste Bild laedt in die HINTERE Ebene (unter der
  *   deckenden vorderen) und wird dort gezeichnet (= dekodiert), BEVOR der Uebergang startet; animiert werden nur opacity und
  *   -webkit-transform. Jalousie/Kacheln: 8 bzw. 6 Teil-Ebenen mit demselben Bild als Hintergrund (einmal angelegt, sonst unsichtbar).
  * - Info-Block wechselt die Ecke nur zusammen mit dem Bild (ausblenden, Ecke, mit dem neuen Bild einblenden) – gegen Einbrennen.
@@ -20,7 +20,7 @@
   var U = N.util, C = N.comfort, SL = N.saverLogic, TICK = 1000, SAVER_BLUR = 8, SAVER_Q = 95;   // weicher Schoner (s. url)
   var ID = 'translate3d(0,0,0)', OV_FADE = 400, SETTLE = 150, TILE_SETTLE = 400, INFO_SETTLE = 100, CLEAN_MS = 400, PREP_MS = 1500;
   var S = { on: false }, root = null, timer = 0, lastAct = 0, lastMin = '', homeT0 = 0, evOn = false;
-  var blk, hc, hcT, hcS, hcD, hcSt = '', hcDay = '', el, ov, scr, ck, ti, sb, tilesEl = null, tiles = [], Ls = [], f = 0;
+  var blk, hc, hcT, hcS, hcD, hcSt = '', hcDay = '', el, ov, scr, pcs = [], ck, ti, sb, ckD, tiD, sbD, tilesEl = null, tiles = [], Ls = [], f = 0;
   var kind = '', gen = 0, cyc = 0, nextAt = 0, ready = null, busy = false, loading = false, fails = 0, lastFx = '', lastDur = 0, hadPic = false;   // hadPic: schon ein Bild gezeigt (erstes kommt aus Schwarz)
   var homeItems = [], bag = null, noArt = false, force = null, onGo = null;
   /* Nachtruhe + Herzschlag (SAV-6): t0 = Start dieser Schoner-Sitzung, shown = gezeigte Bilder, hbAt = naechste Protokollzeile */
@@ -126,11 +126,14 @@
       Ls.push({ w: w, inn: inn, img: im, psh: psh, pst: pst, kb: '', pm: false });
     }
     tilesEl = U.el('div', 'scs-tiles', stg || el, 'display:none');
-    if (stg) N.evt.on('screen:resized', function () { if (!S.on) return; fitFlex(); ovSig = ''; place(); });   // Jalousie/Kacheln: Teile erst bei Bedarf
+    if (stg) N.evt.on('screen:resized', function () { if (!S.on) return; fitFlex(); ovSig = ''; place(); fitAmb(); });   // Jalousie/Kacheln: Teile erst bei Bedarf
     ov = U.el('div', 'scs-ov', el);
     scr = U.el('img', 'scs-scr', ov); scr.src = N.img.BLANK;
+    for (i = 0; i < 2; i++) pcs.push(U.el('div', 'scs-pc', ov, 'display:none'));   // Ambient: 2 Stuecke der Abdunklung (SL.ambPieces: Uhr, Text)
     blk = U.el('div', 'scs-blk', ov);
-    ck = U.txt('div', 'scs-ck', blk, ''); ti = U.txt('div', 'scs-ti ell', blk, ''); sb = U.txt('div', 'scs-sb ell', blk, '');
+    /* Text je Zeile in einem span: dessen Breite = Laenge der Zeile (fitAmb); ck/ti/sb sind die Textknoten, ckD/tiD/sbD die Zeilen */
+    ckD = U.el('div', 'scs-ck', blk); tiD = U.el('div', 'scs-ti', blk); sbD = U.el('div', 'scs-sb ell', blk);
+    ck = U.txt('span', '', ckD, ''); ti = U.txt('span', '', tiD, ''); sb = U.txt('span', '', sbD, '');
     if (root.addEventListener) {
       root.addEventListener('mousedown', onPointer, true); root.addEventListener('click', onPointer, true);
       root.addEventListener('mousemove', onPointer, true); root.addEventListener('mousewheel', onPointer, true);
@@ -490,6 +493,7 @@
   function pmSet(r) { pmNow = !!r.x.pm; pmCk = pmNow && r.comp && r.comp.ck || null; }
   function place() {
     var c = SL.info(setting('saverInfo', 'ambient'), cyc), ck0 = pmCk && c.style === 'bigclock' ? pmCk : null, dark = !!c.scr && !pmNow && !night;   // Nachtruhe: Schwarz, keine Abdunklung noetig
+    ovC = c; ovAmb = c.amb && !pmNow && !night;
     var cx = c.x, cy = c.y, cw = c.w, ch = c.h;
     if (stg) {                                            // flexibel: Ecke an den Raendern der Flaeche, hoechstens so gross wie sie
       var W = flexW(), H = flexH();
@@ -511,13 +515,42 @@
       blk.style.right = ck0 ? 'auto' : '';
     }
     tf(ov, 'translate3d(' + cx + 'px,' + cy + 'px,0)');
+    if (!ovAmb) for (var i = 0; i < pcs.length; i++) U.show(pcs[i], false);
+  }
+  /* Ambient: Abdunklung nach dem Text setzen (SL.ambPieces). Misst die Zeilen EINMAL nach dem Setzen des Texts – bei jedem Bildwechsel,
+   * waehrend die Einblendung unsichtbar ist und nichts laeuft (Schnitt: im selben Frame, dort bewegt sich nichts); nie im 1-s-Takt
+   * (die Uhr waechst dort hoechstens um eine Ziffer, off + Auslauf decken das). Kosten: ein Layout des kleinen Info-Blocks. */
+  var ovC = null, ovAmb = false, ambPre = null;
+  function rowOf(d, s, two) {
+    if (d.style.display === 'none' || !s.parentNode.offsetWidth) return null;
+    var w = two ? d.offsetWidth : Math.min(s.parentNode.offsetWidth, d.offsetWidth), x0 = blk.offsetLeft + d.offsetLeft;
+    return { e: ovC.r ? ov.offsetWidth - (x0 + d.offsetWidth) + w : x0 + w, top: blk.offsetTop + d.offsetTop, bot: blk.offsetTop + d.offsetTop + d.offsetHeight };
+  }
+  function fitAmb() {
+    var i, list = [];
+    if (ovAmb && ovC) {
+      var tsp = ti.parentNode, tiR = rowOf(tiD, ti, !!(tsp.getClientRects && tsp.getClientRects().length > 1)), sbR = rowOf(sbD, sb, false);   // Titel auf 2 Zeilen: so breit wie der Block
+      list = SL.ambPieces({ w: ov.offsetWidth, h: ov.offsetHeight, r: ovC.r, t: ovC.t, ck: rowOf(ckD, ck, false), ti: tiR, sb: sbR, tb: sbR ? sbR.bot : tiR ? tiR.bot : 0 });
+    }
+    for (i = 0; i < pcs.length; i++) {
+      var e = pcs[i], q = list[i];
+      U.show(e, !!q);
+      if (!q) continue;
+      var bg = 'url(' + N.assetBase + q.img + ')';
+      if (e._bg !== bg) { e._bg = bg; e.style.backgroundImage = bg; }
+      e.style.backgroundPosition = q.pos; e.style.webkitBackgroundSize = q.size; e.style.backgroundSize = q.size;
+      e.style.top = q.y + 'px'; e.style.height = q.h + 'px'; e.style.width = q.w + 'px';
+      e.style.left = ovC.r ? 'auto' : '0'; e.style.right = ovC.r ? '0' : 'auto';
+      e.setAttribute('data-layout-edge', q.edge.join(','));   // buendig an Seiten- bzw. Bildschirmrand (Layout-Pruefung)
+    }
   }
   function setInfo(x) {
     var p = SL.infoParts(setting('saverInfo', 'ambient'), clockOn(), night);
-    U.setText(ck, p.clock ? clockText() : ''); U.show(ck.parentNode, p.clock);   // ck/ti/sb sind Textknoten (nodeValue)
-    U.show(ti.parentNode, p.title); U.show(sb.parentNode, p.title);
+    U.setText(ck, p.clock ? clockText() : ''); U.show(ckD, p.clock);   // ck/ti/sb sind Textknoten (nodeValue)
+    U.show(tiD, p.title); U.show(sbD, p.title);
     if (x) { U.setText(ti, x.title || ''); U.setText(sb, x.sub || ''); }
     U.show(ov, p.any);
+    fitAmb();
   }
   /* ohne Bildwechsel (nur Uhr, Pause, Ladefehler): ausblenden, umsetzen, einblenden (mit Bild: run) */
   /* Plakat-Bild (Pause-Schoner, Ladefehler): Plakat und Schatten gehoeren zur Einblendung (Gruppe, SL.posterBox gegenueber dem
@@ -600,6 +633,10 @@
     U.show(el, true);
     if (kind === 'art') preParts(setting('saverFx', 'fade'));   // Teile-Ebenen jetzt (Schwarz), nicht im 1. Uebergang
     if (kind !== 'clock') for (var i = 0; i < 2; i++) Ls[i].psh.src = N.assetBase + SL.SHADOW.tall.f;   // Plakat-Schatten vorladen (unsichtbar)
+    if (SL.info(setting('saverInfo', 'ambient'), 0).amb && !ambPre && typeof Image !== 'undefined') {   // Ambient: Stuecke einmal vorladen (kommen mit dem Text, nie danach)
+      ambPre = [];
+      ['u', 'd', 'c', 'z', 'z2'].forEach(function (k) { [false, true].forEach(function (r) { var im = new Image(); im.src = N.assetBase + SL.ambImg(k, r); ambPre.push(im); }); });
+    }
     nextAt = 0;                                           // erstes Bild: sobald es da ist (aus Schwarz)
     if (!noArt) prepare(); else nextAt = now() + interval();
     N.log('Bildschirmschoner an (' + kind + ')');
@@ -633,6 +670,13 @@
       if (now() - t0 > 20000) { cb(null); return; }
       setTimeout(poll, 200);
     })();
+  };
+  /* Messlauf 'saver-amb' (dev/bench.js, Abdunklung nach dem Text, 04.11.): Info-Block mit Titel x an der naechsten Ecke neu setzen wie bei
+   * einem Bildwechsel (Lage, Text, Messen, Stuecke) und die Layout-Kosten erzwingen -> ms (JS + Layout; das Malen zaehlt der Frame-Messer) */
+  S.benchInfo = function (x) {
+    var t0 = now();
+    cyc++; place(); setInfo(x);
+    return ov.offsetWidth >= 0 ? now() - t0 : 0;
   };
   N.ui.saver = S;
 })(N);

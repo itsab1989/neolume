@@ -14,7 +14,7 @@
     this.bg = U.el('img', 'full', root); this.bg.src = N.img.BLANK; this.bg.style.visibility = 'hidden';
     var scrim = U.el('img', 'full', root); scrim.src = N.assetBase + (o.scrim || 'scrim-det.png');   // kraeftiger hinter dem Text (F5/F17; Kuenstler F24)
     this.pc = U.el('div', this.sq ? 'd-poster sq' : 'd-poster', root);
-    this.poster = U.el('img', '', this.pc); this.poster.src = N.img.BLANK;
+    this.poster = U.el('img', '', this.pc); this.poster.src = N.img.BLANK; this.poster.pnCover = true;
     this.pfb = U.el('div', 'd-pfb', this.pc, 'display:none'); this.pfbT = document.createTextNode(''); this.pfb.appendChild(this.pfbT);
   }
   var P = DetHero.prototype;

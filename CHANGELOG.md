@@ -5,6 +5,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.16] - 2026-11-04
+
+### Changed
+- **A calmer screensaver shadow.** In the Ambient style the darkening no longer sits as a big shadow over a whole corner
+  of the picture. It now lies softly just behind the clock and the title, as wide as the text itself, so more of the
+  picture stays bright. Long titles wrap onto two lines instead of running off.
+
+### Fixed
+- **Posters are never squashed.** A picture whose shape differs from its tile (for example in Discover) is now cropped
+  in the middle instead of being stretched or squeezed.
+
+If the screensaver now feels a little more like a picture frame, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.15] - 2026-11-04
 
 ### Fixed

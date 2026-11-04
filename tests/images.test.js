@@ -181,3 +181,34 @@ test('Vorab-Dekodieren (Runde 5): nur geladene Bilder, eines je Frame, nur in Ru
   N.img.reset();
   assert.strictEqual(dec.src, N.img.BLANK);
 });
+
+test('Karte: Bild in falschem Seitenverhaeltnis fuellt den Kasten mittig beschnitten, nie verzerrt (Nutzerbefund iPad 04.11.)', function () {
+  var s = setup(), N = s.N, T = s.T;
+  function Box() { Img.call(this); this.style = {}; this.pnCover = true; }
+  T.tick(1100);
+  // erfundenes Plakat, das der PMS (minSize=1, schneidet nicht zu) breiter als 2:3 liefert: 300 x 264 fuer den Kasten 176 x 264
+  var u = N.img.url('/library/metadata/901/thumb/1', 'poster'), a = new Box();
+  N.img.want(a, u, 0); T.tick(50);
+  a.naturalWidth = 300; a.naturalHeight = 264; a.onload();
+  H.eq(a.style, { left: '-62px', top: '0px', width: '300px', height: '264px' });
+  // 2:3 (der Normalfall, auch 1 px Rundung): keine Stilzuweisung, die CSS-Groesse gilt -> am TV pixelgleich
+  var b = new Box(), v = N.img.url('/library/metadata/902/thumb/1', 'poster');
+  N.img.want(b, v, 0); T.tick(50);
+  b.naturalWidth = 177; b.naturalHeight = 264; b.onload();
+  H.eq(b.style, {});
+  // Karte wird recycelt: neue Adresse -> Inline-Lage weg; LRU-Treffer des alten Bildes in einer anderen Karte kennt die Groesse
+  N.img.want(a, v, 0); T.tick(50);
+  H.eq(a.style, { left: '', top: '', width: '', height: '' });
+  var c = new Box(); N.img.want(c, u, 0); T.tick(50);
+  assert.strictEqual(c.src, u);
+  H.eq(c.style, { left: '-62px', top: '0px', width: '300px', height: '264px' });
+  // zu hohes Bild im Querformat-Kasten 288 x 162: oben/unten beschnitten
+  var d = new Box(), w = N.img.url('/library/metadata/903/thumb/1', 'land');
+  N.img.want(d, w, 0); T.tick(50);
+  d.naturalWidth = 288; d.naturalHeight = 432; d.onload();
+  H.eq(d.style, { left: '0px', top: '-135px', width: '288px', height: '432px' });
+  // ohne pnCover (Schoner, Profilbild …): nichts
+  var e = new Img(); e.style = {}; N.img.want(e, N.img.url('/x/1', 'poster'), 0); T.tick(50);
+  e.naturalWidth = 300; e.naturalHeight = 264; e.onload();
+  H.eq(e.style, {});
+});

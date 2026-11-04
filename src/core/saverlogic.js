@@ -33,8 +33,89 @@
   function miniScr(p) { return cornerScr(p).replace('scrim-saver', 'scrim-saver-m'); }
   function cornerEdge(p) { return [p.r ? 'r' : 'l', p.t ? 't' : 'b']; }
   var BAND_EDGE = ['l', 'r', 'b'], BAND_H = 520, BAND_Y = 720 - BAND_H;
+  /* Ambient: Abdunklung, die dem Text folgt (Nutzerbefund 04.11.: der alte Eck-Schatten scrim-saver[-br|-tr|-tl].png – zwei feste
+   * Glocken 420 x 230 um die Ecke und 300 x 150 entlang des Titels – reichte bei jedem Titel bis x ~950, weit ueber die Bildmitte; auf
+   * hellen Bildern stand eine dunkle Wolke neben der Uhr und neben kurzen Titeln, lange Titel reichten trotzdem bis an ihren Rand).
+   * Jetzt zwei weiche Stuecke: eins hinter der Uhr, so lang wie die Uhr, eins hinter Titel + Zeile, so lang wie die laengere der
+   * beiden (gemessen, einmal je Bildwechsel, solange die Einblendung unsichtbar ist – die TV-Schrift laeuft breiter als Inter, feste
+   * Breiten passen nie). Feld eines Stuecks F = hx(x) * v(y):
+   *  - waagrecht hx = a * 0,5 * erfc((x - xe) / s1) + (1 - a) * 0,5 * erfc((x - xe + c) / s2), xe = Zeilenende + off: zum Seitenrand hin
+   *    1, zum Zeilenende hin schon sanft heller (zweiter, langer Teil – sonst wirkt es wie eine dunkle Platte mit weichem Rand), hinter
+   *    der Zeile gaussartig auslaufend (nach ~150 px kaum noch, nach tail px 0; kein Ende, das man sieht);
+   *  - senkrecht v aus erfc-Kanten: aussen (ueber der Uhr, unter dem Text oben) weich mit so, zwischen Uhr und Titel blendet das
+   *    Uhr-Stueck mit 0,5 * erfc(+t) aus und das Text-Stueck mit 0,5 * erfc(-t) ein (sc), um DIESELBE Mitte -> Summe 1: links von
+   *    beiden bleibt das Feld gleichmaessig, rechts davon waechst die Breite weich von der Uhr zum Titel; untere Ecken bis an den
+   *    Bildschirmrand, obere vom Bildschirmrand an.
+   * Bild-Alpha a = 1 - e^(-k * F) -> uebereinander gemalt 1 - e^(-k * (F1 + F2)) = genau die Summe der Felder (tief im Block
+   * 1 - e^(-k) = 0,64, am Zeilenende ~0,45; keine Stufe, kein Kasten).
+   * Bilder je Seite (-r = rechte Ecken, fertig gespiegelt; waagrecht immer beschnitten, das Element zeigt nur den auslaufenden Teil):
+   *  u  oben weich (so), darunter konstant: untere Ecken bis an den unteren Rand; Titel unter der Uhr: senkrecht auf sc/so gestaucht
+   *     = Einblenden (eine gestauchte erfc-Kante bleibt eine)
+   *  d  oben konstant, unten weich (so): obere Ecken vom oberen Rand; Uhr ueber dem Titel: gestaucht = Ausblenden
+   *  c  Uhr in unteren Ecken: oben weich (so), unten Ausblenden (sc); feste Hoehe (die Uhrzeile ist immer 80 hoch)
+   *  z  Titel + Zeile in oberen Ecken: oben Einblenden (sc), unten weich (so); fuer zref (z2: zref2, Titel auf 2 Zeilen) px Abstand
+   *     gerechnet, senkrecht auf den echten Abstand gestreckt (Faktor ~0,9–1,1: passt auf wenige % genau zum Ausblenden der Uhr)
+   * Werte: hx = waagrechte Kurve (a, s1, s2, c, tail), sc/so = Weichheit Uebergang/aussen, offc/offt = off fuer Uhr/Text, offs =
+   * Zuschlag fuer die Zeile (text-soft braucht an ihrem Ende mehr Deckkraft), gck/gcb = Ziffern-Ober-/Unterkante in der Uhrzeile,
+   * xc = Mitte des Uebergangs unter der Oberkante der Uhrzeile, gti = Oberkante der Titelbuchstaben, gb = Mitte des unteren Auslaufs
+   * unter dem Text. Erzeugt von tools/make_assets.js (ambScrims, mit ambField), geprueft in tests/saver.test.js (Kontrast auf Weiss an
+   * jedem Buchstaben, Ende hinter der Zeile, oben schmal, buendig, keine Stufe). */
+  var AMB = { iw: 1100, k: 1.05, hx: { a: 0.72, s1: 75, s2: 200, c: 200, tail: 230 }, sc: 38, so: 60, offc: 52, offt: 60, offs: 36,
+    gck: 14, gcb: 66, xc: 77, gti: 8, gb: 18, zref: 100, zref2: 136, ihu: 420, ihd: 420 };
+  function erfc(x) {   // Abramowitz/Stegun 7.1.26 (Fehler < 1,5e-7)
+    var z = Math.abs(x), t = 1 / (1 + 0.3275911 * z);
+    var q = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) * Math.exp(-z * z);
+    return x >= 0 ? q : 2 - q;
+  }
+  function tl(sg) { return Math.round(2.6 * sg); }                      // halbe Laenge einer weichen Kante (danach < 1/255)
+  function ambCk() { return AMB.xc - AMB.gck + 0.6 * AMB.so; }           // c: Abstand Einblenden ueber der Uhr -> Ausblenden darunter
+  function ambSize(k) {
+    var A = AMB, To = tl(A.so), Tc = tl(A.sc);
+    return { u: [A.iw, A.ihu], d: [A.iw, A.ihd], c: [A.iw, To + Math.round(ambCk()) + Tc], z: [A.iw, Tc + A.zref + To], z2: [A.iw, Tc + A.zref2 + To] }[k];
+  }
+  function ambImg(k, r) { return 'scrim-saver-a' + k + (r ? '-r' : '') + '.png'; }
+  /* Deckkraft des Bilds k (u/d/c/z/z2, r gespiegelt) an Pixelmitte (x, y) – Quelle fuer tools/make_assets.js */
+  function ambField(k, r, x, y) {
+    var A = AMB, H = A.hx, To = tl(A.so), Tc = tl(A.sc), S = ambSize(k), u = (r ? S[0] - x : x) - (S[0] - H.tail), v;
+    function rise(c, sg) { return 0.5 * erfc((c - y) / sg); }            // 0 -> 1 um y = c
+    function fall(c, sg) { return 0.5 * erfc((y - c) / sg); }            // 1 -> 0 um y = c
+    v = k === 'u' ? rise(To, A.so) : k === 'd' ? fall(S[1] - To, A.so) : k === 'c' ? rise(To, A.so) * fall(To + Math.round(ambCk()), A.sc) :
+      rise(Tc, A.sc) * fall(S[1] - To, A.so);
+    return 1 - Math.exp(-A.k * v * (H.a * 0.5 * erfc(u / H.s1) + (1 - H.a) * 0.5 * erfc((u + H.c) / H.s2)));
+  }
+  /* m = { w, h (Behaelter), r, t (Ecke), ck: {e, top} | null (Uhr), ti: {e, top} | null (Titel), sb: {e, top} | null (Zeile),
+   * tb: Unterkante des Texts }; e = Abstand des Zeilenendes vom Seitenrand, top im Behaelter.
+   * -> [{ k, img, y, h, w, pos (background-position), size (background-size), edge }] */
+  function ambPieces(m) {
+    var A = AMB, To = tl(A.so), Tc = tl(A.sc), f = A.sc / A.so, out = [], side = m.r ? 'r' : 'l', ck = m.ck, tx = m.ti || m.sb, e2, yz, gt, yb, s;
+    function add(k, e, off, y, h, sz, edge) {   // im Behaelter beschnitten (ausserhalb liegt nur der unsichtbare Rest eines Auslaufs)
+      var yr = Math.round(y), y0 = Math.max(0, yr), y1 = Math.min(m.h, yr + Math.round(h)), dy = y0 - yr;
+      out.push({ k: k, img: ambImg(k, m.r), y: y0, h: y1 - y0, w: Math.min(A.iw, Math.round(e + off + A.hx.tail)),
+        pos: (m.r ? 'left ' : 'right ') + (k === 'd' ? 'bottom' : dy ? -dy + 'px' : 'top'), size: A.iw + 'px ' + Math.round(sz) + 'px', edge: edge });
+    }
+    if (tx) { e2 = Math.max(m.ti ? m.ti.e : 0, m.sb ? m.sb.e + A.offs : 0); gt = m.ti ? m.ti.top + A.gti : m.sb.top + 6; yb = m.tb + A.gb; }
+    if (ck && tx) {
+      yz = ck.top + A.xc;                                 // Mitte des Uebergangs Uhr -> Titel
+      if (m.t) {
+        add('d', ck.e, A.offc, 0, yz + Tc, A.ihd * f, [side, 't']);
+        var zk = yb - yz > (A.zref + A.zref2) / 2 ? 'z2' : 'z', zr = zk === 'z2' ? A.zref2 : A.zref;   // 2 Titelzeilen: eigenes Bild
+        s = Math.max(0.9, (yb - yz) / zr);
+        add(zk, e2, A.offt, yz - Tc * s, ambSize(zk)[1] * s, ambSize(zk)[1] * s, [side]);
+      } else {
+        add('c', ck.e, A.offc, ck.top + A.gck - 0.6 * A.so - To, ambSize('c')[1], ambSize('c')[1], [side]);
+        add('u', e2, A.offt, yz - Tc, m.h - (yz - Tc), A.ihu * f, [side, 'b']);
+      }
+    } else if (ck) {
+      if (m.t) add('d', ck.e, A.offc, 0, ck.top + A.gcb + 0.6 * A.so + To, A.ihd, [side, 't']);
+      else { yz = ck.top + A.gck - 0.6 * A.so - To; add('u', ck.e, A.offc, yz, m.h - yz, A.ihu, [side, 'b']); }
+    } else if (tx) {
+      if (m.t) add('d', e2, A.offt, 0, yb + To, A.ihd, [side, 't']);
+      else { yz = gt - 0.6 * A.so - To; add('u', e2, A.offt, yz, m.h - yz, A.ihu, [side, 'b']); }
+    }
+    return out;
+  }
   var INFO = {
-    ambient: { w: OV_W, h: OV_H, scr: cornerScr, edge: cornerEdge, p: CORNERS },
+    ambient: { w: OV_W, h: OV_H, scr: '', amb: true, edge: cornerEdge, p: CORNERS },
     classic: { w: OV_W, h: OV_H, scr: '', p: CORNERS },
     poster: { w: 1280, h: BAND_H, scr: 'scrim-saver-b.png', edge: BAND_EDGE, p: [pos(0, BAND_Y), pos(0, BAND_Y, 1), pos(0, BAND_Y, 0, 0, 16), pos(0, BAND_Y, 1, 0, 16)] },
     lower: { w: 1280, h: BAND_H, scr: 'scrim-saver-b.png', edge: BAND_EDGE, p: [pos(0, BAND_Y), pos(0, BAND_Y, 0, 0, 24), pos(0, BAND_Y, 0, 0, 12), pos(0, BAND_Y, 0, 0, 36)] },
@@ -55,7 +136,7 @@
   function tf(s, x, y) { return 'translate3d(' + x + 'px,' + y + 'px,0)' + (s !== 1 ? ' scale(' + s + ')' : ''); }
 
   var L = {
-    PAGE: PAGE, MIX: MIX, OV_W: OV_W, OV_H: OV_H, FX: FX, FX_MS: FX_MS, CALM: CALM, CORNERS: CORNERS, KB: KB,
+    PAGE: PAGE, MIX: MIX, OV_W: OV_W, OV_H: OV_H, FX: FX, FX_MS: FX_MS, CALM: CALM, CORNERS: CORNERS, KB: KB, AMB: AMB, ambPieces: ambPieces, ambImg: ambImg, ambField: ambField, ambSize: ambSize,
     SEC: [10, 20, 30, 60],
     TYPE: { movie: 1, show: 2, artist: 8 },
     /* Einstellung -> tatsaechlicher Uebergang. reduced: "Reduzierte Bewegung"; rnd: Zahl 0..1 oder Funktion; last: letzter (Zufall
@@ -89,7 +170,7 @@
     /* Stil (unbekannt -> ambient) und Lage Nr. i -> {style, w, h, scr, x, y, r, t, ty, edge} */
     info: function (style, i) {
       var st = Object.prototype.hasOwnProperty.call(INFO, style) ? style : 'ambient', d = INFO[st], p = d.p[((i % d.p.length) + d.p.length) % d.p.length];
-      return { style: st, w: d.w, h: d.h, scr: typeof d.scr === 'function' ? d.scr(p) : d.scr, x: p.x, y: p.y, r: p.r, t: p.t, ty: p.ty || 0,
+      return { style: st, w: d.w, h: d.h, scr: typeof d.scr === 'function' ? d.scr(p) : d.scr, amb: !!d.amb, x: p.x, y: p.y, r: p.r, t: p.t, ty: p.ty || 0,
         edge: typeof d.edge === 'function' ? d.edge(p) : d.edge || [] };
     },
     /* Was zeigt der Stil? "Uhrzeit anzeigen" aus blendet die Uhr in JEDEM Stil aus; reine Uhr-Stile zeigen dann nichts */
