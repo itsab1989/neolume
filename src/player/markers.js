@@ -16,7 +16,7 @@
     if (!this.lastC) for (i = 0; i < this.m.length; i++) if (this.m[i].type === 'credits' && (!this.lastC || this.m[i].start > this.lastC.start)) this.lastC = this.m[i];
   }
   var P = Markers.prototype;
-  /* ctx: {dur, playing, hasNext, last (letzte Folge), resume (ms)} -> {btn:null|'intro'|'credits'|'next'|'watch', marker, cd:-1|Sek., skipTo:-1|ms, next:bool, last:bool} */
+  /* ctx: {dur, playing, hasNext, last (letzte Folge), resume (ms)} -> {btn:null|'intro'|'credits'|'next'|'watch', marker, cd:-1|Sek., skipTo:-1|ms, next:bool, last:bool}, hold:bool (Zeit unsicher: nichts aendern)} */
   P.tick = function (t, ctx) {
     var out = { btn: null, marker: null, cd: -1, skipTo: -1, next: false, last: false }, c = this.cfg;
     if (this.last >= 0 && t > this.last && t - this.last < 3000) this.cnt++; else this.cnt = 0;
@@ -24,7 +24,12 @@
     if (!ctx.playing) { this.cnt = 0; return out; }
     if (this.watch && t < this.watch.until && t >= this.watch.from) { out.btn = 'watch'; out.marker = this.watch.m; }
     else this.watch = null;
-    if (this.cnt < 2 || (ctx.resume > 0 && t < ctx.resume - 5000)) return out;
+    /* hold: diese Zeitmeldung sagt nichts (Zeit doppelt, kurz rueckwaerts oder Luecke >= 3 s – der Player des TVs 2014 stockt so
+     * z. B. im Abspann): Karte und Rueckzaehler bleiben, wie sie sind. Vorher verschwand die Karte "Das war die letzte Folge"
+     * dabei und kam zwei Takte spaeter wieder (TV-Befund 04.11.: Hinweis "naechste Folge erscheint bald" blinkte im Abspann).
+     * Ein echter Sprung blendet beides ohnehin im Player aus (seeked). */
+    if (this.cnt < 2) { out.hold = true; return out; }
+    if (ctx.resume > 0 && t < ctx.resume - 5000) return out;
     var lastC = this.lastC, N0 = c.autoNext && ctx.hasNext && !this.cancelled ? (c.cd || 0) : 0;
     if (N0 > 0 && ctx.dur > 0) {
       var ws = lastC ? lastC.start : ctx.dur - N0 * 1000 - 2000;
@@ -63,6 +68,9 @@
   /* "Intro ansehen": zurueck an den Markerstart, Marker bleibt erledigt (kein erneuter Auto-Sprung) */
   P.watchStart = function () { var w = this.watch; this.watch = null; this.cnt = 0; return w ? w.m.start : -1; };
   P.cancelCountdown = function () { this.cancelled = true; this.cdStart = -1; };
+  /* Karte "Das war die letzte Folge" › "Abspann ansehen" (PLAY-18): wer den Abspann gerade bewusst gewaehlt hat, bekommt fuer
+   * diesen Abspann kein "Abspann ueberspringen" mehr angeboten (es fuehrte ohnehin dorthin, wo "Zur Serie" hinfuehrt; Nutzer 04.11.) */
+  P.keepCredits = function () { if (this.lastC) this.lastC.done = true; };
   P.seeked = function () { this.cnt = 0; this.cdStart = -1; };
   /* Echtes Dateiende (PLAY-18): was jetzt passiert. o: {sleepEnd, autoNext, hasNext, last, cancelled} ->
    * 'sleep' (Sleep-Timer "Ende der Folge"), 'next' (naechster Eintrag), 'card' (Karte "Das war die letzte Folge" kurz mit

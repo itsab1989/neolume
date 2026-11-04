@@ -512,8 +512,8 @@
         N.ui.toast.show(N.t('pl.skipped.' + o.marker.type), { icon: 'confirm' });
       }
       if (o.next) { autoNext(); return; }
-      if (o.cd > 0) { showUp(o.cd); } else if (cdOn) hideUp();
-      if (o.last) showLast(); else if (lastOn) hideLast();
+      if (o.cd > 0) { showUp(o.cd); } else if (cdOn && !o.hold) hideUp();     // hold: Zeit stockt -> Karte bleibt (Markers.tick)
+      if (o.last) showLast(); else if (lastOn && !o.hold) hideLast();
       if (o.btn) showSkip(o.btn, o.marker); else if (btnKind && btnKind !== 'lower' && btnKind !== 'ext') hideSkip();
       if (xt && xt.tick) xt.tick(ms, dur(), o);
     }
@@ -1202,7 +1202,7 @@
     function lastAct(i) {
       if (i === 0 && xt && xt.lastAct && xt.lastAct()) return;
       if (lastEnd || i === 0 || (pb && pb.state === 'ended')) { close(); return; }
-      if (mk) mk.cancelCountdown();
+      if (mk) { mk.cancelCountdown(); mk.keepCredits(); }   // "Abspann ansehen": danach kein "Abspann ueberspringen" (PLAY-18)
       hideLast();
     }
 

@@ -5,6 +5,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.15] - 2026-11-04
+
+### Fixed
+- **The card at the end of an episode no longer blinks.** During the credits of the last available episode, the card
+  ("That was the last episode", or the note when the next one comes out) could disappear and come back again and again,
+  because the TV's player sometimes reports the playing time unevenly there. The card now simply stays. The same goes for
+  the countdown to the next episode.
+
+### Changed
+- **No double offer after "Watch credits".** When the next episode isn't out yet and you choose "Watch credits" on the
+  card, Neolume no longer offers "Skip credits" right afterwards – you just decided to watch them, and skipping would only
+  lead where "To the show" leads anyway.
+
+If the credits now roll as calmly as they should, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.14] - 2026-11-04
 
 ### Fixed

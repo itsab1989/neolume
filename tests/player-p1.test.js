@@ -150,12 +150,47 @@ test('Letzte Folge: Karte statt Countdown ab finalem Abspann bzw. Dauer - N - 2 
   assert.strictEqual(r.o.last, true); assert.strictEqual(r.o.cd, -1); assert.strictEqual(r.o.next, false);
   r.m.cancelCountdown();
   assert.strictEqual(r.m.tick(1303000, { dur: 1440000, playing: true, hasNext: false, last: true }).last, false, 'Abspann ansehen -> Karte weg');
+  // ohne keepCredits bot der Player danach sofort "Abspann ueberspringen" an (Nutzer 04.11.: doppelt) – mit keepCredits nicht mehr
+  assert.strictEqual(r.m.tick(1304000, { dur: 1440000, playing: true, hasNext: false, last: true }).btn, 'credits', 'nur cancelCountdown: Knopf');
+  r = run(fin, { dur: 1440000, playing: true, hasNext: false, last: true, resume: 0 }, [1300000, 1301000, 1302000]);
+  r.m.cancelCountdown(); r.m.keepCredits();
+  var o2 = r.m.tick(1303000, { dur: 1440000, playing: true, hasNext: false, last: true }); o2 = r.m.tick(1304000, { dur: 1440000, playing: true, hasNext: false, last: true });
+  assert.strictEqual(o2.btn, null, 'Abspann ansehen gewaehlt -> kein "Abspann ueberspringen"'); assert.strictEqual(o2.last, false);
+  assert.ok(/mk\.cancelCountdown\(\); mk\.keepCredits\(\)/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'views', 'player.js'), 'utf8')), 'Karte ruft keepCredits');
   r = run([], { dur: 1440000, playing: true, hasNext: false, last: true }, [1426000, 1427000, 1428000]);
   assert.strictEqual(r.o.last, true, 'ohne Marker: Dauer - 12 s');
   r = run([], { dur: 1440000, playing: true, hasNext: false, last: true }, [1425000, 1426000, 1427000]);
   assert.strictEqual(r.o.last, false, 'vorher nicht');
   r = run(fin, { dur: 1440000, playing: true, hasNext: true, last: false }, [1300000, 1301000, 1302000]);
   assert.ok(r.o.cd > 0 && !r.o.last, 'mit naechster Folge: Countdown');
+});
+test('Zeit stockt im Abspann (TV-Befund 04.11.): hold statt "Karte weg", Karte bleibt; echter Sprung zurueck blendet aus', function () {
+  var cfg = { intro: 'button', credits: 'button', autoNext: true, cd: 10 };
+  var fin = [{ type: 'credits', startTimeOffset: 1300000, endTimeOffset: 1440000, 'final': true }];
+  var ctx = { dur: 1440000, playing: true, hasNext: false, last: true, resume: 0 }, m = new N.Markers(fin, cfg), o;
+  [1300000, 1301000, 1302000].forEach(function (t) { o = m.tick(t, ctx); });
+  assert.strictEqual(o.last, true);
+  o = m.tick(1302000, ctx);                                    // dieselbe Zeit noch einmal
+  assert.strictEqual(o.last, false); assert.strictEqual(o.hold, true, 'doppelte Zeit: nichts aendern');
+  o = m.tick(1303000, ctx);
+  assert.strictEqual(o.hold, true, 'erster Takt danach: noch unsicher');
+  o = m.tick(1307000, ctx);                                    // Luecke 4 s
+  assert.strictEqual(o.hold, true, 'Luecke: nichts aendern');
+  o = m.tick(1308000, ctx); o = m.tick(1309000, ctx);
+  assert.strictEqual(o.last, true, 'wieder gleichmaessig: Karte');
+  assert.ok(!o.hold);
+  m.seeked();
+  [1100000, 1101000, 1102000].forEach(function (t) { o = m.tick(t, ctx); });
+  assert.strictEqual(o.last, false); assert.ok(!o.hold, 'nach Sprung vor den Abspann: Karte weg');
+  // Countdown (mit naechster Folge) ebenso
+  var c2 = { dur: 1440000, playing: true, hasNext: true, last: false, resume: 0 }, m2 = new N.Markers(fin, cfg);
+  [1300000, 1301000, 1302000].forEach(function (t) { o = m2.tick(t, c2); });
+  assert.ok(o.cd > 0);
+  o = m2.tick(1302000, c2);
+  assert.strictEqual(o.hold, true);
+  // Player: Karte und Rueckzaehler nur ohne hold ausblenden
+  var src = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'views', 'player.js'), 'utf8');
+  assert.ok(/else if \(lastOn && !o\.hold\) hideLast\(\)/.test(src) && /else if \(cdOn && !o\.hold\) hideUp\(\)/.test(src));
 });
 test('Einstellung "Nachfragen, ob du noch schaust": Standard 3, Kinderprofil 2, eigene Wahl bleibt', function () {
   var files = {};

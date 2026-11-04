@@ -58,6 +58,7 @@
     var SLOTS = HT ? Math.ceil(A.h / Math.min(RM.homeGeom('L', 'land', A.w).pitch, RM.homeGeom('L', 'sq', A.w).pitch)) + 3
       : TILES ? Math.ceil(A.h / Math.min(PITCH.land, PITCH.sq)) + 3 : 4;
     var used = false, onMode = null;                                   // HT-Wechsel ohne Neuaufbau nur, solange die Seite unbedient ist (s.stale)
+    var lastIn = 0, catchT = 0;                                        // HOME-18 Nachholen: letzte Eingabe (ms), Zeitgeber
     var root, pg, ring, hero, sb, fade, cue, cueT, cueOn = false, slots = [], rows = [], tops = [], colMem = {}, R = 0;
     var slotRow = [], heroT = 0, task = null, loadedAt = 0, pending = null, interacted = false;
     /* freies Scrollen (caps.scroll 'free', S5/S6): py = Seitenlage (px); loose = Lage frei verschoben (erste Taste setzt den Fokus auf
@@ -160,9 +161,24 @@
      * und Trackpad gemischt benutzt (Nr. 28) – die Seite darf unter dem Finger nicht umspringen, der erste Tipp traefe sonst
      * eine andere Kachel. */
     function modeChanged() {
-      if (dead || away || used || HT || py !== 0) return;
-      if (N.ui.rail && N.ui.rail.isOpen && N.ui.rail.isOpen()) return;
-      if (heroWanted(A, true)) N.router.renew(s);
+      if (dead || away || HT || !heroWanted(A, true)) return;
+      if (!used && py === 0 && !railIsOpen() && N.router.renew(s)) return;
+      catchUp();
+    }
+    /* Nachholen (Nutzerbefund 04.11., Vorschlag A): auf einer schon bedienten Seite kommt der Infobereich, sobald das ohne sichtbaren
+     * Sprung geht – Zeiger/Tasten, Seite ganz oben (py 0), kein Zug, keine Karte, kein Overlay, Seitenleiste zu und CATCH_MS ohne
+     * Eingabe. Zurueck zu den Kacheln (Finger) weiter erst beim naechsten Aufbau (heroWanted dann false: nichts nachzuholen).
+     * Verdeckt (away): Schluss, die Rueckkehr baut ueber s.stale ohnehin neu. */
+    var CATCH_MS = 1000;
+    function railIsOpen() { return !!(N.ui.rail && N.ui.rail.isOpen && N.ui.rail.isOpen()); }
+    function poke() { lastIn = U.now(); }
+    function catchUp() { if (!catchT && !dead && !HT) catchT = setTimeout(tryCatch, CATCH_MS); }
+    function tryCatch() {
+      catchT = 0;
+      if (dead || away || HT || !heroWanted(A, true)) return;
+      var wait = CATCH_MS - (U.now() - lastIn);
+      if (wait <= 0 && !pan && py === 0 && !railIsOpen() && !N.router.hasOverlay() && N.router.renew(s)) return;
+      catchT = setTimeout(tryCatch, Math.max(wait, 250));
     }
     s.stale = function () { return TILES && caps.homeHero === true && heroWanted(A, true) !== HT; };
     /* Kacheln ohne Infobereich: Platzhalter mit den Methoden des Hero (alle Aufrufe bleiben, nichts wird gemalt oder geladen) */
@@ -930,6 +946,7 @@
       away = true;                                    // Wiederholungen/Toasts/Neuzeichnen ruhen, solange etwas anderes oben ist (L2)
       if (retryT) { clearTimeout(retryT); retryT = 0; resume = true; }
       if (heroT) { clearTimeout(heroT); heroT = 0; }
+      if (catchT) { clearTimeout(catchT); catchT = 0; }
       if (playT) { clearTimeout(playT); playT = 0; loadedAt = 0; }   // Nachladen nach dem Player: beim Zurueckkehren
       if (stripTask) { stripTask.abort(); stripTask = null; }
       stopAll(); pan = null;                          // laufender Schwung endet, wo er ist
@@ -938,6 +955,7 @@
     };
     s.destroy = function () {
       dead = true;
+      if (catchT) { clearTimeout(catchT); catchT = 0; }
       if (amb) amb.destroy();
       if (playT) { clearTimeout(playT); playT = 0; }
       if (chaseT) { clearTimeout(chaseT); chaseT = 0; }
@@ -957,10 +975,10 @@
       for (var k = 0; k < SLOTS; k++) slots[k].clear();
     };
     s.railBlur = function () { railOpen = true; ring.hide(); if (rows.length) slotFor(R).setFocused(false); };
-    s.railFocus = function () { railOpen = false; if (sb.on) return; if (rows.length) { var sl = slotFor(R); sl.setFocused(true); placeRing(sl.ringPos()); } };
+    s.railFocus = function () { railOpen = false; if (TILES && caps.homeHero === true && !HT && heroWanted(A, true)) { poke(); catchUp(); } if (sb.on) return; if (rows.length) { var sl = slotFor(R); sl.setFocused(true); placeRing(sl.ringPos()); } };
 
     s.onKey = function (k) {
-      interacted = true; used = true;
+      interacted = true; used = true; lastIn = U.now();
       if (sb.on) {
         if (sb.onKey(k)) return true;
         if (k === 'LEFT') { N.ui.rail.open(); return true; }
@@ -1011,6 +1029,7 @@
       if (N.pointer) N.pointer.scrolled();
     }
     s.pointer = function (x, y, kind) {
+      lastIn = U.now();
       if (eat) { if (kind === 'click') eat = false; return true; }   // Beruehrung hat den Schwung angehalten: kein Oeffnen, kein Fokus
       if (sb.on) return sb.pointer(x, y, kind);
       if (!rows.length) return false;
@@ -1108,7 +1127,7 @@
     function setPy(p) {
       // Uebergang immer aus – auch wenn ein waagerechter Rad-/Zug-Schritt schon loose gesetzt hat (sonst glitt die Seite 150 ms nach)
       loose = true; if (pg.style.webkitTransition !== 'none') pg.style.webkitTransition = 'none';
-      py = p;
+      py = p; lastIn = U.now();
       if (N.idle) N.idle.touch();
       U.tf(pg, 0, -Math.round(p * 100) / 100);
       syncWin(false);
@@ -1129,7 +1148,7 @@
     s.pan = function (e) {
       if (e.phase === 'start') {
         if (!FREE || !N.kinetic || !rows.length || sb.on) return false;
-        stopAll(); eat = false; pan = null; used = true;
+        stopAll(); eat = false; pan = null; used = true; lastIn = U.now();
         if (e.axis === 'x') {
           var r = rowUnder(e.y);
           if (r < 0) return true;                       // ausserhalb einer Reihe: Zug annehmen, nichts tun
@@ -1146,19 +1165,19 @@
       }
       if (!pan) return true;
       var v = pan.x ? e.dx : e.dy, d = -(v - pan.last);   // Finger nach links/oben -> Inhalt nach links/oben (Lage waechst)
-      pan.last = v;
+      pan.last = v; lastIn = U.now();
       if (e.phase === 'move') { pan.d.move(d, e.t); return true; }
       var p = pan; pan = null;                          // end
       p.d.up(e.t, e.cancel);
       return true;
     };
     /* Beruehrung/Druck haelt jeden laufenden Schwung an; der Klick danach oeffnet nichts (iOS-Verhalten) */
-    s.pointerDown = function () { if (FREE && stopAll()) eat = true; };
+    s.pointerDown = function () { lastIn = U.now(); if (FREE && stopAll()) eat = true; };
     /* Rad/Trackpad (Mac, iPad mit Trackpad): Weg direkt in px (das System liefert den Schwung), Achse je Geste fest (150 ms Pause) */
     s.wheel = function (x, y, dx, dy) {
       if (!FREE || !N.kinetic || !rows.length || sb.on) return false;
       var now = U.now();
-      used = true;
+      used = true; lastIn = now;
       if (now - wheelT > 150 || !wheelAx) wheelAx = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
       wheelT = now;
       eat = false;

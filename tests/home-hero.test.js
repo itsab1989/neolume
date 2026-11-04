@@ -4,7 +4,8 @@
  * - Zeiger/Tastatur + genug Hoehe: Hero mit Bildkasten in Flaechenbreite, erste Reihe bei y 348, Ausschnitt ab y 308, TV-Reihen.
  * - Finger, Einstellung aus, zu flach, zu schmal: Kacheln wie bisher (kein Hero).
  * - Hysterese der Hoehe (RowMath.heroTall), Zeiger ueber dem Infobereich trifft nichts, Hover setzt den Hero erst in Ruhe.
- * - Eingabeart-Wechsel: sofort nur auf einer unbedienten Seite, sonst erst beim naechsten Aufbau (s.stale). */
+ * - Eingabeart-Wechsel: sofort auf einer unbedienten Seite, auf einer bedienten nachgeholt (oben, Ruhe 1 s, nichts offen),
+ *   zum Finger erst beim naechsten Aufbau (s.stale). */
 var test = require('./helpers/load').appleTest(require('node:test')), assert = require('node:assert');
 var fs = require('fs'), path = require('path'), vm = require('vm');
 var H = require('./helpers/load');
@@ -140,9 +141,13 @@ test('Eingabeart-Wechsel: unbediente Seite sofort (renew), bediente erst beim na
   b.N.input.set('pointer');
   assert.deepStrictEqual(b.renews, [], 'bediente Seite: nicht unter der Hand umbauen');
   assert.strictEqual(b.s.stale(), true, 'aber beim naechsten Aufbau');
+  b.T.tick(3000);
+  assert.deepStrictEqual(b.renews, [], 'Seite nicht ganz oben: kein Nachholen');
   var c = open({ w: 1440, h: 900, mode: 'pointer' });
   c.N.input.set('touch');
   assert.deepStrictEqual(c.renews, [], 'Finger: nie sofort (der erste Tipp traefe sonst eine andere Kachel)');
+  c.T.tick(3000);
+  assert.deepStrictEqual(c.renews, [], 'Finger: auch nicht nachgeholt');
   assert.strictEqual(c.s.stale(), true);
   var n = c.make();
   assert.strictEqual(c.heroes.length, 1, 'neuer Aufbau mit Finger: kein weiterer Hero');
@@ -161,4 +166,48 @@ test('Flache Flaeche (Kacheln dicht, Nachbefund 03.11.): Untertitel der Reihen b
     }
     assert.strictEqual(h[1] - h[0], 272); assert.strictEqual(h[2] - h[1], 352);
   });
+});
+
+test('Nachholen (Nutzerbefund 04.11.): bediente Seite bekommt den Infobereich, sobald sie oben steht und 1 s Ruhe ist', function () {
+  var a = open({ w: 1440, h: 900, mode: 'touch' });
+  a.s.wheel(600, 500, 0, 60);                                  // mit dem Finger/Rad bedient, Seite gerollt
+  a.N.input.set('pointer');
+  a.T.tick(2000);
+  assert.deepStrictEqual(a.renews, [], 'gerollt: wartet');
+  a.s.wheel(600, 500, 0, -60);                                 // zurueck nach ganz oben
+  a.T.tick(600);
+  assert.deepStrictEqual(a.renews, [], 'noch keine Sekunde Ruhe');
+  a.s.pointer(700, 500, 'move');                               // Zeiger bewegt: Ruhe beginnt neu
+  a.T.tick(700);
+  assert.deepStrictEqual(a.renews, [], 'Zeiger bewegt sich: wartet weiter');
+  a.T.tick(800);
+  assert.deepStrictEqual(a.renews, [a.s], 'oben und in Ruhe: neu aufbauen');
+  // Seitenleiste offen: erst nach dem Schliessen
+  var b = open({ w: 1440, h: 900, mode: 'touch' }), open_ = true;
+  b.N.ui.rail.isOpen = function () { return open_; };
+  b.N.input.set('pointer');
+  b.T.tick(3000);
+  assert.deepStrictEqual(b.renews, [], 'Seitenleiste offen: wartet');
+  open_ = false; b.s.railFocus();
+  b.T.tick(600);
+  assert.deepStrictEqual(b.renews, [], 'gleich nach dem Schliessen noch nicht');
+  b.T.tick(600);
+  assert.deepStrictEqual(b.renews, [b.s], 'Seitenleiste zu, 1 s Ruhe: neu aufbauen');
+  // Overlay offen: wartet; danach nachgeholt
+  var c = open({ w: 1440, h: 900, mode: 'touch' }), ov = true;
+  c.N.router.hasOverlay = function () { return ov; };
+  c.s.onKey('RIGHT');                                          // mit Tasten bedient
+  c.N.input.set('key');
+  c.T.tick(3000);
+  assert.deepStrictEqual(c.renews, [], 'Overlay offen: wartet');
+  ov = false; c.T.tick(1100);
+  assert.deepStrictEqual(c.renews, [c.s], 'Overlay zu: neu aufbauen');
+  // verdeckt (leave): Schluss, die Rueckkehr baut ueber s.stale neu
+  var d = open({ w: 1440, h: 900, mode: 'touch' });
+  d.s.onKey('RIGHT');
+  d.N.input.set('pointer');
+  d.s.leave();
+  d.T.tick(3000);
+  assert.deepStrictEqual(d.renews, [], 'verdeckt: nichts');
+  assert.strictEqual(d.s.stale(), true);
 });
