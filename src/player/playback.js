@@ -68,9 +68,20 @@
     return { rk: String(m.ratingKey), type: m.type, title: m.title || '', show: m.grandparentTitle || '', showRk: m.grandparentRatingKey ? String(m.grandparentRatingKey) : '',
       s: Number(m.parentIndex) || 0, e: Number(m.index) || 0, dur: Number(part && part.duration) || Number(m.duration) || 0, lib: Number(m.librarySectionID) || 0,
       part: part || null, partId: part ? part.id : 0, parts: md && md.Part ? md.Part.length : 0, ar: ar, markers: m.Marker || [], thumb: m.thumb || '',
-      tracks: TR.streams(part), vcodec: md && md.videoCodec || '', acodec: md && md.audioCodec || '', container: md && md.container || '',
+      tracks: TR.streams(part), ntracks: Playback.trackCount(part), vcodec: md && md.videoCodec || '', acodec: md && md.audioCodec || '', container: md && md.container || '',
       res: md && md.videoResolution || '', bitrate: Number(md && md.bitrate) || 0, vw: Number(md && md.width) || 0, vh: Number(md && md.height) || 0,
       chapters: N.osd ? N.osd.chapters(m.Chapter) : [], mi: mi, versions: m.Media && m.Media.length > 1 ? N.versions.list(m.Media) : [] };
+  };
+  /* Spuren in der Datei (Bild, Ton, eingebettete Untertitel); externe Untertitel (eigene Datei, Stream.key) zaehlen nicht */
+  Playback.trackCount = function (part) {
+    var S = part && part.Stream || [], n = 0;
+    for (var i = 0; i < S.length; i++) if (!S[i].key) n++;
+    return n;
+  };
+  /* Zu viele Spuren fuer Direct Play auf diesem Geraet (caps.codecs.maxTracks, SPEC PLAY-38)? */
+  Playback.tooManyTracks = function (M) {
+    var lim = Number(N.platform.caps.codecs.maxTracks) || 0;
+    return lim > 0 && !!M && M.ntracks > lim;
   };
   /* automatische Spurwahl vor der Decision (PUT /library/parts, muss vorher fertig sein – Patch X21) */
   P.autoTracks = function (done) {
@@ -120,8 +131,9 @@
   P.decide = function () {
     var self = this, c = this.d.cfg, M = this.meta;
     this.session = U.uuid();
-    var burn = TR.subMode(this.sub, c.ass, false) === 'burn';
-    var o = { rk: M.rk, mediaIndex: M.mi, session: this.session, clientId: this.d.clientId, token: this.d.token, dp: this.att.dp && !burn, ds: this.att.ds, subs: burn ? 'burn' : 'none',
+    var burn = TR.subMode(this.sub, c.ass, false) === 'burn', many = Playback.tooManyTracks(M);
+    if (many && this.att.dp) this.log(M.ntracks + ' Spuren > ' + N.platform.caps.codecs.maxTracks + ': kein Direct Play (Player des Geraets), Direct Stream');
+    var o = { rk: M.rk, mediaIndex: M.mi, session: this.session, clientId: this.d.clientId, token: this.d.token, dp: this.att.dp && !burn && !many, ds: this.att.ds, subs: burn ? 'burn' : 'none',
       stereo: c.passthrough === false, boost: c.passthrough === false ? Number(c.audioBoost) || 100 : 100 };
     U.extend(o, this.capOpts());
     this.setState('resolving');
@@ -147,6 +159,7 @@
         o.offsetSec = self.base / 1000;
         url = D.startUrl(self.d.base, o);
       }
+      if (many && r.mode !== 'direct') r.why = N.t('pl.info.why.tracks', { n: M.ntracks, max: N.platform.caps.codecs.maxTracks });   // INFO: eigener Grund statt "Direkte Wiedergabe ist deaktiviert"
       self.log('Decision ' + r.code + ' ' + r.mode + ' ' + r.reason);
       self.mark('Decision fertig');
       self.emit('decision', r);

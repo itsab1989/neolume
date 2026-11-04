@@ -985,6 +985,7 @@ N.strings.nb = {
   'pl.info': 'Info',
   'pl.info.file': 'Fil: video {v} · lyd {a} · {c}',
   'pl.info.reason': 'Årsak fra serveren: {r}',
+  'pl.info.why.tracks': 'Hvorfor pakket om: Filen har {n} spor (bilde, lyd, undertekster). Avspilleren på denne enheten hopper bare trygt i filer med høyst {max} spor – flere får den til å krasje når du fortsetter eller hopper.',
   'pl.info.detail': 'Tekniske detaljer: {d}',
   'pl.mode.direct': 'Direkte avspilling: Filen spilles av uendret – beste kvalitet.',
   'pl.mode.stream': 'Direkte, pakket om: Bilde og lyd er uendret, serveren leverer dem bare i en annen beholder.',

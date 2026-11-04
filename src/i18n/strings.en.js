@@ -983,6 +983,7 @@ N.strings.en = {
   'pl.info': 'Info',
   'pl.info.file': 'File: video {v} · audio {a} · {c}',
   'pl.info.reason': 'Reason from the server: {r}',
+  'pl.info.why.tracks': 'Why repackaged: the file has {n} tracks (picture, sound, subtitles). This device’s player only jumps safely in files with at most {max} tracks – more make it crash when resuming or jumping.',
   'pl.info.detail': 'Technical details: {d}',
   'pl.mode.direct': 'Direct play: the file plays unchanged – best quality.',
   'pl.mode.stream': 'Direct, repackaged: picture and audio stay unchanged; the server only delivers them in a different container.',

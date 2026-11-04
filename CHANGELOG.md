@@ -5,6 +5,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.14] - 2026-11-04
+
+### Fixed
+- **No more TV restart with files that have very many tracks.** Resuming or jumping inside a video file with more than 32
+  tracks (picture, sound and subtitles together – for example a series episode with dozens of subtitle languages) made the
+  2014 TV's own player hang for about half a minute and then restart the whole TV. Starting from the beginning worked,
+  which is why it went unnoticed. Such files now play through the server's repackaging (picture unchanged, almost no work
+  for the server), so resuming and jumping work; every other file still plays directly. INFO in the player tells you why.
+
+If your TV now simply carries on where you left off, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.13] - 2026-11-04
 
 ### Added

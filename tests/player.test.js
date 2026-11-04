@@ -408,6 +408,32 @@ test('HEVC nur Direct Play (caps.codecs.hevcStream false, Apple): Direct Stream 
     assert.strictEqual(r.gets.filter(function (g) { return /decision/.test(g.path); }).length, 1);
   } finally { C.hevc = old[0]; C.maxResolution = old[1]; delete C.hevcStream; }
 });
+test('PLAY-38 Spurgrenze (TV-Test 04.11.: Player des TVs 2014 stuerzt beim Springen in Dateien mit 33+ Spuren ab): mehr als caps.codecs.maxTracks -> Direct Stream mit eigenem Grund; externe UT zaehlen nicht', function () {
+  function metaN(n, ext) {
+    var j = S('meta-direct.json'), part = j.MediaContainer.Metadata[0].Media[0].Part[0], base = part.Stream.length;
+    for (var i = base; i < n; i++) part.Stream.push({ id: 9000 + i, streamType: 3, codec: 'srt', languageCode: 'ger', index: i });
+    for (i = 0; i < (ext || 0); i++) part.Stream.push({ id: 9900 + i, streamType: 3, codec: 'srt', key: '/library/streams/' + (9900 + i) });
+    return j;
+  }
+  var C = N.platform.caps.codecs, old = C.maxTracks;
+  try {
+    assert.strictEqual(old, 32, 'Standard (Orsay) = 32');
+    var r = rig({ metaJson: metaN(33), off: 478000 });
+    r.p.start();
+    assert.strictEqual(r.p.meta.ntracks, 33);
+    assert.strictEqual(r.gets[1].q.directPlay, 0, '33 Spuren -> kein Direct Play'); assert.strictEqual(r.gets[1].q.directStream, 1);
+    r = rig({ metaJson: metaN(32, 5), off: 478000 });
+    r.p.start();
+    assert.strictEqual(r.p.meta.ntracks, 32, 'externe Untertitel zaehlen nicht');
+    assert.strictEqual(r.gets[1].q.directPlay, 1, '32 Spuren -> Direct Play');
+    C.maxTracks = 0;
+    r = rig({ metaJson: metaN(40) }); r.p.start();
+    assert.strictEqual(r.gets[1].q.directPlay, 1, '0 = keine Grenze (Apple)');
+  } finally { C.maxTracks = old; }
+  // Grund im INFO-Panel statt "Direkte Wiedergabe ist deaktiviert"
+  r = rig({ metaJson: metaN(35), dec: 'decision-hevc.json' }); r.p.start();
+  assert.ok(/35/.test(r.p.r.why) && /32/.test(r.p.r.why), r.p.r.why);
+});
 test('Protokoll: oeffentliche IPv4-Adressen geschwaerzt, Heimnetz-Adressen bleiben', function () {
   assert.strictEqual(N.diag.redact('InitPlayer http://203.0.113.7:32400/library/parts/1/file.mkv'), 'InitPlayer http://<fern>:32400/library/parts/1/file.mkv');
   assert.strictEqual(N.diag.redact('http://192.168.1.20:32400/x 10.0.0.5 172.16.3.4'), 'http://192.168.1.20:32400/x 10.0.0.5 172.16.3.4');

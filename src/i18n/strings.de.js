@@ -985,6 +985,7 @@ N.strings.de = {
   'pl.info': 'Infos',
   'pl.info.file': 'Datei: Video {v} · Ton {a} · {c}',
   'pl.info.reason': 'Grund vom Server: {r}',
+  'pl.info.why.tracks': 'Warum neu verpackt: Die Datei hat {n} Spuren (Bild, Ton, Untertitel). Der Player dieses Geräts springt nur in Dateien mit höchstens {max} Spuren sicher – mehr bringen ihn beim Fortsetzen oder Springen zum Absturz.',
   'pl.info.detail': 'Technische Details: {d}',
   'pl.mode.direct': 'Direkte Wiedergabe: Die Datei wird unverändert abgespielt – beste Qualität.',
   'pl.mode.stream': 'Direkt, neu verpackt: Bild und Ton bleiben unverändert, der Server liefert sie nur in einem anderen Behälter.',

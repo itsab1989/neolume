@@ -1338,7 +1338,8 @@
           lines.push(N.t('pl.info.quality', { q: N.t('set.v.q', { n: cq[0] / 1000, r: N.decision.resText(cq[1]) }) }));
         }
       }
-      if (r && r.reason) lines.push(N.t('pl.info.reason', { r: r.reason }));
+      if (r && r.why) lines.push(r.why);
+      else if (r && r.reason) lines.push(N.t('pl.info.reason', { r: r.reason }));
       lines.push(pb && pb.sub && pb.subMode !== 'none' ? N.t('pl.info.sub', { s: pb.sub.label, w: N.t('pl.info.way.' + pb.subMode) }) : N.t('pl.info.subOff'));
       lines.push(N.t('pl.info.aspect', { a: N.t('set.v.' + aspectKey(eff('aspect'))) }));
       if (errOn && s.errDetail) lines.push(N.t('pl.info.detail', { d: s.errDetail }));

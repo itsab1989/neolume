@@ -72,7 +72,11 @@
         h264: { maxBitDepth: 8, maxLevel: 41, maxWidth: 1920, maxHeight: 1088 },
         maxResolution: '1920x1080',
         streamSelection: true, // Tonspur im Direct Play am Geraet waehlen (DirectPlayStreamSelection)
-        subtitleTarget: 'srt'  // externe Untertitel als SRT anfordern
+        subtitleTarget: 'srt', // externe Untertitel als SRT anfordern
+        // hoechstens so viele Spuren in der Datei (Bild + Ton + eingebettete Untertitel) fuer Direct Play; mehr -> Direct Stream
+        // (Server verpackt nur um). TV-Test 04.11.: der Player des TVs 2014 stuerzt beim Springen (Fortsetzen, Sprung, Ziffern) in
+        // einer Datei mit 33+ Spuren ab und reisst den ganzen Fernseher in einen Neustart; 32 laufen. 0 = keine Grenze.
+        maxTracks: 32
       },
       // App-Raster 1280x720; scale = Pixel je App-Pixel. flex: logische Flaeche W x H >= 1280x720 fuellt den Bildschirm
       // (Apple, 08-touch.md 8b); w/h sind dann die Mindestgroesse (Querformat 1280x720), die aktuelle liefert screen.size() (N.screen)
