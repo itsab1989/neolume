@@ -27,7 +27,8 @@
 **Neolume** is a free, open-source, **unofficial client for Plex Media Server** made for Samsung Smart TVs from **2014**
 (the "Orsay" Smart Hub, for example the H and HU series). The official Plex app for these TVs is no longer maintained and can
 no longer sign in, because the TV only speaks old encryption that plex.tv no longer accepts. Neolume solves that: a small setup
-program on your computer signs in **once**, and from then on the TV talks **only to your own Plex Media Server at home**.
+program on your computer signs in **once**, and from then on the TV talks **only to your own Plex Media Server at home** –
+unless you switch on one of the optional extras, such as Live TV (see [Privacy and security](#privacy-and-security)).
 
 > [!NOTE]
 > **Neolume is not made by Plex.** It is an independent hobby project and is not affiliated with, endorsed or supported by
@@ -67,20 +68,24 @@ program on your computer signs in **once**, and from then on the TV talks **only
 **Fast and made for the remote**
 - Starts in a fraction of a second from its own cache, then refreshes quietly in the background.
 - Smooth navigation on the TV's modest hardware; works with the normal remote **and** the Smart Control touch pointer.
-- German and English interface (follows the TV's language, or choose in Settings).
-- Choose your accent colour per profile: seven colours, all checked for readability.
+- Interface in German, English and Norwegian (Bokmål): it follows the TV's language, or you choose under
+  Settings › Language & controls › Language.
+- Choose your *Selection colour* per profile: eight colours – Teal (the default), Amber, Coral, Rose, Lavender, Sky blue, Mint
+  and Grey – all checked for readability. *Badge colour* (Settings › Home & appearance) colours the small badges on the tiles (new,
+  watched, episodes left): light grey by default, or any selection colour if you want them to stand out more.
 - A screensaver that shows art from your whole libraries, with nine transitions (or Random) and six overlay styles to choose from;
   after a long time (2 hours by default) it shows only the clock on black, which is gentler on older TVs and the screen.
 - `RETURN` works the way you expect: at the top of a library, Search, Discover or Settings it takes you to Home – or, if
   you prefer, back through the sections you opened, like Back in a web browser (*Back from a section* in Settings).
 - Make it calmer if you like: four styles for the home screen clock, and button hints that always show, fade out after a
-  few seconds or stay hidden (every button is still explained under Settings → Help & info → Remote control keys).
+  few seconds or stay hidden (every button is still explained under Settings → Help & diagnostics → Remote control keys).
 
 **Home, libraries, details, search**
 - Home with *Continue Watching*, *Up Next*, *Recently Added* per library, background art that follows the focus, and a
   season strip that shows at a glance how far you are in a show; a show's page adds a bar for the whole series (both can
   be switched off).
-- *Customize Home* per profile: turn rows on/off, reorder them, add extra rows.
+- *Customize Home* per profile: turn rows on/off, reorder them, add extra rows. *Home tile size* (Settings › Home & appearance)
+  offers Large (the default), Medium and Small – smaller tiles show more titles side by side without scrolling.
 - **Show all** at the end of a Home row, like in the Plex phone app: "New: Movies" opens the whole library sorted by
   *Recently added* (just for this visit), other rows open their full list as a grid with the view sizes Large, Medium,
   Small or List.
@@ -90,12 +95,16 @@ program on your computer signs in **once**, and from then on the TV talks **only
 - Library grid with sort, filters, A–Z jump bar and several view sizes – remembered per library and profile.
 - Optional library background: a soft colour mood of the selected title (default), its picture, or a new random picture each
   time you open the library – kept dark so text stays readable, or plain if you prefer.
-- Detail pages for movies, shows, seasons and episodes with cast, extras, similar titles and version choice.
+- Detail pages for movies, shows, seasons and episodes with cast, extras, similar titles and version choice. `INFO` on a
+  title shows its whole description; a long one scrolls page by page.
 - Search across your libraries.
 
 **Player**
 - Direct Play of what the TV can decode itself; everything else (for example HEVC or 10-bit video) is converted by your
   Plex Media Server automatically.
+- You decide how much the server may send: *Quality limit at home* (only applies when the server converts) and *Quality limit over the internet* (for example from a
+  friend's server) each set an upper limit, or *Original (no limit)*, which sends the file unchanged whenever the TV can play
+  it (Settings › Playback).
 - Audio and subtitle choice with readable track names, remembered per show; optional rule for anime (Japanese audio with subtitles).
 - Skip intro / skip credits, next-episode countdown, chapters, sleep timer, "Still watching?", seek preview thumbnails
   (markers and thumbnails need the data your server provides).
@@ -109,11 +118,20 @@ program on your computer signs in **once**, and from then on the TV talks **only
 - *Discover* rows, your Plex **watchlist** and details of titles that are not on your server through an optional helper on
   your home network (everything else works without it). The helper can start with your computer and shows a small icon in
   the menu bar or next to the clock; one click removes it completely.
-  The plex.tv rows (Trending now, Just released, Coming soon) suggest only titles you don't have yet – switchable under Settings → Display.
+  The plex.tv rows (Trending now, Just released, Coming soon) suggest only titles you don't have yet – switchable under Settings → Live TV & Discover.
 - Optional: libraries of **servers that someone shared with you** (for example a friend), shown in the sidebar with their origin.
+- Optional **Live TV** (off by default, Settings › Live TV & Discover › *Live TV*): the free live streams that public broadcasters show
+  on their own websites – Das Erste, ZDF, arte, 3sat, phoenix, the regional channels and more, plus arte in French,
+  channels from Austria, Denmark, Spain, Sweden and Australia and international services (DW English, NHK World, Arirang …);
+  the region of your country is on first – as a sidebar area and an optional Home row, with "what's on now" where the broadcaster offers it. No
+  unofficial IPTV, nothing with copy protection or a sign-in. On the 2014 Samsung TV, **all channels play with the optional
+  helper**: the ARD and ZDF channels send their sound as a separate track, which the TV's player cannot combine, so the
+  helper fetches picture and sound from the broadcaster and hands the TV one stream (it stores nothing). Without the helper
+  the TV shows only the channels whose sound is inside the picture (arte, DW English); other platforms play them all.
 - No ads, no tracking, no telemetry.
 
-Deliberately **not** included: casting, downloads, Watch Together, remote access outside your home network.
+Deliberately **not** included: casting, downloads, Watch Together, remote access to your own server from outside your
+home network.
 
 ## Screenshots
 
@@ -133,8 +151,8 @@ Deliberately **not** included: casting, downloads, Watch Together, remote access
 | **Music** – artists and albums | **Artist pages** – albums, singles & EPs, live, soundtracks, compilations |
 | ![Audiobook with chapter list and progress](docs/screenshots/audiobooks.png) | ![Discover screen with keyboard and suggestions](docs/screenshots/discover.png) |
 | **Audiobooks** – chapters and progress | **Discover** – rediscover your library |
-| ![Screensaver showing a movie's background picture with the clock and title in the Ambient style](docs/screenshots/screensaver.png) | ![Accent colour picker with seven colours, set to Coral](docs/screenshots/accent.png) |
-| **Screensaver** – pictures from your libraries, nine transitions (or Random), six overlay styles | **Accent colour** – seven colours, per profile; every setting explained |
+| ![Screensaver showing a movie's background picture with the clock and title in the Ambient style](docs/screenshots/screensaver.png) | ![Selection colour picker with eight colours, set to Coral](docs/screenshots/accent.png) |
+| **Screensaver** – pictures from your libraries, nine transitions (or Random), six overlay styles | **Selection colour** – eight colours, per profile; every setting explained |
 
 <sub>All titles, people and artwork in the screenshots are invented demo content.</sub>
 
@@ -195,7 +213,7 @@ These TVs have a ready-made download:
 
 | TV system | Models | Download | Installation guide | Media servers | Last tested on a real TV | Status |
 |---|---|---|---|---|---|---|
-| **Samsung Smart TV 2014 (Orsay)** | 2014 H series (e.g. UE48H8000, UE40H6400)<br>2014 HU series, 4K (e.g. UE55HU7500) | [Setup program](#download) for your computer – it contains the TV app | [English](docs/INSTALL.md) · [Deutsch](docs/INSTALL.de.md) | Plex | 1.0.16 (2026-11-04, UE48H8000) | ✅ tested on a real TV by the maintainer |
+| **Samsung Smart TV 2014 (Orsay)** | 2014 H series (e.g. UE48H8000, UE40H6400)<br>2014 HU series, 4K (e.g. UE55HU7500) | [Setup program](#download) for your computer – it contains the TV app | [English](docs/INSTALL.md) · [Deutsch](docs/INSTALL.de.md) | Plex | 1.0.17 (2026-11-05, UE48H8000) | ✅ tested on a real TV by the maintainer |
 
 No community port for other TVs yet – yours could be the first: [community ports](PORTS.md).
 <!-- /gen:platforms -->
@@ -219,7 +237,13 @@ official Plex app in their app store – try that first. If you would still like
 
 ## Privacy and security
 
-- **No telemetry, no ads, no analytics.** In daily use the TV talks only to your Plex Media Server.
+- **No telemetry, no ads, no analytics.** In daily use the TV talks only to your Plex Media Server – plus, only if you set
+  them up, the optional helper on your home network and servers that someone shared with you.
+- **Live TV** (off by default) is the one feature that reaches out to other sources on its own, and only while it is
+  switched on and only for what you see: a channel you play is loaded straight from the broadcaster's website and video
+  servers, "what's on now" comes from the ARD programme service, and the channel logos come from Wikimedia Commons
+  through your Plex server. No account, no cookies and no identifiers are sent. Switched off, nothing is requested.
+
 - Your **Plex password** and **Plex PIN** are entered only on plex.tv, never in Neolume or the setup program.
 - Every profile gets its own access that works **only with your server**; it is stored in the TV's app storage. You can
   revoke it any time on plex.tv under *Authorized Devices*.

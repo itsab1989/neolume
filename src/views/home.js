@@ -67,7 +67,7 @@
     for (var si = 0; si < SLOTS; si++) slotRow.push(-1);
     var undo = null, hideCommit = null, retryT = 0, retryN = 0, offline = false, pingT = 0, railOpen = false;
     var seasonCache = new N.LRU(10), stripTask = null, drawn = false;
-    var skel = null, away = false, parked = null, resume = false, prepRaf = false, dead = false, onFlush = null, onSet = null, onBack = null, onPlayed = null, onScanned = null, onAnime = null, cfgDirty = false;
+    var skel = null, away = false, parked = null, resume = false, prepRaf = false, dead = false, onFlush = null, onSet = null, onBack = null, onPlayed = null, onScanned = null, onAnime = null, onEpg = null, cfgDirty = false;
     var size = 'L', skelSize = '';
     /* Kacheln (Apple Nr. 27, SPEC HOME-17): Hintergrund wie in Bibliotheken (N.ui.Ambient, Einstellung libBg/libBgStrength) –
      * Titel = oberste ganz sichtbare Kachel (Film/Serie), mit Tasten bzw. unter Maus/Trackpad die Kachel im Fokus; hov = der Zeiger
@@ -121,7 +121,7 @@
       sb = new N.ui.StateBlock(root);
       onFlush = function () { if (hideCommit) hideCommit.run(); };
       N.evt.on('app:flush', onFlush);                 // EXIT-Taste: ausstehendes Ausblenden sofort senden (L8)
-      onSet = function (e) { if (e && e.key === 'homeRows') cfgDirty = true; if (e && /^anime/.test(e.key) && hero) hero.paintOv(); };
+      onSet = function (e) { if (e && (e.key === 'homeRows' || e.key === 'liveHome' || e.key === 'liveRegions' || e.key === 'liveTv')) cfgDirty = true; if (e && /^anime/.test(e.key) && hero) hero.paintOv(); };
       onAnime = function () { if (hero) hero.paintOv(); };
       N.evt.on('anime:changed', onAnime);             // "Als Anime behandeln" (TOOLS): Ueberzeile sofort anpassen
       N.evt.on('settings:changed', onSet);            // "Startseite anpassen": beim naechsten Betreten neu ordnen + laden
@@ -151,6 +151,9 @@
         refresh(ids);
       };
       N.evt.on('library:changed', onChanged);         // HOME-12: neue Titel auf dem Server -> betroffene Reihen an Ort und Stelle
+      onEpg = function () { if (!dead) N.idle.add(liveFresh, 'home-live'); };
+      N.evt.on('live:epg', onEpg);                    // Fernsehen (LIVE-8): "Laeuft gerade" angekommen -> Reihe im Leerlauf neu beschriften
+      N.evt.on('live:avail', onEpg);                  // Helfer erreichbar bzw. weg (LIVE-10): Sender mit getrenntem Ton dazu/weg
       watchFn = function () { return !dead && !away; };
       N.libwatch.want(watchFn);                       // solange die Startseite oben ist: alle 2 Min. im Leerlauf nachsehen
       if (TILES && caps.homeHero === true) { onMode = function () { modeChanged(); }; N.evt.on('input:mode', onMode); }
@@ -347,7 +350,17 @@
       N.idle.add(updateHints, 'home-hints');
       N.idle.add(warm, 'home-warm');
       N.idle.add(extNear, 'home-ext');
+      N.idle.add(liveEpg, 'home-live-epg');
       if (amb) { amb.data(); ambKick(); }
+    }
+    /* Fernsehen (LIVE-8): Programmdaten der Sender in der Reihe holen (nur wo der Sender sie offen anbietet; im Leerlauf) */
+    function liveRow() { for (var r = 0; r < rows.length; r++) if (rows[r].live) return r; return -1; }
+    function liveEpg() { var r = liveRow(); if (r >= 0 && !dead) N.live.epgFetch(liveIds(rows[r])); }
+    /* neue Beschriftung: nicht fokussierte Reihe an Ort und Stelle, fokussierte erst nach Tastenruhe (wie HOME-12) */
+    function liveFresh() {
+      var r = liveRow(), nr = r >= 0 ? N.live.homeRow() : null;
+      if (!nr || dead || away) return;
+      if (r === R) { held[nr.id] = nr; holdLater(); } else putRow(r, nr);
     }
     function placeRing(p) {
       if (rows[R] && !rows[R].items.length) { ring.hide(); return; }   // Hinweis-Reihe einer Erweiterung ("Wird geladen …"): keine Karte
@@ -446,6 +459,7 @@
       if (!rows.length) return [N.disc.blueHint()];      // Lade-Skelett: keine Karten-Aktionen
       var it = curItem(), list = [];
       if (it && it.ext) return [{ k: 'OK', t: 'hint.details' }, N.disc.blueHint()];   // Erweiterungs-Karte: nur Details
+      if (it && it.live) return [{ k: 'OK', t: 'hint.watch' }, N.disc.blueHint(), { k: 'TOOLS', t: 'hint.options' }];   // Fernsehen (LIVE-6)
       if (it && it.all) return [{ k: 'OK', t: 'hint.showAll' }, N.disc.blueHint()];   // HOME-14 "Alle anzeigen"
       if (!it && rows[R] && rows[R].note) return [N.disc.blueHint()];   // Hinweis-Reihe ohne Karten
       if (rows[R] && rows[R].id === 'cw') list.push({ k: 'red', t: 'hint.hide' });
@@ -457,7 +471,8 @@
     };
 
     /* ---------- Fokus-Schritte ---------- */
-    function afterMove() { scheduleHero(); N.idle.add(updateHints, 'home-hints'); N.idle.add(warm, 'home-warm'); N.idle.add(extNear, 'home-ext'); if (amb) ambKick(); }
+    function afterMove() { scheduleHero(); N.idle.add(updateHints, 'home-hints'); N.idle.add(warm, 'home-warm'); N.idle.add(extNear, 'home-ext'); if (amb) ambKick(); if (DWARM && N.details.warm) N.details.warm(curItem()); }
+    var DWARM = !!(N.ui.card && N.ui.card.on());       // Detailkarte (Apple): Hintergrund der fokussierten Karte vorladen (DET-21); TV: nie
     /* Reihen einer optionalen Erweiterung (N.hubs.extRow): erst laden, wenn sie in die Naehe kommen (R-1 … R+2), immer aus der
      * Idle-Queue (nie im Fokusschritt); naht der Fokus dem Ende einer geladenen Reihe, die mehr hat, die naechste Seite holen. */
     function extNear() {
@@ -560,6 +575,7 @@
       if (!it) return;
       if (it.all) { openAll(rows[R]); return; }      // HOME-14: Karte "Alle anzeigen" (OK, PLAY, Klick)
       if (it.ext) { if (!N.ext.call('home:open', it)) N.router.push('extdetails', { it: it, rail: 'home' }); return; }   // Titel ausserhalb des Servers (Erweiterungs-Reihe)
+      if (it.live) { N.live.play(it.live, liveIds(rows[R])); return; }   // Fernsehen (LIVE-6): Sender sofort, CH▲/▼ blaettert in dieser Reihe
       if (N.music.isAudio(it)) { if (play && N.music.play(it)) return; if (N.music.open(it)) return; }   // M4 Musik/Hoerbuecher
       if (!M.isVideo(it)) { N.router.push('soon', { area: 'details', label: N.t('soon.music') }); return; }   // Musik/Hoerbuch/Playlist
       // OK auf Weiterschauen/Naechste Folgen und PLAY auf jeder Film-/Folgenkarte spielen ab (M3); sonst Details (M3b)
@@ -696,7 +712,19 @@
     function menu() {
       var it0 = curItem(); if (!it0) return;
       if (it0.ext || it0.all) { openItem(it0, false); return; }   // Titel ausserhalb des Servers / "Alle anzeigen": kein Menue
+      if (it0.live) { liveMenu(it0); return; }
       N.anime.ensure(it0, function () { if (curItem() === it0 && N.router.top() === s && !N.router.hasOverlay()) menuOpen(it0); });   // Einordnung fuer "Als Anime behandeln"
+    }
+    function liveIds(row) { var o = []; for (var i = 0; row && i < row.items.length; i++) if (row.items[i].live) o.push(row.items[i].live); return o; }
+    /* Fernsehen (LIVE-6): Ansehen · Sender der Startseite (Liste wie "Startseite anpassen") · Alle Sender (Bereich Fernsehen) */
+    function liveMenu(it) {
+      N.ui.dialog.open({ title: it.title, buttons: [{ id: 'play', t: N.t('menu.watch') }, { id: 'pick', t: N.t('menu.liveHome') }, { id: 'all', t: N.t('menu.liveAll') }],
+        vertical: true, focus: 0, top: 120,
+        onSelect: function (id) {
+          if (id === 'play') openItem(it, false);
+          else if (id === 'pick') N.router.push('livehome');
+          else N.app.navigate('livetv');
+        } });
     }
     function menuOpen(it) {
       var b = [];
@@ -968,6 +996,7 @@
       if (onScanned) N.evt.off('library:scanned', onScanned);
       if (onChanged) N.evt.off('library:changed', onChanged);
       if (onMode) N.evt.off('input:mode', onMode);
+      if (onEpg) { N.evt.off('live:epg', onEpg); N.evt.off('live:avail', onEpg); }
       if (watchFn) N.libwatch.unwant(watchFn);
       if (task) task.abort(); task = null;
       if (retryT) clearTimeout(retryT);
@@ -999,7 +1028,7 @@
         case 'RED': hideCard(); return true;
         case 'YELLOW': toggleWatched(); return true;
         case 'BLUE': N.router.push(N.disc.blueView()); return true;
-        case 'INFO': if (it && (it.ext || it.all)) openItem(it, false); else N.details.open(it); return true;
+        case 'INFO': if (it && it.live) liveMenu(it); else if (it && (it.ext || it.all)) openItem(it, false); else N.details.open(it); return true;
         case 'TOOLS': menu(); return true;
         case 'FF': moveCol(Math.min(sl.count() - 1, f + 5)); return true;
         case 'RW': moveCol(Math.max(0, f - 5)); return true;
@@ -1071,11 +1100,14 @@
     };
     /* ---------- Tippen, freies Scrollen (Apple: caps.cardTap, caps.home 'tiles', caps.scroll 'free'; 08-touch S4–S6) ---------- */
     /* Tipper/Klick auf eine Kachel: bei cardTap 'details' oeffnen Film/Serie/Folge die Details (Detailkarte, Nr. 9/12) statt
-     * abzuspielen; "Alle anzeigen", Erweiterungs-Karten, Musik und Playlists wie OK */
+     * abzuspielen, eine Weiterhoeren-Karte die Karte ihres Buchs; "Alle anzeigen", Erweiterungs-Karten, Musik und Playlists wie OK.
+     * Tasten (auch am Apple-Geraet) und der TV bleiben bei openItem: OK auf Weiterhoeren setzt sofort fort. */
     function tap(it) {
       if (!it) return;
       if (N.details.tap && N.details.tap(it)) return;   // Detailkarte (caps.details 'card'): auch Album/Kuenstler, nur Finger/Maus (DET-10)
       if (TAP_DETAILS && !it.all && !it.ext && M.isVideo(it)) { N.details.open(it); return; }
+      var book = TAP_DETAILS ? N.music.listenAlbum(it) : null;   // Weiterhoeren: Karte des Buchs ("Fortsetzen" zuerst) statt sofort abzuspielen (DET-10)
+      if (book) { N.details.open(book); return; }
       openItem(it, false);
     }
     /* Kacheln: Treffer in jeder sichtbaren Reihe (Seitenlage py, Reihenlage px), auch angeschnittene Karten und ihre Beschriftung.

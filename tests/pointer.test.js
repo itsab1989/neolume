@@ -435,8 +435,14 @@ test('Seitenleiste flexibel: Vorbeischiessen klappt nicht auf, Verweilen bzw. Be
   // (5) schnelle deutliche Bewegung nach links in der Spalte: sofort auf; weit hinaus: sofort zu
   at(110, 300, 45); at(70, 300, 0);
   assert.strictEqual(R.isOpen(), true, 'Bewegung nach links (' + R.OPEN_LEFT + ' px) klappt sofort auf');
-  T.tick(45); at(700, 300, 0);
+  T.tick(45); seen = []; at(700, 300, 0);
   assert.strictEqual(R.isOpen(), false, 'weit hinaus: sofort zu');
+  assert.ok(seen.indexOf('move@700') >= 0, 'erster Hover nach dem Zuklappen wirkt sofort');
+  // (5b) Nachbefund 04.11.: waehrend die Leiste zugleitet, laufen weitere Hover-Folgen erst am Ende (an der letzten Zeigerstelle)
+  at(800, 300, 45); at(900, 300, 30);
+  assert.ok(seen.indexOf('move@800') < 0 && seen.indexOf('move@900') < 0, 'im Gleiten zurueckgestellt: ' + seen.join(' '));
+  T.tick(120);
+  assert.strictEqual(seen[seen.length - 1], 'move@900', 'am Ende des Gleitens: letzte Zeigerstelle');
   // (6) Flattern an der Kante der Spalte (104 <-> 120 alle 20 ms): kein Auf und Zu
   T.tick(300);
   for (var i = 0; i < 20; i++) at(i % 2 ? 120 : 104, 300, 20);
@@ -445,6 +451,100 @@ test('Seitenleiste flexibel: Vorbeischiessen klappt nicht auf, Verweilen bzw. Be
   // (7) Klick in der Spalte wirkt sofort (wie bisher)
   at(400, 300, 300); P.click(60, 190, null);
   assert.strictEqual(R.isOpen(), false, 'Klick: Eintrag gewaehlt, Leiste zu');
+});
+
+/* Nutzerbefund iPad 05.11. (Trackpad): "will auf die kleinen Symbole klicken, genau dann klappt sie aus" und "Live-TV muss zweimal
+ * angeklickt werden". Flexible Flaeche: Klick auf ein Symbol der eingeklappten Spalte fuehrt sofort hin (Panel bekommt nie .open),
+ * Zielen (Zeiger bewegt sich) klappt nicht auf, erst Ruhe bzw. linker Rand; Druck verwirft die Absicht; ein Loslassen ohne click
+ * (WebKit verwirft ihn, wenn das Ziel zwischen Druck und Loslassen wechselte) wirkt einmal als Klick. */
+function flexRail(N, T, nav) {
+  N.router._reset(T.now);
+  N.ui.hints = { el: null, set: function () {}, refresh: function () {}, hit: function () { return null; } };
+  var R = N.ui.rail, panelLog = [];
+  function el() { return { className: '', style: {} }; }
+  var pn = { style: {}, _c: '' };
+  Object.defineProperty(pn, 'className', { get: function () { return this._c; }, set: function (v) { this._c = v; panelLog.push(v); } });
+  R.el = el(); R.panel = pn; R.dim = el(); R.att = 'home'; R.cur = 'home'; R.f = 0;
+  R.entries = [{ id: 'profile', y: 28, ni: el() }, { id: 'home', y: 112, ni: el() }, { id: 'lib-1', y: 168, ni: el() }, { id: 'livetv', y: 224, ni: el() }, { id: 'settings', y: 636, ni: el() }];
+  N.app = { navigate: function (id) { nav.push(id); return true; } };
+  N.router.define('x', function () { return { rail: 'home', flex: true, create: function () {}, onKey: function () { return true; }, pointer: function () { return true; } }; });
+  N.router.reset('x');
+  N.screen.flex = true; N.screen.safe = { t: 0, r: 0, b: 0, l: 0 }; N.screen.h = 720; N.screen.view = function () { return { x: 0, y: 0 }; };
+  return panelLog;
+}
+test('Seitenleiste flexibel: Klick auf ein Symbol fuehrt sofort hin, ohne aufzuklappen (auch Live-TV mit einem Klick)', function () {
+  var ctx = H.load({ fakeTimers: true }), N = ctx.N, T = ctx.timers, nav = [], log = flexRail(N, T, nav), P = N.pointer, R = N.ui.rail;
+  function at(x, y, ms) { P.move(x, y); T.tick(ms === undefined ? 45 : ms); }
+  at(400, 248, 300);
+  at(70, 248, 60);                                           // Zeiger kommt auf "Live-TV" an, Klick kurz danach
+  P.click(70, 248, null);
+  H.eq(nav, ['livetv'], 'ein Klick genuegt');
+  assert.ok(log.every(function (c) { return !/\bopen\b/.test(c); }), 'Panel nie aufgeklappt: ' + log.join(' | '));
+  T.tick(1000);
+  assert.strictEqual(R.isOpen(), false, 'klappt auch danach nicht auf (Absicht verworfen)');
+  // nach dem Zielen ruhen: auf, dann Klick auf denselben Eintrag
+  at(400, 300, 300); log.length = 0;
+  at(70, 190, R.OPEN_DWELL + 20);
+  assert.strictEqual(R.isOpen(), true, 'Ruhe in der Spalte: auf');
+  P.click(70, 190, null);
+  H.eq(nav, ['livetv', 'lib-1'], 'Klick im aufgeklappten Panel');
+});
+test('Seitenleiste flexibel: Zielen klappt nicht auf, Ruhe bzw. linker Rand schon', function () {
+  var ctx = H.load({ fakeTimers: true }), N = ctx.N, T = ctx.timers, nav = [], P = N.pointer, R = N.ui.rail;
+  flexRail(N, T, nav);
+  function at(x, y, ms) { P.move(x, y); T.tick(ms === undefined ? 45 : ms); }
+  at(400, 300, 300);
+  for (var i = 0; i < 14; i++) at(90 - (i % 3) * 4, 130 + i * 10, 45);   // ~630 ms in der Spalte unterwegs (zielt, nach unten)
+  assert.strictEqual(R.isOpen(), false, 'beim Zielen (Bewegung) bleibt sie zu');
+  T.tick(R.OPEN_DWELL + 10);
+  assert.strictEqual(R.isOpen(), true, 'Zeiger ruht: auf');
+  at(700, 300, 400);
+  assert.strictEqual(R.isOpen(), false);
+  at(90, 300, 45); at(R.EDGE_X, 300, 0);                    // an den linken Rand: sofort
+  assert.strictEqual(R.isOpen(), true, 'linker Rand: sofort auf');
+});
+test('Seitenleiste flexibel: Druck verwirft die Absicht; Loslassen ohne click wirkt genau einmal', function () {
+  var ctx = H.load({ fakeTimers: true }), N = ctx.N, T = ctx.timers, nav = [], P = N.pointer, R = N.ui.rail;
+  flexRail(N, T, nav);
+  function at(x, y, ms) { P.move(x, y); T.tick(ms === undefined ? 45 : ms); }
+  at(400, 300, 300); at(70, 248, 200);                       // Ruhe laeuft (noch nicht offen)
+  P.railPress(70, 248);
+  T.tick(R.OPEN_DWELL + 50);
+  assert.strictEqual(R.isOpen(), false, 'gedrueckt: klappt nicht auf');
+  P.railRelease(70, 248); P.railClick(); P.click(70, 248, null);   // normaler Ablauf mouseup -> click
+  T.tick(200);
+  H.eq(nav, ['livetv'], 'genau ein Wechsel');
+  at(400, 300, 300); at(70, 190, 100);
+  P.railPress(70, 190); P.railRelease(71, 190);              // click kam nie an
+  T.tick(200);
+  H.eq(nav, ['livetv', 'lib-1'], 'Loslassen wirkt als Klick');
+  at(400, 300, 300); at(70, 190, 100);
+  P.railPress(70, 190); P.railRelease(140, 190);             // weggezogen: kein Klick
+  T.tick(200);
+  H.eq(nav, ['livetv', 'lib-1']);
+});
+
+/* Review 05.11.: Finger (platforms/apple/loader/touch.js) schickt beim Wischen mousedown und – beim Uebergang in den Zug –
+ * mouseup an derselben Stelle, aber nie einen click. Der Ersatz-Klick der Maus darf daraus keinen Wechsel machen (Rand-Wisch zum
+ * Aufklappen bzw. senkrechtes Wischen in der Icon-Spalte fuehrte sonst 80 ms spaeter zum Eintrag unter dem Finger). */
+test('Seitenleiste flexibel: Finger-Wischen in der Icon-Spalte loest keinen Ersatz-Klick aus (nur Maus/Trackpad)', function () {
+  var ctx = H.load({ fakeTimers: true }), N = ctx.N, T = ctx.timers, nav = [], P = N.pointer;
+  flexRail(N, T, nav);
+  function node() { return { style: {}, className: '', appendChild: function () {}, setAttribute: function () {}, addEventListener: function () {} }; }
+  ctx.document = { getElementById: function () { return null; }, createElement: node, createTextNode: function () { return {}; }, body: null };
+  var on = {}, root = node();
+  root.addEventListener = function (t, fn) { on[t] = fn; };
+  P.init(root, node()); P.setEnabled(true);
+  function ev(x, y, touch) { var e = { clientX: x, clientY: y, button: 0, preventDefault: function () {} }; if (touch) e.pnInput = 'touch'; return e; }
+  on.mousedown(ev(6, 248, true)); on.mouseup(ev(6, 248, true));   // Finger: Auflegen, Zug beginnt (up am Startpunkt), kein click
+  T.tick(300);
+  H.eq(nav, [], 'Wischen: kein Wechsel');
+  on.mousedown(ev(70, 248)); on.mouseup(ev(70, 248));             // Maus: click verworfen -> Ersatz wirkt weiter
+  T.tick(300);
+  H.eq(nav, ['livetv'], 'Maus ohne click: Loslassen wirkt als Klick');
+  on.mousedown(ev(70, 190)); on.mouseup(ev(70, 190)); on.click(ev(70, 190));   // Maus mit click: genau ein Wechsel
+  T.tick(300);
+  H.eq(nav, ['livetv', 'lib-1'], 'Maus mit click: kein zweiter Wechsel');
 });
 
 /* Ziehen und Eingabeart (SPEC PLAY-34, Entscheidung Apple Nr. 14/15): der Bildschirm entscheidet ueber pointerGrab/pointerDrag */
@@ -506,4 +606,18 @@ test('caps.pointer: Standard remote (TV), Vertrag prueft den Wert', function () 
   assert.strictEqual(N.platform.caps.pointer, 'remote');
   assert.strictEqual(N.Platform.defaults().pointer, 'remote');
   assert.ok(N.Platform.check({ caps: { pointer: 'finger' } }).indexOf('caps.pointer muss remote|mouse sein') >= 0);
+});
+test('Seitenleiste flexibel: Aufklappen nach links immer an derselben Stelle, egal wo der Zeiger zuerst in der Spalte gemessen wurde (Nutzerbefund 05.11.)', function () {
+  [111, 104, 96, 88, 82].forEach(function (first) {
+    var ctx = H.load({ fakeTimers: true }), N = ctx.N, T = ctx.timers, nav = [], P = N.pointer, R = N.ui.rail;
+    flexRail(N, T, nav);
+    function at(x, y, ms) { P.move(x, y); T.tick(ms === undefined ? 45 : ms); }
+    at(400, 300, 300);
+    var x = first, opened = 0;
+    at(x, 300, 45);
+    while (x > 40 && !R.isOpen()) { x -= 5; at(x, 300, 45); }   // 5 px je Takt (N.pointer verwirft Bewegungen < JITTER)
+    opened = x;
+    assert.ok(R.isOpen(), 'klappt auf (erster Messpunkt ' + first + ')');
+    assert.ok(opened <= 80 && opened > 75, 'an der Linie (80 px) bzw. im ersten Schritt dahinter: ' + opened + ', erster Messpunkt ' + first);
+  });
 });

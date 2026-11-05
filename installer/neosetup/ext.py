@@ -7,6 +7,7 @@ An extension is an object with any of these optional members (all hooks get the 
   config(w, cfg)                      may add its own block to setup.json before the package is built
   reset(w)                            forget its secrets from memory (logout, finish, quit)
   helper_store(w, store)              may add/remove its own data in the helper file (store.extra)
+  tv_fetched(w, addr)                 the TV (address addr) just downloaded the app package from the sync server
   ui() -> str                         JavaScript for the setup page (runs inside the page script, see ui.html "ext")
   helper_about(lang) -> str           extra paragraph for "What does the helper do?" in the helper's icon menu
   helper_api(helper) -> obj           extra helper routes: obj.handle(method, path, qs, headers, body, client) -> (status, dict)
@@ -60,6 +61,10 @@ def reset(w):
 
 def helper_store(w, store):
     for _, fn in _each('helper_store'): fn(w, store)
+
+
+def tv_fetched(w, addr):
+    for _, fn in _each('tv_fetched'): fn(w, addr)
 
 
 def ui():

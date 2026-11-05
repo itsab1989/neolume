@@ -49,6 +49,8 @@ design/icons
 design/README.md
 tools/i18n_rules.js
 tools/spec_gen.js
+tools/live_data.js
+tools/live_tls.js
 tools/visual.js
 tools/bench.js
 tools/preview.html

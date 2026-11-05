@@ -1,7 +1,8 @@
 /* Ansicht 'settings' – Einstellungen (SPEC 5.18, 7.13, 10.4; Mockup settings.html):
  * Zeilen immer 64 hoch, Fokus = surface-3 + 3-px-Amber-Rahmen, feste Beschreibungsflaeche (nodeValue, ohne Animation).
- * Kategorien (Reihenfolge docs/research/settings-order-2026-10-29.md): Wiedergabe, Ton & Untertitel, Anime, Oberflaeche,
- * [Erweiterung], Bildschirmschoner, Profil & Konto (Konto-Aktionen nur Hauptkonto, SPEC 7.15.1), Diagnose, Hilfe & Info – je Kategorie
+ * Kategorien (Reihenfolge docs/research/settings-order-2026-10-29.md 9): Wiedergabe, Ton & Untertitel, Anime, Startseite & Aussehen,
+ * Sprache & Bedienung, Live-TV & Entdecken, [Erweiterung], Bildschirmschoner, Profil & Konto (Konto-Aktionen nur Hauptkonto, SPEC 7.15.1),
+ * Hilfe & Diagnose – je Kategorie
  * EINE geordnete Liste. Mehr als 6 Zeilen: EIN Listen-Container scrollt per translate3d (Anker 3. Zeile). ◀ von jeder Zeile -> Kategorie; RETURN: Zeile -> Kategorie -> Start bzw. vorheriger Bereich (NAV-5).
  * Listen oeffnen das Auswahl-Panel (keine Wertaenderung per ◀▶). Speichern entprellt ueber N.store.
  * Finger/Trackpad (caps.scroll 'free', App.pan -> s.pan): senkrechtes Wischen ueber einer langen Liste verschiebt sie frei unter
@@ -80,16 +81,18 @@
       if (N.platform.caps.cellular) o.push(quals('qualityCell', N.decision.QWAN));
       return o;
     }
-    /* Wiedergabe (Reihenfolge docs/research/settings-order-2026-10-29.md 2.2): Fortsetzen, Serien-Abend (Intro … Sleep-Timer),
-     * Qualitaet (beim Umwandeln, ueber das Internet, [ueber Mobilfunk]) + Bildformat, Spulen. Ton-Ausgabe (Durchreichen, Verstaerkung) steht unter "Ton & Untertitel". */
+    /* Wiedergabe (Reihenfolge docs/research/settings-order-2026-10-29.md 9.2): Fortsetzen, Serien-Abend (Intro … Sleep-Timer), Spulen,
+     * Bildformat, zuletzt der Qualitaets-Block (zu Hause, ueber das Internet, [ueber Mobilfunk], Direkte Wiedergabe, Geringere Qualitaet) –
+     * selten geaendert, eher technisch. Ton-Ausgabe steht unter "Ton & Untertitel", die Feinauswahl (braucht den Zeiger) unter
+     * "Sprache & Bedienung". */
     function playRows() {
       return [choice('resume', vals(['ask', 'resume', 'start'])), choice('resumeRewind', rewinds()),
         choice('skipIntro', vals(['off', 'button', 'auto'])), choice('skipCredits', vals(['off', 'button', 'auto'])), toggle('autoNext'), countdownRow(),
         choice('stillWatching', stills()), choice('stillTime', hours()), choice('sleepDefault', sleeps()),
-        quals('quality')].concat(netQuals(), [toggle('directPlay'), toggle('lowerOffer'),
-        choice('aspect', [['auto', v('auto')], ['orig', v('orig')], ['fill', v('fill')], ['43', v('a43')], ['zoom', v('zoom')]]),
         choice('seekArrows', secs([5, 10, 15, 30]).concat(secBF('10/30'))), ffrwRow(), choice('seekFf', secs([10, 30, 60]).concat(secBF('15/30'))),
-        toggle('thumbs'), loupeRow(), loupeStyleRow()]);
+        toggle('thumbs'),
+        choice('aspect', [['auto', v('auto')], ['orig', v('orig')], ['fill', v('fill')], ['43', v('a43')], ['zoom', v('zoom')]]),
+        quals('quality')].concat(netQuals(), [toggle('directPlay'), toggle('lowerOffer')]);
     }
     /* Wartezeit vor naechster Folge: wirkt nur mit "Naechste Folge automatisch" (player/markers.js: cd nur bei autoNext) -> sonst gedimmt */
     function countdownRow() {
@@ -134,12 +137,14 @@
       return r;
     }
     function delays() { var o = []; N.osd.DELAYS.forEach(function (ms) { o.push([ms, N.osd.delayText(ms)]); }); return o; }
-    /* Ton & Untertitel: erst die drei Grundwahlen, dann Darstellung der Untertitel, zuletzt Technik (ASS, Ton-Ausgabe) */
+    /* Ton & Untertitel: erst die drei Grundwahlen, dann Darstellung der Untertitel, Technik (ASS, Ton-Ausgabe), zuletzt die
+     * Titelmelodie mit ihrer Lautstaerke (gedimmt darunter; bis 05.11.2026 unter "Oberflaeche", gehoert zum Ton) */
     function subsRows() {
       return [choice('audioLang', vals(['de', 'en', 'no', 'ja', 'server'])), choice('subs', vals(['off', 'forced', 'foreign', 'always', 'server'])),
         choice('subLang', vals(['de', 'en', 'no'])), toggle('rememberTracks'), choice('subSize', vals(['small', 'medium', 'large', 'xl'])),
         choice('subColor', vals(['white', 'yellow'])), choice('subBg', vals(['none', 'dim', 'solid'])), choice('subPos', vals(['low', 'high'])), choice('subDelay', delays()),
-        choice('ass', vals(['burn', 'text'])), toggle('passthrough'), boostRow()];
+        choice('ass', vals(['burn', 'text'])), toggle('passthrough'), boostRow(),
+        toggle('themeMusic'), themeVolRow()];          // Titelmelodie (SPEC v2.2, M3b: Standard aus)
     }
     /* Anime (docs/TODO.md "Anime-Erkennung"): Erkennung je Titel (normal/streng/aus) -> "als eigene Kategorie zeigen" (Ueberzeile, INFO)
      * und "Anime-Wiedergaberegeln" (Ton/UT) unabhaengig voneinander; Erkennung "aus" dimmt beide. Feinere Regeln gedimmt, solange die
@@ -185,7 +190,7 @@
       return r;
     }
     /* Hinweis bei neuen Inhalten (N.newsLogic, SPEC HOME-13): Elternzeile Aus/Allgemein/Genau, darunter Anzeigedauer und "Auch
-     * waehrend der Wiedergabe" (beide gedimmt bei Aus). Steht im Block "Hinweise" direkt vor den Tastenhinweisen. */
+     * waehrend der Wiedergabe" (beide gedimmt bei Aus). Steht im Block "Hinweise" direkt unter den Tastenhinweisen. */
     function newsRows() {
       var S = st(), NL = N.newsLogic;
       function off() { return NL.mode(S.settings) === 'off'; }
@@ -269,8 +274,8 @@
     }
     /* Hintergrund in Bibliotheken (N.amb, ui/ambient.js): Modus und Staerke mit Erklaerung je Wert; Staerke gedimmt bei "Aus" */
     function libBgRows() {
-      /* Startseite mit Kacheln (Apple, HOME-17): dieselbe Einstellung gilt auch hinter den Kacheln der Startseite -> eigene Texte
-       * ("Seitenhintergrund"); TV: Texte wie bisher (Hero, Hintergrund nur in Bibliotheken) */
+      /* Name "Seitenhintergrund" auf allen Geraeten; Startseite mit Kacheln (Apple, HOME-17): dieselbe Einstellung gilt auch hinter den
+       * Kacheln der Startseite -> eigene Beschreibungen; TV: Hintergrund nur in Bibliotheken (Startseite hat den Hero) */
       var S = st(), A = N.amb, T = N.platform.caps.home === 'tiles';
       function opt(val, k) { return [val, v(k), null, v(k + (T && k === 'bgRandom' ? '.sT' : '.s'))]; }
       var m = choice('libBg', [opt(A.MODES[0], 'bgOff'), opt(A.MODES[1], 'bgMood'), opt(A.MODES[2], 'bgTitle'), opt(A.MODES[3], 'bgRandom')]);
@@ -279,7 +284,7 @@
       str.val = function () { return v(A.strength(S.settings) === 'strong' ? 'bgStrong' : 'bgSoft'); };
       str.disabled = function () { return A.mode(S.settings) === 'off'; };
       str.ddesc = 'set.libBgStrength.off.desc';
-      if (T) { m.label = 'set.pageBg'; m.desc = 'set.pageBg.desc'; str.desc = 'set.pageBgStrength.desc'; str.ddesc = 'set.pageBgStrength.off.desc'; }
+      if (T) { m.desc = 'set.pageBg.desc'; str.desc = 'set.pageBgStrength.desc'; }   // gleicher Name "Seitenhintergrund" ueberall (05.11.2026)
       return [m, str];
     }
     /* P4 (docs/research/discover.md): Entdecken an/aus (Standard: an im Hauptprofil). Merkliste nur mit Helfer; ohne Helfer eine
@@ -294,12 +299,16 @@
       /* Blaue Taste oeffnet Suche oder Entdecken (Nutzerwunsch 31.10.): haengt an "Entdecken" -> direkt darunter, gedimmt wenn aus */
       var bk = choice('blueKey', [['search', v('bkSearch'), null, v('bkSearch.s')], ['discover', v('bkDisc'), null, v('bkDisc.s')]]);
       bk.disabled = function () { return !D.enabled(); }; bk.ddesc = 'set.blueKey.off.desc'; bk.help = 'help.blueKey';
-      if (!D.helper()) return [d, bk, { id: 'watchlist', type: 'value', label: 'set.watchlist', desc: 'set.watchlist.none.desc', val: function () { return v('notSetUp'); } }, ir];
-      D.probeHelper(function () { paintAll(); });
+      /* plex.tv direkt (caps.plexTvDirect, z. B. Apple): Merkliste schaltbar wie am TV, ohne Helfer-Probe. Sonst Plattform ohne Helfer
+       * (caps.helper false): keine Zeile – der Satz "Helfer starten" waere dort nicht befolgbar (UX-Review 05.11.) */
+      var dir = !!(D.direct && D.direct());
+      if (!dir && !D.helper() && N.platform && N.platform.caps && N.platform.caps.helper === false) return [d, bk, ir];
+      if (!dir && !D.helper()) return [d, bk, { id: 'watchlist', type: 'value', label: 'set.watchlist', desc: 'set.watchlist.none.desc', val: function () { return v('notSetUp'); } }, ir];
+      if (!dir) D.probeHelper(function () { paintAll(); });
       return [d, bk, { id: 'watchlist', type: 'toggle', label: 'set.watchlist', desc: 'set.watchlist.desc',
         get: function () { return D.watchlistOn(); }, set: function (x) { S.setSetting('watchlist', x); },
         disabled: function () { return D.helperState() === 'down' || !D.enabled(); },
-        ddesc: function () { return D.helperState() === 'down' ? 'set.watchlist.down.desc' : 'set.watchlist.off.desc'; } }, ir].concat(hideRows());
+        ddesc: function () { var p = D.helperProblem(); return p ? 'set.watchlist.' + p + '.desc' : D.helperState() === 'down' ? 'set.watchlist.down.desc' : 'set.watchlist.off.desc'; } }, ir].concat(hideRows());
     }
     /* "Nur Titel, die du noch nicht hast" (N.insp.hide): wirkt nur auf die plex.tv-Reihen (Helfer) -> nur mit eingetragenem Helfer.
      * Standard AN (fehlender Wert = an). Mit Weiteren Servern eine zweite Zeile: auch deren Titel ausblenden (Standard an). */
@@ -358,31 +367,36 @@
             onSelect: function (l) { if (l !== N.i18n.lang()) N.app.setLang(l); } });
         } };
     }
-    /* Oberflaeche (2.5): Layout (Startseite, Seitenleiste, Zurueck aus einem Bereich, Ansicht) · Aussehen (Akzent, Markierungen, Hintergruende, Bewegung) · Kacheln
-     * (Fortschritt, Spoiler) · Uhr · Hinweise (neue Inhalte + Anzeigedauer + im Video, Tastenhinweise) · Bedienung (Zuletzt gesucht, Zeiger) ·
-     * Titelmelodie · Entdecken-Block (nur Erwachsene) */
-    function displayRows(S) {
+    /* Startseite & Aussehen (docs/research/settings-order-2026-10-29.md 9.5): Startseite (anpassen, Infobereich bzw. Kachelgroesse),
+     * Bibliotheksansicht, Farben (Auswahl, Markierungen), Kacheln (Spoiler, Fortschritt), Hintergruende, Uhr, zuletzt Weniger Animationen */
+    function lookRows(S) {
       var adult = !S.isKid();
-      return only([langRow(),
+      return only([
         adult && { id: 'homerows', type: 'action', label: 'set.homeRows', desc: 'set.homeRows.desc',   // SPEC 7.3.1 – nicht in Kinderprofilen (7.13)
           val: function () { return N.tn('set.homeRows.val', homeCount()); }, run: function () { N.router.push('homerows'); } },
         homeHeroRow(S),                                // HOME-18 (nur caps.homeHero, Apple): direkt unter "Startseite anpassen" – auch fuer Kinder
-        // W1 "Seitenleiste anpassen": Eintraege umsortieren/ausblenden (Start + Einstellungen bleiben), gleiche Liste wie oben
-        adult && { id: 'railitems', type: 'action', label: 'set.railItems', desc: 'set.railItems.desc',
-          val: function () { return N.tn('set.railItems.val', N.ui.rail.order().length); }, run: function () { N.router.push('railitems'); } },
-        sectionBackRow(),
         N.platform.caps.home !== 'tiles' && homeSizeRow(),   // HOME-15: direkt vor der Bibliotheksansicht (gleiche Werte Gross/Mittel/Klein); Kacheln-Startseite (Apple): eigene Masse
         choice('libView', [['L', N.t('lib.view.L')], ['M', N.t('lib.view.M')], ['S', N.t('lib.view.S')], ['list', N.t('lib.view.list')]]),   // Bibliotheksansicht (Feedback-Regel 2)
-        accentRow(), badgeRow(),
-        toggle('backgrounds')].concat(libBgRows(), [
-        { id: 'rm', type: 'toggle', label: 'set.reduceMotion', desc: 'set.reduceMotion.desc',
-          get: function () { return !!(S.settings && S.settings.reduceMotion); }, set: function (x) { S.setSetting('reduceMotion', x); N.fx.setReduced(x); } },
+        accentRow(), badgeRow(), toggle('spoiler'),
         { id: 'ep', type: 'toggle', label: 'set.episodeProgress', desc: 'set.episodeProgress.desc',
           get: function () { return !!(S.settings && S.settings.episodeProgress); }, set: function (x) { S.setSetting('episodeProgress', x); } },
         // TV-Befund 28.10.: Serien-Balken einzeln abschaltbar (vorher an "Folgen-Fortschritt" gekoppelt)
         { id: 'sp', type: 'toggle', label: 'set.seriesProgress', desc: 'set.seriesProgress.desc',
           get: function () { return !!(S.settings && S.settings.seriesProgress); }, set: function (x) { S.setSetting('seriesProgress', x); } },
-        toggle('spoiler'), toggle('clock'), clockStyleRow()].concat(newsRows(), N.platform.caps.hintBar === false ? [] : [hintsRow()], [recentRow()],
+        toggle('backgrounds')].concat(libBgRows(), [toggle('clock'), clockStyleRow(),
+        { id: 'rm', type: 'toggle', label: 'set.reduceMotion', desc: 'set.reduceMotion.desc',
+          get: function () { return !!(S.settings && S.settings.reduceMotion); }, set: function (x) { S.setSetting('reduceMotion', x); N.fx.setReduced(x); } }]));
+    }
+    /* Sprache & Bedienung (9.6): Sprache, Seitenleiste, Zurueck aus einem Bereich, Hinweise (Tastenhinweise, neue Inhalte), Zuletzt
+     * gesucht, Zeiger (Steuerung, Rand, Beschleunigen) und darunter die Feinauswahl am Fortschrittsbalken, die den Zeiger braucht */
+    function controlsRows(S) {
+      var adult = !S.isKid();
+      return only([langRow(),
+        // W1 "Seitenleiste anpassen": Eintraege umsortieren/ausblenden (Start + Einstellungen bleiben)
+        adult && { id: 'railitems', type: 'action', label: 'set.railItems', desc: 'set.railItems.desc',
+          val: function () { return N.tn('set.railItems.val', N.ui.rail.order().length); }, run: function () { N.router.push('railitems'); } },
+        sectionBackRow(),
+        N.platform.caps.hintBar !== false && hintsRow()].concat(newsRows(), [recentRow()],
         // Smart-Control-Zeiger (Fernbedienung): mit echter Maus/Trackpad (caps.pointer 'mouse', Apple) nicht anbieten – "Aus" haette
         // dort die Maus abgeschaltet, Randzonen braucht freies Rollen nicht (Nutzer 03.11., SPEC NAV-26)
         N.platform.caps.pointer === 'mouse' ? [] : [{ id: 'ptr', type: 'toggle', label: 'set.pointer', desc: 'set.pointer.desc',
@@ -395,10 +409,36 @@
         { id: 'ptracc', type: 'toggle', label: 'set.ptrAccel', desc: 'set.ptrAccel.desc',
           ddesc: function () { return S.state.pointer === false ? 'set.ptrAccel.off.desc' : 'set.ptrAccel.edge.desc'; },
           disabled: function () { return S.state.pointer === false || S.state.ptrEdge === false; },
-          get: function () { return S.state.ptrAccel !== false; }, set: function (x) { S.state.ptrAccel = x; S.save(); N.pointer.setAccel(x); } }], [
-        toggle('themeMusic'),                         // Titelmelodie (SPEC v2.2, M3b: Standard aus)
-        themeVolRow()
-      ]), adult ? discRows() : []));                   // P4 Entdecken + Merkliste (Kinderprofile: nicht vorhanden)
+          get: function () { return S.state.ptrAccel !== false; }, set: function (x) { S.state.ptrAccel = x; S.save(); N.pointer.setAccel(x); } }],
+        [loupeRow(), loupeStyleRow()]));              // Feinauswahl (PLAY-30/31): bis 05.11.2026 unter Wiedergabe, gedimmt ohne Zeiger
+    }
+    /* Live-TV (SPEC LIVE-1, Nutzerwunsch 05.11.): geschlossener Block mit Elternzeile wie Entdecken (nur Erwachsene, Inhalte von
+     * ausserhalb des Servers), erster Block der Kategorie "Live-TV & Entdecken". Standard aus: ein Update aendert nichts Sichtbares und
+     * fragt nichts im Netz an. Darunter gedimmt, solange aus: Sender-Regionen, Sender auf der Startseite, Qualitaet. INFO erklaert
+     * Herkunft und Grenzen. */
+    function liveRows(S) {
+      function off() { return !N.live.on(); }
+      function dim(r) { r.disabled = off; r.ddesc = 'set.liveTv.off.desc'; return r; }
+      var on = toggle('liveTv');
+      on.help = 'help.liveTv';
+      var reg = dim({ id: 'liveRegions', type: 'list', label: 'set.liveRegions', desc: 'set.liveRegions.desc', help: 'help.liveRegions',
+        info: function () { var nt = N.live.regionNote(); return N.t('help.liveRegions') + (nt ? '\n\n' + nt : ''); },   // Land ohne Sender (LIVE-7)
+        val: function () { var r = N.live.regions(), o = []; for (var i = 0; i < r.length; i++) o.push(N.live.regionName(r[i])); return o.join(', '); },
+        open: function () {
+          var e = N.live.regionEntries();
+          N.ui.panel.select({ title: N.t('set.liveRegions'), multi: true, entries: e, onDone: function (sel) {
+            if (!sel.length) { N.ui.toast.show(N.t('toast.liveRegion')); return; }
+            S.setSetting('liveRegions', sel); paintAll();
+          } });
+        } });
+      var home = dim({ id: 'livehome', type: 'action', label: 'set.liveHome', desc: 'set.liveHome.desc',
+        val: function () { return N.tn('set.liveHome.val', N.live.on() ? N.liveLogic.rows.enabled(S.settings && S.settings.liveHome || null, N.live.homeAvail()).length : 0); },
+        run: function () { N.router.push('livehome'); } });
+      var o = [];
+      N.liveLogic.QUALITY.forEach(function (k) { o.push([k, N.t('lv.q.' + k), null, k === 'auto' ? v('lqAuto.s') : null]); });
+      var q = dim(choice('liveQuality', o));
+      q.help = 'help.liveQuality';
+      return [on, reg, home, q];
     }
     /* Infobereich ueber den Kacheln der Startseite (HOME-18, caps.homeHero): Standard an; wirkt nur mit Zeiger/Tastatur und genug Hoehe
      * (views/home.js heroWanted), gilt beim naechsten Aufbau der Startseite */
@@ -468,16 +508,18 @@
         } }
       ];
     }
-    /* Kategorien: Wiedergabe · Ton & Untertitel · Anime · Oberflaeche · [Erweiterung, z. B. Anfragen] · Bildschirmschoner ·
-     * Profil & Konto · Diagnose · Hilfe & Info. Kinder: ohne Bildschirmschoner, Profil & Konto und Diagnose. */
+    /* Kategorien (docs/research/settings-order-2026-10-29.md 9): Wiedergabe · Ton & Untertitel · Anime · Startseite & Aussehen ·
+     * Sprache & Bedienung · Live-TV & Entdecken · [Erweiterung, z. B. Anfragen] · Bildschirmschoner · Profil & Konto · Hilfe & Diagnose –
+     * hoechstens 10 (die Liste rollt am TV nicht). Kinder: ohne Live-TV & Entdecken, Bildschirmschoner, Profil & Konto und ohne die
+     * Protokoll-Zeilen in Hilfe & Diagnose. */
     function defs() {
       var S = st(), adult = !S.isKid();
       var list = only([{ id: 'play', rows: playRows() }, { id: 'subs', rows: subsRows() }, { id: 'anime', rows: animeRows() },
-        { id: 'display', rows: displayRows(S) },
+        { id: 'look', rows: lookRows(S) }, { id: 'controls', rows: controlsRows(S) },
+        adult && { id: 'live', rows: liveRows(S).concat(discRows()) },   // LIVE-1 Live-TV, P4 Entdecken + Merkliste (Kinderprofile: beides nicht vorhanden)
         adult && { id: 'saver', rows: saverRows() },
         adult && { id: 'account', rows: accountRows(S), desc: S.pkg ? 'set.cat.account.app.desc' : null },
-        adult && { id: 'diag', rows: diagRows() },
-        { id: 'help', rows: helpRows() }]);
+        { id: 'help', rows: adult ? helpRows().concat(diagRows()) : helpRows(), desc: adult ? null : 'set.cat.help.kid.desc' }]);
       N.ext.call('settings:cats', list, S, paintAll);   // optionale Erweiterungen: eigene Kategorie (core/ext.js)
       return list;
     }
@@ -517,7 +559,9 @@
       for (i = 0; i < maxRows(); i++) {
         var re = { el: U.el('div', 'set-row', list, 'display:none;top:' + (i * ROW_STEP) + 'px' + (STACK ? ';width:' + LW + 'px' : '')) };
         re.lb = U.txt('div', 'lb', re.el, '', STACK ? 'width:' + Math.max(160, LW - 250) + 'px' : undefined);
-        re.val = U.txt('div', 'val', re.el, '');
+        /* schmal (STACK): der Wert beginnt hinter dem Namen (left + right aus dem CSS je Eingabeart) statt fester 220 px – sonst lag ein
+         * langer Wert ueber dem Namen (iPhone SE/Duo hochkant: "Bilder im Bildschirmschoner" / "Nur echte Hintergrundbilder", 05.11.) */
+        re.val = U.txt('div', 'val', re.el, '', STACK ? 'left:' + (21 + Math.max(160, LW - 250) + 8) + 'px;width:auto' : undefined);
         re.tg = U.el('div', 'toggle', re.el); U.el('i', '', re.tg);
         re.sw = U.el('span', 'sw', re.el);              // Farbfeld (nur Zeilen mit sw, z. B. Akzentfarbe)
         U.el('div', 'sep', re.el);
@@ -666,6 +710,7 @@
     s.railBlur = function () { if (zone === 'cat') U.cls(catEls[c], 'is-focus', false); else U.cls(rowEls[r].el, 'is-focus', false); };
     s.railFocus = function () { if (zone === 'cat') U.cls(catEls[c], 'is-focus', true); else U.cls(rowEls[r].el, 'is-focus', true); };
     s.toastLow = true;              // Toast unter der Beschreibung (.set-desc), nie darueber (NAV-10)
+    s.toastUnder = !(N.screen && N.screen.flex);   // … und buendig mit ihr, nicht ueber der Bereichsliste (10 Bereiche reichen bis y 650); flexible Flaeche (Apple) hat eigene Lage
     s.hints = function () { return [{ k: 'ret', t: 'hint.back' }, { k: 'INFO', t: 'hint.learnMore' }]; };
     s.onKey = function (k) {
       var n;
@@ -674,7 +719,7 @@
         else if (k === 'RIGHT' || k === 'ENTER') focusRow(0);
         else if (k === 'LEFT') N.ui.rail.open();
         else if (k === 'RETURN') { if (params && params.sec) N.app.sectionBack(); else N.router.back(); }   // NAV-5: Kategorien -> Start bzw. vorheriger Bereich
-        else if (k === 'INFO') N.ui.panel.help(N.t('set.cat.' + cats[c].id), N.t('set.cat.' + cats[c].id + '.desc'));
+        else if (k === 'INFO') N.ui.panel.help(N.t('set.cat.' + cats[c].id), N.t(catKey(c)));
         return true;
       }
       if (k === 'UP' || k === 'DOWN') { n = N.nav.list(r, rowsOf().length, k, true); if (n >= 0) focusRow(n); }

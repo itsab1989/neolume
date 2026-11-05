@@ -194,3 +194,87 @@ test('A–Z auf Norwegisch (03.11.): Leiste # A–Z Æ Ø Å, Æ/Ø/Å eigene Bu
   assert.strictEqual(L.jump(odd, 'C', false).ch, 'Å');   // fehlender Buchstabe: naechster in Leisten-Reihenfolge
   assert.strictEqual(L.cmp('Z', 'Æ'), -1); assert.strictEqual(L.cmp('Ø', 'Å'), -1); assert.strictEqual(L.cmp('#', 'A'), -1);
 });
+
+/* LIB-13: eingemischte Karten einer Erweiterung (Abbildung Server-Index <-> Raster-Index, Seiten, A–Z, Reihenfolge) */
+test('LIB-13: nur Titelsortierung ohne Filter bzw. mit "Ungesehene"', function () {
+  assert.strictEqual(L.mixable({ sort: 'title', f: { status: '' } }), true);
+  assert.strictEqual(L.mixable({ sort: 'title', desc: true, f: { status: 'unwatched' } }), true);
+  assert.strictEqual(L.mixable({ sort: 'added', f: { status: '' } }), false, 'Zuletzt hinzugefuegt: nie');
+  assert.strictEqual(L.mixable({ sort: 'title', f: { status: 'watched' } }), false);
+  assert.strictEqual(L.mixable({ sort: 'title', f: { status: 'started' } }), false);
+  assert.strictEqual(L.mixable({ sort: 'title', f: { status: '', genre: { id: '5', t: 'Action' } } }), false);
+  assert.strictEqual(L.mixable({ sort: 'title', f: { status: '', actor: { id: 3, t: 'X' } } }), false);
+});
+test('LIB-13: Schluessel ohne Artikel (wie titleSort), Buchstabe der Leiste', function () {
+  assert.strictEqual(L.mixKey('The Mondhafen'), 'Mondhafen');
+  assert.strictEqual(L.mixKey('Der Waldtroll'), 'Waldtroll');
+  assert.strictEqual(L.mixKey('Die Brücke'), 'Die Brücke');
+  assert.strictEqual(L.mixKey('A'), 'A', 'ein einzelnes Wort bleibt');
+  assert.strictEqual(L.mixLetter('mondhafen', 'de'), 'M');
+  assert.strictEqual(L.mixLetter('Ärger', 'de'), 'A');
+  assert.strictEqual(L.mixLetter('Øya', 'nb'), 'Ø');
+  assert.strictEqual(L.mixLetter('12 Tage', 'de'), '#');
+});
+test('LIB-13: Abbildung Server <-> Raster, Seiten des Servers fuer Raster-Seiten', function () {
+  var m = L.mix([3, 3, 60]);                         // zwei Karten vor Server-Titel 3, eine vor 60
+  H.eq(m.v, [3, 4, 62]);
+  assert.strictEqual(m.toV(0), 0); assert.strictEqual(m.toV(2), 2); assert.strictEqual(m.toV(3), 5); assert.strictEqual(m.toV(59), 61); assert.strictEqual(m.toV(60), 63);
+  assert.strictEqual(m.toS(5), 3); assert.strictEqual(m.toS(3), 3, 'Karte -> naechster Server-Titel'); assert.strictEqual(m.toS(63), 60);
+  assert.strictEqual(m.phAt(4), 1); assert.strictEqual(m.phAt(5), -1);
+  H.eq(L.mixPages(m, [0], 50, 120), [0], 'Raster 0–49 = Server 0–47');
+  H.eq(L.mixPages(m, [1], 50, 120), [0, 1], 'Raster 50–99 = Server 48–96');
+  H.eq(L.mixPages(m, [2], 50, 120), [1, 2]);
+  H.eq(L.mixPages(L.mix([0]), [0], 50, 0), [], 'leerer Server: keine Seite');
+  var e = L.mix([]); assert.strictEqual(e.toV(7), 7); assert.strictEqual(e.toS(7), 7);
+  var b = L.mix([49]);                               // Karte genau an der Seitengrenze: Server-Titel 49 (Seite 0) steht im Raster bei 50
+  H.eq(L.mixPages(b, [0], 50, 120), [0]); H.eq(L.mixPages(b, [1], 50, 120), [0, 1], 'Raster-Seite 1 braucht Server-Seite 0 (Titel 49) und 1');
+});
+test('LIB-13: Gelb unter "Nur ungesehene" – Server-Titel faellt weg bzw. kommt zurueck, Karten dahinter ruecken mit', function () {
+  var m = L.mix([3, 60]);                            // Raster: Karte bei 3 und 61
+  m.cut(1);                                          // Server-Titel an Raster 1 gesehen -> weg
+  H.eq(m.v, [2, 60]); H.eq(m.ks, [2, 59]);
+  assert.strictEqual(m.toV(58), 59, 'spaeter geladener Server-Titel 58 (vorher 59) landet dort, wo die Karte zuvor 59 hatte');
+  m.ins(1);                                          // rueckgaengig (Fehler beim Server)
+  H.eq(m.v, [3, 61]); H.eq(m.ks, [3, 60]);
+  var k = L.mix([3]); k.cut(5); H.eq(k.v, [3], 'Titel hinter der Karte: Karte bleibt');
+});
+test('LIB-13: A–Z zaehlt die Karten mit, Sprung trifft den Buchstaben; Reihenfolge A–Z und Z–A', function () {
+  var chars = [{ ch: '#', n: 2 }, { ch: 'A', n: 3 }, { ch: 'M', n: 4 }, { ch: 'Z', n: 1 }];
+  var c2 = L.mixChars(chars, ['M', 'B']);
+  H.eq(c2, [{ ch: '#', n: 2 }, { ch: 'A', n: 3 }, { ch: 'B', n: 1 }, { ch: 'M', n: 5 }, { ch: 'Z', n: 1 }]);
+  assert.strictEqual(L.jump(c2, 'M', false).idx, 6);
+  assert.strictEqual(L.mixChars(chars, []).length, 4);
+  var o = L.mixOrder(['Mondhafen', 'Baum', 'Moos'], [5, 2, 5], 10, false);
+  H.eq(o.map(function (x) { return [x.j, x.k]; }), [[1, 2], [0, 5], [2, 5]]);
+  var d = L.mixOrder(['Mondhafen', 'Baum', 'Moos'], [5, 2, 5], 10, true);
+  H.eq(d.map(function (x) { return [x.j, x.k]; }), [[2, 5], [0, 5], [1, 8]], 'absteigend: Gesamtzahl - davor, Gleichstand Z–A');
+});
+
+/* LIB-13 mit vielen Karten (Plan N.lib.mixPlan): Bereich je Karte aus dem Buchstaben-Index, genaue Stelle erst, wenn gebraucht */
+test('LIB-13: Plan – Bereiche aus dem Buchstaben-Index, need() vor einer Seite, Abbildung nur mit gezaehlten Stellen', function () {
+  var ch = [{ ch: 'A', n: 20 }, { ch: 'B', n: 20 }, { ch: 'C', n: 20 }, { ch: 'D', n: 20 }];
+  var m = L.mixPlan(['Apfel', 'Dattel', 'Birne'], ch, false);
+  assert.strictEqual(m.n, 3); assert.strictEqual(m.total, 80);
+  H.eq(m.list.map(function (o) { return [o.key, o.lo, o.hi]; }), [['apfel', 0, 40], ['birne', 0, 60], ['dattel', 40, 80]], 'ein Buchstabe Spielraum');
+  H.eq(m.need(0, 19).map(function (o) { return o.key; }), ['apfel', 'birne']);
+  assert.strictEqual(m.toV(10), -1, 'ungezaehlt: unbekannt');
+  var ap = m.list[0], bi = m.list[1], da = m.list[2];
+  assert.ok(m.set(ap, 5) && m.set(bi, 30));
+  assert.strictEqual(m.toV(4), 4); assert.strictEqual(m.toV(10), 11); assert.strictEqual(m.toV(35), 37);
+  assert.strictEqual(m.toV(45), -1, 'Dattel noch ungezaehlt');
+  assert.strictEqual(m.pos(0), 5); assert.strictEqual(m.pos(1), 31); assert.strictEqual(m.pos(2), -1);
+  assert.strictEqual(m.phAt(31), 1); assert.strictEqual(m.phAt(30), -1);
+  assert.strictEqual(m.toS(31), 30, 'Karte -> naechster Server-Titel');
+  assert.strictEqual(m.set(da, 79), true);
+  assert.strictEqual(m.toV(79), 82); assert.strictEqual(m.pos(2), 81);
+  m.cut(10); assert.strictEqual(m.pos(1), 30, 'Gelb: Karten dahinter ruecken mit'); assert.strictEqual(m.pos(0), 5);
+  var w = L.mixPlan(['Dattel'], ch, false);
+  assert.strictEqual(w.set(w.list[0], 3), false, 'ausserhalb des Bereichs: geklemmt, gemeldet');
+  assert.strictEqual(w.list[0].k, 40);
+  var d = L.mixPlan(['Apfel', 'Dattel'], ch, true);                  // Z–A: Stelle = Gesamtzahl − Zaehlung
+  H.eq(d.list.map(function (o) { return [o.key, o.lo, o.hi]; }), [['dattel', 0, 40], ['apfel', 40, 80]]);
+  d.set(d.list[0], 70); assert.strictEqual(d.pos(0), 10);
+  var z = L.mixPlan(['Zeder'], ch, false);                            // Buchstabe fehlt beim Server: am Ende
+  H.eq([z.list[0].lo, z.list[0].hi], [60, 80]);
+  assert.strictEqual(L.MIX_MAX, 100);
+});

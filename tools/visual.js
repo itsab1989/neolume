@@ -219,6 +219,7 @@ function libAll(id, q) {
   if (String(id) === '1' && /^nbAbc/.test(curSeed)) NB_ABC.forEach(function (t, k) {   // erfundene norwegische Titel hinter Z (Æ Ø Å)
     var c = JSON.parse(JSON.stringify(LIB[1][k + 1])); c.ratingKey = String(4900 + k); c.title = c.titleSort = t; c.thumb = '/t/m' + c.ratingKey; c.art = '/a/m' + c.ratingKey; list.push(c);
   });
+  if (q.get('titleSort<<') !== null) { var k0 = q.get('titleSort<<').toLowerCase(); list = list.filter(function (m) { return String(m.titleSort || m.title).toLowerCase() < k0; }); }   // LIB-13: Titel davor (wie der PMS)
   if (/titleSort:desc/.test(sort)) list.reverse();
   else if (/^addedAt|episode.addedAt/.test(sort)) list.sort(function (a, b) { return (b.addedAt || 0) - (a.addedAt || 0); });
   return list;
@@ -449,6 +450,7 @@ function startServer(cb) {
     if (p === '/photo/:/transcode') {
       var w = Math.min(1280, Number(u.searchParams.get('width')) || 100), h = Math.min(720, Number(u.searchParams.get('height')) || 100);
       var src = u.searchParams.get('url') || '';
+      if (/\/Demo_d\d+\.svg/.test(src)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(ringPng(w, Math.max(8, Math.round(h * 0.55)), colorFor(src))); }   // Fernsehen: Ersatz-Logo (breit, ohne minSize: passt in den Kasten)
       if (/^\/t\/(wide|tall)/.test(src)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(/wide/.test(src) ? ringPng(Math.min(1280, Math.round(h * 1.6)), h, [70, 90, 150]) : ringPng(w, Math.round(w * 2), [150, 80, 70])); }
       // SAV-5 (Seeds svPic*): Poster als buntes Bild im Plakat-Format 2:3 (unscharf: wie am PMS abgedunkelt) – kein zweifarbiges
       // Ersatzbild, dessen harte Mittelkante im Schoner wie ein Fehler aussieht; Hintergrundbilder: ungerade rk = Standbild (unruhig), gerade = echt
@@ -647,6 +649,21 @@ function makeSeeds(port) {
   seeds.ptrHold = seed({}, null, JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, ptrEdgeDwell: 600000 }));
   seeds.ptrHoldPlay = seed({}, null, JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', sefFake: 'still', seekDelay: 600000, fixedClock: '21:34', welcome: false, ptrEdgeDwell: 600000 }));
   seeds.ptrOff = seed({ pointer: false });
+  /* Fernsehen (SPEC A20): Einstellung an, erfundene Sender und Sendungen (config liveDemo, kein Netz), Ersatz-Logos vom Mock.
+   * Seitenleiste: "Fernsehen" vorn (LEFT,UP,ENTER oeffnet den Bereich); liveHome: Reihe "Fernsehen" oben auf der Startseite */
+  var cfgLive = function (o) { var x = { readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, liveDemo: true, sefFake: 'still' }; for (var k in o || {}) x[k] = o[k]; return JSON.stringify(x); };
+  function liveSet(o) { var x = { liveTv: true, railItems: [{ id: 'livetv', on: true }, { id: 'home', on: true }] }; for (var k in o || {}) x[k] = o[k]; return { 'settings-aaaa1111.json': x }; }
+  seeds.live = seed({}, liveSet(), cfgLive());
+  seeds.liveEn = seed({ lang: 'en' }, liveSet(), cfgLive());
+  seeds.liveNb = seed({ lang: 'nb' }, liveSet(), cfgLive());
+  seeds.liveM = seed({}, liveSet({ liveView: 'M' }), cfgLive());
+  seeds.liveS = seed({}, liveSet({ liveView: 'S' }), cfgLive());
+  seeds.liveList = seed({}, liveSet({ liveView: 'list' }), cfgLive());
+  seeds.liveRegions = seed({}, liveSet({ liveRegions: ['de', 'fr', 'int'] }), cfgLive());
+  var TVROWS = [{ id: 'tv', on: true }, { id: 'cw', on: true }, { id: 'deck', on: true }];   // ganze Reihenfolge (sonst ordnet merge Standard-Reihen davor)
+  seeds.liveHome = seed({}, liveSet({ homeRows: TVROWS }), cfgLive());
+  seeds.liveHomeEn = seed({ lang: 'en' }, liveSet({ homeRows: TVROWS }), cfgLive());
+  seeds.liveOffSet = seed({}, { 'settings-aaaa1111.json': {} }, cfgLive());   // Fernsehen aus: Einstellungen mit gedimmten Zeilen
   // Nutzer-Feedback 28.10. "Zuletzt gesucht" (Chips in 2 Zeilen, Rot entfernt, Verlauf loeschen, Einstellung Aus/4/8, Standard 8); erfundene Begriffe.
   // REC8: 8 normal lange Begriffe fuellen die 2 Zeilen (mit "Verlauf loeschen"); RECL: 8 Begriffe mit sehr langen -> aelteste ausgeblendet
   var REC8 = ['Nordlicht', 'Bergklang', 'Krimi', 'Hafenlichter', 'Aurora Weiss', 'Sterne', 'Winterreise', 'Leuchtfeuer'];
@@ -836,10 +853,10 @@ function rep(k, n) { var o = []; for (var i = 0; i < n; i++) o.push(k); return o
 var SCENES = [
   // P2: nur PMS (setup.json) + App-PIN je Profil
   { name: 'p2-profiles', seed: 'pkg' },
-  { name: 'p2-account', seed: 'pkg', keys: 'ENTER,wait800,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN' },
-  { name: 'p2-pin-new', seed: 'pkg', keys: 'ENTER,wait800,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER' },
-  { name: 'p2-pin-mismatch', seed: 'pkg', keys: 'ENTER,wait800,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER,1,2,3,4,wait600,5,6,7,8,wait600' },
-  { name: 'p2-pins-all', seed: 'pkg', keys: 'ENTER,wait800,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'p2-account', seed: 'pkg', keys: 'ENTER,wait800,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN' },
+  { name: 'p2-pin-new', seed: 'pkg', keys: 'ENTER,wait800,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER' },
+  { name: 'p2-pin-mismatch', seed: 'pkg', keys: 'ENTER,wait800,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER,1,2,3,4,wait600,5,6,7,8,wait600' },
+  { name: 'p2-pins-all', seed: 'pkg', keys: 'ENTER,wait800,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER' },
   { name: 'p2-pin-kid', seed: 'pkg', keys: 'RIGHT,ENTER,9,9,9,9,wait600' },
   { name: 'login', seed: 'login', mask: LOGIN_MASK },
   { name: 'profiles', seed: 'multi' },
@@ -869,29 +886,29 @@ var SCENES = [
   { name: 'home-size-s-poster', seed: 'homeS', keys: 'DOWN,DOWN,RIGHT,RIGHT', mask: [[320, 270, 600, 34]] },
   { name: 'home-size-m-last', seed: 'homeM', keys: 'DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'home-size-s-last', seed: 'homeS', keys: 'DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-homesize', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN' },   // Oberflaeche: direkt vor "Ansicht der Bibliotheken"
-  { name: 'settings-homesize-panel', seed: 'homeS', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-homesize-panel-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,ENTER' },          // Einstellung Hintergrundbilder aus -> einfarbig wie bisher
-  { name: 'settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT' },
+  { name: 'settings-homesize', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN' },   // Startseite & Aussehen: direkt vor "Ansicht der Bibliotheken"
+  { name: 'settings-homesize-panel', seed: 'homeS', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,ENTER' },
+  { name: 'settings-homesize-panel-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,ENTER' },          // Einstellung Hintergrundbilder aus -> einfarbig wie bisher
+  { name: 'settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT' },
   // ACC-2 "Farbe der Markierungen" direkt unter der Akzentfarbe: Zeile, Auswahl (DE/EN), INFO
-  { name: 'settings-badge', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-badge-panel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-badge-panel-en', seed: 'bdBlueEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-badge-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
-  { name: 'settings-accent-panel-gray', seed: 'gray', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-badge', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-badge-panel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-badge-panel-en', seed: 'bdBlueEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-badge-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-accent-panel-gray', seed: 'gray', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER' },
   // PLAY-37: Qualitaet beim Umwandeln / ueber das Internet mit "Original (ohne Grenze)" (TV: kein 4K), INFO
-  { name: 'settings-quality-panel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-quality-panel-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-qremote-panel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-qremote-panel-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-quality-orig', seed: 'qOrig', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-quality-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
-  { name: 'settings-quality-info-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-quality-panel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-quality-panel-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-qremote-panel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-qremote-panel-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-quality-orig', seed: 'qOrig', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-quality-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-quality-info-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
   // DET-3: "Serien-Fortschritt anzeigen" mit Erklaerung (DE/EN)
-  { name: 'settings-seriesprog', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-seriesprog-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-epprog-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-diag', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT' },
+  { name: 'settings-seriesprog', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-seriesprog-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-epprog-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-diag', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'search', seed: 'home', keys: 'BLUE' },
   { name: 'search-123', seed: 'home', keys: 'BLUE,wait600,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
   { name: 'search-results', seed: 'home', keys: 'BLUE,wait600,ENTER,RIGHT,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN' },
@@ -914,9 +931,9 @@ var SCENES = [
   { name: 'search-recent-sugg-up', seed: 'recent8', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,UP' },
   { name: 'search-recent-ptr', seed: 'recentPtr', keys: 'BLUE,wait600', mwait: 3600, moves: '700:300,700:320,600:160,601:161' },   // Zeiger auf Zeile 2: Fokus ohne Rollen
   { name: 'search-recent-ptr-click', seed: 'recentPtr', keys: 'BLUE,wait600', mwait: 4600, moves: '700:300,700:320,818:116,819:117,click@819:117' },   // Klick auf einen Begriff = OK
-  { name: 'settings-recent', seed: 'recent8', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-recent-panel-en', seed: 'recent8En', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-recent-info', seed: 'recent8', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-recent', seed: 'recent8', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-recent-panel-en', seed: 'recent8En', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-recent-info', seed: 'recent8', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
   { name: 'p4-discover-recent', seed: 'recent8', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT' },
   { name: 'p4-discover', seed: 'home', keys: 'LEFT,UP,ENTER,wait800' },
   { name: 'p4-discover-rail', seed: 'home', keys: 'LEFT,UP' },
@@ -938,20 +955,20 @@ var SCENES = [
   { name: 'p4-insp-rows', seed: 'home', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,DOWN,wait800' },   // Inspiration: Fokus in der 4. Reihe
   { name: 'p4-insp-back', seed: 'home', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,RIGHT,ENTER,wait1200,RETURN,wait900' },   // Detailseite und zurueck: Fokus bleibt in der Reihe
   { name: 'p4-insp-cleared', seed: 'home', keys: 'LEFT,UP,ENTER,wait600,ENTER,RIGHT,ENTER,wait2500,RED,wait1500' },   // Eingabe geloescht -> Reihen wieder da
-  { name: 'p4-insprows', seed: 'insp', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait600' },   // Einstellungen > Inspiration anpassen
-  { name: 'p4-settings-watchlist', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-bluekey', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait600' },   // Blaue Taste oeffnet (31.10.): Auswahl Suche/Entdecken
+  { name: 'p4-insprows', seed: 'insp', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait600' },   // Einstellungen > Inspiration anpassen
+  { name: 'p4-settings-watchlist', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-bluekey', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait600' },   // Blaue Taste oeffnet (31.10.): Auswahl Suche/Entdecken
   // "Nur Titel, die du noch nicht hast" (Entdecken, plex.tv-Reihen ueber den Helfer): Einstellung de/en, mit Weiteren Servern, Reihen mit Filter
-  { name: 'p4-settings-insphide', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600' },
-  { name: 'p4-settings-insphide-info', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600,INFO' },   // INFO: alles erklaert
-  { name: 'p4-settings-insphide-en', seed: 'inspNewEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600' },
-  { name: 'p4-settings-insphide-srv', seed: 'pkgSrvHelper', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600' },   // zweite Zeile: auch Weitere Server
+  { name: 'p4-settings-insphide', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600' },
+  { name: 'p4-settings-insphide-info', seed: 'inspNew', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600,INFO' },   // INFO: alles erklaert
+  { name: 'p4-settings-insphide-en', seed: 'inspNewEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600' },
+  { name: 'p4-settings-insphide-srv', seed: 'pkgSrvHelper', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600' },   // zweite Zeile: auch Weitere Server (Live-TV & Entdecken, letzte Zeile)
   { name: 'p4-insp-new', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,wait800' },          // Filter an: nur fremde Titel + Hinweis-Reihe
   { name: 'p4-insp-new-en', seed: 'inspNewEn', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,wait800' },
   { name: 'p4-insp-new-skip', seed: 'inspNew', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,wait800' },   // DOWN springt ueber den Hinweis
   { name: 'p4-insp-new-off', seed: 'inspNewOff', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,wait800' },   // Filter aus: Marken wie bisher
-  { name: 'settings-homerows', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,ENTER,DOWN' },
-  { name: 'settings-homerows-move', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,ENTER,DOWN,DOWN,DOWN,YELLOW,UP' },
+  { name: 'settings-homerows', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN' },
+  { name: 'settings-homerows-move', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,YELLOW,UP' },
   { name: 'home-custom', seed: 'custom' },
   /* HOME-14 "Alle anzeigen": Karte am Reihenende (Poster, Querformat mit Zahl, EN), Bibliothek nur fuer diesen Besuch nach Hinzugefuegt,
    * ganze Liste eines Server-Hubs bzw. von Weiterschauen, RETURN zurueck auf die Karte */
@@ -969,12 +986,12 @@ var SCENES = [
   { name: 'lib-all-cw-list', seed: 'cwMore', keys: 'FF,FF,FF,FF,ENTER,wait800,RED,wait600,DOWN,DOWN,DOWN,ENTER,wait900,RETURN,wait600' },
   { name: 'lib-all-cw-chip', seed: 'cwMore', keys: 'FF,FF,FF,FF,ENTER,wait800,UP,wait400' },
   { name: 'home-all-back', seed: 'home', keys: 'DOWN,DOWN,RIGHT,RIGHT,RIGHT,ENTER,wait800,RETURN,wait600', mask: [[320, 270, 600, 34]] },
-  { name: 'settings-secback', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN' },   // NAV-5: "Zurueck aus einem Bereich" unter "Seitenleiste anpassen"
-  { name: 'settings-secback-panel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-secback-panel-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-secback-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-secback', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN' },   // NAV-5: "Zurueck aus einem Bereich" unter "Seitenleiste anpassen"
+  { name: 'settings-secback-panel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER' },
+  { name: 'settings-secback-panel-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER' },
+  { name: 'settings-secback-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,INFO' },
   { name: 'home-return-exit', seed: 'home', keys: 'DOWN,RIGHT,RETURN,RETURN' },   // NAV-5: erste Karte, dann gleich der Beenden-Dialog (ohne Seitenleiste)
-  { name: 'settings-railitems', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER,DOWN' },   // W1: Seitenleiste anpassen
+  { name: 'settings-railitems', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,ENTER,DOWN' },   // W1: Seitenleiste anpassen
   { name: 'home-rail-custom', seed: 'railCustom', keys: 'LEFT' },                     // W1: Serien oben, Suche und Dokus aus
   { name: 'player-resume', seed: 'play', keys: 'ENTER' },
   { name: 'player-skip', seed: 'play', keys: 'ENTER,ENTER' },
@@ -1001,25 +1018,25 @@ var SCENES = [
   // P5 Einstellungen & Komfort
   { name: 'p5-settings-subs', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'p5-settings-anime', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,RIGHT,DOWN' },
-  { name: 'p5-settings-display', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-settings-display', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   // Zeiger-Scrollen beschleunigen (abhaengig von Zeiger-Steuerung): an, Zeiger-Steuerung selbst (Erklaerung mit "Aus: …"), Zeiger aus = grau, englisch
-  { name: 'settings-ptraccel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-ptredge', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // Zeiger blaettert am Rand weiter (TV-Befund 1.0.5)
-  { name: 'settings-ptredge-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
-  { name: 'settings-ptraccel-edgeoff', seed: 'ptrEdgeOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // ausgegraut: erst am Rand weiterblaettern einschalten
-  { name: 'settings-pointer', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-ptraccel-off', seed: 'ptrOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-ptredge-off', seed: 'ptrOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-ptraccel-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-ptredge-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-ptredge-info-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
-  { name: 'settings-pointer-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'p5-settings-help', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN' },
+  { name: 'settings-ptraccel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptredge', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // Zeiger blaettert am Rand weiter (TV-Befund 1.0.5)
+  { name: 'settings-ptredge-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-ptraccel-edgeoff', seed: 'ptrEdgeOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // ausgegraut: erst am Rand weiterblaettern einschalten
+  { name: 'settings-pointer', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptraccel-off', seed: 'ptrOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptredge-off', seed: 'ptrOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptraccel-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptredge-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ptredge-info-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-pointer-en', seed: 'ptrEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-settings-help', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN' },
   { name: 'p5-settings-boost', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'p5-keys', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'p5-keys-trick', seed: 'keysTrick', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'p5-keys-trick-en', seed: 'keysTrickEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'p5-conntest', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER,wait1500', mask: [[872, 112, 376, 48]] },   // Antwortzeit (gemessen, 0/1 ms; bricht in die 2. Zeile um)
+  { name: 'p5-keys', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-keys-trick', seed: 'keysTrick', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-keys-trick-en', seed: 'keysTrickEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-conntest', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER,wait1500', mask: [[872, 112, 376, 48]] },   // Antwortzeit (gemessen, 0/1 ms; bricht in die 2. Zeile um)
   // Anime je Titel (docs/TODO.md "Anime-Erkennung"): Ueberzeile, Grund im INFO-Panel, TOOLS-Eintraege, Kategorie ausgeblendet
   { name: 'p5-anime-details', seed: 'anime', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800' },
   { name: 'p5-anime-info', seed: 'anime', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,INFO' },
@@ -1036,11 +1053,11 @@ var SCENES = [
   { name: 'saver-off-busy', seed: 'svBusyOff', keys: 'wait6000' },
   { name: 'saver-fade-done', seed: 'svDarkFade', keys: 'wait7000' },                   // Standard (Ueberblenden) nach dem ersten Bild
   // Einstellungen: Schoner-Zeilen, Auswahl Uebergang/Einblendung, Mehrfachauswahl Bibliotheken
-  { name: 'saver-settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'saver-fx-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER' },   // +1: Zeile "Nach langer Zeit nur noch die Uhr" (SAV-6)
-  { name: 'saver-info-picker-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,ENTER' },
-  { name: 'saver-night-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600,INFO' },   // SAV-6: INFO erklaert die Nachtruhe
-  { name: 'saver-libs-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,ENTER' },   // Musik dazu
+  { name: 'saver-settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'saver-fx-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER' },   // +1: Zeile "Nach langer Zeit nur noch die Uhr" (SAV-6)
+  { name: 'saver-info-picker-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,ENTER' },
+  { name: 'saver-night-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait600,INFO' },   // SAV-6: INFO erklaert die Nachtruhe
+  { name: 'saver-libs-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,ENTER' },   // Musik dazu
   { name: 'p5-spoiler', seed: 'spoiler', keys: 'DOWN' },
   // Uhr auf der Startseite: je Stil hell (de, Hero-Bild), dunkel (en, Hintergrundbilder aus), kraeftig gruen (de, Film-Reihe)
   { name: 'clock-box', seed: 'clock_box' }, { name: 'clock-free', seed: 'clock_free' }, { name: 'clock-date', seed: 'clock_date' }, { name: 'clock-small', seed: 'clock_small' },
@@ -1060,17 +1077,17 @@ var SCENES = [
   { name: 'news-library', seed: 'newsLib', keys: 'LEFT,DOWN,ENTER,wait3500' },
   { name: 'news-player', seed: 'newsPlay', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait8000', mask: CLOCK },
   { name: 'news-player-off', seed: 'newsPlayOff', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait8000', mask: CLOCK },
-  { name: 'news-settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'news-settings-secs-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'news-settings-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
-  { name: 'settings-clockstyle', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-clockstyle-off', seed: 'spoiler', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // Uhr aus: Zeile gedimmt, Satz erklaert warum
-  { name: 'settings-hints-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-hints-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'news-settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'news-settings-secs-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'news-settings-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-clockstyle', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-clockstyle-off', seed: 'spoiler', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // Uhr aus: Zeile gedimmt, Satz erklaert warum
+  { name: 'settings-hints-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-hints-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,INFO' },
   // Akzentfarbe: Einstellung (Farbfeld), Auswahl mit Farbfeldern, Wechsel wirkt sofort; Startseite/Seitenleiste in anderen Farben
-  { name: 'accent-setting', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'accent-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN' },
-  { name: 'accent-live', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'accent-setting', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN' },
+  { name: 'accent-picker', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN' },
+  { name: 'accent-live', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,ENTER' },
   { name: 'accent-home-violet', seed: 'violet', keys: 'DOWN' },
   { name: 'accent-rail-coral', seed: 'coral', keys: 'LEFT,DOWN' },
   { name: 'accent-player-coral', seed: 'coralPlay', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,RIGHT,RIGHT,RIGHT', mask: CLOCK },
@@ -1078,7 +1095,7 @@ var SCENES = [
   { name: 'accent-home-gray', seed: 'gray', keys: 'DOWN' },
   { name: 'accent-rail-gray', seed: 'gray', keys: 'LEFT,DOWN' },
   { name: 'accent-library-gray', seed: 'gray', keys: 'LEFT,DOWN,ENTER,wait800,DOWN,RIGHT' },
-  { name: 'accent-settings-gray', seed: 'gray', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'accent-settings-gray', seed: 'gray', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN' },
   // ACC-2 Farbe der Markierungen: Bibliothek (Dreieck, Haken), Serien (Zahl), Startseite; Grau-Markierungen zu Lavendel-Akzent
   { name: 'badge-library-amber', seed: 'bdAmber', keys: 'LEFT,DOWN,ENTER,wait800,DOWN,RIGHT' },
   { name: 'badge-shows-amber', seed: 'bdAmber', keys: 'LEFT,DOWN,DOWN,ENTER' },
@@ -1153,7 +1170,7 @@ var SCENES = [
   { name: 'details-ptr-cast-hidden', seed: 'ptrHold', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,DOWN,DOWN', mwait: 7800, moves: '600:420,600:440,600:200,601:202,700:300,701:301' },
   // Film: Klick in die untere Randzone unter den Knoepfen holt die Besetzung herein
   { name: 'details-movie-ptr-cast', seed: 'ptrHold', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800', mwait: 6000, moves: '600:300,600:320,700:630,click@700:630' },
-  { name: 'settings-play-end', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-play-end', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   // M4 Musik (Bibliothek 3 "Musik"): quadratische Karten, Alben-Reiter, Album-/Kuenstlerseite, Jetzt laeuft, Mini-Player
   { name: 'music-artists', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800' },
   { name: 'music-albums', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800' },
@@ -1189,11 +1206,11 @@ var SCENES = [
   { name: 'player-trick-normal', seed: 'playTrick', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,FF,FF,PLAY', mask: CLOCK },   // PLAY: Pille weg, Pause-Symbol
   { name: 'player-trick-hls', seed: 'trickHls', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait1500,FF', mask: CLOCK },
   { name: 'player-trick-hls-en', seed: 'trickHlsEn', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait1500,FF', mask: CLOCK },
-  { name: 'settings-ffrw', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-ffrw-panel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-ffrw-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'settings-ffrw-panel-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-ffrw-help-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'settings-ffrw', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ffrw-panel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-ffrw-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-ffrw-panel-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-ffrw-help-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
   { name: 'player-asym', seed: 'playAsym', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,RIGHT', mask: CLOCK },                    // -10 / +30
   { name: 'player-ep-pn', seed: 'play', keys: 'ENTER,ENTER,wait800,UP,DOWN,LEFT,LEFT', mask: CLOCK },     // Folge: erste der Queue -> ⏮ gedimmt, Fokus bleibt auf -10; Skip-Knopf sichtbar
   { name: 'player-hover', seed: 'ptrHoldPlay', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,700:486', mask: CLOCK },   // Zeiger ueber dem Balken: Zeit + Vorschaubild
@@ -1230,14 +1247,14 @@ var SCENES = [
   { name: 'player-lpD-end', seed: 'lpD', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6800, moves: '600:300,1180:486,1181:486,1180:486,1181:486,1180:486,1170:486', mask: CLOCK },   // Keil am Balkenende
   { name: 'player-lpD-nothumbs', seed: 'lpDNo', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,700:486,701:486,700:486,701:486,700:486,760:486', mask: CLOCK },   // -> Panel
   { name: 'player-lpD-up', seed: 'lpD', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6800, moves: '600:300,700:486,701:486,700:486,701:486,700:486,760:486,760:280', mask: CLOCK },   // ueber die Lasche hinaus: zu
-  { name: 'settings-loupe-style', seed: 'lpStyleOn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,' + rep('DOWN', 19) + ',ENTER' },
-  { name: 'settings-loupe-style-off-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,' + rep('DOWN', 19) },
+  { name: 'settings-loupe-style', seed: 'lpStyleOn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,' + rep('DOWN', 12) + ',ENTER' },   // Sprache & Bedienung, letzte Zeile (seit 05.11.2026)
+  { name: 'settings-loupe-style-off-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,' + rep('DOWN', 12) },
   { name: 'book-np-loupe', seed: 'bookLoupe', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,860:404,861:404,860:404,861:404,860:404,900:404' },
   { name: 'book-np-loupe-en', seed: 'bookLoupeEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,640:404,641:404,640:404,641:404,640:404,620:420' },
   { name: 'book-np-loupe-guard', seed: 'bookLoupe', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,860:404,861:404,860:404,861:404,860:404,870:440,880:480,890:510' },   // Jetzt laeuft (B): Zeiger auf der Knopfreihe, Knoepfe reagieren nicht
   { name: 'music-np-hover', seed: 'musicLoupe', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,860:404,861:404,860:404,861:404,860:404' },   // Musiktitel 3 Min.: nur Zeit-Blase
-  { name: 'settings-loupe-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,' + rep('DOWN', 18) + ',INFO' },
-  { name: 'settings-loupe-off-en', seed: 'ptrOffEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,' + rep('DOWN', 18) },
+  { name: 'settings-loupe-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,' + rep('DOWN', 11) + ',INFO' },
+  { name: 'settings-loupe-off-en', seed: 'ptrOffEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,' + rep('DOWN', 11) },
   { name: 'music-mini-nocover', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,RIGHT,RIGHT,ENTER,wait800,ENTER,wait800,PAUSE,RETURN,wait1500' },
   { name: 'music-mini-list', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait1500,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,wait800' },
   { name: 'music-mini-lib', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800,RETURN,wait800,RETURN,wait1500' },
@@ -1278,11 +1295,34 @@ var SCENES = [
   { name: 'rail-many', seed: 'manyLibSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'srv-library', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait1000' },
   { name: 'srv-details', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait1000,RIGHT,ENTER,wait2500', mask: [[992, 624, 288, 32]] },   // letzte Besetzungsbilder laden mal spaeter
-  { name: 'srv-railitems', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'srv-settings', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'srv-railitems', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'srv-settings', seed: 'pkgSrv', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'srv-details-error', seed: 'pkgSrvMetaFail', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait1000,RIGHT,ENTER,wait2600', hold: 16000 },   // Meldung deckt Titel/Metazeile ab
   { name: 'srv-down', seed: 'pkgSrvDown', keys: 'wait3500,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,wait1500' },
-  { name: 'rail-long-en', seed: 'longLibEn', keys: 'LEFT' }
+  { name: 'rail-long-en', seed: 'longLibEn', keys: 'LEFT' },
+  // Fernsehen (SPEC A20, LIVE-1 … LIVE-8): erfundene Sender (liveDemo), Ersatz-Logos; Zeiten der Sendung im Player haengen von der Uhr ab
+  { name: 'live-rail', seed: 'live', keys: 'LEFT,UP' },
+  { name: 'live-area', seed: 'live', keys: 'LEFT,UP,ENTER,wait1500' },
+  { name: 'live-area-en', seed: 'liveEn', keys: 'LEFT,UP,ENTER,wait1500' },
+  { name: 'live-area-nb', seed: 'liveNb', keys: 'LEFT,UP,ENTER,wait1500' },
+  { name: 'live-area-m', seed: 'liveM', keys: 'LEFT,UP,ENTER,wait1500,RIGHT' },
+  { name: 'live-area-s', seed: 'liveS', keys: 'LEFT,UP,ENTER,wait1500,DOWN' },
+  { name: 'live-area-list', seed: 'liveList', keys: 'LEFT,UP,ENTER,wait1500,DOWN' },
+  { name: 'live-area-regions', seed: 'liveRegions', keys: 'LEFT,UP,ENTER,wait1500,UP,RIGHT,ENTER' },
+  { name: 'live-area-all', seed: 'liveRegions', keys: 'LEFT,UP,ENTER,wait1500,DOWN,DOWN' },
+  { name: 'live-area-menu', seed: 'live', keys: 'LEFT,UP,ENTER,wait1500,TOOLS' },
+  { name: 'live-player', seed: 'live', keys: 'LEFT,UP,ENTER,wait1500,ENTER,wait800,RIGHT', mask: CLOCK.concat([[96, 496, 220, 32], [960, 496, 224, 32]]) },
+  { name: 'live-player-pause', seed: 'live', keys: 'LEFT,UP,ENTER,wait1500,ENTER,wait800,PAUSE', mask: CLOCK.concat([[96, 496, 220, 32], [960, 496, 224, 32]]) },
+  { name: 'live-player-en', seed: 'liveEn', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,ENTER,wait800,RIGHT,RIGHT,RIGHT', mask: CLOCK.concat([[96, 496, 220, 32], [960, 496, 224, 32]]) },
+  { name: 'live-player-list', seed: 'live', keys: 'LEFT,UP,ENTER,wait1500,ENTER,wait800,RIGHT,RIGHT,RIGHT,ENTER', mask: CLOCK },
+  { name: 'live-player-more', seed: 'live', keys: 'LEFT,UP,ENTER,wait1500,ENTER,wait800,TOOLS', mask: CLOCK },
+  { name: 'live-home', seed: 'liveHome', keys: 'wait1500' },
+  { name: 'live-home-en', seed: 'liveHomeEn', keys: 'wait1500,RIGHT' },
+  { name: 'live-home-menu', seed: 'liveHome', keys: 'wait1500,TOOLS' },
+  { name: 'live-home-pick', seed: 'liveHome', keys: 'wait1500,TOOLS,DOWN,ENTER,wait500' },
+  { name: 'live-settings', seed: 'live', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT' },   // Live-TV & Entdecken, Zeile 0
+  { name: 'live-settings-off', seed: 'liveOffSet', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN' },
+  { name: 'live-railitems', seed: 'live', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,ENTER' }
 ];
 
 SAVER_STYLES.forEach(function (st) {
@@ -1294,7 +1334,7 @@ SAVER_STYLES.forEach(function (st) {
     { name: 'saver-' + st + '-pos3', seed: 'svBusyPos' + cap + '3', keys: 'wait6000' });
 });
 /* SAV-5: Einstellung (Zeile, Auswahl en, INFO-Erklaerung), Standard ueberspringt Standbilder, Auch Standbilder, Poster je Einblendung */
-var SV_SET = 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN';   // Einstellungen › Bildschirmschoner › "Bilder im Bildschirmschoner" (Zeile 5)
+var SV_SET = 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN';   // Einstellungen › Bildschirmschoner › "Bilder im Bildschirmschoner" (Zeile 5)
 SCENES.push({ name: 'saver-pics-setting', seed: 'home', keys: SV_SET }, { name: 'saver-pics-picker-en', seed: 'en', keys: SV_SET + ',ENTER' },
   { name: 'saver-pics-info', seed: 'home', keys: SV_SET + ',wait600,INFO' }, { name: 'saver-pics-art', seed: 'svPicArt', keys: 'wait6000' },
   { name: 'saver-pics-stills', seed: 'svPicStills', keys: 'wait6000' });
@@ -1324,8 +1364,8 @@ SCENES.push({ name: 'login-nb', seed: 'loginNb', mask: LOGIN_MASK },
   { name: 'library-reg-end-nb', seed: 'nbAbc', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT' + ',DOWN'.repeat(28) + ',wait600' },
   { name: 'details-movie-nb', seed: 'nb', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER' },
   { name: 'details-show-nb', seed: 'nb', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,RIGHT,wait800,DOWN' },
-  { name: 'settings-nb', seed: 'nb', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT' },
-  { name: 'settings-lang-nb', seed: 'nb', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,ENTER,wait600' },
+  { name: 'settings-nb', seed: 'nb', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT' },
+  { name: 'settings-lang-nb', seed: 'nb', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,ENTER,wait600' },
   { name: 'search-nb', seed: 'nb', keys: 'BLUE,wait600,DOWN,DOWN,DOWN,DOWN,RIGHT,RIGHT,RIGHT' },
   { name: 'search-123-nb', seed: 'nb', keys: 'BLUE,wait600,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
   { name: 'player-osd-nb', seed: 'playNb', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,PAUSE', mask: CLOCK });   // nach dem Wandern: Lage 2, Plakat mit

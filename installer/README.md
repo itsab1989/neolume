@@ -207,6 +207,10 @@ The Docker image runs **only the helper** (the setup itself always runs on a com
    After replacing `helper.json` (new setup), restart the container.
 4. Do not also start the helper on the computer.
 
+Bridge mode (no `--net=host`) is detected: the helper sees every client as the container's gateway (a `172.17.x.x` address),
+logs a notice once, answers `403 {"error":"nat"}` where it needs the TV's address and reports `"nat": true` in
+`/neo-helper`; the TV and the setup program then ask for host networking. It never binds anything to that address.
+
 **Synology Container Manager (DSM 7.2+):** *Container Manager → Project → Create*, path `/volume1/docker/neolume`,
 source *Create docker-compose.yml* and paste [`docker-compose.yml`](docker-compose.yml). Set `user:` to your user and
 group id (SSH: `id`; e.g. `1026:100`) – the container must be able to read `helper.json` (or make the file readable for

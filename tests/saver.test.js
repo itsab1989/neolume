@@ -699,7 +699,7 @@ test('Schoner Ambient: Abdunklung folgt dem Text – lesbar auf Weiss, oben schm
     var eMax = Math.max(ck ? ck.e : 0, ti ? ti.e : 0, sb ? sb.e + M.offs : 0);
     for (yy = 0; yy < H; yy += 3) assert.ok(alpha(Math.ceil(eMax + TAIL), yy) <= 1 / 255, tag + ': endet spaetestens ' + TAIL + ' px hinter dem Text');
     if (ck && ti && wt - wc >= 300) {                     // oben schmal: neben der Uhr kaum Schatten, auch bei langem Titel
-      var far = alpha(ck.e + 120, ck.top + 30);
+      var far = alpha(Math.round(ck.e + M.offc + 0.9 * M.hx.s1), ck.top + 30);   // dieselbe Stelle des Auslaufs: 1.0.16 120 px, seit 05.11. 175 px
       worstNear = Math.max(worstNear, far);
       assert.ok(far <= 0.15, tag + ': neben der Uhr zu dunkel (' + far.toFixed(2) + ')');
     }
@@ -995,6 +995,17 @@ test('Bild und Titel gehoeren zusammen (Nutzerbefund 1.0.7): echte Takte, langsa
       assert.deepStrictEqual(r.bad, [], pv.saverPics + ', ' + iv + ' s: ' + r.bad.join(' | '));
     });
   });
+});
+test('Ebenen-Notiz weicht vom DOM ab (Nutzerbefund 05.11., TV nach ~35 Min.): wird erkannt, protokolliert und korrigiert – Bild und Titel passen danach wieder', function () {
+  var e = saverEnv({ saverNight: 0, saverInterval: 10, saverFx: 'fade' }), S = e.S;
+  S.start({});
+  e.run(60000);
+  var ls = e.all('scs-l'), p = ls[0].parentNode;
+  p.insertBefore(S._front() === ls[0] ? ls[1] : ls[0], null);           // von aussen: hintere Ebene ans Ende = oben (wie am TV beobachtet)
+  e.run(60000);
+  assert.ok(e.warns.some(function (w) { return /^saver (ebenen notiz \d dom \d|alte Ebene \d oben beim Aufraeumen) \(korrigiert\)/.test(w); }), e.warns.join('\n'));
+  var order = ls.slice().sort(function (a, b) { return p.childNodes.indexOf(b) - p.childNodes.indexOf(a); });
+  assert.strictEqual(order[0], S._front().w, 'vordere Ebene liegt wieder oben');
 });
 test('SAV-1: Ruhe zaehlt erst nach der Wiedergabe bzw. dem letzten Bildschirmwechsel (Nutzerbefund 30.10.: Schoner 1 s nach dem Folgenende)', function () {
   var e = saverEnv({ screensaver: 5 }), M = e.N, S = e.S, top = 'player', st = { active: true, paused: false, item: { title: 'Demo' } };

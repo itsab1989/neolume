@@ -534,13 +534,16 @@ def fig_app_settings(lang):
     s.circle(64, 400, 9, 'none', '#ffffff', 2)
     s.line(44, 390, 44, 410, '#ffffff', 3)
     s.text(110, 70, T(lang, 'Einstellungen', 'Settings'), 26, '#f2f2f2', 'bold')
-    cats = T(lang, ['Wiedergabe', 'Ton & Untertitel', 'Anime', 'Oberfläche', 'Profil & Konto', 'Diagnose', 'Hilfe & Info'],
-             ['Playback', 'Audio & subtitles', 'Anime', 'Display', 'Profile & account', 'Diagnostics', 'Help & info'])
+    cats = T(lang, ['Wiedergabe', 'Ton & Untertitel', 'Anime', 'Startseite & Aussehen', 'Sprache & Bedienung', 'Live-TV & Entdecken',
+                    'Bildschirmschoner', 'Profil & Konto', 'Hilfe & Diagnose'],
+             ['Playback', 'Audio & subtitles', 'Anime', 'Home & appearance', 'Language & controls', 'Live TV & Discover',
+              'Screensaver', 'Profile & account', 'Help & diagnostics'])
+    sel = 5                                   # Live-TV & Entdecken (Kategorien seit 05.11.2026)
     for i, c in enumerate(cats):
-        yy = 116 + i * 38
-        if i == 3: s.line(110, yy - 16, 110, yy + 4, '#ffffff', 3)
-        s.text(122, yy, c, 17, '#ffffff' if i == 3 else '#a7abb2', 'bold' if i == 3 else 'normal')
-    s.badge(104, 116 + 3 * 38 - 6, '1', 12)
+        yy = 116 + i * 36
+        if i == sel: s.line(110, yy - 16, 110, yy + 4, '#ffffff', 3)
+        s.text(122, yy, c, 17, '#ffffff' if i == sel else '#a7abb2', 'bold' if i == sel else 'normal')
+    s.badge(104, 116 + sel * 36 - 6, '1', 12)
     rows = [(T(lang, 'Entdecken in der Seitenleiste', 'Discover in the sidebar'), 'toggle'),
             (T(lang, 'Merkliste', 'Watchlist'), 'toggle'),
             (T(lang, 'Inspiration anpassen', 'Customize inspiration'), T(lang, '7 Reihen', '7 rows')),
@@ -561,15 +564,15 @@ def fig_app_settings(lang):
     s.rect(x0 - 10, 372, w + 20, 52, '#1e2125', None, 0, 8)
     s.text(x0 + 6, 396, T(lang, 'Ohne Helfer steht bei „Merkliste“: Nicht eingerichtet', 'Without the helper, “Watchlist” says: Not set up'), 15, '#c4c7cc')
     s.text(x0 + 6, 414, T(lang, 'Helfer antwortet nicht: Zeile ist grau, mit Erklärung', 'Helper not answering: the row is grey, with a reason'), 15, '#c4c7cc')
-    end = legend(s, 474, [('1', T(lang, 'In Neolume: Einstellungen → Oberfläche', 'In Neolume: Settings → Display')),
+    end = legend(s, 474, [('1', T(lang, 'In Neolume: Einstellungen → Live-TV & Entdecken', 'In Neolume: Settings → Live TV & Discover')),
                           ('2', T(lang, '„Merkliste“ lässt sich einschalten = der Fernseher hat den Helfer gefunden',
                                        '“Watchlist” can be switched on = the TV has found the helper'))])
     s.h = end + 6
     return s.render(T(lang, 'Neolume: Merkliste in den Einstellungen', 'Neolume: watchlist in Settings'),
-                    T(lang, 'Skizze der Einstellungen von Neolume: links die Bereiche, „Oberfläche“ gewählt. Rechts die Zeilen „Entdecken '
+                    T(lang, 'Skizze der Einstellungen von Neolume: links die Bereiche, „Live-TV & Entdecken“ gewählt. Rechts die Zeilen „Entdecken '
                             'in der Seitenleiste“, „Merkliste“ (markiert, eingeschaltet), „Inspiration anpassen“ und „Nur Titel, die du '
                             'noch nicht hast“. Hinweis: Ohne Helfer steht bei Merkliste „Nicht eingerichtet“.',
-                      'Sketch of the Neolume settings: categories on the left, “Display” chosen. On the right the rows “Discover in '
+                      'Sketch of the Neolume settings: categories on the left, “Live TV & Discover” chosen. On the right the rows “Discover in '
                       'the sidebar”, “Watchlist” (highlighted, switched on), “Customize inspiration” and “Only titles you don’t '
                       'have yet”. Note: without the helper, Watchlist says “Not set up”.'))
 

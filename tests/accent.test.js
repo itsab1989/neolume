@@ -209,6 +209,6 @@ test('i18n: Name je Palettenfarbe in de, en und nb', function () {
     N.i18n.set(l);
     N.accent.ids().forEach(function (id) { var t = N.t('set.v.ac_' + id); assert.ok(t && t !== 'set.v.ac_' + id && t.length <= 14, l + ' ' + id); });
     assert.ok(N.t('set.v.bdLight').length <= 14);
-    assert.ok(N.t('set.accent').length <= 16);
+    assert.ok(N.t('set.accent').length <= 20);   // "Farbe der Auswahl" (05.11.2026); Panel-Titel tragen bis 34 Zeichen
   });
 });

@@ -2,7 +2,7 @@
  * Netz-Standards sind im Repo leer: tools/build.js setzt die lokalen Werte aus local.json (git-ignoriert) ins gebaute app.js. */
 (function (N) {
   var C = {
-    version: '1.0.16',
+    version: '1.0.17',
     product: N.brand.name,
     platform: N.platform.info.platform,               // X-Plex-Kopfzeilen je Plattform (N.platform.info, Adapter)
     platformVersion: N.platform.info.platformVersion,
@@ -18,6 +18,7 @@
     readOnly: false,
     helperUrl: '',                      // P4: optionaler Helfer fuer die Merkliste (nur Entwicklung; im Alltag setup.json "helper")
     helperKey: '',
+    helperSign: '',                 // Entwicklung: Signaturschluessel des Helfers (64 hex, sonst setup.json helper.sign)
     cropBase: 'app',
     logHost: '',                        // "Protokoll senden" (Dev-/Update-Server, tools/dev.py serve), aus local.json / config.json
     model: N.platform.info.model || '',   // SPEC 6.4 (Orsay-Adapter)
@@ -37,6 +38,7 @@
       if (Number(o.fakeEndMs) > 0) C.fakeEndMs = Number(o.fakeEndMs);   // nur Bildtests (ohne SEF): Video endet ms nach dem Start (Karte am Ende mit Rueckzaehler)
       if (Number(o.ptrEdgeDwell) > 0) C.ptrEdgeDwell = Number(o.ptrEdgeDwell);   // nur Tests: Zeiger-Randzone zeigt nur die Pille
       if (/^#[0-9A-Fa-f]{6}$/.test(o.fakeBg || '')) C.fakeBg = o.fakeBg;   // nur Bildtests: Farbe des Video-Platzhalters (helles Bild, Feinauswahl)
+      if (o.liveDemo === true) C.liveDemo = true;      // nur Bildtests: Fernsehen mit erfundenen Sendern (N.liveDemo), ohne Netz
       if (typeof o.fakeSub === 'string' && o.fakeSub.length < 120) C.fakeSub = o.fakeSub;   // nur Bildtests (stehendes Bild): feste Untertitel-Zeile
       if (o.hlsFast === true) C.hls = { wait: 0, startBitrate: 5000000, offset: true, eac3: true, incomplete: true, buf: null };
       var H = C.hls;
@@ -62,6 +64,7 @@
       if (o.cropBase === 'video' || o.cropBase === 'app') C.cropBase = o.cropBase;   // Zoom: Koordinaten fuer SetCropArea (A/B)
       if (typeof o.helperUrl === 'string' && /^http:\/\/[0-9.]+(:\d{1,5})?\/?$/.test(o.helperUrl)) C.helperUrl = o.helperUrl;   // P4: Merkliste-Helfer (Entwicklung; sonst setup.json)
       if (typeof o.helperKey === 'string' && /^[A-Za-z0-9_\-]{16,128}$/.test(o.helperKey)) C.helperKey = o.helperKey;
+      if (typeof o.helperSign === 'string' && /^[0-9a-f]{64}$/.test(o.helperSign)) C.helperSign = o.helperSign;
       if (typeof o.pms === 'string' && /^http:\/\/[A-Za-z0-9.\-]+(:\d{1,5})?\/*$/.test(o.pms)) C.pmsFallback = o.pms.replace(/\/+$/, '');
     },
     /* host[:port][/pfad] – kein Schema, keine Zugangsdaten (@), keine Query/Fragmente (Sicherheits-Review) */

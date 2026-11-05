@@ -99,13 +99,15 @@
   /* P4: optionaler Eintrag "Entdecken" (N.disc.enabled); W1: Reihenfolge und ausgeblendete Eintraege je Profil
    * ("Seitenleiste anpassen", N.railRows) – Start und Einstellungen sind immer da */
   /* Weitere Server: deren Bibliotheken (N.srv, mit srv/srvName) nach den eigenen; Seitenleisten-ID 'xlib-<server>-<id>' */
+  /* Fernsehen (SPEC LIVE-1): Eintrag 'livetv' moeglich (Erwachsene, Senderdaten vorhanden) */
+  R.live = function () { return !!(N.live && N.live.allowed()); };
   R.allLibs = function () { var x = N.srv ? N.srv.libs() : []; return x.length ? R.libs.concat(x) : R.libs; };
   /* zwischen Profil und Einstellungen passen hoechstens MAX Eintraege (Abstand min. 48); weitere bleiben unsichtbar, bis der
    * Nutzer andere in "Seitenleiste anpassen" ausblendet (betrifft praktisch nur viele Bibliotheken weiterer Server) */
   R.MAX = 10;
   R.order = function () {
     var disc = !!(N.disc && N.disc.enabled()), st = N.session && N.session.settings;
-    var ids = N.railRows.enabled(st && st.railItems || null, N.railRows.avail(R.allLibs(), disc));
+    var ids = N.railRows.enabled(st && st.railItems || null, N.railRows.avail(R.allLibs(), disc, R.live()));
     var mx = R.MAX;
     if (ids.length <= mx) return ids;
     var out = [], n = 0;                            // 'home' bleibt immer (gesperrt), an seiner Stelle
@@ -123,6 +125,7 @@
       if (id === 'search') list.push({ id: id, icon: 'search', t: 'nav.search', y: y });
       else if (id === 'discover') list.push({ id: id, icon: 'compass', t: 'nav.discover', y: y });
       else if (id === 'home') list.push({ id: id, icon: 'home', t: 'nav.home', y: y });
+      else if (id === 'livetv') list.push({ id: id, icon: 'live', t: 'nav.live', y: y });
       else if (lib) list.push({ id: id, icon: R.libIcon(lib), label: lib.title, lib: lib, y: y });
     }
     var gy = R.geo(ids.length), FX = !!N.screen.flex;
@@ -131,10 +134,15 @@
     while (R.panel.firstChild) R.panel.removeChild(R.panel.firstChild);
     if (R.fixRi && R.fixRi.parentNode) R.fixRi.parentNode.removeChild(R.fixRi);
     R.fixRi = null; R.mP = null;
+    /* flexibel (Nutzerbefund iPad 05.11.: "sprunghaft"): Inhalt des Panels in einer Huelle, die beim Gleiten gegenlaeufig verschoben
+     * wird (flex.css .nav-cnt) – Symbole stehen still unter dem Zeiger, die Kante des Panels legt die Beschriftungen frei; am TV fehlt
+     * die Huelle (Eintraege direkt im Panel, Bild wie bisher) */
+    var PC = FX ? U.el('div', 'nav-cnt', R.panel) : R.panel;
+    R.cnt = FX ? PC : null;
     /* flexibel: Eintraege des Panels in einem Ausschnitt mit eigenem Behaelter (rollt mit der Icon-Spalte); am TV direkt im Panel */
-    R.clipP = FX ? U.el('div', 'nav-clip', R.panel, 'position:absolute;left:0;top:0;width:100%') : null;
+    R.clipP = FX ? U.el('div', 'nav-clip', PC, 'position:absolute;left:0;top:0;width:100%') : null;
     R.pin = FX ? U.el('div', 'nav-in', R.clipP, 'position:absolute;left:0;top:0;width:100%;height:0') : R.panel;
-    var sep = U.el('div', 'nav-sep', FX ? R.panel : R.pin);
+    var sep = U.el('div', 'nav-sep', FX ? PC : R.pin);
     R.sMax = gy.sMax; R.sy = 0; R.clip = gy.clip; R.ctop = gy.top;
     if (FX) {
       sep.style.top = (gy.set - 12) + 'px'; sep.style.bottom = 'auto';
@@ -146,7 +154,7 @@
       // Mehr-Pfeile: Icon-Spalte (Mitte x 72) dauerhaft, Panel (Mitte der Beschriftung) je Aufbau; nur flach sichtbar (edges)
       if (!R.mI) { R.mI = N.ui.more(R.el, '', ''); R.el.insertBefore(R.mI.up, R.dim); R.el.insertBefore(R.mI.dn, R.dim); }   // unter Abdunklung und Panel
       R.mI.up.style.cssText = 'left:58px;top:2px'; R.mI.dn.style.cssText = 'left:58px;top:' + (gy.clip + 2) + 'px';   // Band clip..clip+40, Trennlinie bei clip+36, "Einstellungen" ab clip+48
-      R.mP = N.ui.more(R.panel, 'left:146px;top:2px', 'left:146px;top:' + (gy.clip + 2) + 'px');
+      R.mP = N.ui.more(PC, 'left:146px;top:2px', 'left:146px;top:' + (gy.clip + 2) + 'px');
       R.icons.setAttribute('data-scroll', gy.sMax > 0 ? '1' : ''); R.pin.setAttribute('data-scroll', gy.sMax > 0 ? '1' : '');
       if (!R.fl) R.fl = N.ui.freeList({ el: R.icons, set: scrollSet, max: function () { return R.sMax; }, dim: visH,
         hit: function (x) { return R.sMax > 0 && (R.open_ || !R.slim()) && x < (R.open_ ? NAV_W : 112) + R.edge(); } });
@@ -165,7 +173,7 @@
         if (e.fixed) { R.fixRi = e.ri; R.el.insertBefore(e.ri, R.dim); }   // unter Abdunklung und Panel wie die Spalte
         U.el('div', 'bar', e.ri);
         N.ui.icon(e.ri, e.icon);
-        e.ni = U.el('div', 'ni', e.fixed ? R.panel : R.pin, 'top:' + e.y + 'px');
+        e.ni = U.el('div', 'ni', e.fixed ? PC : R.pin, 'top:' + e.y + 'px');
         N.ui.icon(e.ni, e.icon);
         var lt = e.label || N.t(e.t);
         if (e.lib && e.lib.srv) {                      // Weitere Server: Name einzeilig, darunter klein die Herkunft
@@ -242,7 +250,16 @@
     fxMark();
     U.cls(R.panel, 'open', false);
     U.cls(R.dim, 'on', false);
-    U.cls(R.entries[R.f].ni, 'is-focus', false);
+    var fe = R.entries[R.f];
+    /* flexibel (Nachbefund 04.11., Touchpad): die Akzent-Fuellung des Eintrags unter dem Zeiger verschwand im ersten Bild des
+     * Einklappens – das Panel gleitet jetzt mit ihr hinaus, sie faellt erst am Ende weg (wieder offen: setF fuehrt sie) */
+    if (soft() && fe) {
+      R.settleEnd = U.now() + CLOSE_MS; R.settleN = 0; setTimeout(function () { if (!R.open_ || R.entries[R.f] !== fe) U.cls(fe.ni, 'is-focus', false); }, CLOSE_MS);
+      /* Nacharbeit (N.idle: Hinweise, Vorab-Dekodieren, Erweiterungen) lief am iPad gemessen 80 ms nach dem Zuklappen = mitten im
+       * Gleiten (Apple: N.idle wartet nur 80 ms Ruhe). Sie wartet jetzt bis nach dem Gleiten: Ruhe zaehlt im Gleiten alle 60 ms neu. */
+      if (N.idle) { N.idle.touch(); for (var h = 60; h < CLOSE_MS; h += 60) setTimeout(function () { if (!R.open_) N.idle.touch(); }, h); }   // Apple: 80 ms Ruhe -> fruehestens bei 200 ms
+    }
+    else if (fe) U.cls(fe.ni, 'is-focus', false);
     if (!silent) { var scr = N.router.top(); if (scr && scr.railFocus) scr.railFocus(); }
     N.router.refreshHints();
   };
@@ -280,7 +297,10 @@
     if (hit < 0 && kind !== 'click' && N.screen && N.screen.flex) hit = R.hitY(y, true);
     else if (ar) return true;                         // Pfeil-Band ohne Eintrag (TV gibt es nicht)
     if (hit < 0) return false;
-    if (!R.open_ && soft() && kind !== 'click' && !(R.rest && !moved(x, y))) return intent(x, y);   // Maus/Trackpad: Absicht abwarten
+    /* flexibel (Nutzerbefund iPad 05.11.: "will auf die kleinen Symbole klicken, genau dann klappt sie aus"): Klick auf ein Symbol der
+     * eingeklappten Spalte fuehrt sofort dorthin, ohne vorher aufzuklappen (wie Symbolleisten unter iPadOS/macOS) */
+    if (!R.open_ && soft() && kind === 'click') { hoverStop(); R.held = false; R.activate(hit); R.rest = true; R.restAt = { x: x, y: y }; return true; }
+    if (!R.open_ && soft() && !(R.rest && !moved(x, y))) return intent(x, y);   // Maus/Trackpad: Absicht abwarten
     if (!R.open_ && R.rest && kind !== 'click') {
       /* flexibel (Befund K 03.11.: "klappt nach einem Klick nicht wieder auf"): Darueberfahren klappt wieder auf, sobald der Zeiger in
        * der Spalte deutlich weiterbewegt wurde (24 px seit dem Klick) – ein Zittern direkt nach dem Klick (Grund fuer R.rest, Befund
@@ -303,8 +323,22 @@
    * - Schliessen: neben dem Panel erst nach GRACE ms (zurueck ins Panel = bleibt offen); weiter als FAR px daneben sofort.
    * - Ring und Abdunklung blenden mit (Klasse rail-fx am body, CSS platforms/apple/loader/flex.css), Kurven/Dauern dort.
    * TV (Smart-Control-Zeiger): unveraendert sofort auf/zu, soft() ist dort nie wahr. */
-  var OPEN_DWELL = 120, OPEN_LEFT = 32, GRACE = 160, FAR = 96, FX_MS = 260;
-  R.OPEN_DWELL = OPEN_DWELL; R.OPEN_LEFT = OPEN_LEFT; R.GRACE = GRACE; R.FAR = FAR;
+  var OPEN_DWELL = 350, OPEN_LEFT = 32, GRACE = 160, FAR = 96, FX_MS = 220, CLOSE_MS = 140;   // CLOSE_MS = Einklappen in flex.css
+  /* Nutzerbefund iPad 05.11.: Absicht = Zeiger RUHT OPEN_DWELL ms in der Spalte (jede Bewegung ueber REST_PX startet neu – beim Zielen
+   * auf ein Symbol klappt nichts auf, der Klick fuehrt direkt hin), Zeiger am linken Rand (x <= EDGE_X) bzw. OPEN_LEFT nach links = sofort */
+  var REST_PX = 6, EDGE_X = 8;
+  /* Waehrend die Leiste zugleitet (Nachbefund 04.11., Touchpad: "springt beim Einklappen, wenn ich schnell ueber Cover fahre"):
+   * der erste Hover auf der Seite wirkt sofort (Ring landet gleich auf der Kachel unter dem Zeiger), weitere Hover-Folgen (Fokus,
+   * Ring, Infobereich) erst am Ende des Gleitens an der letzten Zeigerstelle – kein Fokuswechsel je Kachel im Gleiten. -> true =
+   * dieses Ereignis zurueckstellen (fn laeuft einmal am Ende) */
+  R.settleEnd = 0; R.settleN = 0; var settleT = 0;
+  R.deferHover = function (fn) {
+    if (!soft() || R.open_ || U.now() >= R.settleEnd) return false;
+    if (R.settleN++ === 0) return false;
+    if (!settleT) settleT = setTimeout(function () { settleT = 0; if (!R.open_) fn(); }, Math.max(0, R.settleEnd - U.now()) + 10);
+    return true;
+  };
+  R.OPEN_DWELL = OPEN_DWELL; R.OPEN_LEFT = OPEN_LEFT; R.GRACE = GRACE; R.FAR = FAR; R.CLOSE_MS = CLOSE_MS; R.EDGE_X = EDGE_X; R.REST_PX = REST_PX;
   function soft() { return !!(N.screen && N.screen.flex); }
   function moved(x, y) { var rp = R.restAt; return !!(rp && (Math.abs(y - rp.y) >= 24 || Math.abs(x - rp.x) >= 24)); }
   R.hov = null;                                       // {x, y, t: Zeitgeber} seit dem Eintritt in die Spalte
@@ -312,15 +346,24 @@
   function intent(x, y) {
     var h = R.hov;
     if (R.rest) R.rest = false;                        // nach einem Klick deutlich weiterbewegt (24 px): wieder wie Eintritt
-    if (!h) {
-      h = R.hov = { x0: x, x: x, y: y, t: 0 };
-      h.t = setTimeout(function () { if (R.hov === h) { R.hov = null; openAt(h.y); } }, OPEN_DWELL);
-      return true;
-    }
+    if (R.held) return true;                           // Taste gedrueckt (Klick unterwegs): nie aufklappen
+    if (x <= EDGE_X) { hoverStop(); openAt(y); return true; }   // Zeiger am linken Bildschirmrand: sofort (wie das Dock am Rand)
+    if (!h) { h = R.hov = { x0: x, x: x, y: y, rx: x, ry: y, t: 0 }; arm(h); return true; }
     h.x = x; h.y = y;
-    if (h.x0 - x >= OPEN_LEFT) { hoverStop(); openAt(y); }
+    /* feste Linie statt "OPEN_LEFT ab dem ersten Messpunkt" (Nutzerbefund 05.11.: Einblenden begann nicht immer an derselben Stelle –
+     * der erste Messpunkt in der Spalte haengt vom Tempo ab): nach links ueber x = Spalte - OPEN_LEFT = sofort, immer dieselbe Stelle */
+    if (x <= 112 + R.edge() - OPEN_LEFT && x < h.x0) { hoverStop(); openAt(y); return true; }
+    if (Math.abs(x - h.rx) + Math.abs(y - h.ry) > REST_PX) { h.rx = x; h.ry = y; arm(h); }   // Zielen (Zeiger bewegt sich): Ruhe neu
     return true;
   }
+  function arm(h) {
+    if (h.t) clearTimeout(h.t);
+    h.t = setTimeout(function () { if (R.hov === h) { R.hov = null; openAt(h.y); } }, OPEN_DWELL);
+  }
+  /* Maus/Trackpad gedrueckt ueber der eingeklappten Spalte (N.pointer, nur flexibel): Absicht verwerfen – zwischen Druck und Klick
+   * klappt nichts mehr auf (vorher konnte das Aufklappen genau in den Klick fallen: Ziel unter dem Zeiger wechselte) */
+  R.held = false;
+  R.press = function (on) { if (!soft()) return; if (on && !R.open_) { hoverStop(); R.held = true; } else if (!on) R.held = false; };
   function openAt(y) { if (R.open_ || (N.router.hasOverlay && N.router.hasOverlay())) return; var hit = R.hitY(y, true); if (hit >= 0) R.open(hit); }   // inzwischen Dialog offen: nichts
   /* Zeiger neben dem offenen Panel (x in Leisten-Koordinaten). done: nach dem verzoegerten Schliessen (Zeiger hebt die Ansicht
    * unter sich wieder hervor). -> true = Ereignis verbraucht (Panel bleibt in der Frist offen), false = zu, Ansicht bekommt es */
@@ -407,6 +450,7 @@
   var drag = null, outT = 0;
   function frame(pos) {   // einziger Schreibweg im Frame: Lage + Abdunklung (nur transform/opacity)
     R.panel.style.webkitTransform = R.panel.style.transform = 'translate3d(' + Math.round(pos) + 'px,0,0)';
+    if (R.cnt) R.cnt.style.webkitTransform = R.cnt.style.transform = 'translate3d(' + (-Math.round(pos)) + 'px,0,0)';   // Inhalt steht still (flex.css)
     R.dim.style.opacity = String(clamp((pos + TRAVEL) / TRAVEL, 0, 1));
   }
   function paintDrag(pos, first) {
@@ -415,25 +459,36 @@
       ps.webkitTransition = ps.transition = 'none'; ds.webkitTransition = ds.transition = 'none';
       ps.visibility = 'visible'; ds.visibility = 'visible';
       ds.webkitTransform = ds.transform = 'translate3d(0,0,0)';
+      if (R.cnt) { R.cnt.style.webkitTransition = R.cnt.style.transition = 'none'; U.cls(R.panel, 'drag', true); }
     }
     frame(pos);
   }
-  function unpaint() {
-    var ps = R.panel.style, ds = R.dim.style;
-    ps.webkitTransition = ps.transition = ''; ps.webkitTransform = ps.transform = ''; ps.visibility = '';
-    ds.webkitTransition = ds.transition = ''; ds.webkitTransform = ds.transform = ''; ds.visibility = ''; ds.opacity = '';
+  /* Inline-Werte weg, die Klasse traegt wieder. Nach dem Schliessen (Nachbefund iPad 04.11., Finger: "ganz weg, dann blitzt ein
+   * schmaler Teil auf"): das Panel steht inline bei -NAV_W (ganz draussen), die Klasse ohne .open bei -TRAVEL – ohne Sperre lief der
+   * CSS-Uebergang (170 ms, sichtbar bis zu seinem Ende) von -320 zurueck auf -200 ueber die Icon-Spalte (gemessen: 10 Frames). Darum
+   * erst ohne Uebergang auf die Klassen-Lage (unsichtbar), Stil festschreiben (eine Layout-Abfrage, nur Finger-Weg), dann Uebergang frei. */
+  function unpaint(still) {
+    var ps = R.panel.style, ds = R.dim.style, cs = R.cnt ? R.cnt.style : {};
+    if (still) { ps.webkitTransition = ps.transition = 'none'; ds.webkitTransition = ds.transition = 'none'; cs.webkitTransition = cs.transition = 'none'; }
+    else { ps.webkitTransition = ps.transition = ''; ds.webkitTransition = ds.transition = ''; cs.webkitTransition = cs.transition = ''; }
+    ps.webkitTransform = ps.transform = ''; ps.visibility = '';
+    ds.webkitTransform = ds.transform = ''; ds.visibility = ''; ds.opacity = '';
+    cs.webkitTransform = cs.transform = '';
+    if (R.cnt) U.cls(R.panel, 'drag', false);
+    if (still) { void R.panel.offsetWidth; ps.webkitTransition = ps.transition = ''; ds.webkitTransition = ds.transition = ''; cs.webkitTransition = cs.transition = ''; }
   }
   /* Loslassen: von der Finger-Lage mit Restgeschwindigkeit an die Ziel-Lage gleiten, danach Inline-Werte weg (Klasse .open traegt) */
   function settle(pos, v, open) {
     var to = open ? 0 : -NAV_W, g = N.fx && N.fx.reduced && N.fx.reduced() ? { ms: 0 } : R.glide(pos, to, v);
     if (open) { if (!R.open_) R.open(); } else if (R.open_) R.close();
-    if (!g.ms) { unpaint(); return; }
+    if (!g.ms) { unpaint(!open); return; }
     var ps = R.panel.style, ds = R.dim.style;
     ps.webkitTransition = '-webkit-transform ' + g.ms + 'ms ' + g.ease; ps.transition = 'transform ' + g.ms + 'ms ' + g.ease;
     ds.webkitTransition = ds.transition = 'opacity ' + g.ms + 'ms ' + g.ease;
+    if (R.cnt) { R.cnt.style.webkitTransition = '-webkit-transform ' + g.ms + 'ms ' + g.ease; R.cnt.style.transition = 'transform ' + g.ms + 'ms ' + g.ease; }
     ps.visibility = 'visible'; ds.visibility = 'visible';   // zu: Klasse .open fehlt schon -> sonst sofort unsichtbar
     frame(to);
-    outT = setTimeout(function () { outT = 0; unpaint(); }, g.ms + 40);
+    outT = setTimeout(function () { outT = 0; unpaint(!R.open_); }, g.ms + 40);
   }
   R.pan = function (e) {
     if (!R.el || !e) return false;
@@ -459,7 +514,7 @@
   };
   R.dragging = function () { return !!drag; };
   /* Schalter "Entdecken in der Seitenleiste" wirkt sofort */
-  N.evt.on('settings:changed', function (e) { if (e && (e.key === 'discover' || e.key === 'railItems') && R.el) R.build(); });
+  N.evt.on('settings:changed', function (e) { if (e && (e.key === 'discover' || e.key === 'railItems' || e.key === 'liveRegions' || e.key === 'liveTv') && R.el) R.build(); });
   /* Weitere Server: Bibliotheken kamen/gingen -> neu aufbauen (nur bei geaenderter Liste; bei offener Leiste erst nach dem Schliessen) */
   var xsig = '[]', xdirty = false;
   N.evt.on('srv:changed', function () {

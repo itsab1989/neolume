@@ -18,6 +18,7 @@
  *   fuer fremde Eintraege ein Praefix (N.srv.skey), damit sie nicht mit gleichen Nummern des eigenen Servers kollidieren. */
 (function (N) {
   var U = N.util, IDT = 5000, LIBT = 20000, RETRY = 30000, MAX_LIBS = 7, TIMEOUT = 25000, FRESH = 300000;   // TV-Test 1.0.4: Internet-Latenz
+  var SLOW = 3000, UPGRADE = 30000;   // SRV-6: langsame Anfrage -> Warnung im Protokoll; ueber Relay: bessere Adresse nach 30 s erneut pruefen
   var list = [], byId = {}, uuid = '', ctx = '', gen = 0, startT = 0;
 
   function now() { return U.now(); }
@@ -51,10 +52,14 @@
     RETRY: RETRY, TIMEOUT: TIMEOUT,
     /* Protokollzeile je Anfrage an einen weiteren Server (Pfad ohne Query/Token): Dauer, Versuche, Ergebnis – zum Pruefen am TV */
     timing: function (id, method, path, err, meta) {
-      var sv = byId[id];
-      N.log('srv ' + (sv ? sv.name : '?') + ' ' + method + ' ' + String(path).split('?')[0] + ' -> ' + (err ? (err.type || 'err') + (err.status ? ' ' + err.status : '') : 'ok') +
-        (meta ? ' ' + meta.ms + ' ms' + (meta.tries > 1 ? ' (' + meta.tries + ' Versuche)' : '') : ''));
+      var sv = byId[id], slow = !!(meta && (meta.ms > SLOW || meta.tries > 1));
+      var l = 'srv ' + (sv ? sv.name : '?') + ' ' + method + ' ' + String(path).split('?')[0] + ' -> ' + (err ? (err.type || 'err') + (err.status ? ' ' + err.status : '') : 'ok') +
+        (meta ? ' ' + meta.ms + ' ms' + (meta.tries > 1 ? ' (' + meta.tries + ' Versuche)' : '') : '') + (sv && sv.base && S.isRelay(sv, sv.base) ? ' via Relay' : '');
+      // SRV-6 (Nutzerbefund iPad 05.11.): langsam (> 3 s) bzw. wiederholt -> Warnung, steht auch im normalen Bau im Protokoll
+      if (slow && N.diag) N.diag.log('warn', l); else N.log(l);
     },
+    /* Adresse ist ein Plex-Relay (aus plex.tv, nur mit TLS 1.2; setup.json kennt keine): langsam und gedrosselt -> nur als letzte */
+    isRelay: function (sv, uri) { return !!(sv && sv.relays && sv.relays.indexOf(uri) >= 0); },
     /* Profil aktiv (session.activate): Server dieses Profils aus setup.json; Bibliotheken sofort aus dem Speicher (Seitenleiste),
      * Pruefung der Adressen spaeter im Hintergrund (start). servers: [{machineId, name, uris, token}] */
     setProfile: function (servers, profileUuid) {
@@ -62,9 +67,12 @@
       if (startT) { clearTimeout(startT); startT = 0; }
       var c = cache();
       for (var i = 0; servers && i < servers.length; i++) {
-        var s = servers[i], m = c.s[s.machineId] || {}, uris = s.uris.slice(0);
-        if (m.uri && uris.indexOf(m.uri) > 0) { uris.splice(uris.indexOf(m.uri), 1); uris.unshift(m.uri); }   // zuletzt funktionierende zuerst
-        var sv = { id: s.machineId, name: s.name || '', uris: uris, token: s.token, base: '', state: 'idle', at: 0, busy: null,
+        var s = servers[i], m = c.s[s.machineId] || {}, uris = s.uris.slice(0), relays = [];
+        for (var r = 0; s.relays && r < s.relays.length; r++) if (typeof s.relays[r] === 'string' && uris.indexOf(s.relays[r]) >= 0) relays.push(s.relays[r]);
+        // zuletzt funktionierende zuerst – ausser einem Relay (SRV-6: einmal ueber das Relay verbunden, blieb die App sonst dabei,
+        // auch wenn die direkte Adresse wieder ging; jede Anfrage dauerte dann Sekunden)
+        if (m.uri && uris.indexOf(m.uri) > 0 && relays.indexOf(m.uri) < 0) { uris.splice(uris.indexOf(m.uri), 1); uris.unshift(m.uri); }
+        var sv = { id: s.machineId, name: s.name || '', uris: uris, relays: relays, token: s.token, base: '', state: 'idle', at: 0, busy: null,
           libs: cleanLibs(m.libs) };
         list.push(sv); byId[sv.id] = sv;
       }
@@ -164,7 +172,8 @@
         if (g !== gen) { var w = sv.busy || []; sv.busy = null; for (var j = 0; j < w.length; j++) w[j]('none'); return; }   // Profil gewechselt: Wartende nicht haengen lassen
         sv.state = state; sv.at = now();
         if (state === 'ok' || state === 'down') remember(sv);
-        N.log('srv ' + sv.name + ': ' + state);
+        if (state === 'ok' && S.isRelay(sv, sv.base)) { if (N.diag) N.diag.log('warn', 'srv ' + sv.name + ': ok ueber Relay (direkte Adresse antwortet nicht)'); S.upgradeLater(id); }
+        else N.log('srv ' + sv.name + ': ' + state);
         var l = sv.busy; sv.busy = null;
         changed();
         for (var i = 0; i < l.length; i++) l[i](state);
@@ -217,12 +226,44 @@
           for (var i = 0; i < o.length; i++) {
             if (o[i].machineId !== sv.id) continue;
             for (var j = 0; j < o[i].uris.length; j++) if (sv.uris.indexOf(o[i].uris[j]) < 0) { sv.uris.push(o[i].uris[j]); n++; }
+            for (j = 0; o[i].relays && j < o[i].relays.length; j++) if (sv.relays.indexOf(o[i].relays[j]) < 0) sv.relays.push(o[i].relays[j]);
           }
           if (n) N.log('srv ' + sv.name + ': ' + n + ' neue Adresse(n) von plex.tv');
           next();
         });
       }
       next();
+    },
+    /* SRV-6: ueber das Relay verbunden -> nach UPGRADE im Hintergrund die besseren Adressen (Reihenfolge der Liste, vor dem Relay)
+     * erneut pruefen (/identity ohne Token); antwortet eine, laufen alle weiteren Anfragen und Bilder darueber. Laeuft das Relay
+     * weiter, alle FRESH erneut. */
+    upgradeLater: function (id) {
+      var sv = byId[id], g = gen;
+      if (!sv || sv.upT) return;
+      sv.upT = setTimeout(function () {
+        sv.upT = 0;
+        if (g !== gen || !sv.base || !S.isRelay(sv, sv.base) || sv.busy) return;
+        var base = sv.base, k = 0, better = [];
+        for (var i = 0; i < sv.uris.length; i++) if (!S.isRelay(sv, sv.uris[i])) better.push(sv.uris[i]);
+        function next() {
+          if (g !== gen || sv.base !== base) return;
+          if (k >= better.length) { again(); return; }
+          var uri = better[k++];
+          N.http.request({ url: uri + '/identity', headers: N.plex.headers(null), timeout: IDT, retries: 0, no401: true, dedupe: false, nowatch: true },
+            function (err, d) {
+              if (g !== gen || sv.base !== base) return;
+              if (!err && d && d.MediaContainer && d.MediaContainer.machineIdentifier === sv.id) {
+                sv.base = uri; remember(sv);
+                N.log('srv ' + sv.name + ': bessere Adresse antwortet wieder – Relay verlassen');
+                changed();
+                return;
+              }
+              next();
+            });
+        }
+        function again() { sv.upWait = FRESH; S.upgradeLater(id); }
+        next();
+      }, sv.upWait || UPGRADE);
     },
     /* Antwort des Helfers GET /servers {servers:[{id, uris:[...]}]} -> gepruefte http-Adressen fuer diesen Server */
     helperUris: function (d, id) {

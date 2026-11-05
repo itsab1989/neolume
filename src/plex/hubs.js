@@ -119,8 +119,9 @@
           items = M.normList(data.pl || [], kinds);
           if (items.length) row = { id: id, kind: 'poster', tk: 'home.row.playlists', tp: null, title: data.plTitle || '', items: items };
         } else if (p.group === 'ext') row = H.extRow(id);
+        else if (p.group === 'live') row = N.live ? N.live.homeRow() : null;   // Fernsehen (LIVE-6): Sender, kein Server-Inhalt
         /* Erweiterungs-Reihen setzen ihr Ziel selbst ({t: 'x'}, Karte per withAll; views/library.js holt die Liste ueber 'lib:list') */
-        if (row && !row.ext) { row.all = H.allTarget(row, p, data, p.group === 'hub' ? h : null); H.withAll(row); }
+        if (row && !row.ext && !row.live) { row.all = H.allTarget(row, p, data, p.group === 'hub' ? h : null); H.withAll(row); }
         if (row) rows.push(row);
       }
       return rows;
@@ -168,7 +169,9 @@
       var by = {}, out = [], i, x;
       for (i = 0; i < rows.length; i++) by[rows[i].id] = rows[i];
       for (i = 0; i < ids.length; i++) {
-        x = by[ids[i]] || (HR.parse(ids[i]).group === 'ext' ? H.extRow(ids[i]) : null);   // Erweiterungs-Reihe: nie im Cache, gleich ihr Stand
+        var g = HR.parse(ids[i]).group;
+        if (g === 'live') x = N.live ? N.live.homeRow() : null;   // Fernsehen: immer die aktuelle Senderauswahl (nie aus dem Cache)
+        else x = by[ids[i]] || (g === 'ext' ? H.extRow(ids[i]) : null);   // Erweiterungs-Reihe: nie im Cache, gleich ihr Stand
         if (x) out.push(H.withAll(x));
       }
       return out;
@@ -244,7 +247,7 @@
     forCache: function (rows, maxBytes) {
       maxBytes = maxBytes || 60000;
       var keep = [], r, i;
-      for (r = 0; r < rows.length; r++) if (!rows[r].ext) keep.push(rows[r]);   // Erweiterungs-Reihen: eigener Speicher, nie hier
+      for (r = 0; r < rows.length; r++) if (!rows[r].ext && !rows[r].live) keep.push(rows[r]);   // Erweiterungs-/Fernseh-Reihen: eigener Stand, nie hier
       var copy = JSON.parse(JSON.stringify(keep)), s;
       /* "Alle anzeigen" (HOME-14) nie in den Cache: andere Leser (Suche-Vorschlaege, Schoner) sehen nur echte Titel; row.all bleibt,
        * H.pick haengt die Karte beim Lesen wieder an */

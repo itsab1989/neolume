@@ -77,7 +77,7 @@
   };
   /* Hintergrund: Art scharf, ohne Art Poster/Cover unscharf vom Server (N.img.bg); Hintergrundbilder aus: einfarbig */
   Hero.prototype.load = function (it) {
-    var self = this, b = it ? N.img.bg(it.art, it.thumb) : null;
+    var self = this, b = it && !it.live ? N.img.bg(it.art, it.thumb) : null;   // Fernsehen: kein Hintergrund aus dem Senderlogo
     var url = b ? b.url : '', soft = !!(b && b.soft);
     if (url === this.url) return;
     this.url = url;

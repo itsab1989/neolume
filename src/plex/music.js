@@ -235,6 +235,16 @@
       }
       return out;
     },
+    /* Weiterhoeren-Karte (continueCards: type 'track', kind 'audio') -> ihr Buch als Album-Eintrag fuer die Detailkarte (Finger/Maus,
+     * caps.cardTap 'details', DET-10): dort steht "Fortsetzen" an erster Stelle. null = keine solche Karte bzw. Track ohne Album
+     * (dann bleibt es beim Abspielen). Am TV ungenutzt: OK setzt dort sofort fort. */
+    listenAlbum: function (t) {
+      if (!t || t.type !== 'track' || t.kind !== 'audio' || !t.albumRk) return null;
+      var a = { rk: t.albumRk, type: 'album', kind: 'audio', title: t.title, artist: t.artist, artistRk: t.artistRk, thumb: t.thumb, art: t.art,
+        lib: t.lib, year: t.year, vleaf: 0, leaf: 0, child: 0 };
+      if (t.srv) a.srv = t.srv;
+      return a;
+    },
     /* Fortschritt einer Track-Karte 0..1 (Weiterhoeren) */
     trackProgress: function (t) { return t && t.dur > 0 && t.off > 0 ? Math.min(0.98, t.off / t.dur) : 0; },
 

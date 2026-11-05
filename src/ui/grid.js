@@ -26,7 +26,7 @@
     for (var i = 0; i < this.pool.length; i++) {
       var e = this.pool[i];
       this._free(e);
-      e.card.className = this.cardCls; e.cap.className = this.capCls; e.foc = false; e.x = e.y = null;
+      e.card.className = this.cardCls; e.cap.className = this.capCls; e.foc = false; e.xc = ''; e.x = e.y = null;
     }
     this.byIdx = {};
   };
@@ -59,7 +59,12 @@
   Grid.prototype._release = function (e) {
     if (e.idx >= 0) { if (this.byIdx[e.idx] === e) delete this.byIdx[e.idx]; e.idx = -1; }
     N.img.drop(e.img, true); e.it = null;
-    if (e.foc) { e.card.className = this.cardCls; e.cap.className = this.capCls; e.foc = false; }
+    if (e.foc || e.xc) { e.xc = ''; this._cls(e, false); }
+  };
+  /* Klassen einer Karte + Beschriftung: Ansicht, Zusatzklasse des Eintrags (e.xc), Fokus */
+  Grid.prototype._cls = function (e, foc) {
+    var x = (e.xc || '') + (foc ? ' is-focus' : '');
+    e.card.className = this.cardCls + x; e.cap.className = this.capCls + x; e.foc = foc;
   };
   Grid.prototype._hide = function (e) {
     if (e.on && e.idx < 0) { e.card.style.display = 'none'; e.cap.style.display = 'none'; e.on = false; N.img.drop(e.img); }
@@ -67,6 +72,7 @@
   /* Beschriftung: Raster wie die Posterkarte; Liste mit Jahr · Dauer · Restzeit */
   Grid.prototype._caption = function (it) {
     if (!it) return ['', ''];
+    if (it.type === 'live') return [it.title, it.sub || ''];   // Fernsehen: Sender · Laeuft gerade
     if (this.G.size !== 'list') return M.posterCaption(it);
     if (N.music && N.music.isAudio(it)) return N.music.caption(it, true);   // M4: Interpret · Jahr bzw. Interpret · Dauer
     var p = [];
@@ -85,9 +91,10 @@
     if (e.it !== it) {
       e.it = it;
       U.setText(e.ph, it && G.size !== 'list' ? it.title : '');
-      var phc = it && !it.thumb ? 'ph fb ' + N.ui.fbClass(it) : 'ph';   // ohne Bild: farbige Titelkarte (F28), nie grau
+      var lg = !!(it && it.logo), phc = lg ? 'ph lg' : it && !it.thumb ? 'ph fb ' + N.ui.fbClass(it) : 'ph';   // ohne Bild: farbige Titelkarte (F28), nie grau; Senderlogo: Name bis zum Logo
       if (e.phc !== phc) { e.phc = phc; e.phEl.className = phc; }
-      N.img.want(e.img, it && it.thumb ? N.img.url(it.thumb, G.TIER) : '', prio);
+      e.img.pnLogo = lg ? [G.LW || G.W, G.LH || G.H] : null;   // Fernsehen (LIVE-3): Logo ganz, mittig (Liste: im Bildfeld LW x LH)
+      N.img.want(e.img, it && it.thumb ? N.img.url(it.thumb, G.TIER, lg ? N.img.LOGO : undefined) : '', prio);
       var b = it ? M.badge(it) : { b: '', n: '' }, bc = b.b ? 'bdg ' + b.b : 'bdg';
       if (e.bc !== bc) { e.bc = bc; e.badge.className = bc; }
       U.setText(e.badgeT, b.n);
@@ -102,7 +109,8 @@
     }
     if (!e.on) { e.card.style.display = ''; e.cap.style.display = ''; e.on = true; }
     var foc = this.focused && i === this.f;
-    if (foc !== e.foc) { e.card.className = foc ? this.cardCls + ' is-focus' : this.cardCls; e.cap.className = foc ? this.capCls + ' is-focus' : this.capCls; e.foc = foc; }
+    var xc = it && it.cls ? ' ' + it.cls : '';         // optionale Zusatzklasse je Eintrag (Erweiterung, LIB-13), nur bei Aenderung geschrieben
+    if (foc !== e.foc || xc !== e.xc) { e.xc = xc; this._cls(e, foc); }
   };
   /* Fenster herstellen; prio 0 = Fokuszeile sofort, sonst Puffer.
    * mode 0 = alles sofort; 1 = sichtbare Zeilen sofort, Puffer im naechsten Frame; 2 = Haeppchen (CHUNK Karten, sichtbare zuerst) */
@@ -152,8 +160,8 @@
     if (moved) this.render(0, 1);
     var cur = this.byIdx[i];
     if (this.focused) {
-      if (old && old !== cur && old.foc) { old.card.className = this.cardCls; old.cap.className = this.capCls; old.foc = false; N.fx.move(old.card); }
-      if (cur && !cur.foc) { cur.card.className = this.cardCls + ' is-focus'; cur.cap.className = this.capCls + ' is-focus'; cur.foc = true; N.fx.move(cur.card); }
+      if (old && old !== cur && old.foc) { this._cls(old, false); N.fx.move(old.card); }
+      if (cur && !cur.foc) { this._cls(cur, true); N.fx.move(cur.card); }
     }
     if (moved) this._slide(this.G.offset(r));
     return this.ringPos();
@@ -171,8 +179,8 @@
     this.render(0, 1);
     var cur = this.byIdx[i];
     if (this.focused) {
-      if (old && old !== cur && old.foc) { old.card.className = this.cardCls; old.cap.className = this.capCls; old.foc = false; }
-      if (cur && !cur.foc) { cur.card.className = this.cardCls + ' is-focus'; cur.cap.className = this.capCls + ' is-focus'; cur.foc = true; }
+      if (old && old !== cur && old.foc) this._cls(old, false);
+      if (cur && !cur.foc) this._cls(cur, true);
     }
     this._slide(G.offset(r));
     return this.ringPos();
@@ -217,8 +225,8 @@
     this.f = i; this.r = this.G.row(i);
     this.render(0, 1);
     var cur = this.byIdx[i];
-    if (old && old !== cur && old.foc) { old.card.className = this.cardCls; old.cap.className = this.capCls; old.foc = false; }
-    if (this.focused && cur && !cur.foc) { cur.card.className = this.cardCls + ' is-focus'; cur.cap.className = this.capCls + ' is-focus'; cur.foc = true; }
+    if (old && old !== cur && old.foc) this._cls(old, false);
+    if (this.focused && cur && !cur.foc) this._cls(cur, true);
     if (was) { var pg = this.pg; pg.style.webkitTransition = 'none'; U.tf(pg, 0, this.G.offset(this.r)); this._still(this.G.offset(this.r)); setTimeout(function () { if (!tweenOn()) pg.style.webkitTransition = ''; }, 60); }
     return this.ringPos();
   };
@@ -230,7 +238,7 @@
   Grid.prototype.setFocused = function (on) {
     this.focused = on;
     var e = this.byIdx[this.f];
-    if (e && e.foc !== on) { N.fx.move(e.card); e.card.className = on ? this.cardCls + ' is-focus' : this.cardCls; e.cap.className = on ? this.capCls + ' is-focus' : this.capCls; e.foc = on; }
+    if (e && e.foc !== on) { N.fx.move(e.card); this._cls(e, on); }
   };
   /* Karte entfernen (Gelb unter Filter "Ungesehen", SPEC 6.3.1): Fokus auf die nachrueckende, sonst die vorherige */
   Grid.prototype.removeAt = function (i) {

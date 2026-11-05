@@ -270,6 +270,7 @@
       if (!user.pin && cached && !(S.state.profiles[user.uuid] || {}).needPin) { cb(null, cached); return null; }
       return N.auth.switchUser(S.state.account.token, user.uuid, pin, function (err, userToken) {
         if (err) { cb(err); return; }
+        if (N.ptv) N.ptv.remember(user.uuid, userToken);   // plex.tv direkt (caps.plexTvDirect): Merkliste dieses Profils, nur im Speicher
         N.auth.serverTokenFor(userToken, S.state.server.machineId, function (e2, serverToken, servers) {
           S.takeServers(user.uuid, servers, true);         // TLS 1.2: Weitere Server dieses Profils (SRV-5); TV: nichts
           if (e2 && e2.type === 'noserver' && user.admin) { cb(null, userToken); return; }

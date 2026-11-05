@@ -193,6 +193,136 @@
       if (!s) return '';
       return s.charAt((Math.max(1, presses) - 1) % s.length);
     },
+    /* ---------- Eingemischte Karten einer Erweiterung (LIB-13) ----------
+     * Nur Titelsortierung, ohne Filter oder nur "Ungesehene" (eingemischte Titel sind nie gesehen/angefangen und haben keine
+     * Genres, Jahrzehnte, Aufloesungen, Sammlungen oder Personen beim Server). */
+    /* hoechstens so viele eingemischte Karten je Bibliothek (je Karte eine kleine Zaehl-Anfrage beim Oeffnen); die Erweiterung nennt
+     * mehr in ihrer Statuszeile ("12 von 15 …") */
+    MIX_MAX: 100,
+    mixable: function (prefs) {
+      var f = prefs.f || {};
+      if (prefs.sort !== 'title' || f.actor || (f.status && f.status !== 'unwatched')) return false;
+      for (var i = 0; i < LISTS.length; i++) if (f[LISTS[i].id]) return false;
+      return true;
+    },
+    /* Sortier-Schluessel einer eingemischten Karte wie Plex' titleSort: fuehrender Artikel weg (am PMS 1.43 so beobachtet:
+     * "The", "Der", "Das", "A", "An"); Gross/Klein spielt fuer den Server keine Rolle */
+    mixKey: function (title) {
+      var t = String(title || '').replace(/^\s+|\s+$/g, '');
+      var m = /^(the|der|das|a|an)\s+(\S.*)$/i.exec(t);
+      return m ? m[2] : t;
+    },
+    /* Buchstabe der Leiste fuer einen Schluessel (Umlaute/Akzente zum Grundbuchstaben; Æ Ø Å nur auf Norwegisch eigen) */
+    mixLetter: function (key, lang) {
+      var c = String(key || '').charAt(0).toUpperCase(), abc = L.letters(lang), F = { 'Ä': 'A', 'Á': 'A', 'À': 'A', 'Â': 'A', 'É': 'E', 'È': 'E', 'Ê': 'E', 'Ö': 'O', 'Ó': 'O', 'Ò': 'O', 'Ô': 'O', 'Ü': 'U', 'Ú': 'U', 'Í': 'I', 'Ñ': 'N', 'Ç': 'C' };
+      if (abc.indexOf(c) < 0 && F[c]) c = F[c];
+      return c && abc.indexOf(c) > 0 ? c : '#';
+    },
+    /* Abbildung Server-Index <-> Raster-Index. ks = Stelle je eingemischter Karte = Zahl der Server-Titel davor (aufsteigend
+     * sortiert). Karte j steht im Raster bei ks[j] + j; ein Server-Titel s bei s + Zahl der Karten mit ks[j] <= s. */
+    mix: function (ks) {
+      var v = [];
+      for (var j = 0; j < ks.length; j++) v.push(ks[j] + j);
+      return {
+        n: ks.length, ks: ks, v: v,
+        toV: function (s) { var c = 0; while (c < ks.length && ks[c] <= s) c++; return s + c; },
+        /* Server-Index des Raster-Index i (bei einer eingemischten Karte: der naechste Server-Titel danach) */
+        toS: function (i) { var c = 0; while (c < v.length && v[c] < i) c++; return i - c; },
+        phAt: function (i) { for (var j = 0; j < v.length; j++) if (v[j] === i) return j; return -1; },
+        /* Server-Titel an Raster-Index i faellt weg (Gelb unter "Nur ungesehene", SPEC 6.3.1) bzw. kommt dort wieder dazu: Karten
+         * dahinter ruecken mit, sonst landeten spaeter geladene Seiten um eins verschoben (doppelte bzw. fehlende Karte) */
+        cut: function (i) { for (var j = 0; j < v.length; j++) if (v[j] > i) { v[j]--; ks[j]--; } },
+        ins: function (i) { for (var j = 0; j < v.length; j++) if (v[j] >= i) { v[j]++; ks[j]++; } }
+      };
+    },
+    /* Plan fuer viele eingemischte Karten (LIB-13, bis MIX_MAX): die genaue Stelle einer Karte wird erst gezaehlt, wenn sie gebraucht
+     * wird. Vorher kennt der Plan nur ihren Bereich aus dem Buchstaben-Index des Servers (chars = L.chars, aufsteigend): die Zahl der
+     * Server-Titel davor liegt im Bereich ihres Buchstabens, mit einem Buchstaben Spielraum davor und danach (Plex sortiert Umlaute und
+     * Zeichen nicht immer wie die Leiste). keys = Schluessel je Karte (L.mixKey), desc = Z–A. Reihenfolge im Raster: bekannte Stelle bzw.
+     * Bereichsanfang, dann Schluessel – eine noch ungezaehlte Karte ueberlappt nie eine schon gezeichnete Seite (need() vor jeder Seite),
+     * also aendert ihr Zaehlen die Lage keiner gezeichneten Karte. Rueckgabe wie L.mix (n, toV, toS, phAt, cut, ins), dazu pos(j) =
+     * Raster-Index der Karte j (-1 = unbekannt), need(a, b) = ungezaehlte Karten, die Server-Index a..b betreffen, set/drop, list. */
+    mixPlan: function (keys, chars, desc, lang) {
+      var tot = 0, st = [], i, j, A = [];
+      for (i = 0; i < chars.length; i++) { st.push(tot); tot += chars[i].n; }
+      function end(x) { return x < chars.length ? st[x] + chars[x].n : tot; }
+      function fold(s) { return String(s || '').toLowerCase().replace(/[äáàâ]/g, 'a').replace(/[éèê]/g, 'e').replace(/[öóòô]/g, 'o').replace(/[üúù]/g, 'u').replace(/ß/g, 'ss'); }
+      for (j = 0; j < keys.length; j++) {
+        var ch = L.mixLetter(keys[j], lang), a = -1, b = -1, p;
+        for (i = 0; i < chars.length; i++) if (chars[i].ch === ch) { if (a < 0) a = i; b = i; }
+        if (a < 0) { for (p = 0; p < chars.length && L.cmp(chars[p].ch, ch) < 0; p++) {} a = p; b = p - 1; }   // Buchstabe fehlt beim Server
+        var lo = st[Math.max(0, a - 1)] || 0, hi = end(b + 1);
+        A.push({ j: j, key: fold(keys[j]), k: -1, b: -1, lo: desc ? tot - hi : lo, hi: desc ? tot - lo : hi });
+      }
+      function val(o) { return o.k >= 0 ? o.k : o.lo; }
+      var dirty = false;
+      function fix() { if (dirty) { dirty = false; sort(); } }            // nach Zaehlungen erst beim naechsten Lesen neu ordnen (einmal je Stapel)
+      function sort() { A.sort(function (x, y) { return val(x) - val(y) || (x.key < y.key ? (desc ? 1 : -1) : x.key > y.key ? (desc ? -1 : 1) : x.j - y.j); }); M.n = A.length; }
+      var M = {
+        n: 0, total: tot, list: A,
+        order: function () { fix(); return A; },
+        pos: function (j) { fix(); return A[j].k >= 0 ? A[j].k + j : -1; },
+        /* Server-Index s -> Raster-Index; -1, solange eine ungezaehlte Karte davor oder dahinter liegen koennte */
+        toV: function (s) {
+          fix();
+          var c = 0;
+          for (var x = 0; x < A.length; x++) {
+            var o = A[x];
+            if (o.k >= 0 ? o.k <= s : o.hi <= s) { c++; continue; }
+            if (o.k < 0 && o.lo <= s) return -1;
+            if (val(o) > s) break;
+          }
+          return s + c;
+        },
+        /* Raster-Index i -> Server-Index (bei einer Karte: der naechste Server-Titel); ungezaehlte Karten am Anfang ihres Bereichs
+         * (nur fuer die Wahl der Server-Seiten). Binaere Suche: val(o) + Rang steigt streng. */
+        toS: function (i) { fix(); var a = 0, b = A.length; while (a < b) { var m = (a + b) >> 1; if (val(A[m]) + m < i) a = m + 1; else b = m; } return i - a; },
+        phAt: function (i) { fix(); var a = 0, b = A.length; while (a < b) { var m = (a + b) >> 1; if (val(A[m]) + m < i) a = m + 1; else b = m; } return a < A.length && A[a].k >= 0 && A[a].k + a === i ? a : -1; },
+        need: function (a, b) { fix(); var out = []; for (var x = 0; x < A.length; x++) if (A[x].k < 0 && A[x].lo <= b && A[x].hi >= a) out.push(A[x]); return out; },
+        /* Zaehlung (Zahl der Server-Titel davor, aufsteigend) einer Karte o; ausserhalb ihres Bereichs -> geklemmt, Rueckgabe false */
+        set: function (o, before) {
+          var k = desc ? tot - before : before, ok = k >= o.lo && k <= o.hi;
+          o.b = before; o.k = Math.max(o.lo, Math.min(o.hi, k)); dirty = true;
+          return ok;
+        },
+        drop: function (o) { var x = A.indexOf(o); if (x >= 0) A.splice(x, 1); M.n = A.length; },
+        /* wie L.mix: Server-Titel an Raster-Index i weg (Gelb unter "Nur ungesehene") bzw. wieder da – Karten dahinter ruecken mit */
+        cut: function (i) { fix(); for (var x = 0; x < A.length; x++) if (val(A[x]) + x > i) { if (A[x].k >= 0) A[x].k--; A[x].lo--; A[x].hi--; } },
+        ins: function (i) { fix(); for (var x = 0; x < A.length; x++) if (val(A[x]) + x >= i) { if (A[x].k >= 0) A[x].k++; A[x].lo++; A[x].hi++; } }
+      };
+      sort();
+      return M;
+    },
+    /* Raster-Seiten (GridMath.pagesFor) -> Server-Seiten, die sie fuellen (sTotal = Titel beim Server) */
+    mixPages: function (mx, vpages, size, sTotal) {
+      var out = [], seen = {};
+      for (var i = 0; i < vpages.length; i++) {
+        var a = mx.toS(vpages[i] * size), b = Math.min(sTotal - 1, mx.toS(vpages[i] * size + size - 1));
+        for (var p = Math.floor(a / size); p <= Math.floor(Math.max(a, b) / size); p++) if (p * size < sTotal && !seen[p]) { seen[p] = 1; out.push(p); }
+      }
+      return out;
+    },
+    /* Buchstaben-Zaehlung des Servers (L.chars) + eingemischte Karten (Buchstaben je Karte) – Sprung/Markierung bleiben exakt */
+    mixChars: function (chars, letters) {
+      var out = [], i, j;
+      for (i = 0; i < chars.length; i++) out.push({ ch: chars[i].ch, n: chars[i].n });
+      for (j = 0; j < letters.length; j++) {
+        var ch = letters[j], hit = false;
+        for (i = 0; i < out.length; i++) if (out[i].ch === ch) { out[i].n++; hit = true; break; }
+        if (hit) continue;
+        for (i = 0; i < out.length && L.cmp(out[i].ch, ch) < 0; i++) {}
+        out.splice(i, 0, { ch: ch, n: 1 });
+      }
+      return out;
+    },
+    /* Stellen aus den Zaehlungen: before[j] = Server-Titel vor Karte j (aufsteigend); absteigend = Gesamtzahl - before.
+     * -> Reihenfolge der Karten im Raster [{j, k}] (nach k, bei Gleichstand nach Schluessel in Sortier-Richtung) */
+    mixOrder: function (keys, before, total, desc) {
+      var a = [];
+      for (var j = 0; j < keys.length; j++) a.push({ j: j, k: desc ? Math.max(0, total - before[j]) : Math.min(total, before[j]), key: String(keys[j] || '').toLowerCase() });
+      a.sort(function (x, y) { return x.k - y.k || (x.key < y.key ? (desc ? 1 : -1) : x.key > y.key ? (desc ? -1 : 1) : 0); });
+      return a;
+    },
     /* ---------- Werte-Listen der Zusatzfilter ---------- */
     values: function (json) {
       var list = json && json.MediaContainer && json.MediaContainer.Directory || [], out = [];

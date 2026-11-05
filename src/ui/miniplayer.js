@@ -2,10 +2,14 @@
  * Titel, Interpret, Play/Pause-Symbol wie in Jetzt laeuft, duenner Balken, Taste B = Jetzt laeuft). Ansichten mit A–Z-Leiste setzen
  * s.miniX (F26); Ein-/Ausblenden meldet 'mini:vis' (Listen schaffen Platz). Sichtbar, solange N.audio aktiv ist und weder Jetzt-laeuft
  * noch der Video-Player oben liegt. Aktualisierung hoechstens 1x/s und nur in Tastenruhe (keine DOM-Arbeit im Tastenpfad). Klick = Jetzt laeuft.
+ * Ohne farbige TV-Kappe (Apple, NAV-26: Finger/Maus statt Gruen/STOP) eigene Knoepfe: Play/Pause (Feld 236–296) und Schliessen
+ * (×, Feld 296–360, beendet die Wiedergabe), je volle Hoehe 64; Rest = Jetzt laeuft. Trefferflaeche = wo die Leiste wirklich steht
+ * (flexible Flaeche: flex.css setzt sie unten an, offsetLeft/offsetTop beim Klick); TV unveraendert (feste Lage, ganze Leiste ein Knopf).
  * Ausserdem globale Hinweise zur Ton-Wiedergabe (Sleep-Timer, Fehler) und Stop beim Profilwechsel (Token gehoert zum Profil). */
 (function (N) {
   var U = N.util, MU = N.music, X = 856, Y = 572, W = 360, H = 64, HIDE = { nowplaying: 1, player: 1, login: 1, profiles: 1, start: 1 };
-  var M = { el: null, on: false, rk: '', timer: 0, w: -1, x: X, ic0: '' };
+  var PP_X = 236, X_X = 296;                           // Knopf-Felder (nur ohne TV-Kappe): Play/Pause, Schliessen
+  var M = { el: null, on: false, rk: '', timer: 0, w: -1, x: X, ic0: '', btns: false };
   M.init = function (parent) {
     var e = M.el = U.el('div', 'mini', parent, 'display:none');
     M.fb = U.el('div', 'mini-fb', e, 'display:none'); M.fbT = document.createTextNode(''); M.fb.appendChild(M.fbT);   // ohne Cover: Farbfeld + Initiale (F28)
@@ -13,7 +17,11 @@
     M.t1 = U.txt('div', 'mini-t1 ell', e, ''); M.t2 = U.txt('div', 'mini-t2 ell', e, '');
     M.ic = N.ui.icon(e, 'pause', 's1', 'left:252px;top:16px');
     var k = U.el('span', 'k k-green mini-k', e); k.appendChild(document.createTextNode('B'));
-    if (N.keys.label('green') !== null) k.style.display = 'none';   // Apple (NAV-26): keine farbige TV-Kappe; der Mini-Player ist selbst ein Knopf
+    if (N.keys.label('green') !== null) {             // Apple (NAV-26): keine farbige TV-Kappe; der Mini-Player ist selbst ein Knopf
+      k.style.display = 'none';
+      M.btns = true;
+      M.xb = U.el('div', 'mini-x', e); U.el('i', '', M.xb); U.el('b', '', M.xb);   // Schliessen = Wiedergabe beenden (CSS-Form wie das X der Karte)
+    }
     M.bar = U.el('i', '', U.el('div', 'mini-bar', e));
     N.evt.on('audio:track', function () { M.rk = ''; M.update(true); });
     N.evt.on('audio:state', function () { M.update(true); });
@@ -42,6 +50,8 @@
     var c = N.audio.core(), top = N.router.topName(), act = N.audio.active();
     if (act && top === 'profiles') { N.audio.stop('Profilwechsel'); act = false; }
     var show = act && !HIDE[top], scr = N.router.top(), x = scr && scr.miniX || X;
+    /* flexibel (schmale Fenster, iPhone hochkant): nie ueber den rechten Rand hinaus (vorher fest 856 wie am TV) */
+    if (N.screen && N.screen.flex && N.screen.view) { var vw = N.screen.view().w || 0; if (vw) x = Math.max(16, Math.min(x, vw - W - 24)); }
     if (show && x !== M.x) { M.x = x; M.el.style.left = x + 'px'; }   // Bibliothek: links neben der A–Z-Leiste (F26)
     if (show !== M.on) { M.on = show; U.show(M.el, show); force = true; N.evt.emit('mini:vis', show); }   // Ansichten schaffen Platz unten (F26)
     if (!show) { if (M.timer) { clearInterval(M.timer); M.timer = 0; } return; }   // Takt nur, solange sichtbar
@@ -65,9 +75,20 @@
     if (on) { M.fb.className = 'mini-fb ' + N.ui.fbClass(it); U.setText(M.fbT, N.ui.initial(it.album || it.title)); }
     U.show(M.fb, on);
   }
+  /* Lage der Leiste in Flaechen-Koordinaten: flexibel wie gesetzt (flex.css: unten), sonst fest */
+  M.rect = function () {
+    var e = M.el;
+    if (N.screen && N.screen.flex && e && e.offsetHeight > 0) return { x: e.offsetLeft, y: e.offsetTop };
+    return { x: M.x, y: Y };
+  };
   M.pointer = function (x, y, kind) {
-    if (!M.on || x < M.x || x >= M.x + W || y < Y || y >= Y + H) return false;
-    if (kind === 'click') N.router.push('nowplaying');
+    if (!M.on) return false;
+    var r = M.rect(), dx = x - r.x;
+    if (dx < 0 || dx >= W || y < r.y || y >= r.y + H) return false;
+    if (kind !== 'click') return true;
+    if (M.btns && dx >= X_X) { N.audio.stop('Mini-Player'); M.update(true); return true; }   // Wiedergabe beenden, Leiste geht zu
+    if (M.btns && dx >= PP_X) { if (N.audio.active()) N.audio.toggle(); else N.audio.restart(); M.update(true); return true; }   // wie Jetzt laeuft
+    N.router.push('nowplaying');
     return true;
   };
   N.ui.mini = M;

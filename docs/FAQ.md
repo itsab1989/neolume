@@ -12,6 +12,7 @@
 - [Do I need my computer all the time?](#do-i-need-my-computer-all-the-time)
 - [Does Neolume need the internet?](#does-neolume-need-the-internet)
 - [Does it work away from home (remote access)?](#does-it-work-away-from-home-remote-access)
+- [Can I watch live TV?](#can-i-watch-live-tv)
 - [Profiles, kids profiles and PINs](#profiles-kids-profiles-and-pins)
 - [What happens to my other self-installed apps?](#what-happens-to-my-other-self-installed-apps)
 - [Does it replace the old Plex app on the TV?](#does-it-replace-the-old-plex-app-on-the-tv)
@@ -31,7 +32,8 @@ please open an [issue](https://github.com/itsab1989/neolume/issues) instead.
 ### Why does Neolume exist?
 Samsung TVs from 2014 can only use old encryption (TLS 1.1 and older). plex.tv stopped accepting it, so the TV's original
 Plex app can no longer sign in, and it is no longer maintained. Neolume moves the sign-in to your computer (once, during
-setup); afterwards the TV only talks to your own Plex Media Server on your home network, which works without modern encryption.
+setup); afterwards the TV only talks to your own Plex Media Server on your home network, which works without modern encryption
+(apart from optional extras you switch on yourself, such as [Live TV](#can-i-watch-live-tv)).
 
 ### Which TVs does Neolume run on?
 Neolume is built for Samsung's **"Orsay" Smart TV platform** – the Smart Hub with the Maple/WebKit browser engine that
@@ -110,11 +112,35 @@ or next to the clock; it can be removed completely with one click. Step by step:
 Not for watching – only your Plex Media Server on the home network (the server itself uses the internet for posters and
 metadata). The setup needs the internet once (plex.tv sign-in). Exception: the watchlist, the plex.tv rows in Discover and
 the details of titles that are not on your server come from plex.tv through the optional helper on your home network (see
-[INSTALL, section 13](INSTALL.md#13-optional-the-helper-for-watchlist-and-discover)).
+[INSTALL, section 13](INSTALL.md#13-optional-the-helper-for-watchlist-and-discover)). And if you switch on the optional
+[Live TV](#can-i-watch-live-tv), the channels themselves of course come from the internet.
 
 ### Does it work away from home (remote access)?
 No, by design. Neolume uses your own server only through its home-network address, so your access never travels over the
-internet unencrypted.
+internet unencrypted. The one exception you can choose: [servers that someone shared with you](#can-i-use-a-server-that-a-friend-shared-with-me)
+are reached over the internet. For them, *Settings → Playback → Quality over the internet* sets how much may come at
+once, so a video from far away does not stall.
+
+### Can I watch live TV?
+Yes, optionally: **Settings → Live TV & Discover → Live TV** (off by default). It shows the free live streams that public
+broadcasters put on their own websites – Das Erste, ZDF, arte, 3sat, phoenix, the regional channels and more, plus arte in
+French, channels from Austria, Denmark, Spain, Sweden and Australia and international services such as DW English, NHK
+World and Arirang (the region of your country is on first) – as an area in the sidebar and, if you like, as a row on
+Home. Neolume uses only the addresses the broadcaster's own player uses: no unofficial IPTV, nothing with copy protection or a sign-in, and channels that only stream
+in their own country stay blocked elsewhere.
+
+On the **2014 Samsung TV** **all channels play with the [optional helper](INSTALL.md)**. The ARD and ZDF channels send
+their sound as a separate track, and the TV's 2014 player cannot combine it with the picture – so the helper fetches both
+from the broadcaster and gives the TV one stream with picture and sound. It only repackages, stores nothing and adds about
+one segment (2 seconds) of delay. Without the helper the TV lists only the channels whose sound is inside the picture
+(arte, DW English) and the status line says how many more the helper would bring. On other platforms all channels play
+without it.
+
+While Live TV is on, the TV loads a channel you play straight from the broadcaster, "what's on now" from the ARD programme
+service, and the channel logos from Wikimedia Commons through your Plex server. No account, cookies or identifiers are sent.
+Switched off, nothing is requested. With the helper on the 2014 TV, the ARD and ZDF channels are fetched by the helper on
+your computer or NAS instead (the same broadcaster addresses, so the broadcaster sees your home connection as before); the
+helper keeps only the last few seconds in memory, writes nothing to disk and logs no addresses.
 
 ### Can I use a server that a friend shared with me?
 Yes, optionally. In the setup program's **Summary**, click **Search shared servers** and tick the servers you want. Their
@@ -131,9 +157,12 @@ connections: Preferred**), and the connection to it goes over the internet **wit
   for the main profile's own PIN, run the setup again with **Reset app PINs** ticked.
 
 ### Can I change the colours?
-Yes. **Settings → Display → Accent colour** offers seven colours for the focus, buttons and progress bars: Teal
-(the default), Amber, Coral, Rose, Lavender, Sky blue and Mint. The choice is saved per profile and takes effect at once.
+Yes. **Settings → Home & appearance → Selection colour** offers eight colours for the focus, buttons and progress bars: Teal
+(the default), Amber, Coral, Rose, Lavender, Sky blue, Mint and Grey. The choice is saved per profile and takes effect at once.
 Every colour is checked for good contrast: labels on it and the colour itself on the dark background reach at least 4.5:1.
+Directly below, **Badge colour** sets the colour of the small badges on the tiles – the triangle for "not watched yet",
+the tick for "watched" and the number of episodes left. It is light grey by default; pick an accent colour if you want
+them to stand out more on bright posters.
 
 ### How do I skip forward and back, and change the skip length?
 In a video, **left/right** and the on-screen **-10/+10** buttons jump by *Skip length (arrows & buttons)*; the
@@ -185,9 +214,9 @@ Off, the other screensaver settings are dimmed. They are listed here in the same
 | Picture transition | Crossfade · Cut · Fade through black · Slow zoom · Slow drift · Zoom through · Curtain · Blinds · Tiles · Random | How the next picture appears. With *Reduced motion*, moving ones become a crossfade. |
 | Change picture every | 30 · 10 · 20 · 60 seconds | How long each picture stays. |
 | Screensaver pictures | Real backgrounds only · Also video stills · Posters and covers | Which kind of picture is shown. Some titles have no background picture of their own, so Plex uses a random frame from the video – often dark or blurred; *Real backgrounds only* skips those. INFO explains each choice. |
-| Blur screensaver images | On · Off | Soft and calm, or sharp. |
-| Screensaver pictures from | Libraries · Home screen | Libraries: random titles with background art from whole libraries, no repeats until all were shown. Home screen: only titles from there (no extra requests). |
-| Screensaver libraries | Movies & TV shows · your pick | Which libraries are used (only with *Libraries* above). Music libraries show artist pictures. |
+| Blur pictures | On · Off | Soft and calm, or sharp. |
+| Picture source | Libraries · Home screen | Libraries: random titles with background art from whole libraries, no repeats until all were shown. Home screen: only titles from there (no extra requests). |
+| Libraries for pictures | Movies & TV shows · your pick | Which libraries are used (only with *Libraries* above). Music libraries show artist pictures. |
 | Unwatched titles only | Off · On | Only movies and shows you haven't finished yet (only with *Libraries* above). |
 | Clock only after a long time | 2 hrs · 1 hr · 4 hrs · Never | After this long, the last picture fades out and only the clock keeps moving on a black screen. Older TVs can run out of memory after many hours of constantly changing pictures and freeze; black also protects the screen from burn-in and saves power. Any key ends the screensaver as usual. |
 
@@ -197,7 +226,7 @@ defaults and only see pictures their own Plex account may see.
 ### Where does RETURN take me?
 `RETURN` always goes back one step. In a section you opened from the sidebar – a library (music and audiobooks too),
 Search, Discover or Settings – it first takes you to the top (the first row, the keyboard, the categories). Press it once
-more and the setting **Settings → Display → Back from a section** decides: **To Home** (default) goes straight to the
+more and the setting **Settings → Language & controls → Back from a section** decides: **To Home** (default) goes straight to the
 Home screen; **To the previous section** works like Back in a web browser and steps back through the sections you opened,
 each one only once, ending on Home. On Home, `RETURN` takes you to the first card, and from there it asks whether you want
 to exit. The sidebar opens with ◀. Each profile has its own choice.
@@ -205,7 +234,7 @@ to exit. The sidebar opens with ◀. Each profile has its own choice.
 ### What is the small notice about new content?
 When new movies, episodes, music or audiobooks arrive on your server, a small notice fades in for a few seconds and fades
 out by itself – on Home at the right under the clock, in libraries and on *Now playing* at the top right. It never needs a
-button and waits while you press buttons or a menu is open. You set it under **Settings → Display**:
+button and waits while you press buttons or a menu is open. You set it under **Settings → Language & controls**:
 **New content notice** (**Exact** = default, what is new, for example "New episode" with show, season and episode;
 **General** = just "New content on your server"; or **Off**), **How long the notice stays** (3, 5, 8 or 12 seconds;
 default 5) and **Also while a video plays** (off by default; when on, it appears small at the top left of the video, only
@@ -213,13 +242,13 @@ while no controls are on screen). Your profile only hears about what it is allow
 update the affected rows by themselves, without moving the card you have highlighted.
 
 ### What is the colourful background in my libraries? Can I turn it off?
-That is the **library background** (**Settings → Display → Library background**). *Colour mood* (the default) tints the
+That is the **page background** (**Settings → Home & appearance → Page background**). *Colour mood* (the default) tints the
 background with soft colours of the selected title – the colours your Plex server already provides, so it costs no extra
 download. *Title picture* shows that title's picture, blurred and darkened by your server; *Random picture* picks one
 picture from the library each time you open it. *Off* keeps the plain dark background. **Background strength** chooses
 between *Subtle* (default, darkest, text easiest to read) and *Stronger*. The background only changes after you stop on a
 title for a moment, never while you scroll – so moving through the grid stays smooth. With **Background images** turned
-off, *Title picture* and *Random picture* show the colour mood instead; with **Reduce motion** on, it switches without
+off, *Title picture* and *Random picture* show the colour mood instead; with **Fewer animations** on, it switches without
 fading.
 
 ### Why does Discover only suggest titles I don't have? Can I see everything?
@@ -230,7 +259,7 @@ Discover rows and in your libraries anyway. To keep the rows full, Neolume asks 
 (up to 30 per row) and checks all of them against your server in one request. If you already have everything from a list,
 the row shows a short note instead of staying empty.
 
-To see all titles again, turn off **Settings → Display → Only titles you don't have yet**. The rows then show everything,
+To see all titles again, turn off **Settings → Live TV & Discover → Only titles you don't have yet**. The rows then show everything,
 and titles on your server are marked *On your server* and can be played right away. If you use
 [servers shared with you](#can-i-use-a-server-that-a-friend-shared-with-me), a second setting, **Also check other
 servers** (on by default), hides their titles too; a shared server that doesn't answer within a few seconds is skipped,
@@ -248,6 +277,10 @@ No. Neolume is a separate app with its own name. A preinstalled Plex app stays a
 ### What data does Neolume send, and where are my credentials?
 - Neolume sends requests **only to your Plex Media Server** (libraries, images, playback, progress). No telemetry, no ads,
   no analytics. A diagnostic log is sent only when you ask for it, and only to a computer on your home network.
+- Exceptions only for what you switch on yourself: the optional helper on your home network, servers that someone shared
+  with you, and [Live TV](#can-i-watch-live-tv) – while it is on, the broadcasters, the ARD programme service and (through
+  your Plex server) Wikimedia Commons for the logos, without any account, cookies or identifiers.
+
 - On the TV, each profile has its **own server access** that is valid only for your server, stored in the app's storage on the TV.
   Your Plex password is not stored anywhere.
 - The setup program keeps access data **only in memory** and does not write it to disk – except if you choose to keep the

@@ -45,12 +45,13 @@ TEXTS = {
             '„Neu erschienen“ und „Bald verfügbar“ und – wenn du in Entdecken einen Titel öffnest, der nicht auf deinem Server '
             'ist – dessen Inhalt, Genres, Laufzeit und Besetzung von plex.tv. Merkst du am Fernseher einen Titel vor oder '
             'entfernst ihn, gibt der Helfer das an plex.tv weiter. Nutzt du freigegebene Server anderer Leute, fragt er auch '
-            'deren aktuelle Adresse ab. Mehr holt er nicht aus dem Internet.\n\n'
+            'deren aktuelle Adresse ab. Für „Live-TV“ holt er beim Abspielen eines Senders von ARD oder ZDF Bild und Ton bei '
+            'diesem Sender und gibt sie dem Fernseher als einen Strom. Mehr holt er nicht aus dem Internet.\n\n'
             'Warum? Der Fernseher kann plex.tv nicht selbst erreichen: plex.tv verlangt eine neuere Verschlüsselung (TLS 1.2), '
             'der Fernseher kann nur ältere (bis TLS 1.1).\n\n'
-            'Was er nicht tut: Er leitet keine Videos weiter (die kommen immer direkt von deinem Plex-Server), ist aus dem Internet '
-            'nicht erreichbar und reicht keine Anfragen für andere weiter. Er antwortet nur Geräten in deinem Heimnetz und ruft im '
-            'Internet nur feste plex.tv-Adressen ab. Daten gehen ins Internet nur an plex.tv.\n\n'
+            'Was er nicht tut: Er leitet keine Videos deines Plex-Servers weiter (die kommen immer direkt vom Server), ist aus dem '
+            'Internet nicht erreichbar und reicht keine Anfragen für andere weiter. Er antwortet nur Geräten in deinem Heimnetz und '
+            'ruft im Internet nur feste plex.tv-Adressen und für Live-TV die Senderadressen der App ab. Live-TV speichert er nicht.\n\n'
             'Gespeichert: die Zugangsdatei helper.json (nur für dich lesbar) in\n%s\n\n'
             'Ist der Helfer aus, läuft die App ganz normal weiter – nur Merkliste, diese Reihen und die Infos zu Titeln '
             'außerhalb deines Servers fehlen.\n'
@@ -88,13 +89,15 @@ TEXTS = {
             'The helper fetches your Plex watchlist, the Discover rows “Trending now”, “Just released” and “Coming soon” and – '
             'when you open a title in Discover that is not on your server – its story, genres, runtime and cast from plex.tv '
             'for your 2014 Samsung TV. When you add or remove a title on the TV, the helper passes that on to plex.tv. If you '
-            'use servers other people shared with you, it also looks up their current address. It fetches nothing else from '
-            'the internet.\n\n'
+            'use servers other people shared with you, it also looks up their current address. For Live TV it fetches picture and '
+            'sound of an ARD or ZDF channel you play from that broadcaster and hands them to the TV as one stream. It fetches '
+            'nothing else from the internet.\n\n'
             'Why? The TV cannot reach plex.tv by itself: plex.tv requires newer encryption (TLS 1.2), the TV only knows older '
             'versions (up to TLS 1.1).\n\n'
-            'What it does not do: it never passes on video (videos always come straight from your Plex server), it cannot be '
-            'reached from the internet, and it does not pass on requests for anyone else. It only answers devices in your home '
-            'network and only calls fixed plex.tv addresses on the internet. Data goes to the internet only to plex.tv.\n\n'
+            'What it does not do: it never passes on videos of your Plex server (they always come straight from the server), it '
+            'cannot be reached from the internet, and it does not pass on requests for anyone else. It only answers devices in '
+            'your home network and on the internet only calls fixed plex.tv addresses and, for Live TV, the broadcaster addresses '
+            'of the app. It does not store live TV.\n\n'
             'Stored: the access file helper.json (readable only by you) in\n%s\n\n'
             'When the helper is off, the app keeps working – only the watchlist, these rows and the details of titles outside '
             'your server are missing.\n'
@@ -206,6 +209,7 @@ class Background(object):
             h = helpermod.Helper(self.store, 'plexneo-helper-' + self.store.key[:8].encode().hex()[:12])
             h.background = True
             h.store_path = self.path
+            h.log = self.log
             srv.api = h
             try:
                 srv.start()

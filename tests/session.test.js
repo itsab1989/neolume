@@ -117,6 +117,10 @@ test('Fehlerabbildung: Kinderprofil haengt "Bitte frag einen Erwachsenen." an', 
   assert.strictEqual(N.errs.kind({ type: 'http', status: 401 }, 'pms'), 'auth');
   assert.ok(/Bitte frag einen Erwachsenen\.$/.test(N.errs.texts('server', { server: 'X', n: 5 }, true).text));
   assert.ok(!/Erwachsenen/.test(N.errs.texts('server', { server: 'X', n: 5 }, false).text));
+  // Hilfsdienst ohne Adresse: kein halber Satz "auf dem ." (TV-Befund 05.11.)
+  assert.ok(/auf dem Rechner 10\.0\.0\.2\./.test(N.errs.texts('proxy', { server: '10.0.0.2' }, false).text));
+  var nh = N.errs.texts('proxy', { server: '' }, false).text;
+  assert.ok(/in deinem Heimnetz\./.test(nh) && !/auf dem/.test(nh));
 });
 
 /* Review M2 (M3/M4/M5) */

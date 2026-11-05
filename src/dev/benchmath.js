@@ -4,7 +4,7 @@
  *   zugewiesen/fertig geladen wurde = Dekodieren im Hauptthread)
  * - line(): eine Log-Zeile je Szenario; leaks(): Vergleich zweier Schnappschuesse nach wiederholtem Oeffnen/Schliessen */
 (function (N) {
-  var LONG = 50, KEYS = { R: 'RIGHT', L: 'LEFT', U: 'UP', D: 'DOWN', E: 'ENTER', B: 'RETURN' };
+  var LONG = 50, KEYS = { R: 'RIGHT', L: 'LEFT', U: 'UP', D: 'DOWN', E: 'ENTER', B: 'RETURN', C: 'CH_DOWN' };
   function Meter() { this.frames = 0; this.long = 0; this.worst = 0; this.stall = 0; this.t0 = 0; this.last = 0; this.img = null; }
   /* t: Zeitstempel des Frames (ms), img: Zaehler der Bildereignisse (Zuweisungen + Ladeende) */
   Meter.prototype.frame = function (t, img) {
@@ -26,7 +26,7 @@
     keys: function (script) {
       var out = [], parts = String(script || '').split(/\s+/);
       for (var i = 0; i < parts.length; i++) {
-        var m = /^([RLUDEB])(\d*)$/.exec(parts[i]);
+        var m = /^([RLUDEBC])(\d*)$/.exec(parts[i]);
         if (!m) continue;
         for (var n = m[2] ? Number(m[2]) : 1; n > 0; n--) out.push(KEYS[m[1]]);
       }
@@ -38,7 +38,7 @@
       for (var i = 0; i < names.length; i++) {
         for (var j = 0; j < want.length; j++) {
           var w = want[j].replace(/^\s+|\s+$/g, '').replace(/:\d+$/, '');
-          if (w === 'all' ? names[i] !== 'leak' && names[i] !== 'xtab' && names[i].indexOf('chunk-') !== 0 && names[i].indexOf('nocapl-') !== 0 && names[i].indexOf('saver-') !== 0 && names[i].indexOf('amb-') !== 0 && names[i].indexOf('hvar-') !== 0 && names[i].indexOf('rvar-') !== 0 : names[i] === w || names[i].indexOf(w + '-') === 0) { out.push(names[i]); break; }
+          if (w === 'all' ? names[i] !== 'leak' && names[i] !== 'xtab' && names[i].indexOf('chunk-') !== 0 && names[i].indexOf('nocapl-') !== 0 && names[i].indexOf('saver-') !== 0 && names[i].indexOf('amb-') !== 0 && names[i].indexOf('hvar-') !== 0 && names[i].indexOf('rvar-') !== 0 && names[i].indexOf('live') !== 0 : names[i] === w || names[i].indexOf(w + '-') === 0) { out.push(names[i]); break; }
         }
       }
       return out;

@@ -20,7 +20,7 @@
   T.tabOf = function (id) {
     if (!id) return '';
     if (id === 'home' || id === 'search' || id === 'settings') return id;
-    if (id === 'discover' || id === 'profile') return '';
+    if (id === 'discover' || id === 'profile' || id === 'livetv') return '';
     return 'lib';
   };
   /* rein: Reiter unter x in einer Leiste der Breite w (4 gleich breite Felder) */

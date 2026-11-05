@@ -113,6 +113,7 @@
       var an = (it.type === 'movie' || it.type === 'show' || it.type === 'season' || it.type === 'episode') && N.anime && N.anime.shown(it);
       if (it.type === 'movie') return N.t(an ? 'home.overline.animeMovie' : 'home.overline.movie');
       if (it.type === 'playlist') return N.t('home.overline.playlist');
+      if (it.type === 'live') return N.t('home.overline.live');   // Fernsehen (LIVE-6)
       if (it.kind === 'music' || it.kind === 'audio') return N.t('home.overline.' + it.kind);
       if (an) return N.t('home.overline.anime');
       return N.t('home.overline.show');

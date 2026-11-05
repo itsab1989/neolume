@@ -11,7 +11,7 @@ var RULES = [
   [/^kids\.protect\.title$/, 32], [/^kids\.protect\.text$/, 160],
   [/^err\.btn\./, 18], [/^login\.btn/, 18], [/^err\..*\.title$/, 40], [/^err\..*\.text$/, 200],
   [/^empty\..*\.title$/, 40], [/^empty\..*\.text$/, 200],
-  [/^set\.cat\.[a-z]+$/, 18], [/^set\..*\.(desc|disabled)$/, 160], [/^set\.(on|off)$/, 18], [/^set\.[a-zA-Z]+$/, 34],
+  [/^set\.cat\.[a-z]+$/, 22], [/^set\..*\.(desc|disabled)$/, 160], [/^set\.(on|off)$/, 18], [/^set\.[a-zA-Z]+$/, 34],
   [/^home\.row\./, 32], [/^home\.overline\./, 40], [/^prof\.sub\./, 14], [/^prof\.pin\.title$/, 32], [/^card\.sub\./, 30],
   [/^ss\./, 24], [/^menu\./, 34], [/^help\./, 600], [/^lang\./, 18], [/^soon\.title$/, 40], [/^soon\.text$/, 200]
 ];

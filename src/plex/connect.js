@@ -108,9 +108,11 @@
     for (var i = 0; servers && i < servers.length; i++) {
       var s = servers[i];
       if (!s || s.owned || !s.machineId || s.machineId === ownId || !s.token || !s.conns || !s.conns.length) continue;
-      var o = order(s.conns, '', friendGrp), uris = [];
-      for (var j = 0; j < o.length && uris.length < MAX_URIS; j++) uris.push(o[j].uri);
-      out.push({ machineId: s.machineId, name: s.name || '', uris: uris, token: s.token });
+      var o = order(s.conns, '', friendGrp), uris = [], relays = [];
+      for (var j = 0; j < o.length && uris.length < MAX_URIS; j++) { uris.push(o[j].uri); if (o[j].relay) relays.push(o[j].uri); }
+      var e = { machineId: s.machineId, name: s.name || '', uris: uris, token: s.token };
+      if (relays.length) e.relays = relays;                // SRV-6: N.srv merkt sich ein Relay nie als "zuerst probieren"
+      out.push(e);
     }
     return out;
   }

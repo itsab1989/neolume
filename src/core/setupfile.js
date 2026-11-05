@@ -102,6 +102,8 @@
     }
     var hp = d.helper, helper = null;                                          // P4: optionaler Merkliste-Helfer (docs/research/discover.md)
     if (hp && typeof hp === 'object' && lanUri(hp.url)) helper = { url: lanUri(hp.url), key: typeof hp.key === 'string' && /^[A-Za-z0-9_\-]{16,128}$/.test(hp.key) ? hp.key : '' };
+    // helper.sign (Protokoll 2): der Schluessel selbst bleibt in N.disc (Erweiterungspunkt setup:parse), hier nur ob es ihn gibt
+    if (helper && typeof hp.sign === 'string' && /^[0-9a-f]{64}$/.test(hp.sign)) helper.signed = true;
     var cfg = {
       schema: 1, createdAt: str(d.createdAt, 40), setupVersion: str(d.setupVersion, 20),
       clientId: typeof d.clientIdentifier === 'string' && CID.test(d.clientIdentifier) ? d.clientIdentifier : '',

@@ -15,7 +15,7 @@
   var U = N.util;
   var BLANK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
   var TIERS = {
-    poster: [176, 264], posterS: [144, 216], posterXS: [96, 144], posterQ: [120, 180], listThumb: [48, 72], land: [288, 162], landM: [240, 135], landS: [192, 108],   // landM/landS: Startseite Mittel/Klein (HOME-15)
+    poster: [176, 264], posterS: [144, 216], posterXS: [96, 144], posterQ: [120, 180], listThumb: [48, 72], land: [288, 162], landM: [240, 135], landS: [192, 108], landXS: [128, 72], listLand: [96, 54],   // landM/landS: Startseite Mittel/Klein (HOME-15)
     hero: [1280, 720],            // am TV gemessen: 1280x720 schaerfer UND weniger Haenger als skaliert (PHASE1)
     square: [176, 176], squareS: [144, 144], squareXS: [96, 96], squareQ: [120, 120], listSq: [48, 48], cover: [192, 192], coverL: [400, 400],   // M4 Musik (quadratisch)
     saverPoster: [360, 540], saverSq: [460, 460],   // Schoner "Poster und Cover" (scharf, 1:1 gezeigt)
@@ -50,6 +50,9 @@
   function url(path, tier, opts) {
     if (!path) return '';
     var sz = TIERS[tier] || TIERS.poster, q = { width: Math.round(sz[0] * SCALE), height: Math.round(sz[1] * SCALE), minSize: 1, upscale: 1, format: (opts && opts.format) || 'jpeg' };
+    /* Senderlogo (Fernsehen, SPEC LIVE-3): ganz sichtbar statt beschnitten – Kasten LOGO_W x LOGO_H der Karte, ohne minSize (der PMS
+     * passt das Bild hinein), PNG (durchsichtiger Grund); die Karte legt es mittig auf eine helle Flaeche (logoFit) */
+    if (opts && opts.logo) { q.width = Math.round(sz[0] * LOGO_W * SCALE); q.height = Math.round(sz[1] * LOGO_H * SCALE); delete q.minSize; q.format = 'png'; }
     if (opts && opts.blur) q.blur = Math.round(opts.blur * SCALE);   // Radius in Ausgabe-Pixeln: bei Retina-Stufe gleich unscharf
     if (opts && opts.opacity) { q.opacity = opts.opacity; q.background = opts.background || '000000'; }   // PMS dunkelt ab (Deckkraft % ueber Farbe), geprueft 27.10.
     if (opts && opts.quality) q.quality = opts.quality;   // PMS: JPEG-Qualitaet 1..100 (Standard ~75; s. SOFT_Q)
@@ -94,10 +97,10 @@
     return { x: Math.round((W - w) / 2), y: Math.round((H - h) / 2), w: w, h: h };
   }
   /* nach onload (Bild noch verdeckt): unscharfes Ersatzbild mittig auf 1280x720 legen (1:1, nur verschoben), Art auf die CSS-Groesse zurueck */
-  function fit(img, soft) {
-    var st = img.style;
-    if (!soft || !img.naturalWidth) { st.left = st.top = st.width = st.height = ''; return; }
-    var c = cover(img.naturalWidth, img.naturalHeight, 1280, 720);
+  function fit(img, soft, nw, nh) {                  // nw/nh: Groesse aus einem vorab geladenen Bild (fetch), sonst die des <img>
+    var st = img.style, w = nw || img.naturalWidth, h = nh || img.naturalHeight;
+    if (!soft || !w) { st.left = st.top = st.width = st.height = ''; return; }
+    var c = cover(w, h, 1280, 720);
     st.left = c.x + 'px'; st.top = c.y + 'px'; st.width = c.w + 'px'; st.height = c.h + 'px';
   }
 
@@ -109,6 +112,8 @@
    * durch SCALE). Bilder im richtigen Format (alle ueblichen) bekommen keine Stilzuweisung -> am TV pixelgleich und ohne Kosten. */
   var BOX_RE = /[?&]width=(\d+)&height=(\d+)/;
   function boxFit(img, u, nw, nh) {
+    if (img.pnLogo && logoFit(img, nw, nh)) return;
+    if (img._pnLg) unfit(img);
     if (!img.pnCover) return;
     var m = nw > 0 && nh > 0 ? BOX_RE.exec(u) : null, st = img.style;
     if (m) {
@@ -120,7 +125,24 @@
     }
     unfit(img);
   }
-  function unfit(img) { if (img._pnFit) { img._pnFit = 0; var st = img.style; st.left = st.top = st.width = st.height = ''; } }
+  function unfit(img) {
+    if (img._pnFit) { img._pnFit = 0; var st = img.style; st.left = st.top = st.width = st.height = ''; }
+    if (img._pnLg) { img._pnLg = 0; img.style.padding = img.style.width = img.style.height = ''; img.className = ''; }
+  }
+  /* Senderlogo (img.pnLogo = [Breite, Hoehe] der Karte in App-px, gesetzt von Reihe/Raster): das <img> deckt die ganze Karte, das
+   * Logo steht mittig in seinem Kasten (LOGO_W x LOGO_H der Karte), der Rest ist Innenabstand mit der hellen Flaeche der Klasse
+   * .lgi (deckt den Sendernamen darunter, der bis zum Laden bzw. ohne Logo zu sehen ist). Nur beim Zeigen, nie im Tastenpfad. */
+  var LOGO_W = 0.7, LOGO_H = 0.6;
+  function logoFit(img, nw, nh) {
+    var b = img.pnLogo;
+    if (!b || !(nw > 0 && nh > 0)) return false;
+    var W = b[0], H = b[1], k = Math.min(W * LOGO_W / nw, H * LOGO_H / nh) * SCALE, w = Math.max(1, Math.round(nw * k / SCALE)), h = Math.max(1, Math.round(nh * k / SCALE));
+    w = Math.min(w, Math.round(W * LOGO_W)); h = Math.min(h, Math.round(H * LOGO_H));
+    var px = Math.floor((W - w) / 2), py = Math.floor((H - h) / 2), st = img.style;
+    st.left = st.top = ''; st.width = W + 'px'; st.height = H + 'px'; st.padding   /* border-box (#root img): Inhalt = Karte minus Innenabstand */ = py + 'px ' + (W - w - px) + 'px ' + (H - h - py) + 'px ' + px + 'px';
+    img.className = 'lgi'; img._pnLg = 1;
+    return true;
+  }
 
   function detach(img) { img.onload = img.onerror = null; }
   /* Download fertig (losgeloest) bzw. LRU-Treffer -> ins sichtbare <img> (zaehlt ins Dekodier-Budget) */
@@ -237,8 +259,50 @@
   function kick() { if (!frameT) frameT = setTimeout(function () { frameT = 0; U.raf(pump); }, 0); }
   var seq = 0;
 
+  /* Einzelbild ausserhalb der Warteschlange holen und vorab dekodieren (Detailkarte: Hintergrund vor dem Hochgleiten; Vorladen fuer
+   * die fokussierte Karte, Nutzerbefund iPad/Mac 05.11., SPEC DET-21). Ein laufender Abruf derselben URL wird mitbenutzt (nie zwei
+   * Anfragen); geladen -> LRU. cb(ok, Breite, Hoehe) nach Laden + decode(). -> {cancel()}: Abbrechen nur, wenn niemand mehr wartet.
+   * Nur von Apple-Wegen aufgerufen (caps.details 'card'); am TV nie. */
+  var fl = {};                                       // laufende Einzel-Abrufe: URL -> {pre, cbs}
+  function fetch1(u, cb) {
+    var f = u && fl[u], pre;
+    if (!f) {
+      pre = u ? mkPre() : null;
+      if (!pre) { if (cb) cb(false); return { cancel: function () {} }; }
+      f = fl[u] = { pre: pre, cbs: [] };
+      var end = function (ok) {
+        if (fl[u] !== f) return;
+        delete fl[u];
+        for (var i = 0; i < f.cbs.length; i++) f.cbs[i](ok, pre.naturalWidth || 0, pre.naturalHeight || 0);
+      };
+      pre.onload = function () {
+        detach(pre); loads++; lru.set(u, pre.naturalWidth ? [pre.naturalWidth, pre.naturalHeight] : 1);
+        var once = false, go = function () { if (!once) { once = true; end(true); } };
+        if (pre.decode) { try { pre.decode().then(go, go); } catch (e) { go(); } } else go();
+      };
+      pre.onerror = function () { detach(pre); end(false); };
+      pre.src = u;
+    }
+    var me = cb || function () {};
+    f.cbs.push(me);
+    return { cancel: function () {
+      var i = f.cbs.indexOf(me);
+      if (i >= 0) f.cbs.splice(i, 1);
+      if (!f.cbs.length && fl[u] === f) { delete fl[u]; detach(f.pre); try { f.pre.src = BLANK; } catch (e) {} }
+    } };
+  }
+  var pf = null;                                     // Vorladen: hoechstens EIN Abruf (fokussierte Karte)
+  function prefetch(u) {
+    if (pf && pf.u === u) return;
+    if (pf) { pf.h.cancel(); pf = null; }
+    if (!u || lru.has(u)) return;                    // schon geladen (Zwischenspeicher des Browsers)
+    var me = pf = { u: u };
+    me.h = fetch1(u, function () { if (pf === me) pf = null; });
+  }
+
   N.img = {
-    BLANK: BLANK, TIERS: TIERS, url: url, avatar: avatar, bg: bg, cover: cover, fit: fit, SOFT_BLUR: SOFT_BLUR, SOFT_Q: SOFT_Q,
+    BLANK: BLANK, TIERS: TIERS, url: url, LOGO: { logo: true }, logoFit: logoFit, avatar: avatar, bg: bg, cover: cover, fit: fit, SOFT_BLUR: SOFT_BLUR, SOFT_Q: SOFT_Q,
+    fetch: fetch1, prefetch: prefetch,
     /* Bild fuer ein <img> anfordern; prio 0 sichtbar, 1 Puffer, 2 Vorladen. done(ok) optional */
     want: function (img, u, prio, done) {
       if (!u) { N.img.drop(img); if (done) done(false); return; }
@@ -288,6 +352,7 @@
       for (var i = 0; i < jobs.length; i++) jobs[i].img._pnJob = null;
       for (i = 0; i < ready.length; i++) ready[i].img._pnJob = null;
       jobs = []; ready = []; lru.clear(); warmQ = []; warmed.clear();
+      if (pf) { pf.h.cancel(); pf = null; }
       if (dec) dec.src = BLANK;
     },
     SCALE: SCALE,

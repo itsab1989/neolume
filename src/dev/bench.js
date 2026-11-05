@@ -396,6 +396,99 @@
     home(); R().push('discover');
     later(5000, function () { measure(label || 'discover', BM.keys('R10 D6 U3 D3'), GAP, function () { R().back(); later(800, done); }); });
   };
+  /* Fernsehen (SPEC A20; nicht in 'all' – braucht Internet zu den Sendern): Einstellung fuer den Lauf an (danach wie vorher).
+   * live-<v>: Bereich in der Ansicht v, Logos ueber den PMS, Tasten wie lib-*; live-zap: Sender 1 starten, 5x CH▼ im Takt 6 s –
+   * gemessen werden die Frames; die Startzeit je Sender steht als "live <id> Bild nach <ms> ms" im Protokoll (Ziel <= 5000 ms) */
+  function liveOn(fn) {
+    var S0 = N.session, was = S0.settings.liveTv, vw = S0.settings.liveView;
+    S0.settings.liveTv = true;
+    return function (v) { if (v) S0.settings.liveView = v; fn(function () { S0.settings.liveTv = was; S0.settings.liveView = vw; }); };
+  }
+  ['L', 'M', 'S', 'list'].forEach(function (v) {
+    S['live-' + v] = function (done) {
+      liveOn(function (back) {
+        home(); R().push('livetv', {});
+        later(4000, function () { measure('live-' + v, BM.keys('R3 D6 R U6 D6'), GAP, function () { R().back(); back(); later(800, done); }); });
+      })(v);
+    };
+  });
+  S['live-zap'] = function (done) {
+    liveOn(function (back) {
+      var chs = N.live.channels(), ids = [];
+      for (var i = 0; i < chs.length && i < 6; i++) ids.push(chs[i].id);
+      if (!ids.length) { back(); skip('live-zap', 'keine Sender', done); return; }
+      home(); N.live.play(ids[0], ids);
+      later(8000, function () {
+        measure('live-zap', BM.keys('C5'), 6000, function () { if (R().topName() === 'liveplayer') R().key('STOP'); back(); later(1500, done); });
+      });
+    })();
+  };
+  /* live-check (Pruefauftrag 05.11.): echte Sender am Geraet – je Sender und Qualitaet bis 15 s auf das Bild warten, dann 4 s laufen
+   * lassen und festhalten: Zeit bis zum Bild, Quelle der Adresse, gewaehlte Variante, Bildgroesse, Tonspuren, dekodierter Ton (WebKit
+   * webkitAudioDecodedByteCount: waechst nur, wenn wirklich Ton kommt), Zeit laeuft. Zeile "live-check <id> q <q>: …" im Protokoll.
+   * Untertitel (Pruefung 05.11., LIVE-4): je Sender die Spuren als "Art:Sprache:Modus:Cues" (nach dem Start alle 'disabled');
+   * danach "live-check subs": Das Erste, Mehr › Untertitel › erste Spur per Tasten -> 'hidden', Cues und Zeile in der Box nach 10 s,
+   * CH▼ zu ZDF -> dieselbe Sprache wieder gewaehlt, Aus -> alle 'disabled'. */
+  S['live-check'] = function (done) {
+    var plan = [['de-daserste', 'auto'], ['de-zdf', 'auto'], ['de-arte', 'auto'], ['int-dw-en', 'auto'], ['de-arte', '540'], ['int-dw-en', '540'], ['de-daserste', '540'], ['de-tagesschau24', 'auto']];
+    liveOn(function (back) {
+      var S0 = N.session, wq = S0.settings.liveQuality, i = 0;
+      (function next() {
+        if (i >= plan.length) { S0.settings.liveQuality = wq; liveSubs(function () { back(); later(1000, done); }); return; }
+        var p = plan[i++], t0 = U.now();
+        S0.settings.liveQuality = p[1];
+        home(); N.live.play(p[0], [p[0]]);
+        (function wait() {
+          var pr = N.live.probe();
+          if (pr && (pr.state === 'playing' || pr.err) || U.now() - t0 > 15000) {
+            var a0 = pr ? pr.audBytes : -1, tA = pr ? pr.t : -1;
+            later(4000, function () {
+              var q = N.live.probe() || {};
+              log('live-check ' + p[0] + ' q ' + p[1] + ': ' + (q.err ? 'FEHLER' : q.state) + ', Bild nach ' + q.ms + ' ms, ' + q.src + ', Variante ' + (q.pick || 'Master') +
+                (q.split ? ' (Ton getrennt)' : '') + ', Bild ' + q.vres + ', Tonspuren ' + q.aud + ', Ton dekodiert ' + (q.audBytes >= 0 && a0 >= 0 ? (q.audBytes - a0) + ' B in 4 s' : '?') +
+                ', Zeit ' + tA + ' -> ' + q.t + (q.muted ? ', stumm' : '') + ', Untertitel [' + (q.subs || '') + ']');
+              if (R().topName() === 'liveplayer') R().key('STOP');
+              later(1500, next);
+            });
+            return;
+          }
+          later(500, wait);
+        })();
+      })();
+    })();
+  };
+  /* Teil von live-check: Untertitel waehlen wie ein Nutzer (TOOLS, Mehr › Untertitel, erste Spur), Senderwechsel, Aus */
+  function liveSubs(done) {
+    var ids = ['de-daserste', 'de-zdf'];
+    function st(tag) { var q = N.live.probe() || {}; log('live-check subs ' + tag + ': ' + (q.id || '?') + ' ' + (q.err ? 'FEHLER' : q.state) + ', Zeit ' + q.t + ', Spuren [' + (q.subs || '') + '], gewaehlt ' + q.subIdx + ', Box "' + String(q.subBox || '').replace(/\n/g, ' / ').slice(0, 80) + '"'); return q; }
+    function until(fn, max, cb) { var t0 = U.now(); (function w() { if (fn() || U.now() - t0 > max) { cb(); return; } later(500, w); })(); }
+    function playing() { var q = N.live.probe(); return !!(q && (q.state === 'playing' || q.err)); }
+    function keys(list, cb) { var k = 0; (function nx() { if (k >= list.length) { cb(); return; } R().key(list[k++]); later(450, nx); })(); }
+    function end() { if (R().topName() === 'liveplayer') R().key('STOP'); later(1500, done); }
+    home(); N.live.play(ids[0], ids);
+    until(playing, 15000, function () {
+      later(4000, function () {
+        var q = st('start');
+        if (!q.subs) { log('live-check subs: keine Untertitelspuren gemeldet'); end(); return; }
+        keys(['TOOLS', 'DOWN', 'DOWN', 'ENTER', 'DOWN', 'ENTER'], function () {
+          st('gewaehlt');
+          later(10000, function () {
+            st('nach 10 s');
+            R().key('CH_DOWN');
+            later(1000, function () {
+              until(playing, 15000, function () {
+                later(6000, function () {
+                  var z = st('ZDF'), up = [];
+                  for (var u = 0; u <= z.subIdx; u++) up.push('UP');   // Fokus steht auf der gewaehlten Spur, "Aus" ist der erste Eintrag
+                  keys(['TOOLS', 'DOWN', 'DOWN', 'ENTER'].concat(up, ['ENTER']), function () { later(1000, function () { st('aus'); end(); }); });
+                });
+              });
+            });
+          });
+        });
+      });
+    });
+  }
   S['player-osd'] = function (done) {
     first('movie', function (it) {
       if (!it) { skip('player-osd', 'kein Film', done); return; }
@@ -575,7 +668,7 @@
       });
     });
   };
-  var NAMES = ['home', 'home-hero', 'home-M', 'home-S', 'lib-L', 'lib-M', 'lib-S', 'lib-list', 'details-movie', 'details-show', 'search', 'discover', 'player-osd', 'loupe', 'loupe-stretch', 'loupe-film', 'leak', 'xtab'].concat(CHUNKS, SAVERS, HVARS, RVARS);
+  var NAMES = ['home', 'home-hero', 'home-M', 'home-S', 'lib-L', 'lib-M', 'lib-S', 'lib-list', 'details-movie', 'details-show', 'search', 'discover', 'player-osd', 'loupe', 'loupe-stretch', 'loupe-film', 'leak', 'xtab', 'live-L', 'live-M', 'live-S', 'live-list', 'live-zap', 'live-check'].concat(CHUNKS, SAVERS, HVARS, RVARS);
 
   function waitHome(my, tries, fn) {
     if (run !== my || my.stop) return;

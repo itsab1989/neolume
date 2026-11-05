@@ -24,6 +24,9 @@ UPDATE_PORT = 32499          # shared with the optional helper (neosetup/helper.
 _HOST_OK = re.compile(r'(\d{1,3}(?:\.\d{1,3}){3}|localhost|\[[0-9A-Fa-f:.]+\])(?::\d{1,5})?')
 
 
+_LIVE_TOKEN = re.compile(r'/live/[A-Za-z0-9_-]{8,}')
+
+
 class Raw(object):
     """Answer of a helper route that is not JSON (e.g. a small page of an edition extension): bytes, content type and extra
     headers (Content-Security-Policy etc.). Built-in routes always answer JSON."""
@@ -48,7 +51,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self.server.owner.event(self.client_address[0], self.path[:80], 403)
         self.send_error(403); return False
 
-    def _api(self, method):
+    def _api(self, method, head=False):
         """Helper routes (neosetup.helper.Helper.handle) take precedence over static files; None = not a helper path."""
         api = self.server.owner.api
         if not api: return False
@@ -71,13 +74,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.end_headers()
-        self.wfile.write(body)
+        if not head: self.wfile.write(body)
         self.server.owner.event(self.client_address[0], self.path.split('?', 1)[0][:80], status)
         return True
 
     def _serve(self, head):
         owner = self.server.owner
         if not head and self._api('GET'): return
+        if head and self.path.startswith('/live/') and self._api('GET', head=True): return   # some players probe live media with HEAD
         path = self.path.split('?', 1)[0]
         item = owner.files.get(path)            # exact match against the allow-list, nothing else
         if item is None:
@@ -112,12 +116,46 @@ _Handler.do_PUT = _write('PUT')
 _Handler.do_DELETE = _write('DELETE')
 
 
+MAX_CONN = 64              # open connections in total (one thread each) …
+MAX_CONN_CLIENT = 12       # … and per client address (the TV's player uses 2-4; review 05.11. Z1)
+
+
 class _HTTP(http.server.ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = os.name != 'nt'   # Windows SO_REUSEADDR would let us bind a port another program uses
     def server_bind(self):                  # no getfqdn(): slow name resolution can block start-up
         socketserver.TCPServer.server_bind(self)
         self.server_name, self.server_port = self.server_address[:2]
+        self.conns, self.conn_lock = {}, threading.Lock()
+
+    # Every connection gets its own thread, also one that never sends a request (idle up to _Handler.timeout). Without a cap
+    # one home-network device could open thousands and use up threads/memory, and the rate limit (it counts requests) never
+    # saw them. Above the caps a new connection is closed at once; the TV's connections are never refused while it stays
+    # under MAX_CONN_CLIENT.
+    def process_request(self, request, client_address):
+        addr = client_address[0] if client_address else ''
+        with self.conn_lock:
+            total = sum(self.conns.values())
+            ok = total < MAX_CONN and self.conns.get(addr, 0) < MAX_CONN_CLIENT
+            if ok: self.conns[addr] = self.conns.get(addr, 0) + 1
+        if not ok:
+            self.shutdown_request(request); return
+        try:
+            http.server.ThreadingHTTPServer.process_request(self, request, client_address)
+        except Exception:
+            self._release(addr); raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            http.server.ThreadingHTTPServer.process_request_thread(self, request, client_address)
+        finally:
+            self._release(client_address[0] if client_address else '')
+
+    def _release(self, addr):
+        with self.conn_lock:
+            n = self.conns.get(addr, 0) - 1
+            if n > 0: self.conns[addr] = n
+            else: self.conns.pop(addr, None)
 
 
 class LanServer(object):
@@ -126,6 +164,7 @@ class LanServer(object):
         self.allow = set(allow or [])
         self.lock_path = lock_path          # first non-loopback client fetching this path becomes the only client
         self.locked_to = None
+        self.on_fetch = None                # optional callable(addr, path) after a file was served (wizard: TV got the package)
         self.files = {}
         self.api = None                     # optional helper (neosetup.helper.Helper) on the update port
         self.events = []                    # (time, client, path, status)
@@ -148,7 +187,11 @@ class LanServer(object):
             # a route of an optional extension may be open to every home-network client for a short time (e.g. a phone page
             # while a pairing code is shown on the TV); never public addresses
             opener = getattr(self.api, 'open_path', None) if self.api is not None else None
-            return bool(path and opener and opener(path) and lan_client_ok(addr, None))
+            if path and opener and opener(path) and lan_client_ok(addr, None): return True
+            # Docker bridge (helper.is_nat): let the helper answer 403 {"error": "nat"}, so the TV can explain the fix
+            nat = getattr(self.api, 'is_nat', None) if self.api is not None else None
+            return bool(nat and nat(addr) and path is not None and (path.startswith('/neo-helper') or path.startswith('/watchlist') or
+                        path.startswith('/discover/') or path.startswith('/live/') or path.startswith('/arr/') or path in ('/servers', '/details')))
         loop = addr.startswith('127.') or addr == '::1'
         if self.locked_to and addr != self.locked_to and not loop: return False
         if self.lock_path and path is not None and path != self.lock_path and not loop and addr != self.locked_to: return False
@@ -162,8 +205,13 @@ class LanServer(object):
             if self.lock_path and path == self.lock_path and not self.locked_to and not (addr.startswith('127.') or addr == '::1'):
                 self.locked_to = addr
         self.event(addr, path, 200)
+        cb = self.on_fetch
+        if cb:
+            try: cb(addr, path)
+            except Exception: pass             # never break serving because of the page state
 
     def event(self, addr, path, status):
+        path = _LIVE_TOKEN.sub('/live/~', str(path))      # live TV session token (helper) never in the event list
         with self._lock:
             self.events.append((time.time(), addr, path, status))
             del self.events[:-200]

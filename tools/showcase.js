@@ -291,7 +291,7 @@ var SCENES = [
   { name: 'settings', seed: 'home', keys: 'LEFT,' + down(8) + ',ENTER,DOWN,DOWN,DOWN,RIGHT' },
   { name: 'music', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,ENTER,wait900,UP,RIGHT,ENTER,wait1200,DOWN,RIGHT' },              // Alben
   { name: 'artist', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,ENTER,wait900,RIGHT,RIGHT,RIGHT,RIGHT,ENTER,wait1500,DOWN,DOWN' },   // Kuenstlerin mit Gruppen
-  { name: 'accent', seed: 'coral', keys: 'LEFT,' + down(8) + ',ENTER,DOWN,DOWN,DOWN,RIGHT,' + down(6) + ',ENTER' },                // Akzentfarbe: Auswahl (Zeile 6 seit HOME-15)
+  { name: 'accent', seed: 'coral', keys: 'LEFT,' + down(8) + ',ENTER,DOWN,DOWN,DOWN,RIGHT,' + down(3) + ',ENTER' },                // Farbe der Auswahl: Auswahl (Startseite & Aussehen, Zeile 3 seit 05.11.2026)
   { name: 'screensaver', seed: 'saver', keys: 'wait6000' },                                                                    // Einblendung Ambient
   { name: 'audiobooks', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait900,RIGHT,ENTER,wait1200,DOWN' }               // Buch mit Kapiteln
 ];

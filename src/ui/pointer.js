@@ -97,6 +97,9 @@
     }
     if (N.ui.hints.backHit && N.ui.hints.backHit(x, y)) { if (kind === 'click') N.router.key('RETURN'); return true; }   // Zurueck-Knopf (Nr. 26)
     var rail = N.ui.rail, scr = N.router.top(), cf = N.router.cardFrame ? N.router.cardFrame(scr) : null, slim = !!(rail && rail.slim && rail.slim());
+    /* M4 Mini-Player liegt ueber Ansicht und Detailkarte (z.float ueber der Kartenhuelle): sein Feld zuerst, sonst traf ein Tipp
+     * darauf die Karte bzw. die Kachel darunter (Nutzerbefund 05.11.). Bei offener Seitenleiste erst unten (wie bisher). */
+    if (!(rail && rail.isOpen && rail.isOpen()) && N.ui.mini && N.ui.mini.pointer(x, y, kind)) return true;
     // flexible Flaeche M/K: Menue-Knopf bzw. Leiste unten (unter Karte und offener Seitenleiste)
     if (slim && !cf && !rail.isOpen() && N.ui.tabbar.pointer(x, y, kind)) return true;
     if (cf && !(rail && rail.isOpen())) {            // Detailkarte (nur caps.details 'card'): Inhalt, X/Pfeil, Flaeche daneben
@@ -118,6 +121,7 @@
       } else if (rail.rest || rail.hov) rail.away(); // Punkt hat die Icon-Spalte verlassen: Darueberfahren klappt wieder auf, Absicht verworfen
 
     }
+    if (kind === 'move' && rail && rail.deferHover && rail.deferHover(refollow)) return true;   // flexibel: Leiste gleitet noch zu
     if (N.ui.mini && N.ui.mini.pointer(x, y, kind)) return true;   // M4: Mini-Player (Klick = Jetzt laeuft)
     if (P.arrowsOn && kind === 'click') {
       var d = arrowHit(x, y);
@@ -302,10 +306,33 @@
     if (!P.on) { P.refocus(); return; }
     if (e.preventDefault) e.preventDefault();
     if (P.dragDone) { P.dragDone = false; P.refocus(); return; }   // Klick nach einem Maus-Zug: der Zug hat schon gewirkt
+    railUp(false);
     N.input.set(kindOf(e));
     P.click(e.clientX, e.clientY, e.target);
     P.refocus();
   }
+  /* Seitenleiste (nur flexibel, Nutzerbefund iPad 05.11.: "Live-TV muss zweimal angeklickt werden"): Druck ueber der eingeklappten
+   * Icon-Spalte verwirft die Aufklapp-Absicht (N.ui.rail.press) – zwischen Druck und Loslassen aendert sich unter dem Zeiger nichts.
+   * Kommt nach dem Loslassen an derselben Stelle kein click (WebKit verwirft ihn, wenn das Ziel zwischen Druck und Loslassen
+   * wechselte), wirkt das Loslassen selbst als Klick. Am TV nie (N.screen.flex). Nur Maus/Trackpad: der Finger (touch.js) schickt
+   * beim Wischen mousedown + mouseup am Startpunkt ohne click – daraus darf kein Klick werden (Review 05.11.). */
+  var RAIL_UP_MS = 80, RAIL_SLOP = 10;
+  P.railDown = null; P.railUpT = 0;
+  function railCol(x) {
+    var rl = N.ui.rail;
+    return !!(N.screen && N.screen.flex && rl && rl.press && rl.attached() && !rl.isOpen() && !(rl.slim && rl.slim()) && !owner() && x < 112 + (rl.edge ? rl.edge() : 0));
+  }
+  function railDown(x, y) { if (railCol(x)) { P.railDown = { x: x, y: y }; N.ui.rail.press(true); } else P.railDown = null; }
+  /* up: Loslassen (x, y) -> ggf. Ersatz-Klick nach RAIL_UP_MS; false: echter click kam (Ersatz verwerfen) */
+  function railUp(up, x, y) {
+    if (!up) { if (P.railUpT) { clearTimeout(P.railUpT); P.railUpT = 0; } if (N.ui.rail && N.ui.rail.press) N.ui.rail.press(false); return; }
+    var d = P.railDown; P.railDown = null;
+    if (!d) return;
+    if (Math.abs(x - d.x) + Math.abs(y - d.y) > RAIL_SLOP) { N.ui.rail.press(false); return; }
+    if (P.railUpT) clearTimeout(P.railUpT);
+    P.railUpT = setTimeout(function () { P.railUpT = 0; N.ui.rail.press(false); if (P.on) P.click(x, y, null); }, RAIL_UP_MS);
+  }
+  P.railPress = railDown; P.railRelease = function (x, y) { railUp(true, x, y); }; P.railClick = function () { railUp(false); };
   P.click = function (x, y, target) {
     P.x = x; P.y = y; P.keyT = 0; P.lastMove = U.now(); P.lockT = 0; P.rx = x; P.ry = y;   // Klick ist eindeutig: Sperre aus
     thr.cancel(); P.pend = false; edgeStop(); P.holdCancel();
@@ -447,6 +474,7 @@
       // Maus/Trackpad (caps.pointer 'mouse', nicht am TV): Druck auf ein Zug-Ziel (Player-Balken) -> Ziehen statt Klick/langer Druck
       if (N.input.mode === 'pointer' && N.platform.caps.pointer === 'mouse' && P.grab(e.clientX, e.clientY) === 'drag' && P.drag('start', e.clientX, e.clientY)) { P.mdrag = true; return; }
       press(true); P.down(e.clientX, e.clientY);
+      if (kindOf(e) !== 'touch') railDown(e.clientX, e.clientY); else P.railDown = null;
     }, false);
     // Rechtsklick/Ctrl-Klick = Optionen (Maus/Trackpad, NAV-25); das Kontextmenue der WebView entfaellt. Fernseher: kein Ereignis
     if (N.platform.caps.pointer === 'mouse') root.addEventListener('contextmenu', function (e) {
@@ -458,7 +486,7 @@
     }, false);
     root.addEventListener('mouseup', function (e) {
       if (P.mdrag) { P.mdrag = false; P.dragDone = true; P.drag('end', e.clientX, e.clientY); P.refocus(); return; }
-      press(false); P.up(); P.refocus();
+      press(false); P.up(); railUp(true, e.clientX, e.clientY); P.refocus();
     }, false);
     var a = anchor();
     if (a) a.addEventListener('blur', refocusSoon, false);

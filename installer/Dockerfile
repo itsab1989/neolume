@@ -5,7 +5,8 @@
 #   Image:   ghcr.io/itsab1989/<APP_SLUG>-setup:<version>|latest   (linux/amd64, linux/arm64, linux/arm/v7)
 #   Port:    32499/tcp (helper; plain HTTP, home network only - never forward it in your router)
 #   Volume:  /data  -> folder that contains helper.json (mount read-only)
-#   Network: host networking is REQUIRED (the helper must see the TV's real address for its LAN/TV checks)
+#   Network: host networking is REQUIRED (the helper must see the TV's real address for its LAN/TV checks). Bridge mode is
+#            detected (all clients = the container's gateway): the helper logs it, answers 403 "nat", the TV explains the fix
 #
 #   docker run -d --name neolume-helper --restart=unless-stopped --net=host \
 #     --user "$(id -u):$(id -g)" -v /volume1/docker/neolume:/data:ro ghcr.io/itsab1989/neolume-setup:latest

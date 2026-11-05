@@ -14,7 +14,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Neolume">
 <meta property="og:title" content="Neolume – watch your Plex library on a 2014 Samsung Smart TV again">
-<meta property="og:description" content="Free, open-source client for Plex Media Server on 2014 Samsung Smart TVs (Orsay). One-time setup from Windows, macOS or Linux; afterwards the TV talks only to your own server.">
+<meta property="og:description" content="Free, open-source client for Plex Media Server on 2014 Samsung Smart TVs (Orsay). One-time setup from Windows, macOS or Linux; afterwards the TV talks directly to your own server, with no cloud in between.">
 <meta property="og:url" content="https://itsab1989.github.io/neolume/">
 <meta property="og:image" content="https://itsab1989.github.io/neolume/assets/og-image.png">
 <meta property="og:image:width" content="1200">
@@ -30,11 +30,11 @@
   "@type": "SoftwareApplication",
   "name": "Neolume",
   "alternateName": "Neolume for Samsung Smart TV",
-  "description": "Unofficial, open-source client for Plex Media Server on 2014 Samsung Smart TVs with the Orsay Smart Hub. A setup program for Windows, macOS and Linux signs in once and installs the app; afterwards the TV talks only to your own server.",
+  "description": "Unofficial, open-source client for Plex Media Server on 2014 Samsung Smart TVs with the Orsay Smart Hub. A setup program for Windows, macOS and Linux signs in once and installs the app; afterwards the TV talks directly to your own server, with no cloud in between.",
   "applicationCategory": "MultimediaApplication",
   "applicationSubCategory": "Media player / Plex client",
   "operatingSystem": "Samsung Smart TV (Orsay, 2014); setup program: Windows, macOS, Linux",
-  "softwareVersion": "1.0.16",
+  "softwareVersion": "1.0.17",
   "license": "https://opensource.org/licenses/MIT",
   "isAccessibleForFree": true,
   "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"},
@@ -60,7 +60,7 @@
     {"@type": "Question", "name": "Do I need Plex Pass?",
      "acceptedAnswer": {"@type": "Answer", "text": "No. Only extras like skip-intro markers and seek thumbnails depend on data your server creates with Plex Pass."}},
     {"@type": "Question", "name": "Why can my 2014 Samsung TV no longer sign in to Plex?",
-     "acceptedAnswer": {"@type": "Answer", "text": "The TV only supports old encryption (TLS 1.1 and older), which plex.tv no longer accepts. Neolume signs in once from your computer; afterwards the TV only talks to your own Plex Media Server on the home network."}},
+     "acceptedAnswer": {"@type": "Answer", "text": "The TV only supports old encryption (TLS 1.1 and older), which plex.tv no longer accepts. Neolume signs in once from your computer; afterwards the TV only talks to your own Plex Media Server on the home network (apart from optional extras such as Live TV)."}},
     {"@type": "Question", "name": "Is there a Neolume for newer TVs (Tizen, webOS, Android TV)?",
      "acceptedAnswer": {"@type": "Answer", "text": "No ready-made one. Neolume runs only on 2014 Samsung TVs with the Orsay Smart Hub; most newer TVs have the official Plex app in their app store. If you want Neolume's look and features on a newer TV, an AI coding agent can build it for you from Neolume's product specification and porting playbook: https://itsab1989.github.io/neolume/port.html"}}
   ]
@@ -106,7 +106,8 @@
     <p>Samsung TVs from 2014 only speak old encryption (TLS 1.1 and older). plex.tv no longer accepts it, so the TV's original
       Plex app can no longer sign in – and it is no longer maintained. Neolume moves the sign-in to your computer: a small setup
       program signs in to Plex <strong>once</strong>, prepares access for your profiles and installs the app on the TV through
-      Samsung's own developer sync. From then on the TV talks <strong>only to your own Plex Media Server</strong> on your home network.</p>
+      Samsung's own developer sync. From then on the TV talks <strong>only to your own Plex Media Server</strong> on your home network –
+      unless you switch on an optional extra such as Live TV.</p>
   </div>
 </section>
 
@@ -114,14 +115,17 @@
   <div class="wrap">
     <h2>Features</h2>
     <div class="grid">
-      <div class="card"><h3>Fast and made for the remote</h3><p>Starts from its own cache in a fraction of a second. Smooth on the TV's hardware, with the normal remote or the Smart Control pointer.</p></div>
-      <div class="card"><h3>Home, libraries, search</h3><p>Continue Watching, Up Next, Recently Added, a season strip, a library grid with sort, filters and A–Z, detail pages and search. A <strong>Show all</strong> card at the end of a Home row opens the whole list.</p></div>
+      <div class="card"><h3>Fast and made for the remote</h3><p>Starts from its own cache in a fraction of a second. Smooth on the TV's hardware, with the normal remote or the Smart Control pointer. In German, English and Norwegian (Bokmål) – it follows the TV's language, or you choose in Settings.</p></div>
+      <div class="card"><h3>Home, libraries, search</h3><p>Continue Watching, Up Next, Recently Added, a season strip, a library grid with sort, filters and A–Z, detail pages and search. A <strong>Show all</strong> card at the end of a Home row opens the whole list, and INFO shows a title's whole description.</p></div>
+      <div class="card"><h3>Make it yours</h3><p>Eight accent colours per profile, a colour for the badges on the tiles (light grey by default), Home tiles in Large, Medium or Small, and quality limits for conversion and over the internet – or "Original" with no limit.</p></div>
       <div class="card"><h3>Always up to date</h3><p>When something new arrives on your server, a short notice fades in and out by itself (exact, general or off). Home and the libraries update only what changed – your highlight stays where it is.</p></div>
       <div class="card"><h3>A player that just works</h3><p>Direct Play up to 1080p; HEVC, 10-bit and 4K are converted by your server. Audio and subtitles per show, skip intro and credits, autoplay next episode.</p></div>
       <div class="card"><h3>Profiles for the family</h3><p>Plex Home profiles with avatars, kids profiles with reduced settings and an optional app PIN per profile.</p></div>
       <div class="card"><h3>Music and audiobooks</h3><p>Browse artists and albums and listen on the big screen.</p></div>
+      <div class="card"><h3>Discover, watchlist, shared servers</h3><p>Discover ideas from your own library, and with the optional helper your Plex watchlist and what is trending on plex.tv. Libraries of servers that a friend shared with you can appear in the sidebar too.</p></div>
+      <div class="card"><h3>Live TV (optional)</h3><p>Off by default: the free live streams of public broadcasters such as Das Erste, ZDF, arte and DW English. On the 2014 TV all channels play with the optional helper: ARD and ZDF send their sound separately, so the helper joins picture and sound into one stream; without it the TV shows arte and DW English.</p></div>
       <div class="card"><h3>Calm screensaver</h3><p>Art from your libraries with nine transitions and six overlay styles. After a long time only the clock stays on black – gentle on older TVs and the screen.</p></div>
-      <div class="card"><h3>Private by design</h3><p>No ads, no tracking, no telemetry. In daily use the TV talks only to your server – no cloud in between.</p></div>
+      <div class="card"><h3>Private by design</h3><p>No ads, no tracking, no telemetry. In daily use the TV talks only to your server – no cloud in between. Only Live TV, if you switch it on, loads the channels from the broadcasters, programme info from ARD and logos from Wikimedia (through your server).</p></div>
     </div>
   </div>
 </section>
@@ -143,8 +147,8 @@
       <figure><img src="screenshots/audiobooks.png" alt="Audiobook with chapter list and progress" loading="lazy" width="1280" height="720"><figcaption>Audiobooks – chapters and progress</figcaption></figure>
       <figure><img src="screenshots/discover.png" alt="Discover screen with keyboard and suggestions" loading="lazy" width="1280" height="720"><figcaption>Discover – rediscover your library</figcaption></figure>
       <figure><img src="screenshots/screensaver.png" alt="Screensaver with a movie's background picture, the clock and the title in the Ambient style" loading="lazy" width="1280" height="720"><figcaption>Screensaver – pictures from your libraries</figcaption></figure>
-      <figure><img src="screenshots/accent.png" alt="Accent colour picker with seven colours, set to Coral" loading="lazy" width="1280" height="720"><figcaption>Accent colour – seven colours, per profile</figcaption></figure>
-      <figure><img src="screenshots/settings.png" alt="Settings with the categories on the left, including Screensaver; the Display section lists Language, Customize home screen, Customize sidebar, Back from a section, Library view and Accent colour, with a short explanation of the selected row below" loading="lazy" width="1280" height="720"><figcaption>Settings in plain language</figcaption></figure>
+      <figure><img src="screenshots/accent.png" alt="Selection colour picker with eight colours, set to Coral" loading="lazy" width="1280" height="720"><figcaption>Selection colour – eight colours, per profile</figcaption></figure>
+      <figure><img src="screenshots/settings.png" alt="Settings with the categories on the left, including Screensaver; the Home &amp; appearance section lists Customize home screen, Home tile size, Library view, Selection colour, Badge colour and Spoiler protection, with a short explanation of the selected row below" loading="lazy" width="1280" height="720"><figcaption>Settings in plain language</figcaption></figure>
     </div>
     <p class="note">All titles, people and artwork in the screenshots are invented demo content.</p>
   </div>
@@ -159,7 +163,7 @@
     <div class="table-wrap"><table>
       <thead><tr><th>TV system</th><th>Models</th><th>Guide</th><th>Media servers</th><th>Last tested on a real TV</th><th>Status</th></tr></thead>
       <tbody>
-        <tr><td><b>Samsung Smart TV 2014 (Orsay)</b></td><td>2014 H series (e.g. UE48H8000, UE40H6400)<br>2014 HU series, 4K (e.g. UE55HU7500)</td><td><a href="https://github.com/itsab1989/neolume/blob/main/docs/INSTALL.md">English</a> · <a href="https://github.com/itsab1989/neolume/blob/main/docs/INSTALL.de.md">Deutsch</a></td><td>Plex</td><td>1.0.16 (2026-11-04, UE48H8000)</td><td>✅ tested on a real TV by the maintainer</td></tr>
+        <tr><td><b>Samsung Smart TV 2014 (Orsay)</b></td><td>2014 H series (e.g. UE48H8000, UE40H6400)<br>2014 HU series, 4K (e.g. UE55HU7500)</td><td><a href="https://github.com/itsab1989/neolume/blob/main/docs/INSTALL.md">English</a> · <a href="https://github.com/itsab1989/neolume/blob/main/docs/INSTALL.de.md">Deutsch</a></td><td>Plex</td><td>1.0.17 (2026-11-05, UE48H8000)</td><td>✅ tested on a real TV by the maintainer</td></tr>
       </tbody>
     </table></div>
 <!-- /gen:platforms-html -->
@@ -186,7 +190,7 @@
     <h2>How to install</h2>
     <ol class="steps">
       <li><b>On the TV:</b> sign in to Smart Hub once with the user <code>develop</code> (<code>MENU</code> → Smart Hub → Samsung Account → Log In – no password needed).</li>
-      <li><b>On your computer:</b> download the setup program from the <a href="https://github.com/itsab1989/neolume/releases/latest">latest release</a> and start it – Windows (<code>neolume-setup-windows-x64.exe</code>), macOS (<code>neolume-setup-macos-arm64.zip</code> or <code>-macos-x64.zip</code>), Linux (<code>neolume-setup-linux-x64</code>) or any system with Python (<code>neolume-setup.pyz</code>).</li>
+      <li><b>On your computer:</b> download the setup program from the <a href="https://github.com/itsab1989/neolume/releases/latest">latest release</a> and start it – Windows (<code>neolume-setup-windows-x64.exe</code>, or <code>-windows-arm64.exe</code> on ARM devices), macOS (<code>neolume-setup-macos-arm64.zip</code> for Apple chips or <code>-macos-x64.zip</code> for Intel), Linux (<code>neolume-setup-linux-x64</code> or <code>-linux-arm64</code>, e.g. Raspberry Pi 4/5) or any system with Python 3.8+ (<code>neolume-setup.pyz</code>). For a NAS there is a Docker image for the optional helper (<code>ghcr.io/itsab1989/neolume-setup</code>).</li>
       <li><b>In the browser:</b> sign in with Plex, pick your server and profiles, click <i>Create app package</i>.</li>
       <li><b>On the TV:</b> in SAMSUNG APPS hold <code>OK</code> for 5 seconds on any app → <i>IP Setting</i> → your computer's address → <i>Start User App Sync</i>.</li>
       <li><b>Done:</b> Neolume appears under MY APPS. Your computer is no longer needed.</li>
@@ -217,7 +221,7 @@
     <div class="table-wrap"><table>
       <thead><tr><th>Port</th><th>TV</th><th>OS</th><th>Spec version</th><th>Maintainer</th></tr></thead>
       <tbody>
-        <tr><td><a href="https://github.com/itsab1989/neolume">Neolume (reference implementation)</a></td><td>Samsung – 2014 H/HU series with Smart Hub (Orsay), tested on UE48H8000</td><td>Orsay Smart Hub (2014)</td><td>1.0.16</td><td><a href="https://github.com/itsab1989">@itsab1989</a></td></tr>
+        <tr><td><a href="https://github.com/itsab1989/neolume">Neolume (reference implementation)</a></td><td>Samsung – 2014 H/HU series with Smart Hub (Orsay), tested on UE48H8000</td><td>Orsay Smart Hub (2014)</td><td>1.0.17</td><td><a href="https://github.com/itsab1989">@itsab1989</a></td></tr>
       </tbody>
     </table></div>
 <!-- /gen:ports-html -->
@@ -230,9 +234,10 @@
     <details><summary>Is Neolume an official Plex app?</summary><p>No. Neolume is an independent open-source project and is not affiliated with, endorsed or supported by Plex, Inc. "Plex" is a trademark of Plex, Inc.</p></details>
     <details><summary>Do I need Plex Pass?</summary><p>No. Only extras like skip-intro markers and seek thumbnails depend on data your server creates with Plex Pass.</p></details>
     <details><summary>Will it delete my other apps?</summary><p>Apps from the Samsung store are not touched. The TV's developer sync removes other <em>self-installed</em> apps that are not on the sync list – the setup program lets you add them so they stay.</p></details>
-    <details><summary>Does it work outside my home?</summary><p>No, by design. Neolume only connects to your server on your home network.</p></details>
+    <details><summary>Does it work outside my home?</summary><p>No, by design. Neolume uses your own server only through its home-network address, so your access never travels over the internet unencrypted. The one exception you can choose: servers that someone shared with you are reached over the internet, and <i>Settings → Playback → Quality over the internet</i> sets how much may come at once so a video from far away does not stall.</p></details>
     <details><summary>Is there a Neolume for newer TVs (Tizen, webOS, Android TV)?</summary><p>No ready-made one. Neolume runs only on 2014 Samsung TVs with the Orsay Smart Hub; most newer TVs have the official Plex app in their app store. If you want Neolume's look and features on a newer TV, an AI coding agent can build it for you from Neolume's specification – see <a href="port.html">Build it for your TV with an AI agent</a>.</p></details>
-    <details><summary>Is my data safe?</summary><p>There is no telemetry or tracking. Your Plex password is only entered on plex.tv. Each profile gets access that only works with your server and can be revoked on plex.tv at any time.</p></details>
+    <details><summary>Is my data safe?</summary><p>There is no telemetry or tracking. Your Plex password is only entered on plex.tv. Each profile gets access that only works with your server and can be revoked on plex.tv at any time. Optional Live TV (off by default) loads channels from the broadcasters, programme info from ARD and logos from Wikimedia through your server – only while it is on, without account, cookies or identifiers.</p></details>
+
     <p><a href="https://github.com/itsab1989/neolume/blob/main/docs/FAQ.md">All questions and answers →</a></p>
   </div>
 </section>

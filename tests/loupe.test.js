@@ -146,7 +146,7 @@ test('Schutzzone: Band bis unter die Knopfreihe, dort kein seitliches Verlassen;
   assert.strictEqual(L().N.Loupe.K.CORR, 32);
 });
 
-test('Einstellung: Feinauswahl in Wiedergabe, Standard aus, ohne Zeiger-Steuerung ausgegraut (mit Erklaerung), INFO-Hilfe', function () {
+test('Einstellung: Feinauswahl in Sprache & Bedienung, Standard aus, ohne Zeiger-Steuerung ausgegraut (mit Erklaerung), INFO-Hilfe', function () {
   var fs = require('fs'), path = require('path'), vm = require('vm');
   var ctx = H.load(), N = ctx.N, src = fs.readFileSync(path.join(__dirname, '..', 'src', 'views', 'settings.js'), 'utf8');
   src = src.replace('    s.create = function (root) {', '    s.__defs = defs;\n    s.create = function (root) {');
@@ -166,7 +166,7 @@ test('Einstellung: Feinauswahl in Wiedergabe, Standard aus, ohne Zeiger-Steuerun
   var row = null;
   factory().__defs().forEach(function (c) { c.rows.forEach(function (r) { if (r.id === 'ptrLoupe') { row = r; row.cat = c.id; } }); });
   assert.ok(row, 'Zeile ptrLoupe fehlt');
-  assert.strictEqual(row.cat, 'play');
+  assert.strictEqual(row.cat, 'controls');                     // Sprache & Bedienung, unter den Zeiger-Zeilen (05.11.2026)
   assert.strictEqual(row.get(), false);
   assert.strictEqual(row.disabled(), false);
   state.pointer = false;
@@ -272,7 +272,7 @@ test('Einstellung: Darstellung der Feinauswahl – drei Formen mit Unterzeile, S
     startProfile: function () { return 'last'; }, pinSwitchAvailable: function () { return false; }, hasRestricted: function () { return false; }, pinSwitchOn: function () { return false; },
     setSetting: function (k, v) { settings[k] = v; }, save: function () {} };
   var row = null, ids = [];
-  factory().__defs().forEach(function (c) { c.rows.forEach(function (r) { if (c.id === 'play') ids.push(r.id); if (r.id === 'loupeStyle') row = r; }); });
+  factory().__defs().forEach(function (c) { c.rows.forEach(function (r) { if (c.id === 'controls') ids.push(r.id); if (r.id === 'loupeStyle') row = r; }); });
   assert.ok(row, 'Zeile loupeStyle fehlt');
   assert.strictEqual(ids.indexOf('loupeStyle'), ids.indexOf('ptrLoupe') + 1);   // direkt unter dem Schalter
   assert.strictEqual(row.val(), N.t('set.v.lpPanel'));                          // ohne gespeicherten Wert: Panel (A)

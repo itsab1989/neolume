@@ -305,7 +305,7 @@ Did you tick **Set up the helper**? Then do **not** quit yet – continue with [
    Neolume on this TV.
 4. Home loads Continue Watching, Up Next and what is new in your libraries.
 5. After a moment on Home, a card **How to use Neolume** shows the remote buttons. You can open it again under
-   **Settings** → **Help & info**.
+   **Settings** → **Help & diagnostics**.
 
 ![Sketch of the Neolume profile picker "Who's watching?" with four example profiles and the note "Protect adult profiles?" with the buttons Got it and Remind me later](img/app-profiles.en.svg)
 
@@ -316,7 +316,7 @@ From now on Neolume talks **only to your server**. Your computer can stay off; t
 | Button | What it does |
 |---|---|
 | Arrow buttons, `OK` | Move, select |
-| `RETURN` | Back. In a library, Search, Discover or Settings it first goes to the top, then to Home (or to the section before – *Back from a section* under **Settings → Display**). On Home: to the first card, then *Exit*. The sidebar opens with ◀ |
+| `RETURN` | Back. In a library, Search, Discover or Settings it first goes to the top, then to Home (or to the section before – *Back from a section* under **Settings → Language & controls**). On Home: to the first card, then *Exit*. The sidebar opens with ◀ |
 | `PLAY` / `PAUSE` / `STOP` | Playback |
 | `◄◄` / `►►` | Skip back / forward (in lists: jump several items) |
 | `TOOLS` | Options for the focused item ("More" menu in the player) |
@@ -440,10 +440,14 @@ The 2014 TV cannot reach plex.tv by itself: plex.tv requires newer encryption (T
 - **What it fetches:** your Plex watchlist (and passes it on to plex.tv when you add or remove a title on the TV), the
   three Discover rows and – when you open a title in Discover that is not on your server – its story, genres, runtime and
   cast from the Plex catalogue. Nothing else. If you use [servers other people shared with you](#14-optional-other-servers-shared-with-you),
-  it also looks up their current address.
-- **What it does not do:** no video traffic (videos always come straight from your Plex server), not reachable from the
-  internet, and does not pass on requests for anyone else. It only answers devices in your home network,
-  only calls a fixed list of plex.tv addresses and sends data only to plex.tv.
+  it also looks up their current address. With **Live TV** on, it also fetches picture and sound of an ARD or ZDF channel
+  you play from that broadcaster and hands the TV one stream – the 2014 TV's player cannot add the separate sound of these
+  channels by itself, so without the helper they are missing on the TV.
+- **What it does not do:** no video traffic from your Plex server (those videos always come straight from the server), not
+  reachable from the internet, and does not pass on requests for anyone else. It only answers devices in your home network,
+  only calls a fixed list of plex.tv addresses and – for Live TV – the broadcaster addresses from the app's channel list
+  (never an address someone sends it), and sends data only to these. Live TV passes through its memory a few seconds at a
+  time and is never stored.
 - **What it stores:** the access file `helper.json` – readable only by your user account – in the settings folder
   (Mac: `~/Library/Application Support/NeolumeSetup`, Windows: `%APPDATA%\NeolumeSetup`, Linux: `~/.config/NeolumeSetup`).
   When installed permanently (13.3) also a copy of the program, an autostart entry and a log file (`helper.log`, without
@@ -547,16 +551,16 @@ icon.
 ### 13.5 Check that it works
 
 **On the TV:**
-1. Open Neolume → **Settings** → **Display** → **Watchlist**. It should be switchable and on.
+1. Open Neolume → **Settings** → **Live TV & Discover** → **Watchlist**. It should be switchable and on.
    - It says **Not set up**: the app package on the TV has no helper yet – tick **Set up the helper**, create the package
      and sync again (13.2).
    - It is grey with *"The Neolume helper is not answering"*: the TV knows the helper but cannot reach it – see
      [13.9](#139-helper-troubleshooting). Neolume tries again after a minute.
 2. Open **Discover** in the sidebar: it shows **Your watchlist** and, before you type, the rows Trending now / Just released /
-   Coming soon (which rows: **Settings** → **Display** → **Customize inspiration**). By default they only suggest titles
-   that are not on your server yet (**Settings** → **Display** → **Only titles you don't have yet**).
+   Coming soon (which rows: **Settings** → **Live TV & Discover** → **Customize inspiration**). By default they only suggest titles
+   that are not on your server yet (**Settings** → **Live TV & Discover** → **Only titles you don't have yet**).
 
-![Sketch of Neolume's settings: Display chosen (1), the row Watchlist switched on and highlighted (2), plus Discover in the sidebar, Customize inspiration and Only titles you don't have yet](img/app-settings-watchlist.en.svg)
+![Sketch of Neolume's settings: Live TV & Discover chosen (1), the row Watchlist switched on and highlighted (2), plus Discover in the sidebar, Customize inspiration and Only titles you don't have yet](img/app-settings-watchlist.en.svg)
 
 **On the computer** – the icon menu's three status lines:
 
@@ -574,6 +578,12 @@ Without the icon: the helper card shows **Running in the background**, or `--hel
   when the installed copy is a different version). Without a browser: run the new file with `--install-helper`.
 - **New profiles or a new setup:** just run the setup again (**Set up the helper** stays ticked → **Create app package**).
   The installed helper picks up the new access file by itself within a few seconds.
+- **A new signing key:** with the signing key the app proves to the helper that a request comes from your TV. It is in
+  every app package and in `helper.json`. If you passed on an old app package, copied the access file or sold a TV, open
+  **Create a new signing key …** in the helper card and confirm. From then on the helper accepts nothing signed with the old
+  key: click **Create app package** and put the package on **every** TV (section 7) – until then the app there shows
+  *"Helper: please rebuild the app package"*. Profiles and everything else stay. If the helper runs on a NAS: copy the new
+  `helper.json` there afterwards and restart the container (13.8).
 
 ### 13.7 Remove it completely
 
@@ -627,6 +637,12 @@ runs on a computer with a browser.
    Synology Container Manager: **Project → Create**, paste the
    [`docker-compose.yml`](https://github.com/itsab1989/neolume/blob/main/installer/docker-compose.yml) and adjust `user:`.
 4. After a new setup, copy the new `helper.json` to the NAS and restart the container.
+
+**Why host networking?** Without `--net=host` (bridge mode, Docker's default) every device reaches the helper through the
+address of the Docker network (an address like `172.17.x.x`). The helper then cannot tell your TV from other devices. It notices
+this by itself: it writes it to its log (`docker logs neolume-helper`), and the TV shows “Helper: run Docker with host
+network” as soon as a feature fails because of it. Fix: delete the container and create it again with `--net=host` (or `network_mode: host`) – `helper.json` stays,
+nothing has to be set up again.
 
 The Docker helper has no icon; to remove it, delete the container and the `helper.json` on the NAS (keep the copy on the
 computer if you want to set it up again with the same key).
@@ -745,7 +761,7 @@ your own server** – off by default.
 2. Tick the servers you want and click **Create app package**, then install as usual. Each profile only gets the servers
    that were shared with **that** profile.
 3. On the TV the libraries appear in the sidebar with a small "from <server>" line. You can hide or move them under
-   **Settings → Display → Customize sidebar**. Search and Home stay with your own server.
+   **Settings → Language & controls → Customize sidebar**. Search and Home stay with your own server.
 
 What the status next to a server means:
 - **reachable** – fine, the TV can use it.

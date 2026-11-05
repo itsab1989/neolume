@@ -1,0 +1,3662 @@
+{
+ "_": "Gemeinsame Vorlage fuer helper.py und N.ptv (src/plex/plextv.js): Eingaben + Erwartung von helper.py. tests/installer/test_helper.py prueft, dass helper.py genau diese Ausgaben liefert, tests/plextv.test.js dasselbe fuer N.ptv. Nur erfundene Titel und Kennungen.",
+ "allowed": [
+  [
+   "GET",
+   "https://discover.provider.plex.tv/library/sections/watchlist/all?type=1&X-Plex-Container-Start=0&X-Plex-Container-Size=50",
+   true
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/library/sections/watchlist/all?includeCollections=0&includeExternalMedia=0",
+   true
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/library/sections/watchlist/all",
+   true
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/library/sections/watchlist/all?",
+   true
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/library/sections/watchlist/all?X%2DPlex%2DContainer%2DSize=5",
+   true
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/library/sections/watchlist/all?sort=titleSort",
+   false
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/library/sections/watchlist/all?type",
+   false
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/library/sections/watchlist/all?type=1&&size=2",
+   false
+  ],
+  [
+   "POST",
+   "https://discover.provider.plex.tv/library/sections/watchlist/all",
+   false
+  ],
+  [
+   "PUT",
+   "https://discover.provider.plex.tv/actions/addToWatchlist?ratingKey=aaaaaaaaaaaaaaaaaaaaaaaa",
+   true
+  ],
+  [
+   "PUT",
+   "https://discover.provider.plex.tv/actions/removeFromWatchlist?ratingKey=aaaaaaaaaaaaaaaaaaaaaaaa",
+   true
+  ],
+  [
+   "PUT",
+   "https://discover.provider.plex.tv/actions/addToWatchlist?ratingKey=aaaaaaaaaaaaaaaaaaaaaaaa&X-Plex-Token=x",
+   false
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/actions/addToWatchlist?ratingKey=aaaaaaaaaaaaaaaaaaaaaaaa",
+   false
+  ],
+  [
+   "PUT",
+   "https://discover.provider.plex.tv/actions/scrobble?ratingKey=aaaaaaaaaaaaaaaaaaaaaaaa",
+   false
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/library/metadata/aaaaaaaaaaaaaaaaaaaaaaaa,bbbbbbbbbbbbbbbbbbbbbbbb/userState",
+   true
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/library/metadata/aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa/userState",
+   true
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/library/metadata/aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa,aaaaaaaaaaaaaaaaaaaaaaaa/userState",
+   false
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/library/metadata/aaaaaaaaaaaaaaaaaaaaaaaa/userState?x=1",
+   false
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/hubs/sections/home/top_watchlisted?X-Plex-Container-Start=0&X-Plex-Container-Size=60",
+   true
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/hubs/sections/home/recently-released-family",
+   true
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/hubs/sections/home/coming-soon?X-Plex-Container-Size=60",
+   true
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/hubs/sections/home/popular",
+   false
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/hubs/sections/home/coming-soon/../x",
+   false
+  ],
+  [
+   "GET",
+   "https://metadata.provider.plex.tv/library/metadata/aaaaaaaaaaaaaaaaaaaaaaaa",
+   true
+  ],
+  [
+   "GET",
+   "https://metadata.provider.plex.tv/library/metadata/aaaaaaaaaaaaaaaaaaaaaaaa?includeUserState=1",
+   false
+  ],
+  [
+   "GET",
+   "https://metadata.provider.plex.tv/library/metadata/aaaaaaaaaaaaaaaaaaaaaaaa/children?X-Plex-Container-Size=5",
+   true
+  ],
+  [
+   "GET",
+   "https://metadata.provider.plex.tv/library/metadata/AAAAAAAAAAAAAAAAAAAAAAAA",
+   false
+  ],
+  [
+   "GET",
+   "https://metadata.provider.plex.tv/library/metadata/aaaaaaaaaaaaaaaaaaaaaaaa,bbbbbbbbbbbbbbbbbbbbbbbb",
+   false
+  ],
+  [
+   "GET",
+   "https://metadata.provider.plex.tv/library/metadata/aaaaaaaaaaaaaaaaaaaaaaaa/../../../api/v2/user",
+   false
+  ],
+  [
+   "GET",
+   "https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=0&includeIPv6=0",
+   true
+  ],
+  [
+   "GET",
+   "https://plex.tv/api/v2/user",
+   false
+  ],
+  [
+   "GET",
+   "http://discover.provider.plex.tv/library/sections/watchlist/all",
+   false
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv:443/library/sections/watchlist/all",
+   false
+  ],
+  [
+   "GET",
+   "https://user:@discover.provider.plex.tv/library/sections/watchlist/all",
+   false
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv/library/sections/watchlist/all#frag",
+   false
+  ],
+  [
+   "GET",
+   "https://DISCOVER.PROVIDER.PLEX.TV/library/sections/watchlist/all",
+   true
+  ],
+  [
+   "GET",
+   "HTTPS://discover.provider.plex.tv/library/sections/watchlist/all",
+   true
+  ],
+  [
+   "GET",
+   "https://discover.provider.plex.tv.example.net/library/sections/watchlist/all",
+   false
+  ],
+  [
+   "GET",
+   "https://evil.example.net/library/metadata/aaaaaaaaaaaaaaaaaaaaaaaa",
+   false
+  ],
+  [
+   "GET",
+   "https://image.tmdb.org/library/metadata/aaaaaaaaaaaaaaaaaaaaaaaa",
+   false
+  ],
+  [
+   "GET",
+   "",
+   false
+  ],
+  [
+   "GET",
+   "discover.provider.plex.tv/library/sections/watchlist/all",
+   false
+  ]
+ ],
+ "details_slim": [
+  [
+   {
+    "CommonSenseMedia": {
+     "x": 1
+    },
+    "Director": [
+     {
+      "tag": "Rita Regie",
+      "thumb": "https://metadata-static.plex.tv/p/r.jpg"
+     }
+    ],
+    "Genre": [
+     {
+      "id": "g1",
+      "tag": "Drama"
+     },
+     {
+      "tag": "Krimi"
+     },
+     {
+      "tag": "Drama"
+     },
+     {
+      "x": 1
+     },
+     "kaputt",
+     {
+      "tag": "Komödie"
+     },
+     {
+      "tag": "Western"
+     },
+     {
+      "tag": "Doku"
+     },
+     {
+      "tag": "Anime"
+     }
+    ],
+    "Guid": [
+     {
+      "id": "imdb://tt0000001"
+     },
+     {
+      "id": "tmdb://4242"
+     },
+     {
+      "id": "tvdb://77"
+     },
+     {
+      "id": "evil://1"
+     },
+     {
+      "id": "tmdb://12345678901"
+     },
+     "x"
+    ],
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "Role": [
+     {
+      "role": "Rolle 0",
+      "tag": "Person 0",
+      "thumb": "https://metadata-static.plex.tv/p/0.jpg"
+     },
+     {
+      "role": "Rolle 1",
+      "tag": "Person 1",
+      "thumb": "https://metadata-static.plex.tv/p/1.jpg"
+     },
+     {
+      "role": "Rolle 2",
+      "tag": "Person 2",
+      "thumb": "https://metadata-static.plex.tv/p/2.jpg"
+     },
+     {
+      "role": "Rolle 3",
+      "tag": "Person 3",
+      "thumb": "https://metadata-static.plex.tv/p/3.jpg"
+     },
+     {
+      "role": "Rolle 4",
+      "tag": "Person 4",
+      "thumb": "https://metadata-static.plex.tv/p/4.jpg"
+     },
+     {
+      "role": "Rolle 5",
+      "tag": "Person 5",
+      "thumb": "https://metadata-static.plex.tv/p/5.jpg"
+     },
+     {
+      "role": "Rolle 6",
+      "tag": "Person 6",
+      "thumb": "https://metadata-static.plex.tv/p/6.jpg"
+     },
+     {
+      "role": "Rolle 7",
+      "tag": "Person 7",
+      "thumb": "https://metadata-static.plex.tv/p/7.jpg"
+     },
+     {
+      "role": "Rolle 8",
+      "tag": "Person 8",
+      "thumb": "https://metadata-static.plex.tv/p/8.jpg"
+     },
+     {
+      "role": "Rolle 9",
+      "tag": "Person 9",
+      "thumb": "https://metadata-static.plex.tv/p/9.jpg"
+     },
+     {
+      "role": "Rolle 10",
+      "tag": "Person 10",
+      "thumb": "https://metadata-static.plex.tv/p/10.jpg"
+     },
+     {
+      "role": "Rolle 11",
+      "tag": "Person 11",
+      "thumb": "https://metadata-static.plex.tv/p/11.jpg"
+     },
+     {
+      "role": "Rolle 12",
+      "tag": "Person 12",
+      "thumb": "https://metadata-static.plex.tv/p/12.jpg"
+     },
+     {
+      "role": "Rolle 13",
+      "tag": "Person 13",
+      "thumb": "https://metadata-static.plex.tv/p/13.jpg"
+     },
+     {
+      "role": "Rolle 14",
+      "tag": "Person 14",
+      "thumb": "https://metadata-static.plex.tv/p/14.jpg"
+     },
+     {
+      "role": "Rolle 15",
+      "tag": "Person 15",
+      "thumb": "https://metadata-static.plex.tv/p/15.jpg"
+     },
+     {
+      "role": "Rolle 16",
+      "tag": "Person 16",
+      "thumb": "https://metadata-static.plex.tv/p/16.jpg"
+     },
+     {
+      "role": "Rolle 17",
+      "tag": "Person 17",
+      "thumb": "https://metadata-static.plex.tv/p/17.jpg"
+     },
+     {
+      "role": "Rolle 18",
+      "tag": "Person 18",
+      "thumb": "https://metadata-static.plex.tv/p/18.jpg"
+     },
+     {
+      "role": "Rolle 19",
+      "tag": "Person 19",
+      "thumb": "https://metadata-static.plex.tv/p/19.jpg"
+     }
+    ],
+    "Similar": [
+     {
+      "guid": "plex://movie/bbbbbbbbbbbbbbbbbbbbbbbb"
+     }
+    ],
+    "Writer": [
+     {
+      "tag": "Bo Buch"
+     },
+     {
+      "tag": "Cy Feder"
+     },
+     {
+      "tag": "Di Tinte"
+     },
+     {
+      "tag": "Ed Satz"
+     }
+    ],
+    "art": "https://metadata-static.plex.tv/a/art.jpg",
+    "audienceRating": 7.8,
+    "contentRating": "de/12",
+    "duration": 5460000,
+    "guid": "plex://movie/aaaaaaaaaaaaaaaaaaaaaaaa",
+    "originallyAvailableAt": "2024-05-01",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "rating": 9.1,
+    "ratingKey": "aaaaaaaaaaaaaaaaaaaaaaaa",
+    "studio": "Demo Studio",
+    "summary": "Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. ",
+    "tagline": "Kurz gesagt.",
+    "thumb": "https://image.tmdb.org/t/p/original/xaaaa.jpg",
+    "title": "Film A",
+    "type": "movie",
+    "userState": false,
+    "year": 2024
+   },
+   {
+    "art": "https://metadata-static.plex.tv/a/art.jpg",
+    "cast": [
+     {
+      "name": "Person 0",
+      "role": "Rolle 0",
+      "thumb": "https://metadata-static.plex.tv/p/0.jpg"
+     },
+     {
+      "name": "Person 1",
+      "role": "Rolle 1",
+      "thumb": "https://metadata-static.plex.tv/p/1.jpg"
+     },
+     {
+      "name": "Person 2",
+      "role": "Rolle 2",
+      "thumb": "https://metadata-static.plex.tv/p/2.jpg"
+     },
+     {
+      "name": "Person 3",
+      "role": "Rolle 3",
+      "thumb": "https://metadata-static.plex.tv/p/3.jpg"
+     },
+     {
+      "name": "Person 4",
+      "role": "Rolle 4",
+      "thumb": "https://metadata-static.plex.tv/p/4.jpg"
+     },
+     {
+      "name": "Person 5",
+      "role": "Rolle 5",
+      "thumb": "https://metadata-static.plex.tv/p/5.jpg"
+     },
+     {
+      "name": "Person 6",
+      "role": "Rolle 6",
+      "thumb": "https://metadata-static.plex.tv/p/6.jpg"
+     },
+     {
+      "name": "Person 7",
+      "role": "Rolle 7",
+      "thumb": "https://metadata-static.plex.tv/p/7.jpg"
+     },
+     {
+      "name": "Person 8",
+      "role": "Rolle 8",
+      "thumb": "https://metadata-static.plex.tv/p/8.jpg"
+     },
+     {
+      "name": "Person 9",
+      "role": "Rolle 9",
+      "thumb": "https://metadata-static.plex.tv/p/9.jpg"
+     },
+     {
+      "name": "Person 10",
+      "role": "Rolle 10",
+      "thumb": "https://metadata-static.plex.tv/p/10.jpg"
+     },
+     {
+      "name": "Person 11",
+      "role": "Rolle 11",
+      "thumb": "https://metadata-static.plex.tv/p/11.jpg"
+     },
+     {
+      "name": "Person 12",
+      "role": "Rolle 12",
+      "thumb": "https://metadata-static.plex.tv/p/12.jpg"
+     },
+     {
+      "name": "Person 13",
+      "role": "Rolle 13",
+      "thumb": "https://metadata-static.plex.tv/p/13.jpg"
+     },
+     {
+      "name": "Person 14",
+      "role": "Rolle 14",
+      "thumb": "https://metadata-static.plex.tv/p/14.jpg"
+     }
+    ],
+    "contentRating": "de/12",
+    "date": "2024-05-01",
+    "directors": [
+     "Rita Regie"
+    ],
+    "duration": 5460000,
+    "genres": [
+     "Drama",
+     "Krimi",
+     "Komödie",
+     "Western",
+     "Doku"
+    ],
+    "guid": "plex://movie/aaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+    "ids": {
+     "imdb": "tt0000001",
+     "tmdb": 4242,
+     "tvdb": 77
+    },
+    "network": "",
+    "rating": 7.8,
+    "studio": "Demo Studio",
+    "summary": "Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene ",
+    "tagline": "Kurz gesagt.",
+    "thumb": "https://image.tmdb.org/t/p/original/xaaaa.jpg",
+    "title": "Film A",
+    "type": "movie",
+    "writers": [
+     "Bo Buch",
+     "Cy Feder",
+     "Di Tinte"
+    ],
+    "year": 2024
+   }
+  ],
+  [
+   {
+    "CommonSenseMedia": {
+     "x": 1
+    },
+    "Director": [
+     {
+      "tag": "Rita Regie",
+      "thumb": "https://metadata-static.plex.tv/p/r.jpg"
+     }
+    ],
+    "Genre": [
+     {
+      "id": "g1",
+      "tag": "Drama"
+     },
+     {
+      "tag": "Krimi"
+     },
+     {
+      "tag": "Drama"
+     },
+     {
+      "x": 1
+     },
+     "kaputt",
+     {
+      "tag": "Komödie"
+     },
+     {
+      "tag": "Western"
+     },
+     {
+      "tag": "Doku"
+     },
+     {
+      "tag": "Anime"
+     }
+    ],
+    "Guid": [
+     {
+      "id": "imdb://tt0000001"
+     },
+     {
+      "id": "tmdb://4242"
+     },
+     {
+      "id": "tvdb://77"
+     },
+     {
+      "id": "evil://1"
+     },
+     {
+      "id": "tmdb://12345678901"
+     },
+     "x"
+    ],
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "Network": [
+     {
+      "tag": "Demo TV"
+     },
+     {
+      "tag": "Zwei"
+     }
+    ],
+    "Role": [
+     {
+      "role": "Rolle 0",
+      "tag": "Person 0",
+      "thumb": "https://metadata-static.plex.tv/p/0.jpg"
+     },
+     {
+      "role": "Rolle 1",
+      "tag": "Person 1",
+      "thumb": "https://metadata-static.plex.tv/p/1.jpg"
+     },
+     {
+      "role": "Rolle 2",
+      "tag": "Person 2",
+      "thumb": "https://metadata-static.plex.tv/p/2.jpg"
+     },
+     {
+      "role": "Rolle 3",
+      "tag": "Person 3",
+      "thumb": "https://metadata-static.plex.tv/p/3.jpg"
+     },
+     {
+      "role": "Rolle 4",
+      "tag": "Person 4",
+      "thumb": "https://metadata-static.plex.tv/p/4.jpg"
+     },
+     {
+      "role": "Rolle 5",
+      "tag": "Person 5",
+      "thumb": "https://metadata-static.plex.tv/p/5.jpg"
+     },
+     {
+      "role": "Rolle 6",
+      "tag": "Person 6",
+      "thumb": "https://metadata-static.plex.tv/p/6.jpg"
+     },
+     {
+      "role": "Rolle 7",
+      "tag": "Person 7",
+      "thumb": "https://metadata-static.plex.tv/p/7.jpg"
+     },
+     {
+      "role": "Rolle 8",
+      "tag": "Person 8",
+      "thumb": "https://metadata-static.plex.tv/p/8.jpg"
+     },
+     {
+      "role": "Rolle 9",
+      "tag": "Person 9",
+      "thumb": "https://metadata-static.plex.tv/p/9.jpg"
+     },
+     {
+      "role": "Rolle 10",
+      "tag": "Person 10",
+      "thumb": "https://metadata-static.plex.tv/p/10.jpg"
+     },
+     {
+      "role": "Rolle 11",
+      "tag": "Person 11",
+      "thumb": "https://metadata-static.plex.tv/p/11.jpg"
+     },
+     {
+      "role": "Rolle 12",
+      "tag": "Person 12",
+      "thumb": "https://metadata-static.plex.tv/p/12.jpg"
+     },
+     {
+      "role": "Rolle 13",
+      "tag": "Person 13",
+      "thumb": "https://metadata-static.plex.tv/p/13.jpg"
+     },
+     {
+      "role": "Rolle 14",
+      "tag": "Person 14",
+      "thumb": "https://metadata-static.plex.tv/p/14.jpg"
+     },
+     {
+      "role": "Rolle 15",
+      "tag": "Person 15",
+      "thumb": "https://metadata-static.plex.tv/p/15.jpg"
+     },
+     {
+      "role": "Rolle 16",
+      "tag": "Person 16",
+      "thumb": "https://metadata-static.plex.tv/p/16.jpg"
+     },
+     {
+      "role": "Rolle 17",
+      "tag": "Person 17",
+      "thumb": "https://metadata-static.plex.tv/p/17.jpg"
+     },
+     {
+      "role": "Rolle 18",
+      "tag": "Person 18",
+      "thumb": "https://metadata-static.plex.tv/p/18.jpg"
+     },
+     {
+      "role": "Rolle 19",
+      "tag": "Person 19",
+      "thumb": "https://metadata-static.plex.tv/p/19.jpg"
+     }
+    ],
+    "Similar": [
+     {
+      "guid": "plex://movie/bbbbbbbbbbbbbbbbbbbbbbbb"
+     }
+    ],
+    "Writer": [
+     {
+      "tag": "Bo Buch"
+     },
+     {
+      "tag": "Cy Feder"
+     },
+     {
+      "tag": "Di Tinte"
+     },
+     {
+      "tag": "Ed Satz"
+     }
+    ],
+    "art": "https://metadata-static.plex.tv/a/art.jpg",
+    "audienceRating": 7.8,
+    "childCount": 3,
+    "contentRating": "de/12",
+    "duration": 5460000,
+    "guid": "plex://show/bbbbbbbbbbbbbbbbbbbbbbbb",
+    "isContinuingSeries": true,
+    "lastEpisodeOriginallyAvailableAt": "2026-10-01",
+    "leafCount": 24,
+    "originallyAvailableAt": "2024-05-01",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "rating": 9.1,
+    "ratingKey": "bbbbbbbbbbbbbbbbbbbbbbbb",
+    "studio": "Demo Studio",
+    "summary": "Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. ",
+    "tagline": "Kurz gesagt.",
+    "thumb": "https://image.tmdb.org/t/p/original/xbbbb.jpg",
+    "title": "Serie B",
+    "type": "show",
+    "userState": false,
+    "year": 2024
+   },
+   {
+    "art": "https://metadata-static.plex.tv/a/art.jpg",
+    "cast": [
+     {
+      "name": "Person 0",
+      "role": "Rolle 0",
+      "thumb": "https://metadata-static.plex.tv/p/0.jpg"
+     },
+     {
+      "name": "Person 1",
+      "role": "Rolle 1",
+      "thumb": "https://metadata-static.plex.tv/p/1.jpg"
+     },
+     {
+      "name": "Person 2",
+      "role": "Rolle 2",
+      "thumb": "https://metadata-static.plex.tv/p/2.jpg"
+     },
+     {
+      "name": "Person 3",
+      "role": "Rolle 3",
+      "thumb": "https://metadata-static.plex.tv/p/3.jpg"
+     },
+     {
+      "name": "Person 4",
+      "role": "Rolle 4",
+      "thumb": "https://metadata-static.plex.tv/p/4.jpg"
+     },
+     {
+      "name": "Person 5",
+      "role": "Rolle 5",
+      "thumb": "https://metadata-static.plex.tv/p/5.jpg"
+     },
+     {
+      "name": "Person 6",
+      "role": "Rolle 6",
+      "thumb": "https://metadata-static.plex.tv/p/6.jpg"
+     },
+     {
+      "name": "Person 7",
+      "role": "Rolle 7",
+      "thumb": "https://metadata-static.plex.tv/p/7.jpg"
+     },
+     {
+      "name": "Person 8",
+      "role": "Rolle 8",
+      "thumb": "https://metadata-static.plex.tv/p/8.jpg"
+     },
+     {
+      "name": "Person 9",
+      "role": "Rolle 9",
+      "thumb": "https://metadata-static.plex.tv/p/9.jpg"
+     },
+     {
+      "name": "Person 10",
+      "role": "Rolle 10",
+      "thumb": "https://metadata-static.plex.tv/p/10.jpg"
+     },
+     {
+      "name": "Person 11",
+      "role": "Rolle 11",
+      "thumb": "https://metadata-static.plex.tv/p/11.jpg"
+     },
+     {
+      "name": "Person 12",
+      "role": "Rolle 12",
+      "thumb": "https://metadata-static.plex.tv/p/12.jpg"
+     },
+     {
+      "name": "Person 13",
+      "role": "Rolle 13",
+      "thumb": "https://metadata-static.plex.tv/p/13.jpg"
+     },
+     {
+      "name": "Person 14",
+      "role": "Rolle 14",
+      "thumb": "https://metadata-static.plex.tv/p/14.jpg"
+     }
+    ],
+    "contentRating": "de/12",
+    "continuing": true,
+    "date": "2024-05-01",
+    "directors": [
+     "Rita Regie"
+    ],
+    "duration": 5460000,
+    "episodes": 24,
+    "genres": [
+     "Drama",
+     "Krimi",
+     "Komödie",
+     "Western",
+     "Doku"
+    ],
+    "guid": "plex://show/bbbbbbbbbbbbbbbbbbbbbbbb",
+    "id": "bbbbbbbbbbbbbbbbbbbbbbbb",
+    "ids": {
+     "imdb": "tt0000001",
+     "tmdb": 4242,
+     "tvdb": 77
+    },
+    "lastAired": "2026-10-01",
+    "network": "Demo TV",
+    "rating": 7.8,
+    "seasons": 3,
+    "studio": "Demo Studio",
+    "summary": "Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene ",
+    "tagline": "Kurz gesagt.",
+    "thumb": "https://image.tmdb.org/t/p/original/xbbbb.jpg",
+    "title": "Serie B",
+    "type": "show",
+    "writers": [
+     "Bo Buch",
+     "Cy Feder",
+     "Di Tinte"
+    ],
+    "year": 2024
+   }
+  ],
+  [
+   {
+    "CommonSenseMedia": {
+     "x": 1
+    },
+    "Director": [
+     {
+      "tag": "Rita Regie",
+      "thumb": "https://metadata-static.plex.tv/p/r.jpg"
+     }
+    ],
+    "Genre": [
+     {
+      "id": "g1",
+      "tag": "Drama"
+     },
+     {
+      "tag": "Krimi"
+     },
+     {
+      "tag": "Drama"
+     },
+     {
+      "x": 1
+     },
+     "kaputt",
+     {
+      "tag": "Komödie"
+     },
+     {
+      "tag": "Western"
+     },
+     {
+      "tag": "Doku"
+     },
+     {
+      "tag": "Anime"
+     }
+    ],
+    "Guid": [
+     {
+      "id": "imdb://tt0000001"
+     },
+     {
+      "id": "tmdb://4242"
+     },
+     {
+      "id": "tvdb://77"
+     },
+     {
+      "id": "evil://1"
+     },
+     {
+      "id": "tmdb://12345678901"
+     },
+     "x"
+    ],
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "Role": [
+     {
+      "role": "Rolle 0",
+      "tag": "Person 0",
+      "thumb": "https://metadata-static.plex.tv/p/0.jpg"
+     },
+     {
+      "role": "Rolle 1",
+      "tag": "Person 1",
+      "thumb": "https://metadata-static.plex.tv/p/1.jpg"
+     },
+     {
+      "role": "Rolle 2",
+      "tag": "Person 2",
+      "thumb": "https://metadata-static.plex.tv/p/2.jpg"
+     },
+     {
+      "role": "Rolle 3",
+      "tag": "Person 3",
+      "thumb": "https://metadata-static.plex.tv/p/3.jpg"
+     },
+     {
+      "role": "Rolle 4",
+      "tag": "Person 4",
+      "thumb": "https://metadata-static.plex.tv/p/4.jpg"
+     },
+     {
+      "role": "Rolle 5",
+      "tag": "Person 5",
+      "thumb": "https://metadata-static.plex.tv/p/5.jpg"
+     },
+     {
+      "role": "Rolle 6",
+      "tag": "Person 6",
+      "thumb": "https://metadata-static.plex.tv/p/6.jpg"
+     },
+     {
+      "role": "Rolle 7",
+      "tag": "Person 7",
+      "thumb": "https://metadata-static.plex.tv/p/7.jpg"
+     },
+     {
+      "role": "Rolle 8",
+      "tag": "Person 8",
+      "thumb": "https://metadata-static.plex.tv/p/8.jpg"
+     },
+     {
+      "role": "Rolle 9",
+      "tag": "Person 9",
+      "thumb": "https://metadata-static.plex.tv/p/9.jpg"
+     },
+     {
+      "role": "Rolle 10",
+      "tag": "Person 10",
+      "thumb": "https://metadata-static.plex.tv/p/10.jpg"
+     },
+     {
+      "role": "Rolle 11",
+      "tag": "Person 11",
+      "thumb": "https://metadata-static.plex.tv/p/11.jpg"
+     },
+     {
+      "role": "Rolle 12",
+      "tag": "Person 12",
+      "thumb": "https://metadata-static.plex.tv/p/12.jpg"
+     },
+     {
+      "role": "Rolle 13",
+      "tag": "Person 13",
+      "thumb": "https://metadata-static.plex.tv/p/13.jpg"
+     },
+     {
+      "role": "Rolle 14",
+      "tag": "Person 14",
+      "thumb": "https://metadata-static.plex.tv/p/14.jpg"
+     },
+     {
+      "role": "Rolle 15",
+      "tag": "Person 15",
+      "thumb": "https://metadata-static.plex.tv/p/15.jpg"
+     },
+     {
+      "role": "Rolle 16",
+      "tag": "Person 16",
+      "thumb": "https://metadata-static.plex.tv/p/16.jpg"
+     },
+     {
+      "role": "Rolle 17",
+      "tag": "Person 17",
+      "thumb": "https://metadata-static.plex.tv/p/17.jpg"
+     },
+     {
+      "role": "Rolle 18",
+      "tag": "Person 18",
+      "thumb": "https://metadata-static.plex.tv/p/18.jpg"
+     },
+     {
+      "role": "Rolle 19",
+      "tag": "Person 19",
+      "thumb": "https://metadata-static.plex.tv/p/19.jpg"
+     }
+    ],
+    "Similar": [
+     {
+      "guid": "plex://movie/bbbbbbbbbbbbbbbbbbbbbbbb"
+     }
+    ],
+    "Writer": [
+     {
+      "tag": "Bo Buch"
+     },
+     {
+      "tag": "Cy Feder"
+     },
+     {
+      "tag": "Di Tinte"
+     },
+     {
+      "tag": "Ed Satz"
+     }
+    ],
+    "art": "https://metadata-static.plex.tv/a/art.jpg",
+    "audienceRating": 0,
+    "contentRating": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRR",
+    "duration": -5,
+    "guid": "plex://movie/cccccccccccccccccccccccc",
+    "originallyAvailableAt": "2024-05-01",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "rating": 8.3,
+    "ratingKey": "cccccccccccccccccccccccc",
+    "studio": "Demo Studio",
+    "summary": "Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. ",
+    "tagline": "Kurz gesagt.",
+    "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+    "title": "Bewertung",
+    "type": "movie",
+    "userState": false,
+    "year": 2024
+   },
+   {
+    "art": "https://metadata-static.plex.tv/a/art.jpg",
+    "cast": [
+     {
+      "name": "Person 0",
+      "role": "Rolle 0",
+      "thumb": "https://metadata-static.plex.tv/p/0.jpg"
+     },
+     {
+      "name": "Person 1",
+      "role": "Rolle 1",
+      "thumb": "https://metadata-static.plex.tv/p/1.jpg"
+     },
+     {
+      "name": "Person 2",
+      "role": "Rolle 2",
+      "thumb": "https://metadata-static.plex.tv/p/2.jpg"
+     },
+     {
+      "name": "Person 3",
+      "role": "Rolle 3",
+      "thumb": "https://metadata-static.plex.tv/p/3.jpg"
+     },
+     {
+      "name": "Person 4",
+      "role": "Rolle 4",
+      "thumb": "https://metadata-static.plex.tv/p/4.jpg"
+     },
+     {
+      "name": "Person 5",
+      "role": "Rolle 5",
+      "thumb": "https://metadata-static.plex.tv/p/5.jpg"
+     },
+     {
+      "name": "Person 6",
+      "role": "Rolle 6",
+      "thumb": "https://metadata-static.plex.tv/p/6.jpg"
+     },
+     {
+      "name": "Person 7",
+      "role": "Rolle 7",
+      "thumb": "https://metadata-static.plex.tv/p/7.jpg"
+     },
+     {
+      "name": "Person 8",
+      "role": "Rolle 8",
+      "thumb": "https://metadata-static.plex.tv/p/8.jpg"
+     },
+     {
+      "name": "Person 9",
+      "role": "Rolle 9",
+      "thumb": "https://metadata-static.plex.tv/p/9.jpg"
+     },
+     {
+      "name": "Person 10",
+      "role": "Rolle 10",
+      "thumb": "https://metadata-static.plex.tv/p/10.jpg"
+     },
+     {
+      "name": "Person 11",
+      "role": "Rolle 11",
+      "thumb": "https://metadata-static.plex.tv/p/11.jpg"
+     },
+     {
+      "name": "Person 12",
+      "role": "Rolle 12",
+      "thumb": "https://metadata-static.plex.tv/p/12.jpg"
+     },
+     {
+      "name": "Person 13",
+      "role": "Rolle 13",
+      "thumb": "https://metadata-static.plex.tv/p/13.jpg"
+     },
+     {
+      "name": "Person 14",
+      "role": "Rolle 14",
+      "thumb": "https://metadata-static.plex.tv/p/14.jpg"
+     }
+    ],
+    "contentRating": "RRRRRRRRRRRRRRRRRRRR",
+    "date": "2024-05-01",
+    "directors": [
+     "Rita Regie"
+    ],
+    "duration": 0,
+    "genres": [
+     "Drama",
+     "Krimi",
+     "Komödie",
+     "Western",
+     "Doku"
+    ],
+    "guid": "plex://movie/cccccccccccccccccccccccc",
+    "id": "cccccccccccccccccccccccc",
+    "ids": {
+     "imdb": "tt0000001",
+     "tmdb": 4242,
+     "tvdb": 77
+    },
+    "network": "",
+    "rating": 8.3,
+    "studio": "Demo Studio",
+    "summary": "Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene ",
+    "tagline": "Kurz gesagt.",
+    "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+    "title": "Bewertung",
+    "type": "movie",
+    "writers": [
+     "Bo Buch",
+     "Cy Feder",
+     "Di Tinte"
+    ],
+    "year": 2024
+   }
+  ],
+  [
+   {
+    "CommonSenseMedia": {
+     "x": 1
+    },
+    "Director": [
+     {
+      "tag": "Rita Regie",
+      "thumb": "https://metadata-static.plex.tv/p/r.jpg"
+     }
+    ],
+    "Genre": [
+     {
+      "id": "g1",
+      "tag": "Drama"
+     },
+     {
+      "tag": "Krimi"
+     },
+     {
+      "tag": "Drama"
+     },
+     {
+      "x": 1
+     },
+     "kaputt",
+     {
+      "tag": "Komödie"
+     },
+     {
+      "tag": "Western"
+     },
+     {
+      "tag": "Doku"
+     },
+     {
+      "tag": "Anime"
+     }
+    ],
+    "Guid": [
+     {
+      "id": "imdb://tt0000001"
+     },
+     {
+      "id": "tmdb://4242"
+     },
+     {
+      "id": "tvdb://77"
+     },
+     {
+      "id": "evil://1"
+     },
+     {
+      "id": "tmdb://12345678901"
+     },
+     "x"
+    ],
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "Role": [
+     {
+      "role": "Rolle 0",
+      "tag": "Person 0",
+      "thumb": "https://metadata-static.plex.tv/p/0.jpg"
+     },
+     {
+      "role": "Rolle 1",
+      "tag": "Person 1",
+      "thumb": "https://metadata-static.plex.tv/p/1.jpg"
+     },
+     {
+      "role": "Rolle 2",
+      "tag": "Person 2",
+      "thumb": "https://metadata-static.plex.tv/p/2.jpg"
+     },
+     {
+      "role": "Rolle 3",
+      "tag": "Person 3",
+      "thumb": "https://metadata-static.plex.tv/p/3.jpg"
+     },
+     {
+      "role": "Rolle 4",
+      "tag": "Person 4",
+      "thumb": "https://metadata-static.plex.tv/p/4.jpg"
+     },
+     {
+      "role": "Rolle 5",
+      "tag": "Person 5",
+      "thumb": "https://metadata-static.plex.tv/p/5.jpg"
+     },
+     {
+      "role": "Rolle 6",
+      "tag": "Person 6",
+      "thumb": "https://metadata-static.plex.tv/p/6.jpg"
+     },
+     {
+      "role": "Rolle 7",
+      "tag": "Person 7",
+      "thumb": "https://metadata-static.plex.tv/p/7.jpg"
+     },
+     {
+      "role": "Rolle 8",
+      "tag": "Person 8",
+      "thumb": "https://metadata-static.plex.tv/p/8.jpg"
+     },
+     {
+      "role": "Rolle 9",
+      "tag": "Person 9",
+      "thumb": "https://metadata-static.plex.tv/p/9.jpg"
+     },
+     {
+      "role": "Rolle 10",
+      "tag": "Person 10",
+      "thumb": "https://metadata-static.plex.tv/p/10.jpg"
+     },
+     {
+      "role": "Rolle 11",
+      "tag": "Person 11",
+      "thumb": "https://metadata-static.plex.tv/p/11.jpg"
+     },
+     {
+      "role": "Rolle 12",
+      "tag": "Person 12",
+      "thumb": "https://metadata-static.plex.tv/p/12.jpg"
+     },
+     {
+      "role": "Rolle 13",
+      "tag": "Person 13",
+      "thumb": "https://metadata-static.plex.tv/p/13.jpg"
+     },
+     {
+      "role": "Rolle 14",
+      "tag": "Person 14",
+      "thumb": "https://metadata-static.plex.tv/p/14.jpg"
+     },
+     {
+      "role": "Rolle 15",
+      "tag": "Person 15",
+      "thumb": "https://metadata-static.plex.tv/p/15.jpg"
+     },
+     {
+      "role": "Rolle 16",
+      "tag": "Person 16",
+      "thumb": "https://metadata-static.plex.tv/p/16.jpg"
+     },
+     {
+      "role": "Rolle 17",
+      "tag": "Person 17",
+      "thumb": "https://metadata-static.plex.tv/p/17.jpg"
+     },
+     {
+      "role": "Rolle 18",
+      "tag": "Person 18",
+      "thumb": "https://metadata-static.plex.tv/p/18.jpg"
+     },
+     {
+      "role": "Rolle 19",
+      "tag": "Person 19",
+      "thumb": "https://metadata-static.plex.tv/p/19.jpg"
+     }
+    ],
+    "Similar": [
+     {
+      "guid": "plex://movie/bbbbbbbbbbbbbbbbbbbbbbbb"
+     }
+    ],
+    "Writer": [
+     {
+      "tag": "Bo Buch"
+     },
+     {
+      "tag": "Cy Feder"
+     },
+     {
+      "tag": "Di Tinte"
+     },
+     {
+      "tag": "Ed Satz"
+     }
+    ],
+    "art": "https://metadata-static.plex.tv/a/art.jpg",
+    "audienceRating": 11,
+    "contentRating": "de/12",
+    "duration": 99999999999,
+    "guid": "plex://movie/cccccccccccccccccccccccc",
+    "originallyAvailableAt": "2024-05-01",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "rating": 12,
+    "ratingKey": "cccccccccccccccccccccccc",
+    "studio": "Demo Studio",
+    "summary": "Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. ",
+    "tagline": "Kurz gesagt.",
+    "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+    "title": "Bewertung zu hoch",
+    "type": "movie",
+    "userState": false,
+    "year": 2024
+   },
+   {
+    "art": "https://metadata-static.plex.tv/a/art.jpg",
+    "cast": [
+     {
+      "name": "Person 0",
+      "role": "Rolle 0",
+      "thumb": "https://metadata-static.plex.tv/p/0.jpg"
+     },
+     {
+      "name": "Person 1",
+      "role": "Rolle 1",
+      "thumb": "https://metadata-static.plex.tv/p/1.jpg"
+     },
+     {
+      "name": "Person 2",
+      "role": "Rolle 2",
+      "thumb": "https://metadata-static.plex.tv/p/2.jpg"
+     },
+     {
+      "name": "Person 3",
+      "role": "Rolle 3",
+      "thumb": "https://metadata-static.plex.tv/p/3.jpg"
+     },
+     {
+      "name": "Person 4",
+      "role": "Rolle 4",
+      "thumb": "https://metadata-static.plex.tv/p/4.jpg"
+     },
+     {
+      "name": "Person 5",
+      "role": "Rolle 5",
+      "thumb": "https://metadata-static.plex.tv/p/5.jpg"
+     },
+     {
+      "name": "Person 6",
+      "role": "Rolle 6",
+      "thumb": "https://metadata-static.plex.tv/p/6.jpg"
+     },
+     {
+      "name": "Person 7",
+      "role": "Rolle 7",
+      "thumb": "https://metadata-static.plex.tv/p/7.jpg"
+     },
+     {
+      "name": "Person 8",
+      "role": "Rolle 8",
+      "thumb": "https://metadata-static.plex.tv/p/8.jpg"
+     },
+     {
+      "name": "Person 9",
+      "role": "Rolle 9",
+      "thumb": "https://metadata-static.plex.tv/p/9.jpg"
+     },
+     {
+      "name": "Person 10",
+      "role": "Rolle 10",
+      "thumb": "https://metadata-static.plex.tv/p/10.jpg"
+     },
+     {
+      "name": "Person 11",
+      "role": "Rolle 11",
+      "thumb": "https://metadata-static.plex.tv/p/11.jpg"
+     },
+     {
+      "name": "Person 12",
+      "role": "Rolle 12",
+      "thumb": "https://metadata-static.plex.tv/p/12.jpg"
+     },
+     {
+      "name": "Person 13",
+      "role": "Rolle 13",
+      "thumb": "https://metadata-static.plex.tv/p/13.jpg"
+     },
+     {
+      "name": "Person 14",
+      "role": "Rolle 14",
+      "thumb": "https://metadata-static.plex.tv/p/14.jpg"
+     }
+    ],
+    "contentRating": "de/12",
+    "date": "2024-05-01",
+    "directors": [
+     "Rita Regie"
+    ],
+    "duration": 0,
+    "genres": [
+     "Drama",
+     "Krimi",
+     "Komödie",
+     "Western",
+     "Doku"
+    ],
+    "guid": "plex://movie/cccccccccccccccccccccccc",
+    "id": "cccccccccccccccccccccccc",
+    "ids": {
+     "imdb": "tt0000001",
+     "tmdb": 4242,
+     "tvdb": 77
+    },
+    "network": "",
+    "rating": 0.0,
+    "studio": "Demo Studio",
+    "summary": "Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene ",
+    "tagline": "Kurz gesagt.",
+    "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+    "title": "Bewertung zu hoch",
+    "type": "movie",
+    "writers": [
+     "Bo Buch",
+     "Cy Feder",
+     "Di Tinte"
+    ],
+    "year": 2024
+   }
+  ],
+  [
+   {
+    "CommonSenseMedia": {
+     "x": 1
+    },
+    "Director": [
+     {
+      "tag": "Rita Regie",
+      "thumb": "https://metadata-static.plex.tv/p/r.jpg"
+     }
+    ],
+    "Genre": [
+     {
+      "id": "g1",
+      "tag": "Drama"
+     },
+     {
+      "tag": "Krimi"
+     },
+     {
+      "tag": "Drama"
+     },
+     {
+      "x": 1
+     },
+     "kaputt",
+     {
+      "tag": "Komödie"
+     },
+     {
+      "tag": "Western"
+     },
+     {
+      "tag": "Doku"
+     },
+     {
+      "tag": "Anime"
+     }
+    ],
+    "Guid": [
+     {
+      "id": "imdb://tt0000001"
+     },
+     {
+      "id": "tmdb://4242"
+     },
+     {
+      "id": "tvdb://77"
+     },
+     {
+      "id": "evil://1"
+     },
+     {
+      "id": "tmdb://12345678901"
+     },
+     "x"
+    ],
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "Network": null,
+    "Role": [
+     {
+      "role": "Rolle 0",
+      "tag": "Person 0",
+      "thumb": "https://metadata-static.plex.tv/p/0.jpg"
+     },
+     {
+      "role": "Rolle 1",
+      "tag": "Person 1",
+      "thumb": "https://metadata-static.plex.tv/p/1.jpg"
+     },
+     {
+      "role": "Rolle 2",
+      "tag": "Person 2",
+      "thumb": "https://metadata-static.plex.tv/p/2.jpg"
+     },
+     {
+      "role": "Rolle 3",
+      "tag": "Person 3",
+      "thumb": "https://metadata-static.plex.tv/p/3.jpg"
+     },
+     {
+      "role": "Rolle 4",
+      "tag": "Person 4",
+      "thumb": "https://metadata-static.plex.tv/p/4.jpg"
+     },
+     {
+      "role": "Rolle 5",
+      "tag": "Person 5",
+      "thumb": "https://metadata-static.plex.tv/p/5.jpg"
+     },
+     {
+      "role": "Rolle 6",
+      "tag": "Person 6",
+      "thumb": "https://metadata-static.plex.tv/p/6.jpg"
+     },
+     {
+      "role": "Rolle 7",
+      "tag": "Person 7",
+      "thumb": "https://metadata-static.plex.tv/p/7.jpg"
+     },
+     {
+      "role": "Rolle 8",
+      "tag": "Person 8",
+      "thumb": "https://metadata-static.plex.tv/p/8.jpg"
+     },
+     {
+      "role": "Rolle 9",
+      "tag": "Person 9",
+      "thumb": "https://metadata-static.plex.tv/p/9.jpg"
+     },
+     {
+      "role": "Rolle 10",
+      "tag": "Person 10",
+      "thumb": "https://metadata-static.plex.tv/p/10.jpg"
+     },
+     {
+      "role": "Rolle 11",
+      "tag": "Person 11",
+      "thumb": "https://metadata-static.plex.tv/p/11.jpg"
+     },
+     {
+      "role": "Rolle 12",
+      "tag": "Person 12",
+      "thumb": "https://metadata-static.plex.tv/p/12.jpg"
+     },
+     {
+      "role": "Rolle 13",
+      "tag": "Person 13",
+      "thumb": "https://metadata-static.plex.tv/p/13.jpg"
+     },
+     {
+      "role": "Rolle 14",
+      "tag": "Person 14",
+      "thumb": "https://metadata-static.plex.tv/p/14.jpg"
+     },
+     {
+      "role": "Rolle 15",
+      "tag": "Person 15",
+      "thumb": "https://metadata-static.plex.tv/p/15.jpg"
+     },
+     {
+      "role": "Rolle 16",
+      "tag": "Person 16",
+      "thumb": "https://metadata-static.plex.tv/p/16.jpg"
+     },
+     {
+      "role": "Rolle 17",
+      "tag": "Person 17",
+      "thumb": "https://metadata-static.plex.tv/p/17.jpg"
+     },
+     {
+      "role": "Rolle 18",
+      "tag": "Person 18",
+      "thumb": "https://metadata-static.plex.tv/p/18.jpg"
+     },
+     {
+      "role": "Rolle 19",
+      "tag": "Person 19",
+      "thumb": "https://metadata-static.plex.tv/p/19.jpg"
+     }
+    ],
+    "Similar": [
+     {
+      "guid": "plex://movie/bbbbbbbbbbbbbbbbbbbbbbbb"
+     }
+    ],
+    "Writer": [
+     {
+      "tag": "Bo Buch"
+     },
+     {
+      "tag": "Cy Feder"
+     },
+     {
+      "tag": "Di Tinte"
+     },
+     {
+      "tag": "Ed Satz"
+     }
+    ],
+    "art": "https://metadata-static.plex.tv/a/art.jpg",
+    "audienceRating": 7.8,
+    "childCount": 2000,
+    "contentRating": "de/12",
+    "duration": 5460000,
+    "guid": "plex://show/dddddddddddddddddddddddd",
+    "isContinuingSeries": "ja",
+    "lastEpisodeOriginallyAvailableAt": "bald",
+    "leafCount": 2.7,
+    "originallyAvailableAt": "2024-05-01",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "rating": 9.1,
+    "ratingKey": "dddddddddddddddddddddddd",
+    "studio": "Demo Studio",
+    "summary": "Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. ",
+    "tagline": "Kurz gesagt.",
+    "thumb": "https://image.tmdb.org/t/p/original/xdddd.jpg",
+    "title": "Serie offen",
+    "type": "show",
+    "userState": false,
+    "year": 2024
+   },
+   {
+    "art": "https://metadata-static.plex.tv/a/art.jpg",
+    "cast": [
+     {
+      "name": "Person 0",
+      "role": "Rolle 0",
+      "thumb": "https://metadata-static.plex.tv/p/0.jpg"
+     },
+     {
+      "name": "Person 1",
+      "role": "Rolle 1",
+      "thumb": "https://metadata-static.plex.tv/p/1.jpg"
+     },
+     {
+      "name": "Person 2",
+      "role": "Rolle 2",
+      "thumb": "https://metadata-static.plex.tv/p/2.jpg"
+     },
+     {
+      "name": "Person 3",
+      "role": "Rolle 3",
+      "thumb": "https://metadata-static.plex.tv/p/3.jpg"
+     },
+     {
+      "name": "Person 4",
+      "role": "Rolle 4",
+      "thumb": "https://metadata-static.plex.tv/p/4.jpg"
+     },
+     {
+      "name": "Person 5",
+      "role": "Rolle 5",
+      "thumb": "https://metadata-static.plex.tv/p/5.jpg"
+     },
+     {
+      "name": "Person 6",
+      "role": "Rolle 6",
+      "thumb": "https://metadata-static.plex.tv/p/6.jpg"
+     },
+     {
+      "name": "Person 7",
+      "role": "Rolle 7",
+      "thumb": "https://metadata-static.plex.tv/p/7.jpg"
+     },
+     {
+      "name": "Person 8",
+      "role": "Rolle 8",
+      "thumb": "https://metadata-static.plex.tv/p/8.jpg"
+     },
+     {
+      "name": "Person 9",
+      "role": "Rolle 9",
+      "thumb": "https://metadata-static.plex.tv/p/9.jpg"
+     },
+     {
+      "name": "Person 10",
+      "role": "Rolle 10",
+      "thumb": "https://metadata-static.plex.tv/p/10.jpg"
+     },
+     {
+      "name": "Person 11",
+      "role": "Rolle 11",
+      "thumb": "https://metadata-static.plex.tv/p/11.jpg"
+     },
+     {
+      "name": "Person 12",
+      "role": "Rolle 12",
+      "thumb": "https://metadata-static.plex.tv/p/12.jpg"
+     },
+     {
+      "name": "Person 13",
+      "role": "Rolle 13",
+      "thumb": "https://metadata-static.plex.tv/p/13.jpg"
+     },
+     {
+      "name": "Person 14",
+      "role": "Rolle 14",
+      "thumb": "https://metadata-static.plex.tv/p/14.jpg"
+     }
+    ],
+    "contentRating": "de/12",
+    "continuing": null,
+    "date": "2024-05-01",
+    "directors": [
+     "Rita Regie"
+    ],
+    "duration": 5460000,
+    "episodes": 2,
+    "genres": [
+     "Drama",
+     "Krimi",
+     "Komödie",
+     "Western",
+     "Doku"
+    ],
+    "guid": "plex://show/dddddddddddddddddddddddd",
+    "id": "dddddddddddddddddddddddd",
+    "ids": {
+     "imdb": "tt0000001",
+     "tmdb": 4242,
+     "tvdb": 77
+    },
+    "lastAired": "",
+    "network": "",
+    "rating": 7.8,
+    "seasons": 0,
+    "studio": "Demo Studio",
+    "summary": "Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene ",
+    "tagline": "Kurz gesagt.",
+    "thumb": "https://image.tmdb.org/t/p/original/xdddd.jpg",
+    "title": "Serie offen",
+    "type": "show",
+    "writers": [
+     "Bo Buch",
+     "Cy Feder",
+     "Di Tinte"
+    ],
+    "year": 2024
+   }
+  ],
+  [
+   {
+    "CommonSenseMedia": {
+     "x": 1
+    },
+    "Director": null,
+    "Genre": "Drama",
+    "Guid": [
+     {
+      "id": "imdb://tt0000001"
+     },
+     {
+      "id": "tmdb://4242"
+     },
+     {
+      "id": "tvdb://77"
+     },
+     {
+      "id": "evil://1"
+     },
+     {
+      "id": "tmdb://12345678901"
+     },
+     "x"
+    ],
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "Network": [
+     {
+      "tag": "Demo TV"
+     },
+     {
+      "tag": "Zwei"
+     }
+    ],
+    "Role": [
+     {
+      "tag": ""
+     },
+     "x",
+     {
+      "role": 7,
+      "tag": "Eve",
+      "thumb": "http://evil.example/x.jpg"
+     }
+    ],
+    "Similar": [
+     {
+      "guid": "plex://movie/bbbbbbbbbbbbbbbbbbbbbbbb"
+     }
+    ],
+    "Writer": [
+     {
+      "tag": "Bo Buch"
+     },
+     {
+      "tag": "Cy Feder"
+     },
+     {
+      "tag": "Di Tinte"
+     },
+     {
+      "tag": "Ed Satz"
+     }
+    ],
+    "art": "https://metadata-static.plex.tv/a/art.jpg",
+    "audienceRating": 7.8,
+    "childCount": 3,
+    "contentRating": "de/12",
+    "duration": 5460000,
+    "guid": "plex://show/dddddddddddddddddddddddd",
+    "isContinuingSeries": true,
+    "lastEpisodeOriginallyAvailableAt": "2026-10-01",
+    "leafCount": 24,
+    "originallyAvailableAt": "2024-05-01",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "rating": 9.1,
+    "ratingKey": "dddddddddddddddddddddddd",
+    "studio": "Demo Studio",
+    "summary": "Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. ",
+    "tagline": "Kurz gesagt.",
+    "thumb": "https://image.tmdb.org/t/p/original/xdddd.jpg",
+    "title": "Rollen kaputt",
+    "type": "show",
+    "userState": false,
+    "year": 2024
+   },
+   {
+    "art": "https://metadata-static.plex.tv/a/art.jpg",
+    "cast": [
+     {
+      "name": "Eve",
+      "role": "",
+      "thumb": ""
+     }
+    ],
+    "contentRating": "de/12",
+    "continuing": true,
+    "date": "2024-05-01",
+    "directors": [],
+    "duration": 5460000,
+    "episodes": 24,
+    "genres": [],
+    "guid": "plex://show/dddddddddddddddddddddddd",
+    "id": "dddddddddddddddddddddddd",
+    "ids": {
+     "imdb": "tt0000001",
+     "tmdb": 4242,
+     "tvdb": 77
+    },
+    "lastAired": "2026-10-01",
+    "network": "Demo TV",
+    "rating": 7.8,
+    "seasons": 3,
+    "studio": "Demo Studio",
+    "summary": "Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene ",
+    "tagline": "Kurz gesagt.",
+    "thumb": "https://image.tmdb.org/t/p/original/xdddd.jpg",
+    "title": "Rollen kaputt",
+    "type": "show",
+    "writers": [
+     "Bo Buch",
+     "Cy Feder",
+     "Di Tinte"
+    ],
+    "year": 2024
+   }
+  ],
+  [
+   {
+    "CommonSenseMedia": {
+     "x": 1
+    },
+    "Director": [
+     {
+      "tag": "Rita Regie",
+      "thumb": "https://metadata-static.plex.tv/p/r.jpg"
+     }
+    ],
+    "Genre": [
+     {
+      "id": "g1",
+      "tag": "Drama"
+     },
+     {
+      "tag": "Krimi"
+     },
+     {
+      "tag": "Drama"
+     },
+     {
+      "x": 1
+     },
+     "kaputt",
+     {
+      "tag": "Komödie"
+     },
+     {
+      "tag": "Western"
+     },
+     {
+      "tag": "Doku"
+     },
+     {
+      "tag": "Anime"
+     }
+    ],
+    "Guid": [
+     {
+      "id": "imdb://tt0000001"
+     },
+     {
+      "id": "tmdb://4242"
+     },
+     {
+      "id": "tvdb://77"
+     },
+     {
+      "id": "evil://1"
+     },
+     {
+      "id": "tmdb://12345678901"
+     },
+     "x"
+    ],
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "Role": [
+     {
+      "role": "Rolle 0",
+      "tag": "Person 0",
+      "thumb": "https://metadata-static.plex.tv/p/0.jpg"
+     },
+     {
+      "role": "Rolle 1",
+      "tag": "Person 1",
+      "thumb": "https://metadata-static.plex.tv/p/1.jpg"
+     },
+     {
+      "role": "Rolle 2",
+      "tag": "Person 2",
+      "thumb": "https://metadata-static.plex.tv/p/2.jpg"
+     },
+     {
+      "role": "Rolle 3",
+      "tag": "Person 3",
+      "thumb": "https://metadata-static.plex.tv/p/3.jpg"
+     },
+     {
+      "role": "Rolle 4",
+      "tag": "Person 4",
+      "thumb": "https://metadata-static.plex.tv/p/4.jpg"
+     },
+     {
+      "role": "Rolle 5",
+      "tag": "Person 5",
+      "thumb": "https://metadata-static.plex.tv/p/5.jpg"
+     },
+     {
+      "role": "Rolle 6",
+      "tag": "Person 6",
+      "thumb": "https://metadata-static.plex.tv/p/6.jpg"
+     },
+     {
+      "role": "Rolle 7",
+      "tag": "Person 7",
+      "thumb": "https://metadata-static.plex.tv/p/7.jpg"
+     },
+     {
+      "role": "Rolle 8",
+      "tag": "Person 8",
+      "thumb": "https://metadata-static.plex.tv/p/8.jpg"
+     },
+     {
+      "role": "Rolle 9",
+      "tag": "Person 9",
+      "thumb": "https://metadata-static.plex.tv/p/9.jpg"
+     },
+     {
+      "role": "Rolle 10",
+      "tag": "Person 10",
+      "thumb": "https://metadata-static.plex.tv/p/10.jpg"
+     },
+     {
+      "role": "Rolle 11",
+      "tag": "Person 11",
+      "thumb": "https://metadata-static.plex.tv/p/11.jpg"
+     },
+     {
+      "role": "Rolle 12",
+      "tag": "Person 12",
+      "thumb": "https://metadata-static.plex.tv/p/12.jpg"
+     },
+     {
+      "role": "Rolle 13",
+      "tag": "Person 13",
+      "thumb": "https://metadata-static.plex.tv/p/13.jpg"
+     },
+     {
+      "role": "Rolle 14",
+      "tag": "Person 14",
+      "thumb": "https://metadata-static.plex.tv/p/14.jpg"
+     },
+     {
+      "role": "Rolle 15",
+      "tag": "Person 15",
+      "thumb": "https://metadata-static.plex.tv/p/15.jpg"
+     },
+     {
+      "role": "Rolle 16",
+      "tag": "Person 16",
+      "thumb": "https://metadata-static.plex.tv/p/16.jpg"
+     },
+     {
+      "role": "Rolle 17",
+      "tag": "Person 17",
+      "thumb": "https://metadata-static.plex.tv/p/17.jpg"
+     },
+     {
+      "role": "Rolle 18",
+      "tag": "Person 18",
+      "thumb": "https://metadata-static.plex.tv/p/18.jpg"
+     },
+     {
+      "role": "Rolle 19",
+      "tag": "Person 19",
+      "thumb": "https://metadata-static.plex.tv/p/19.jpg"
+     }
+    ],
+    "Similar": [
+     {
+      "guid": "plex://movie/bbbbbbbbbbbbbbbbbbbbbbbb"
+     }
+    ],
+    "Writer": [
+     {
+      "tag": "Bo Buch"
+     },
+     {
+      "tag": "Cy Feder"
+     },
+     {
+      "tag": "Di Tinte"
+     },
+     {
+      "tag": "Ed Satz"
+     }
+    ],
+    "art": "https://evil.example/x.jpg",
+    "audienceRating": 7.8,
+    "contentRating": "de/12",
+    "duration": 5460000,
+    "guid": "plex://movie/0123456789abcdef01234567",
+    "originallyAvailableAt": "2024-05-01",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "rating": 9.1,
+    "ratingKey": "0123456789abcdef01234567",
+    "studio": "Demo Studio",
+    "summary": "Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. ",
+    "tagline": "Kurz gesagt.",
+    "thumb": "https://images.plex.tv/x?token=1",
+    "title": "Bild kaputt",
+    "type": "movie",
+    "userState": false,
+    "year": 2024
+   },
+   {
+    "art": "",
+    "cast": [
+     {
+      "name": "Person 0",
+      "role": "Rolle 0",
+      "thumb": "https://metadata-static.plex.tv/p/0.jpg"
+     },
+     {
+      "name": "Person 1",
+      "role": "Rolle 1",
+      "thumb": "https://metadata-static.plex.tv/p/1.jpg"
+     },
+     {
+      "name": "Person 2",
+      "role": "Rolle 2",
+      "thumb": "https://metadata-static.plex.tv/p/2.jpg"
+     },
+     {
+      "name": "Person 3",
+      "role": "Rolle 3",
+      "thumb": "https://metadata-static.plex.tv/p/3.jpg"
+     },
+     {
+      "name": "Person 4",
+      "role": "Rolle 4",
+      "thumb": "https://metadata-static.plex.tv/p/4.jpg"
+     },
+     {
+      "name": "Person 5",
+      "role": "Rolle 5",
+      "thumb": "https://metadata-static.plex.tv/p/5.jpg"
+     },
+     {
+      "name": "Person 6",
+      "role": "Rolle 6",
+      "thumb": "https://metadata-static.plex.tv/p/6.jpg"
+     },
+     {
+      "name": "Person 7",
+      "role": "Rolle 7",
+      "thumb": "https://metadata-static.plex.tv/p/7.jpg"
+     },
+     {
+      "name": "Person 8",
+      "role": "Rolle 8",
+      "thumb": "https://metadata-static.plex.tv/p/8.jpg"
+     },
+     {
+      "name": "Person 9",
+      "role": "Rolle 9",
+      "thumb": "https://metadata-static.plex.tv/p/9.jpg"
+     },
+     {
+      "name": "Person 10",
+      "role": "Rolle 10",
+      "thumb": "https://metadata-static.plex.tv/p/10.jpg"
+     },
+     {
+      "name": "Person 11",
+      "role": "Rolle 11",
+      "thumb": "https://metadata-static.plex.tv/p/11.jpg"
+     },
+     {
+      "name": "Person 12",
+      "role": "Rolle 12",
+      "thumb": "https://metadata-static.plex.tv/p/12.jpg"
+     },
+     {
+      "name": "Person 13",
+      "role": "Rolle 13",
+      "thumb": "https://metadata-static.plex.tv/p/13.jpg"
+     },
+     {
+      "name": "Person 14",
+      "role": "Rolle 14",
+      "thumb": "https://metadata-static.plex.tv/p/14.jpg"
+     }
+    ],
+    "contentRating": "de/12",
+    "date": "2024-05-01",
+    "directors": [
+     "Rita Regie"
+    ],
+    "duration": 5460000,
+    "genres": [
+     "Drama",
+     "Krimi",
+     "Komödie",
+     "Western",
+     "Doku"
+    ],
+    "guid": "plex://movie/0123456789abcdef01234567",
+    "id": "0123456789abcdef01234567",
+    "ids": {
+     "imdb": "tt0000001",
+     "tmdb": 4242,
+     "tvdb": 77
+    },
+    "network": "",
+    "rating": 7.8,
+    "studio": "Demo Studio",
+    "summary": "Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene Geschichte. Eine erfundene ",
+    "tagline": "Kurz gesagt.",
+    "thumb": "",
+    "title": "Bild kaputt",
+    "type": "movie",
+    "writers": [
+     "Bo Buch",
+     "Cy Feder",
+     "Di Tinte"
+    ],
+    "year": 2024
+   }
+  ],
+  [
+   {
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "guid": "plex://season/0123456789abcdef01234567",
+    "originallyAvailableAt": "",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "ratingKey": "0123456789abcdef01234567",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/x0123.jpg",
+    "title": "keine Details",
+    "type": "season",
+    "userState": false,
+    "year": 2020
+   },
+   null
+  ],
+  [
+   null,
+   null
+  ]
+ ],
+ "pick": [
+  {
+   "out": [
+    {
+     "date": "2026-09-01",
+     "guid": "plex://movie/aaaaaaaaaaaaaaaaaaaaaaaa",
+     "id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xaaaa.jpg",
+     "title": "A",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-10-01",
+     "guid": "plex://show/bbbbbbbbbbbbbbbbbbbbbbbb",
+     "id": "bbbbbbbbbbbbbbbbbbbbbbbb",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xbbbb.jpg",
+     "title": "B",
+     "type": "show",
+     "year": 2020
+    },
+    {
+     "date": "2026-11-20",
+     "guid": "plex://movie/cccccccccccccccccccccccc",
+     "id": "cccccccccccccccccccccccc",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+     "title": "C",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "",
+     "guid": "plex://movie/dddddddddddddddddddddddd",
+     "id": "dddddddddddddddddddddddd",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xdddd.jpg",
+     "title": "D",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-03-01",
+     "guid": "plex://movie/0123456789abcdef01234567",
+     "id": "0123456789abcdef01234567",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/x0123.jpg",
+     "title": "E",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-10-25",
+     "guid": "plex://movie/ffffffffffffffffffffffff",
+     "id": "ffffffffffffffffffffffff",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xffff.jpg",
+     "title": "F",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-10-25",
+     "guid": "plex://movie/eeeeeeeeeeeeeeeeeeeeeeee",
+     "id": "eeeeeeeeeeeeeeeeeeeeeeee",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xeeee.jpg",
+     "title": "G",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-12-24",
+     "guid": "plex://show/999999999999999999999999",
+     "id": "999999999999999999999999",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/x9999.jpg",
+     "title": "H",
+     "type": "show",
+     "year": 2020
+    },
+    {
+     "date": "2025-12-01",
+     "guid": "plex://movie/888888888888888888888888",
+     "id": "888888888888888888888888",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/x8888.jpg",
+     "title": "I",
+     "type": "movie",
+     "year": 2020
+    }
+   ],
+   "size": 30,
+   "today": "2026-10-26",
+   "type": null,
+   "when": null
+  },
+  {
+   "out": [
+    {
+     "date": "2026-09-01",
+     "guid": "plex://movie/aaaaaaaaaaaaaaaaaaaaaaaa",
+     "id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xaaaa.jpg",
+     "title": "A",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-10-01",
+     "guid": "plex://show/bbbbbbbbbbbbbbbbbbbbbbbb",
+     "id": "bbbbbbbbbbbbbbbbbbbbbbbb",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xbbbb.jpg",
+     "title": "B",
+     "type": "show",
+     "year": 2020
+    }
+   ],
+   "size": 2,
+   "today": "2026-10-26",
+   "type": null,
+   "when": null
+  },
+  {
+   "out": [
+    {
+     "date": "2026-10-25",
+     "guid": "plex://movie/ffffffffffffffffffffffff",
+     "id": "ffffffffffffffffffffffff",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xffff.jpg",
+     "title": "F",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-10-25",
+     "guid": "plex://movie/eeeeeeeeeeeeeeeeeeeeeeee",
+     "id": "eeeeeeeeeeeeeeeeeeeeeeee",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xeeee.jpg",
+     "title": "G",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-10-01",
+     "guid": "plex://show/bbbbbbbbbbbbbbbbbbbbbbbb",
+     "id": "bbbbbbbbbbbbbbbbbbbbbbbb",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xbbbb.jpg",
+     "title": "B",
+     "type": "show",
+     "year": 2020
+    },
+    {
+     "date": "2026-09-01",
+     "guid": "plex://movie/aaaaaaaaaaaaaaaaaaaaaaaa",
+     "id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xaaaa.jpg",
+     "title": "A",
+     "type": "movie",
+     "year": 2020
+    }
+   ],
+   "size": 30,
+   "today": "2026-10-26",
+   "type": null,
+   "when": "past"
+  },
+  {
+   "out": [
+    {
+     "date": "2026-10-25",
+     "guid": "plex://movie/ffffffffffffffffffffffff",
+     "id": "ffffffffffffffffffffffff",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xffff.jpg",
+     "title": "F",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-10-25",
+     "guid": "plex://movie/eeeeeeeeeeeeeeeeeeeeeeee",
+     "id": "eeeeeeeeeeeeeeeeeeeeeeee",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xeeee.jpg",
+     "title": "G",
+     "type": "movie",
+     "year": 2020
+    }
+   ],
+   "size": 2,
+   "today": "2026-10-26",
+   "type": null,
+   "when": "past"
+  },
+  {
+   "out": [
+    {
+     "date": "2026-11-20",
+     "guid": "plex://movie/cccccccccccccccccccccccc",
+     "id": "cccccccccccccccccccccccc",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+     "title": "C",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-12-24",
+     "guid": "plex://show/999999999999999999999999",
+     "id": "999999999999999999999999",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/x9999.jpg",
+     "title": "H",
+     "type": "show",
+     "year": 2020
+    },
+    {
+     "date": "",
+     "guid": "plex://movie/dddddddddddddddddddddddd",
+     "id": "dddddddddddddddddddddddd",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xdddd.jpg",
+     "title": "D",
+     "type": "movie",
+     "year": 2020
+    }
+   ],
+   "size": 30,
+   "today": "2026-10-26",
+   "type": null,
+   "when": "future"
+  },
+  {
+   "out": [
+    {
+     "date": "2026-11-20",
+     "guid": "plex://movie/cccccccccccccccccccccccc",
+     "id": "cccccccccccccccccccccccc",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+     "title": "C",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-12-24",
+     "guid": "plex://show/999999999999999999999999",
+     "id": "999999999999999999999999",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/x9999.jpg",
+     "title": "H",
+     "type": "show",
+     "year": 2020
+    }
+   ],
+   "size": 2,
+   "today": "2026-10-26",
+   "type": null,
+   "when": "future"
+  },
+  {
+   "out": [
+    {
+     "date": "2026-09-01",
+     "guid": "plex://movie/aaaaaaaaaaaaaaaaaaaaaaaa",
+     "id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xaaaa.jpg",
+     "title": "A",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-11-20",
+     "guid": "plex://movie/cccccccccccccccccccccccc",
+     "id": "cccccccccccccccccccccccc",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+     "title": "C",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "",
+     "guid": "plex://movie/dddddddddddddddddddddddd",
+     "id": "dddddddddddddddddddddddd",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xdddd.jpg",
+     "title": "D",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-03-01",
+     "guid": "plex://movie/0123456789abcdef01234567",
+     "id": "0123456789abcdef01234567",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/x0123.jpg",
+     "title": "E",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-10-25",
+     "guid": "plex://movie/ffffffffffffffffffffffff",
+     "id": "ffffffffffffffffffffffff",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xffff.jpg",
+     "title": "F",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-10-25",
+     "guid": "plex://movie/eeeeeeeeeeeeeeeeeeeeeeee",
+     "id": "eeeeeeeeeeeeeeeeeeeeeeee",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xeeee.jpg",
+     "title": "G",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2025-12-01",
+     "guid": "plex://movie/888888888888888888888888",
+     "id": "888888888888888888888888",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/x8888.jpg",
+     "title": "I",
+     "type": "movie",
+     "year": 2020
+    }
+   ],
+   "size": 30,
+   "today": "2026-10-26",
+   "type": "movie",
+   "when": null
+  },
+  {
+   "out": [
+    {
+     "date": "2026-09-01",
+     "guid": "plex://movie/aaaaaaaaaaaaaaaaaaaaaaaa",
+     "id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xaaaa.jpg",
+     "title": "A",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-11-20",
+     "guid": "plex://movie/cccccccccccccccccccccccc",
+     "id": "cccccccccccccccccccccccc",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+     "title": "C",
+     "type": "movie",
+     "year": 2020
+    }
+   ],
+   "size": 2,
+   "today": "2026-10-26",
+   "type": "movie",
+   "when": null
+  },
+  {
+   "out": [
+    {
+     "date": "2026-10-25",
+     "guid": "plex://movie/ffffffffffffffffffffffff",
+     "id": "ffffffffffffffffffffffff",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xffff.jpg",
+     "title": "F",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-10-25",
+     "guid": "plex://movie/eeeeeeeeeeeeeeeeeeeeeeee",
+     "id": "eeeeeeeeeeeeeeeeeeeeeeee",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xeeee.jpg",
+     "title": "G",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-09-01",
+     "guid": "plex://movie/aaaaaaaaaaaaaaaaaaaaaaaa",
+     "id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xaaaa.jpg",
+     "title": "A",
+     "type": "movie",
+     "year": 2020
+    }
+   ],
+   "size": 30,
+   "today": "2026-10-26",
+   "type": "movie",
+   "when": "past"
+  },
+  {
+   "out": [
+    {
+     "date": "2026-10-25",
+     "guid": "plex://movie/ffffffffffffffffffffffff",
+     "id": "ffffffffffffffffffffffff",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xffff.jpg",
+     "title": "F",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "2026-10-25",
+     "guid": "plex://movie/eeeeeeeeeeeeeeeeeeeeeeee",
+     "id": "eeeeeeeeeeeeeeeeeeeeeeee",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xeeee.jpg",
+     "title": "G",
+     "type": "movie",
+     "year": 2020
+    }
+   ],
+   "size": 2,
+   "today": "2026-10-26",
+   "type": "movie",
+   "when": "past"
+  },
+  {
+   "out": [
+    {
+     "date": "2026-11-20",
+     "guid": "plex://movie/cccccccccccccccccccccccc",
+     "id": "cccccccccccccccccccccccc",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+     "title": "C",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "",
+     "guid": "plex://movie/dddddddddddddddddddddddd",
+     "id": "dddddddddddddddddddddddd",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xdddd.jpg",
+     "title": "D",
+     "type": "movie",
+     "year": 2020
+    }
+   ],
+   "size": 30,
+   "today": "2026-10-26",
+   "type": "movie",
+   "when": "future"
+  },
+  {
+   "out": [
+    {
+     "date": "2026-11-20",
+     "guid": "plex://movie/cccccccccccccccccccccccc",
+     "id": "cccccccccccccccccccccccc",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+     "title": "C",
+     "type": "movie",
+     "year": 2020
+    },
+    {
+     "date": "",
+     "guid": "plex://movie/dddddddddddddddddddddddd",
+     "id": "dddddddddddddddddddddddd",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xdddd.jpg",
+     "title": "D",
+     "type": "movie",
+     "year": 2020
+    }
+   ],
+   "size": 2,
+   "today": "2026-10-26",
+   "type": "movie",
+   "when": "future"
+  },
+  {
+   "out": [
+    {
+     "date": "2026-10-01",
+     "guid": "plex://show/bbbbbbbbbbbbbbbbbbbbbbbb",
+     "id": "bbbbbbbbbbbbbbbbbbbbbbbb",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xbbbb.jpg",
+     "title": "B",
+     "type": "show",
+     "year": 2020
+    },
+    {
+     "date": "2026-12-24",
+     "guid": "plex://show/999999999999999999999999",
+     "id": "999999999999999999999999",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/x9999.jpg",
+     "title": "H",
+     "type": "show",
+     "year": 2020
+    }
+   ],
+   "size": 30,
+   "today": "2026-10-26",
+   "type": "show",
+   "when": null
+  },
+  {
+   "out": [
+    {
+     "date": "2026-10-01",
+     "guid": "plex://show/bbbbbbbbbbbbbbbbbbbbbbbb",
+     "id": "bbbbbbbbbbbbbbbbbbbbbbbb",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xbbbb.jpg",
+     "title": "B",
+     "type": "show",
+     "year": 2020
+    },
+    {
+     "date": "2026-12-24",
+     "guid": "plex://show/999999999999999999999999",
+     "id": "999999999999999999999999",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/x9999.jpg",
+     "title": "H",
+     "type": "show",
+     "year": 2020
+    }
+   ],
+   "size": 2,
+   "today": "2026-10-26",
+   "type": "show",
+   "when": null
+  },
+  {
+   "out": [
+    {
+     "date": "2026-10-01",
+     "guid": "plex://show/bbbbbbbbbbbbbbbbbbbbbbbb",
+     "id": "bbbbbbbbbbbbbbbbbbbbbbbb",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xbbbb.jpg",
+     "title": "B",
+     "type": "show",
+     "year": 2020
+    }
+   ],
+   "size": 30,
+   "today": "2026-10-26",
+   "type": "show",
+   "when": "past"
+  },
+  {
+   "out": [
+    {
+     "date": "2026-10-01",
+     "guid": "plex://show/bbbbbbbbbbbbbbbbbbbbbbbb",
+     "id": "bbbbbbbbbbbbbbbbbbbbbbbb",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/xbbbb.jpg",
+     "title": "B",
+     "type": "show",
+     "year": 2020
+    }
+   ],
+   "size": 2,
+   "today": "2026-10-26",
+   "type": "show",
+   "when": "past"
+  },
+  {
+   "out": [
+    {
+     "date": "2026-12-24",
+     "guid": "plex://show/999999999999999999999999",
+     "id": "999999999999999999999999",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/x9999.jpg",
+     "title": "H",
+     "type": "show",
+     "year": 2020
+    }
+   ],
+   "size": 30,
+   "today": "2026-10-26",
+   "type": "show",
+   "when": "future"
+  },
+  {
+   "out": [
+    {
+     "date": "2026-12-24",
+     "guid": "plex://show/999999999999999999999999",
+     "id": "999999999999999999999999",
+     "summary": "Eine erfundene Geschichte.",
+     "thumb": "https://image.tmdb.org/t/p/original/x9999.jpg",
+     "title": "H",
+     "type": "show",
+     "year": 2020
+    }
+   ],
+   "size": 2,
+   "today": "2026-10-26",
+   "type": "show",
+   "when": "future"
+  }
+ ],
+ "pick_items": [
+  {
+   "date": "2026-09-01",
+   "guid": "plex://movie/aaaaaaaaaaaaaaaaaaaaaaaa",
+   "id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+   "summary": "Eine erfundene Geschichte.",
+   "thumb": "https://image.tmdb.org/t/p/original/xaaaa.jpg",
+   "title": "A",
+   "type": "movie",
+   "year": 2020
+  },
+  {
+   "date": "2026-10-01",
+   "guid": "plex://show/bbbbbbbbbbbbbbbbbbbbbbbb",
+   "id": "bbbbbbbbbbbbbbbbbbbbbbbb",
+   "summary": "Eine erfundene Geschichte.",
+   "thumb": "https://image.tmdb.org/t/p/original/xbbbb.jpg",
+   "title": "B",
+   "type": "show",
+   "year": 2020
+  },
+  {
+   "date": "2026-11-20",
+   "guid": "plex://movie/cccccccccccccccccccccccc",
+   "id": "cccccccccccccccccccccccc",
+   "summary": "Eine erfundene Geschichte.",
+   "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+   "title": "C",
+   "type": "movie",
+   "year": 2020
+  },
+  {
+   "date": "",
+   "guid": "plex://movie/dddddddddddddddddddddddd",
+   "id": "dddddddddddddddddddddddd",
+   "summary": "Eine erfundene Geschichte.",
+   "thumb": "https://image.tmdb.org/t/p/original/xdddd.jpg",
+   "title": "D",
+   "type": "movie",
+   "year": 2020
+  },
+  {
+   "date": "2026-03-01",
+   "guid": "plex://movie/0123456789abcdef01234567",
+   "id": "0123456789abcdef01234567",
+   "summary": "Eine erfundene Geschichte.",
+   "thumb": "https://image.tmdb.org/t/p/original/x0123.jpg",
+   "title": "E",
+   "type": "movie",
+   "year": 2020
+  },
+  {
+   "date": "2026-09-02",
+   "guid": "plex://movie/aaaaaaaaaaaaaaaaaaaaaaaa",
+   "id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+   "summary": "Eine erfundene Geschichte.",
+   "thumb": "https://image.tmdb.org/t/p/original/xaaaa.jpg",
+   "title": "A doppelt",
+   "type": "movie",
+   "year": 2020
+  },
+  {
+   "date": "2026-10-25",
+   "guid": "plex://movie/ffffffffffffffffffffffff",
+   "id": "ffffffffffffffffffffffff",
+   "summary": "Eine erfundene Geschichte.",
+   "thumb": "https://image.tmdb.org/t/p/original/xffff.jpg",
+   "title": "F",
+   "type": "movie",
+   "year": 2020
+  },
+  {
+   "date": "2026-10-25",
+   "guid": "plex://movie/eeeeeeeeeeeeeeeeeeeeeeee",
+   "id": "eeeeeeeeeeeeeeeeeeeeeeee",
+   "summary": "Eine erfundene Geschichte.",
+   "thumb": "https://image.tmdb.org/t/p/original/xeeee.jpg",
+   "title": "G",
+   "type": "movie",
+   "year": 2020
+  },
+  {
+   "date": "2026-12-24",
+   "guid": "plex://show/999999999999999999999999",
+   "id": "999999999999999999999999",
+   "summary": "Eine erfundene Geschichte.",
+   "thumb": "https://image.tmdb.org/t/p/original/x9999.jpg",
+   "title": "H",
+   "type": "show",
+   "year": 2020
+  },
+  {
+   "date": "2025-12-01",
+   "guid": "plex://movie/888888888888888888888888",
+   "id": "888888888888888888888888",
+   "summary": "Eine erfundene Geschichte.",
+   "thumb": "https://image.tmdb.org/t/p/original/x8888.jpg",
+   "title": "I",
+   "type": "movie",
+   "year": 2020
+  }
+ ],
+ "safe_img": [
+  [
+   "https://image.tmdb.org/t/p/original/x.jpg",
+   "https://image.tmdb.org/t/p/original/x.jpg"
+  ],
+  [
+   "https://images.plex.tv/photo?size=medium&url=x",
+   "https://images.plex.tv/photo?size=medium&url=x"
+  ],
+  [
+   "https://metadata-static.plex.tv/a/b.jpg",
+   "https://metadata-static.plex.tv/a/b.jpg"
+  ],
+  [
+   "https://artworks.thetvdb.com/banners/x.jpg",
+   "https://artworks.thetvdb.com/banners/x.jpg"
+  ],
+  [
+   "https://IMAGE.TMDB.ORG/t/p/x.jpg",
+   "https://IMAGE.TMDB.ORG/t/p/x.jpg"
+  ],
+  [
+   "http://image.tmdb.org/t/p/x.jpg",
+   ""
+  ],
+  [
+   "https://evil.example.net/x.jpg",
+   ""
+  ],
+  [
+   "https://image.tmdb.org.evil.example.net/x.jpg",
+   ""
+  ],
+  [
+   "https://image.tmdb.org:8443/x.jpg",
+   ""
+  ],
+  [
+   "https://u:@image.tmdb.org/x.jpg",
+   ""
+  ],
+  [
+   "https://images.plex.tv/photo?X-Plex-Token=abc",
+   ""
+  ],
+  [
+   "https://images.plex.tv/photo?url=x&TOKEN=1",
+   ""
+  ],
+  [
+   "https://image.tmdb.org/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   ""
+  ],
+  [
+   "https://image.tmdb.org/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "https://image.tmdb.org/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  ],
+  [
+   "javascript:alert(1)",
+   ""
+  ],
+  [
+   "",
+   ""
+  ],
+  [
+   null,
+   ""
+  ],
+  [
+   42,
+   ""
+  ],
+  [
+   "https://image.tmdb.org/x.jpg#frag",
+   "https://image.tmdb.org/x.jpg#frag"
+  ],
+  [
+   "https://metadata-static.plex.tv",
+   "https://metadata-static.plex.tv"
+  ]
+ ],
+ "slim": [
+  [
+   {
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "guid": "plex://movie/aaaaaaaaaaaaaaaaaaaaaaaa",
+    "originallyAvailableAt": "2026-09-01",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "ratingKey": "aaaaaaaaaaaaaaaaaaaaaaaa",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/xaaaa.jpg",
+    "title": "Film A",
+    "type": "movie",
+    "userState": false,
+    "year": 2020
+   },
+   {
+    "date": "2026-09-01",
+    "guid": "plex://movie/aaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/xaaaa.jpg",
+    "title": "Film A",
+    "type": "movie",
+    "year": 2020
+   }
+  ],
+  [
+   {
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "guid": "plex://show/bbbbbbbbbbbbbbbbbbbbbbbb",
+    "originallyAvailableAt": "2021-01-08",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "ratingKey": "bbbbbbbbbbbbbbbbbbbbbbbb",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/xbbbb.jpg",
+    "title": "Serie B",
+    "type": "show",
+    "userState": false,
+    "year": 2021
+   },
+   {
+    "date": "2021-01-08",
+    "guid": "plex://show/bbbbbbbbbbbbbbbbbbbbbbbb",
+    "id": "bbbbbbbbbbbbbbbbbbbbbbbb",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/xbbbb.jpg",
+    "title": "Serie B",
+    "type": "show",
+    "year": 2021
+   }
+  ],
+  [
+   {
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "guid": "plex://movie/cccccccccccccccccccccccc",
+    "originallyAvailableAt": "",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "ratingKey": "cccccccccccccccccccccccc",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+    "title": "Film C",
+    "type": "movie",
+    "userState": false,
+    "year": 1799
+   },
+   {
+    "date": "",
+    "guid": "plex://movie/cccccccccccccccccccccccc",
+    "id": "cccccccccccccccccccccccc",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+    "title": "Film C",
+    "type": "movie",
+    "year": 0
+   }
+  ],
+  [
+   {
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "guid": "plex://movie/cccccccccccccccccccccccc",
+    "originallyAvailableAt": "",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "ratingKey": "cccccccccccccccccccccccc",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+    "title": "Film C",
+    "type": "movie",
+    "userState": false,
+    "year": 2200
+   },
+   {
+    "date": "",
+    "guid": "plex://movie/cccccccccccccccccccccccc",
+    "id": "cccccccccccccccccccccccc",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+    "title": "Film C",
+    "type": "movie",
+    "year": 0
+   }
+  ],
+  [
+   {
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "guid": "plex://movie/cccccccccccccccccccccccc",
+    "originallyAvailableAt": "",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "ratingKey": "cccccccccccccccccccccccc",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+    "title": "Film C",
+    "type": "movie",
+    "userState": false,
+    "year": true
+   },
+   {
+    "date": "",
+    "guid": "plex://movie/cccccccccccccccccccccccc",
+    "id": "cccccccccccccccccccccccc",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+    "title": "Film C",
+    "type": "movie",
+    "year": 0
+   }
+  ],
+  [
+   {
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "guid": "plex://movie/cccccccccccccccccccccccc",
+    "originallyAvailableAt": "",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "ratingKey": "cccccccccccccccccccccccc",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+    "title": "Film C",
+    "type": "movie",
+    "userState": false,
+    "year": "2020"
+   },
+   {
+    "date": "",
+    "guid": "plex://movie/cccccccccccccccccccccccc",
+    "id": "cccccccccccccccccccccccc",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+    "title": "Film C",
+    "type": "movie",
+    "year": 0
+   }
+  ],
+  [
+   {
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "guid": "plex://movie/cccccccccccccccccccccccc",
+    "originallyAvailableAt": "",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "ratingKey": "cccccccccccccccccccccccc",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+    "title": "Film C",
+    "type": "movie",
+    "userState": false,
+    "year": 2020.5
+   },
+   {
+    "date": "",
+    "guid": "plex://movie/cccccccccccccccccccccccc",
+    "id": "cccccccccccccccccccccccc",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/xcccc.jpg",
+    "title": "Film C",
+    "type": "movie",
+    "year": 0
+   }
+  ],
+  [
+   {
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "guid": "plex://movie/dddddddddddddddddddddddd",
+    "originallyAvailableAt": "",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "ratingKey": "dddddddddddddddddddddddd",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "http://evil.example/p.jpg",
+    "title": "Bad thumb",
+    "type": "movie",
+    "userState": false,
+    "year": 2020
+   },
+   {
+    "date": "",
+    "guid": "plex://movie/dddddddddddddddddddddddd",
+    "id": "dddddddddddddddddddddddd",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "",
+    "title": "Bad thumb",
+    "type": "movie",
+    "year": 2020
+   }
+  ],
+  [
+   {
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "guid": "plex://movie/dddddddddddddddddddddddd",
+    "originallyAvailableAt": "",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "ratingKey": "dddddddddddddddddddddddd",
+    "summary": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
+    "thumb": "https://image.tmdb.org/t/p/original/xdddd.jpg",
+    "title": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+    "type": "movie",
+    "userState": false,
+    "year": 2020
+   },
+   {
+    "date": "",
+    "guid": "plex://movie/dddddddddddddddddddddddd",
+    "id": "dddddddddddddddddddddddd",
+    "summary": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
+    "thumb": "https://image.tmdb.org/t/p/original/xdddd.jpg",
+    "title": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+    "type": "movie",
+    "year": 2020
+   }
+  ],
+  [
+   {
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "guid": "plex://movie/dddddddddddddddddddddddd",
+    "originallyAvailableAt": "",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "ratingKey": "dddddddddddddddddddddddd",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/xdddd.jpg",
+    "title": "",
+    "type": "movie",
+    "userState": false,
+    "year": 2020
+   },
+   null
+  ],
+  [
+   {
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "guid": "plex://show/dddddddddddddddddddddddd",
+    "originallyAvailableAt": "",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "ratingKey": "dddddddddddddddddddddddd",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/xdddd.jpg",
+    "title": "Typ falsch",
+    "type": "movie",
+    "userState": false,
+    "year": 2020
+   },
+   null
+  ],
+  [
+   {
+    "guid": "plex://season/dddddddddddddddddddddddd",
+    "title": "Staffel",
+    "type": "season"
+   },
+   null
+  ],
+  [
+   {
+    "guid": "plex://movie/dddddddddddddddddddd",
+    "title": "kurz",
+    "type": "movie"
+   },
+   null
+  ],
+  [
+   {
+    "guid": "com.plexapp.agents.imdb://tt1",
+    "title": "Alt",
+    "type": "movie"
+   },
+   null
+  ],
+  [
+   {
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "guid": "plex://movie/0123456789abcdef01234567",
+    "originallyAvailableAt": "2026-9-1",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "ratingKey": "0123456789abcdef01234567",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/x0123.jpg",
+    "title": "Datum kaputt",
+    "type": "movie",
+    "userState": false,
+    "year": 2020
+   },
+   {
+    "date": "",
+    "guid": "plex://movie/0123456789abcdef01234567",
+    "id": "0123456789abcdef01234567",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/x0123.jpg",
+    "title": "Datum kaputt",
+    "type": "movie",
+    "year": 2020
+   }
+  ],
+  [
+   {
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "guid": "plex://movie/0123456789abcdef01234567",
+    "originallyAvailableAt": "2026-09-01T00:00:00Z",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "ratingKey": "0123456789abcdef01234567",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/x0123.jpg",
+    "title": "Datum mit Zeit",
+    "type": "movie",
+    "userState": false,
+    "year": 2020
+   },
+   {
+    "date": "",
+    "guid": "plex://movie/0123456789abcdef01234567",
+    "id": "0123456789abcdef01234567",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/x0123.jpg",
+    "title": "Datum mit Zeit",
+    "type": "movie",
+    "year": 2020
+   }
+  ],
+  [
+   {
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "guid": "plex://movie/0123456789abcdef01234567",
+    "originallyAvailableAt": 20260901,
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "ratingKey": "0123456789abcdef01234567",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/x0123.jpg",
+    "title": "Datum Zahl",
+    "type": "movie",
+    "userState": false,
+    "year": 2020
+   },
+   {
+    "date": "",
+    "guid": "plex://movie/0123456789abcdef01234567",
+    "id": "0123456789abcdef01234567",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/x0123.jpg",
+    "title": "Datum Zahl",
+    "type": "movie",
+    "year": 2020
+   }
+  ],
+  [
+   {
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "guid": "plex://movie/0123456789abcdef01234567",
+    "originallyAvailableAt": "",
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "ratingKey": "0123456789abcdef01234567",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/x0123.jpg",
+    "title": 5,
+    "type": "movie",
+    "userState": false,
+    "year": 2020
+   },
+   null
+  ],
+  [
+   {
+    "Media": [
+     {
+      "url": "https://vod.example/streams/main.m3u8"
+     }
+    ],
+    "guid": "plex://movie/0123456789abcdef01234567",
+    "originallyAvailableAt": null,
+    "publicPagesURL": "https://watch.plex.tv/x",
+    "ratingKey": "0123456789abcdef01234567",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/x0123.jpg",
+    "title": "kein Datum",
+    "type": "movie",
+    "userState": false,
+    "year": 2020
+   },
+   {
+    "date": "",
+    "guid": "plex://movie/0123456789abcdef01234567",
+    "id": "0123456789abcdef01234567",
+    "summary": "Eine erfundene Geschichte.",
+    "thumb": "https://image.tmdb.org/t/p/original/x0123.jpg",
+    "title": "kein Datum",
+    "type": "movie",
+    "year": 2020
+   }
+  ],
+  [
+   "kein Objekt",
+   null
+  ],
+  [
+   null,
+   null
+  ],
+  [
+   [
+    1,
+    2
+   ],
+   null
+  ]
+ ],
+ "state": [
+  [
+   {
+    "MediaContainer": {
+     "UserState": [
+      {
+       "ratingKey": "aaaaaaaaaaaaaaaaaaaaaaaa",
+       "watchlistedAt": 1
+      },
+      {
+       "ratingKey": "bbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      {
+       "ratingKey": "ffffffffffffffffffffffff",
+       "watchlistedAt": 1
+      }
+     ]
+    }
+   },
+   [
+    "aaaaaaaaaaaaaaaaaaaaaaaa",
+    "bbbbbbbbbbbbbbbbbbbbbbbb",
+    "cccccccccccccccccccccccc"
+   ],
+   {
+    "ids": {
+     "aaaaaaaaaaaaaaaaaaaaaaaa": true,
+     "bbbbbbbbbbbbbbbbbbbbbbbb": false,
+     "cccccccccccccccccccccccc": false
+    }
+   }
+  ],
+  [
+   {
+    "MediaContainer": {
+     "UserState": {
+      "ratingKey": "aaaaaaaaaaaaaaaaaaaaaaaa",
+      "watchlistedAt": 17
+     }
+    }
+   },
+   [
+    "aaaaaaaaaaaaaaaaaaaaaaaa"
+   ],
+   {
+    "ids": {
+     "aaaaaaaaaaaaaaaaaaaaaaaa": true
+    }
+   }
+  ],
+  [
+   {
+    "MediaContainer": {}
+   },
+   [
+    "aaaaaaaaaaaaaaaaaaaaaaaa"
+   ],
+   {
+    "ids": {
+     "aaaaaaaaaaaaaaaaaaaaaaaa": false
+    }
+   }
+  ],
+  [
+   {
+    "MediaContainer": {
+     "UserState": "kaputt"
+    }
+   },
+   [
+    "aaaaaaaaaaaaaaaaaaaaaaaa",
+    "bbbbbbbbbbbbbbbbbbbbbbbb"
+   ],
+   {
+    "ids": {
+     "aaaaaaaaaaaaaaaaaaaaaaaa": false,
+     "bbbbbbbbbbbbbbbbbbbbbbbb": false
+    }
+   }
+  ]
+ ]
+}

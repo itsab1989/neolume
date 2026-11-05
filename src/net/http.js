@@ -69,6 +69,7 @@
           cur = null; finishSlot();
           if (aborted) return;
           if (err && retryable(err) && tries < maxRetries) {
+            if (typeof o.resign === 'function') o.headers = o.resign();   // Helfer-Signatur: je Versuch eine neue Nonce (sonst "replay")
             retryT = timers.set(function () { retryT = 0; go(); }, DELAYS[Math.min(tries, DELAYS.length - 1)]);
             tries++;
             return;

@@ -13,7 +13,9 @@
     /* -> {title, text} ; p: {server, n} */
     texts: function (kind, p, kids) {
       p = p || {};
-      var text = N.t('err.' + kind + '.text', { server: p.server || '', n: p.n === undefined ? '' : p.n });
+      // Hilfsdienst ohne bekannte Adresse (z. B. Paket ohne proxyHost): Satz ohne Adresse statt "auf dem ." (TV-Befund 05.11.)
+      var key = kind === 'proxy' && !p.server ? 'err.proxy.textNoHost' : 'err.' + kind + '.text';
+      var text = N.t(key, { server: p.server || '', n: p.n === undefined ? '' : p.n });
       if (kids && ADULT[kind]) text += ' ' + N.t('kids.askAdult');
       return { title: N.t('err.' + kind + '.title'), text: text };
     },

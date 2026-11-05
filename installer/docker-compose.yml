@@ -6,7 +6,8 @@ services:
   neolume-helper:
     image: ghcr.io/itsab1989/neolume-setup:latest   # <APP_SLUG>-setup; pin a version tag instead of latest if you like
     container_name: neolume-helper
-    network_mode: host                # required: the helper must see the TV's real IP (LAN-only checks); uses port 32499
+    network_mode: host                # required: the helper must see the TV's real IP (LAN-only checks); uses port 32499.
+                                      # Without it (bridge) the helper logs "Docker bridge mode" and the TV asks for host networking
     restart: unless-stopped
     user: "1026:100"                  # your NAS user:group id (Synology: run "id" via SSH); must be able to read helper.json
     volumes:

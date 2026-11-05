@@ -57,8 +57,9 @@
     else if (entry.scr && entry.scr.stale && entry.scr.el.style.display === 'none' && entry.scr.stale()) kill(entry);
     var scr = entry.scr || build(entry);
     scr.el.style.display = '';
-    paintCard();
+    paintCard(scr);
     if (scr.enter) scr.enter(entry.params, entry.restore || null);
+    if (entry.card && N.ui.card.held) N.ui.card.go(scr.cardWait);   // frische Karte: gleitet, sobald ihr Bild bereit ist (DET-21)
     syncChrome();
   }
   function top() { return stack.length ? stack[stack.length - 1] : null; }
@@ -74,14 +75,14 @@
   }
   function cardDepth() { var t = stack.length - 1; return t >= 0 && stack[t].card ? t - cardBase() : 0; }
   /* Sichtbarkeit nach jeder Stapel-Aenderung: oben eine Karte -> Karte + Ansicht darunter sichtbar, sonst Karte zu */
-  function paintCard() {
+  function paintCard(scr) {
     var C = N.ui.card;
     if (!C || !C.el) return;
     var d = cardDepth(), b = cardBase();
     if (d) {
       if (stack[b] && stack[b].scr) stack[b].scr.el.style.display = '';
       C.button(d > 1 ? 'back' : 'x');
-      C.show(!C.shown);
+      C.show(!C.shown, !!(scr && scr.cardWait && stack[stack.length - 1].scr === scr));
     } else {
       if (C.shown) C.hide(false);
       for (var i = 0; i < stack.length - 1; i++) if (stack[i].scr) stack[i].scr.el.style.display = 'none';   // z. B. Player ueber der Karte

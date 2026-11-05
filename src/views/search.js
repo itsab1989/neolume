@@ -50,6 +50,10 @@
     var q = '', t9 = new S.T9(), t9T = 0, reqT = 0, task = null, cache = new N.LRU(20), shownQ = null, zone = 'kbd', rf = 0, ring, off = 0, dead = false, away = false, sugg = [], wlTask = null;
     var recPos = [], recN = 0, recLines = 0, recList = [], clrEl, wCache = {}, clrW = 0;   // Chip-Raster (S.pack), gezeigte Begriffe, gemessene Breiten
     var fl = null, winT = -2;                         // freies Scrollen der Ergebnisse (Finger/Trackpad, NAV-20; am TV nie)
+    /* Reihen frei wie auf der Startseite (caps.scroll 'free', Nutzerbefund 05.11.: vorher Rueckfall auf Fokus-Schritte nach dem Abheben):
+     * Row mit free, ein N.kinetic.Drive je Slot (rdrv), rpan = laufender waagerechter Zug, reat = Klick nach Stopp verschlucken,
+     * wAx/wT = Achse der laufenden Rad-Geste (150 ms Pause) */
+    var RFREE = N.platform.caps.scroll === 'free', rdrv = [], rpan = null, reat = false, wAx = '', wT = 0;
     var slotGroup = [], colMem = {}, emptyY = HEAD_Y, emptyRec = 0, wlGroup = null, inspIds = [], inspRows = {}, inspTask = null, pendingEmpty = false, onWl = null, wlDirty = false;   // colMem: Spalte je Gruppen-id
 
     /* ---------- Aufbau ---------- */
@@ -82,7 +86,9 @@
       stateX = U.txt('div', 'a t-body c2', root, '', 'left:' + RX0 + 'px;top:' + (Y0 + 48) + 'px;width:' + sx + 'px');
       tipT = U.txt('div', 'a t-small c2', root, '', 'left:' + RX0 + 'px;top:' + (Y0 + 132) + 'px;width:' + sx + 'px');
       for (i = 0; i < NS; i++) {
-        var sl = new N.ui.Row(resPg, FX ? { caption: S.caption, w: RW, geom: rGeom } : { caption: S.caption });
+        var ro = FX ? { caption: S.caption, w: RW, geom: rGeom } : { caption: S.caption };
+        if (RFREE) ro.free = true;                    // nur Apple: Pool fuer angeschnittene Karten beim Zug (TV unveraendert)
+        var sl = new N.ui.Row(resPg, ro);
         if (FX) { sl.el.style.left = RES_X + 'px'; sl.el.style.width = RW + 'px'; }
         slots.push(sl); slotGroup.push(-1);
       }
@@ -382,6 +388,7 @@
     }
     function layout(ys) {
       if (fl) { fl.reset(); winT = -2; }
+      stopRows(); rpan = null;
       tops = ys; colMem = {};
       for (var i = 0; i < slots.length; i++) { slots[i].clear(); slots[i].setVisible(false); slotGroup[i] = -1; }
       g = Math.min(g, Math.max(0, groups.length - 1));
@@ -409,6 +416,7 @@
         var gi = slotGroup[k], ni = lo + ((k - lo % NS) + NS) % NS;   // Gruppe, die dieser Slot im Fenster bekommt
         if (gi >= 0 && (gi < lo || gi > hi || !groups[gi])) {
           if (slots[k].model) colMem[slots[k].model.id] = slots[k].f;
+          if (rdrv[k]) rdrv[k].stop();                // Slot bekommt eine andere Gruppe: Schwung der alten Reihe endet
           if (ni <= hi && groups[ni]) { slotGroup[k] = -1; continue; }   // wird gleich neu belegt: nicht leeren/verstecken
           slots[k].clear(); slots[k].setVisible(false); slotGroup[k] = -1;
         }
@@ -418,6 +426,7 @@
         if (slotGroup[i % NS] !== i || sl.model !== groups[i]) {
           if (sl.model && slotGroup[i % NS] >= 0) colMem[sl.model.id] = sl.f;
           sl.focused = false;                         // recycelter Slot (nicht geleert): alter Fokus gilt nicht mehr
+          if (rdrv[i % NS]) rdrv[i % NS].stop();
           sl.setModel(groups[i], colMem[groups[i].id] || 0, i === c ? 0 : i === c + 1 ? 1 : 2); slotGroup[i % NS] = i;
           if (zone === 'res' && i === g) sl.setFocused(true);
         }
@@ -440,7 +449,13 @@
     }
     /* erste Taste nach freiem Scrollen: zurueck ins Tasten-Raster; in den Ergebnissen Fokus auf die oberste Reihe im Bild. true = verbraucht */
     function unfree(k) {
-      if (!fl || !fl.keys()) return false;
+      var rw = rowsFix();
+      if (!fl || !fl.keys()) {
+        if (!rw || zone !== 'res' || !hasSlot(g)) return false;
+        placeRing(slotOf(g).ringPos());               // Fokusreihe stand frei: Fokus jetzt auf ihrer ersten ganz sichtbaren Karte
+        N.idle.add(function () { N.router.refreshHints(); }, 'search-hints');
+        return N.keys.isNav(k) || k === 'ENTER';
+      }
       winT = -2;
       var t = topIdx();
       if (zone === 'res' || zone === 'recent') {
@@ -451,10 +466,85 @@
       setOff(t < 0 || STK ? 0 : Math.max(0, tops[t] - TOPY), true);   // Tastatur hat den Fokus: Seite nur einrasten (schmal: Tastatur zeigen)
       return false;
     }
+    /* Reihen (waagerecht) frei wie auf der Startseite: folgt dem Finger 1:1, Schwung, Gummiband an den Enden (N.kinetic.Drive je
+     * Slot, ein Transform je Frame, keine Layout-Abfragen). Erste Taste danach: Reihe zurueck ins Raster (rowsFix). */
+    function stopRows() { var m = false; for (var k = 0; k < rdrv.length; k++) if (rdrv[k] && rdrv[k].stop()) m = true; return m; }
+    function rowsFix() {
+      var m = stopRows();
+      for (var k = 0; k < NS; k++) { var sl = slots[k]; if (sl.free && slotGroup[k] >= 0) { sl.fix(sl.anchorCol()); m = true; } }
+      rpan = null;
+      return m;
+    }
+    function drvRow(k) {
+      if (!rdrv[k]) {
+        var sl = slots[k];
+        rdrv[k] = new N.kinetic.Drive({ dim: FX ? RW : 1280, get: function () { return sl.curPx(); }, max: function () { return sl.maxPx(); },
+          set: function (p) { if (N.idle) N.idle.touch(); sl.setPx(p); rowMoved(k); } });
+      }
+      return rdrv[k];
+    }
+    /* Maus/Trackpad (Nr. 29): Ring faehrt mit der Fokuskarte; links unter die Inhaltskante gewandert -> verbergen (laege sonst ueber
+     * der Tastatur); Treffer unter dem stehenden Zeiger neu bestimmen. Bei Finger ist kein Ring zu sehen. */
+    function rowMoved(k) {
+      if (N.input.mode !== 'pointer') return;
+      if (zone === 'res' && slotGroup[k] === g) {
+        var p = slots[k].ringPos();
+        if (p.x < 128) ring.hide(); else { N.fx.step(true); placeRing(p); }
+      }
+      if (N.pointer && N.pointer.follow) N.pointer.follow();
+    }
+    /* Gruppe mit Karten unter dem Punkt (ganze Reihenhoehe: Kopf, Karten, Beschriftung), rechts neben der Tastatur; -1 = keine */
+    function rowAt(x, y) {
+      if (x < RX0 || y < CLIP_Y) return -1;
+      for (var gi = 0; gi < groups.length; gi++) {
+        if (!hasSlot(gi) || !canFocus(gi)) continue;
+        var t = tops[gi] - off;
+        if (y >= t && y < t + (PITCH[groups[gi].kind] || 316)) return gi;
+      }
+      return -1;
+    }
+    function rowHit(R, x) { return R.free ? R.hitAny(x - RES_X) : R.hit(x - RES_X); }   // frei: auch angeschnittene Karten
     s.scrollTop = function () { if (!fl.free) fl.sync(off); return fl.top(); };   // An den Anfang (Tipp ganz oben / Cmd+Pfeil hoch)
-    s.pan = function (e) { if (e.phase === 'start' && !fl.free) fl.sync(off); return fl.pan(e); };
-    s.wheel = function (x, y, dx, dy) { if (!fl.free) fl.sync(off); return fl.wheel(x, y, dy); };
-    s.pointerDown = function () { fl.down(); };
+    /* Wischen: senkrecht = Seite (N.ui.freeList), waagerecht = Reihe unter dem Finger; waagerecht ausserhalb einer Reihe (Tastatur,
+     * Luecke) annehmen und nichts tun – Wischen ist nie ein Fokus-Schritt (Rueckfall nur ohne N.kinetic) */
+    s.pan = function (e) {
+      if (e.phase === 'start') {
+        rpan = null; reat = false;
+        if (e.axis === 'x' && RFREE && N.kinetic) {
+          stopRows(); if (fl.free) fl.settle();
+          var gi = rowAt(e.x, e.y);
+          rpan = { d: null, last: 0 };
+          if (gi >= 0) { var sl = slotOf(gi); if (sl.pend) sl.render(1, 1); rpan.d = drvRow(gi % NS); rpan.d.grab(e.t); }
+          return true;
+        }
+        stopRows();
+        if (!fl.free) fl.sync(off);
+        return fl.pan(e);
+      }
+      if (!rpan) return fl.pan(e);
+      var p = rpan, d = -(e.dx - p.last);             // Finger nach links -> Inhalt nach links (Lage waechst)
+      p.last = e.dx;
+      if (e.phase === 'move') { if (p.d) p.d.move(d, e.t); return true; }
+      rpan = null;                                    // end
+      if (p.d) p.d.up(e.t, e.cancel);
+      return true;
+    };
+    /* Rad/Trackpad (Mac, iPad mit Trackpad): Achse je Geste fest (150 ms Pause); waagerecht rollt die Reihe unter dem Zeiger direkt
+     * in px (das System liefert den Schwung), senkrecht die Seite */
+    s.wheel = function (x, y, dx, dy) {
+      var now = U.now();
+      if (now - wT > 150 || !wAx) wAx = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      wT = now;
+      if (wAx === 'x' && RFREE && N.kinetic) {
+        reat = false;
+        var gi = rowAt(x, y);
+        if (gi >= 0) drvRow(gi % NS).nudge(dx);
+        return true;
+      }
+      if (!fl.free) fl.sync(off);
+      return fl.wheel(x, y, dy);
+    };
+    s.pointerDown = function () { var m = stopRows(); if (!fl.down() && m) reat = true; };   // Beruehrung haelt jeden Schwung an
 
     /* ---------- Fokus ---------- */
     function placeRing(p) { if (p) ring.to(p.shape, p.x + RES_X, p.y - off); }
@@ -557,6 +647,7 @@
       if (inspTask) inspTask.abort();
       if (onWl) N.evt.off('watchlist:changed', onWl);
       if (reqT) clearTimeout(reqT); if (t9T) clearTimeout(t9T);
+      stopRows();
       for (var i = 0; i < slots.length; i++) slots[i].clear();
     };
     s.railBlur = function () { ring.hide(); if (zone === 'kbd') U.cls(keys[pos.r][pos.c], 'is-focus', false); };
@@ -642,12 +733,13 @@
     function reveal(i, x) {
       N.fx.step(true);
       toGroup(i);                                     // Reihe nach oben holen (wie ▼), dann Spalte unter dem Punkt
-      var R = slotOf(i), h = R.hit(x - RES_X);
+      var R = slotOf(i), h = rowHit(R, x);
       if (h >= 0 && h !== R.f) placeRing(R.hoverCol(h));
       N.pointer.scrolled();                           // Inhalt ist unter dem Punkt gewandert -> Sperre bis zur naechsten Bewegung
     }
     s.pointer = function (x, y, kind) {
       if (fl.eat(kind)) return true;                    // Tipp in den Schwung: nur anhalten
+      if (reat) { if (kind === 'click') reat = false; return true; }   // ebenso nach dem Anhalten einer Reihe
       var p = STK ? (y >= CLIP_Y ? S.hitKey(rows, x, y + off) : null) : S.hitKey(rows, x, y);   // schmal: Tasten rollen mit
       if (p) {
         N.pointer.holdCancel();
@@ -668,7 +760,7 @@
       if (ez) { N.pointer.holdCancel(); if (kind === 'click') s.pointerScroll(ez.d); return true; }   // Randzone: rollt (Verweilen/Klick)
       var hr = y < VB ? ptrRow(y) : null;
       if (!hr || !hr.v) { N.pointer.holdCancel(); return false; }
-      var gi = hr.i, R = slotOf(gi), h = R.hit(x - RES_X);
+      var gi = hr.i, R = slotOf(gi), h = rowHit(R, x);
       if (h < 0) { N.pointer.holdCancel(); return false; }
       if (fl.free) {                                  // frei gescrollt: auch angeschnittene Reihen, nichts rollt
         if (zone !== 'res' || g !== gi) toGroup(gi, true);

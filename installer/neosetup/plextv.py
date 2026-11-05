@@ -76,7 +76,8 @@ class PlexTV(object):
         return data
 
     def _json(self, *a, **k):
-        try: return json.loads(self._call(*a, **k).decode('utf-8'))
+        from .netutil import json_loads
+        try: return json_loads(self._call(*a, **k))
         except ValueError: raise PlexError('parse')
 
     def _xml(self, *a, **k):

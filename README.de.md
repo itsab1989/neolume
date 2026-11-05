@@ -25,7 +25,8 @@
 **2014** (Smart Hub „Orsay“, z. B. H- und HU-Serie). Die offizielle Plex-App dieser Geräte wird nicht mehr gepflegt und kann
 sich nicht mehr anmelden, weil der Fernseher nur alte Verschlüsselung beherrscht. Neolume löst das: Ein kleines
 Einrichtungsprogramm auf deinem Computer meldet sich **einmal** an, danach spricht der Fernseher **nur noch mit deinem
-eigenen Plex Media Server im Heimnetz**.
+eigenen Plex Media Server im Heimnetz** – außer du schaltest eines der optionalen Extras ein, etwa „Live-TV“ (siehe
+[Datenschutz und Sicherheit](#datenschutz-und-sicherheit)).
 
 > [!NOTE]
 > **Neolume ist kein Produkt von Plex.** Es ist ein unabhängiges Hobbyprojekt und steht in keiner Verbindung zu Plex, Inc.
@@ -42,19 +43,24 @@ eigenen Plex Media Server im Heimnetz**.
 
 - Startet in Sekundenbruchteilen aus dem eigenen Zwischenspeicher; Bedienung mit Fernbedienung **und** Smart-Control-Zeiger.
 - Startseite mit Weiterschauen, Nächste Folgen, Neu je Bibliothek, Hintergrundbild und Staffelstreifen; je Profil anpassbar.
-  Auf der Serienseite zusätzlich ein Balken für die ganze Serie (beides abschaltbar).
+  Auf der Serienseite zusätzlich ein Balken für die ganze Serie (beides abschaltbar). *Kachelgröße der Startseite*
+  (Einstellungen › Startseite & Aussehen): Groß (Standard), Mittel oder Klein – kleinere Kacheln zeigen mehr Titel nebeneinander.
 - **Alle anzeigen** am Ende einer Startseiten-Reihe, wie in der Plex-App fürs Handy: „Neu: Filme“ öffnet die ganze
   Bibliothek nach *Zuletzt hinzugefügt* (nur für diesen Besuch), andere Reihen zeigen ihre ganze Liste als Raster mit den
   Ansichten Groß, Mittel, Klein oder Liste.
 - Ein kurzer Hinweis blendet sich ein, wenn etwas Neues auf deinem Server ankommt (z. B. „Neue Folge“ mit Serie, Staffel
   und Folge), und verschwindet von selbst – genau, allgemein oder aus, auf Wunsch auch während eines Videos. Startseite
   und Bibliotheken bemerken neue Titel von selbst, ohne dass sich unter der Markierung etwas verschiebt.
-- Bibliotheken mit Raster, Sortieren, Filtern, A–Z; Detailseiten für Filme, Serien, Staffeln, Folgen; Suche.
+- Bibliotheken mit Raster, Sortieren, Filtern, A–Z; Detailseiten für Filme, Serien, Staffeln, Folgen; Suche. `INFO` auf
+  einem Titel zeigt seine ganze Beschreibung, eine lange seitenweise.
 - Player: Direktwiedergabe oder Umwandlung durch deinen Server (z. B. HEVC), Ton- und Untertitelwahl je Serie,
   Intro/Abspann überspringen, nächste Folge, Kapitel, Sleep-Timer, Vorschaubilder beim Spulen; ⏮ / ⏭ für vorige/nächste
   Folge, Kapitel oder Video; Sprungknöpfe zeigen ihre echte Weite (z. B. -10 / +30). Mit der Smart Control zeigt der
   Fortschrittsbalken die Zeit (und ein Vorschaubild) schon vor dem Klick, und die optionale Feinauswahl macht Sprünge
   in langen Filmen viel genauer.
+- Du bestimmst, wie viel der Server schicken darf: *Qualitätsgrenze zu Hause* (gilt nur, wenn der Server umwandelt) und *Qualitätsgrenze über das Internet* (z. B. vom
+  Server eines Freundes) setzen je eine Obergrenze, oder *Original (ohne Grenze)* schickt die Datei unverändert, wann immer
+  der Fernseher sie abspielen kann (Einstellungen › Wiedergabe).
 - Musik und Hörbücher; Plex-Home-Profile, Kinderprofile, eigene App-PIN je Profil.
 - Entdecken, Plex-Merkliste und Infos zu Titeln, die nicht auf deinem Server sind, über einen optionalen Helfer im Heimnetz;
   die plex.tv-Reihen schlagen nur Titel vor, die du noch nicht hast (abschaltbar). Der Helfer kann mit dem Computer starten,
@@ -64,10 +70,25 @@ eigenen Plex Media Server im Heimnetz**.
 - `RETURN` führt oben in einer Bibliothek, der Suche, Entdecken oder den Einstellungen zur Startseite – oder auf Wunsch
   wie „Zurück“ im Browser durch die zuletzt geöffneten Bereiche (*Zurück aus einem Bereich* in den Einstellungen).
 - Optional: Bibliotheken von **Servern, die jemand für dich freigegeben hat** (z. B. ein Freund), mit Herkunft in der Seitenleiste.
-- Oberfläche Deutsch und Englisch, Akzentfarbe je Profil wählbar (sieben Farben). Keine Werbung, kein Tracking.
+- Optional **Live-TV** (Standard aus, Einstellungen › Live-TV & Entdecken › *Live-TV*): die kostenlosen Livestreams, die
+  öffentlich-rechtliche Sender selbst auf ihren Webseiten zeigen – Das Erste, ZDF, arte, 3sat, phoenix, die Dritten und
+  mehr, dazu arte auf Französisch, Sender aus Österreich, Dänemark, Spanien, Schweden und Australien und
+  Auslandssender (DW English, NHK World, Arirang …); zuerst ist die Region deines Landes an – als Bereich in der Seitenleiste und auf Wunsch als Reihe auf der
+  Startseite, mit „Was läuft gerade“, wo der Sender das anbietet. Kein inoffizielles IPTV, nichts mit Kopierschutz oder
+  Anmeldung. Auf dem Samsung-Fernseher von 2014 laufen **mit dem optionalen Helfer
+  alle Sender**: ARD und ZDF schicken den Ton als eigene Spur, die der Player des Fernsehers nicht dazunehmen kann – der
+  Helfer holt Bild und Ton beim Sender und gibt dem Fernseher einen Strom (er speichert nichts). Ohne Helfer zeigt der
+  Fernseher nur die Sender mit Ton im Bildstrom (arte, DW English); andere Plattformen spielen alle.
+- Oberfläche auf Deutsch, Englisch und Norwegisch (Bokmål): folgt der Sprache des Fernsehers, oder du wählst unter
+  Einstellungen › Sprache & Bedienung › Sprache.
+- *Farbe der Auswahl* je Profil wählbar: acht Farben – Türkis (Standard), Bernstein, Koralle, Rosé, Lavendel, Himmelblau,
+  Mintgrün und Grau –, alle auf Lesbarkeit geprüft. *Farbe der Markierungen* (Einstellungen › Startseite & Aussehen) färbt die kleinen
+  Markierungen auf den Kacheln (neu, gesehen, verbleibende Folgen): standardmäßig Hellgrau, auf Wunsch eine der
+  Farben der Auswahl, damit sie mehr auffallen.
+- Keine Werbung, kein Tracking, keine Telemetrie.
 - Gern auch ruhiger: vier Stile für die Uhr auf der Startseite, und Tastenhinweise, die immer zu sehen sind, nach ein paar
-  Sekunden ausblenden oder ganz verborgen bleiben (jede Taste erklärt trotzdem Einstellungen › Hilfe & Info › Tastenbelegung).
-- Hintergrund in Bibliotheken wählbar: Farbstimmung des gewählten Titels (Standard), sein Bild, ein neues Zufallsbild bei jedem Öffnen oder schlicht.
+  Sekunden ausblenden oder ganz verborgen bleiben (jede Taste erklärt trotzdem Einstellungen › Hilfe & Diagnose › Tastenbelegung).
+- *Seitenhintergrund* der Bibliotheken wählbar: Farbstimmung des gewählten Titels (Standard), sein Bild, ein neues Zufallsbild bei jedem Öffnen oder schlicht.
 
 <p align="center"><img src="docs/screenshots/de/home.png" alt="Startseite von Neolume: großes Hintergrundbild des Films, darunter die Reihe Weiterschauen mit Fortschrittsbalken" width="900"></p>
 
@@ -85,11 +106,22 @@ eigenen Plex Media Server im Heimnetz**.
 | **Musik** – Künstler und Alben | **Künstlerseite** – Alben, Singles & EPs, Live, Soundtracks, Kompilationen |
 | ![Hörbuch mit Kapitelliste und Fortschritt](docs/screenshots/de/audiobooks.png) | ![Entdecken mit Tastatur und Vorschlägen](docs/screenshots/de/discover.png) |
 | **Hörbücher** – Kapitel und Fortschritt | **Entdecken** – die eigene Mediathek neu entdecken |
-| ![Bildschirmschoner mit dem Hintergrundbild eines Films, Uhrzeit und Titel in der Einblendung „Ambient“](docs/screenshots/de/screensaver.png) | ![Auswahl der Akzentfarbe mit sieben Farben, hier Koralle](docs/screenshots/de/accent.png) |
-| **Bildschirmschoner** – Bilder aus deinen Bibliotheken, neun Übergänge (oder Zufall), sechs Einblendungen | **Akzentfarbe** – sieben Farben, je Profil; alle Einstellungen mit Erklärung |
+| ![Bildschirmschoner mit dem Hintergrundbild eines Films, Uhrzeit und Titel in der Einblendung „Ambient“](docs/screenshots/de/screensaver.png) | ![Auswahl der Farbe der Auswahl mit acht Farben, hier Koralle](docs/screenshots/de/accent.png) |
+| **Bildschirmschoner** – Bilder aus deinen Bibliotheken, neun Übergänge (oder Zufall), sechs Einblendungen | **Farbe der Auswahl** – acht Farben, je Profil; alle Einstellungen mit Erklärung |
 
 <sub>Alle Titel, Personen und Bilder in den Bildschirmfotos sind erfundene Beispielinhalte. Englische Oberfläche:
 [englische Übersicht](README.md#screenshots).</sub>
+
+## Was du brauchst
+
+- Einen **Samsung Smart TV von 2014** mit dem Smart Hub „Orsay“ (siehe [Welche Fernseher?](#welche-fernseher)), verbunden mit deinem Heimnetz.
+- Einen **Plex Media Server** im **selben Heimnetz**, dessen **Besitzer** du bist (du richtest die Profile ein).
+- Einen **Computer** im selben Netz für die einmalige Einrichtung und für Updates: Windows, macOS oder Linux.
+  Den optionalen Helfer kann auch ein NAS (z. B. Synology) ausführen.
+- Etwa **20 Minuten** Zeit und die Fernbedienung des Fernsehers.
+
+Plex Pass ist nicht nötig. Einige Extras (Marken zum Überspringen des Intros, Vorschaubilder beim Spulen) nutzen Daten, die
+dein Server nur mit Plex Pass erzeugt; ohne ihn fehlen nur genau diese Extras.
 
 ## Download
 
@@ -131,7 +163,7 @@ Für diese Fernseher gibt es einen fertigen Download:
 
 | Fernseher-System | Modelle | Download | Anleitung | Medienserver | Zuletzt am echten Gerät getestet | Stand |
 |---|---|---|---|---|---|---|
-| **Samsung Smart TV 2014 (Orsay)** | H-Serie 2014 (z. B. UE48H8000, UE40H6400)<br>HU-Serie 2014, 4K (z. B. UE55HU7500) | [Einrichtungsprogramm](#download) für deinen Computer, enthält die TV-App | [Deutsch](docs/INSTALL.de.md) · [Englisch](docs/INSTALL.md) | Plex | 1.0.16 (2026-11-04, UE48H8000) | ✅ vom Entwickler an einem echten Gerät getestet |
+| **Samsung Smart TV 2014 (Orsay)** | H-Serie 2014 (z. B. UE48H8000, UE40H6400)<br>HU-Serie 2014, 4K (z. B. UE55HU7500) | [Einrichtungsprogramm](#download) für deinen Computer, enthält die TV-App | [Deutsch](docs/INSTALL.de.md) · [Englisch](docs/INSTALL.md) | Plex | 1.0.17 (2026-11-05, UE48H8000) | ✅ vom Entwickler an einem echten Gerät getestet |
 
 Für weitere Fernseher gibt es noch keine Community-Portierung – deine könnte die erste sein: [Community-Portierungen](PORTS.md).
 <!-- /gen:platforms-de -->
@@ -142,7 +174,27 @@ einem UE48H8000); Einzelheiten und ältere Modelle stehen in den [Fragen](docs/F
 Google TV …) haben die offizielle Plex-App im App-Store – probiere zuerst die. Möchtest du trotzdem Aussehen und
 Funktionen von Neolume dort haben, kann sie dir ein [KI-Agent nachbauen](#für-deinen-fernseher-bauen--mit-einem-ki-agenten).
 
+## Datenschutz und Sicherheit
+
+- **Keine Telemetrie, keine Werbung, keine Analyse-Dienste.** Im Alltag spricht der Fernseher nur mit deinem Plex Media
+  Server – und, nur wenn du sie einrichtest, mit dem optionalen Helfer im Heimnetz und mit Servern, die jemand für dich
+  freigegeben hat.
+- **Live-TV** (Standard aus) ist die einzige Funktion, die von sich aus andere Quellen anfragt – und auch das nur, solange
+  sie eingeschaltet ist, und nur für das, was du siehst: Ein Sender, den du abspielst, kommt direkt von der Webseite und den
+  Videoservern des Senders, „Was läuft gerade“ vom Programmdienst der ARD, und die Senderlogos kommen von Wikimedia Commons
+  über deinen Plex-Server. Dabei werden kein Konto, keine Cookies und keine Kennungen gesendet. Ausgeschaltet wird nichts
+  angefragt.
+- Dein **Plex-Passwort** und deine **Plex-PIN** gibst du nur auf plex.tv ein, nie in Neolume oder im Einrichtungsprogramm.
+- Jedes Profil bekommt einen eigenen Zugang, der **nur mit deinem Server** funktioniert; er liegt im App-Speicher des
+  Fernsehers. Du kannst ihn jederzeit auf plex.tv unter *Autorisierte Geräte* widerrufen.
+- Die Seite des Einrichtungsprogramms ist nur von deinem eigenen Computer aus erreichbar, hält Anmeldedaten nur im
+  Arbeitsspeicher und gibt das App-Paket nur an Geräte in deinem Heimnetz.
+- Der Fernseher kann keine moderne Verschlüsselung, deshalb sprechen Fernseher und Server **innerhalb deines Heimnetzes**
+  unverschlüsselt (HTTP). Nutze Neolume nur in einem Netz, dem du vertraust; öffentliche Server-Adressen werden nie benutzt.
+- Ein Diagnose-Protokoll wird nur auf deinen Wunsch gesendet, und nur an einen Computer in deinem Heimnetz.
+
 ## Für deinen Fernseher bauen – mit einem KI-Agenten
+
 
 Neolume selbst läuft nur auf Samsung-Fernsehern von 2014. Für einen neueren Fernseher (Samsung Tizen, LG webOS,
 Android TV / Google TV, Fire TV, Apple TV …) kann ein KI-Coding-Agent dieselbe App bauen. Alles, was er dafür braucht,

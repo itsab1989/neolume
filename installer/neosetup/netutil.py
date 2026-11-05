@@ -1,13 +1,41 @@
 """LAN helpers: client filter, own LAN address, GDM discovery, choice of the PMS address, read-only PMS probes."""
 import ipaddress
 import json
+import os
+import re
 import socket
+import struct
 import urllib.request
 import xml.etree.ElementTree as ET
 
 GDM_PORT = 32414
 GDM_GROUP = '239.0.0.250'
 GDM_QUERY = b'M-SEARCH * HTTP/1.1\r\n\r\n'
+JSON_DEPTH = 64                # deepest nesting accepted in JSON from outside (real answers: about 10)
+_JSON_TOKENS = re.compile(r'[\[\]{}"\\]')
+
+
+def json_loads(data, max_depth=JSON_DEPTH):
+    """json.loads with a nesting limit that does not depend on the Python version: up to 3.13 json raised RecursionError on
+    deep input (not a ValueError: handlers died with a traceback), 3.14+ parses 30 000 levels without complaint. The depth
+    is checked first by one linear pass over brackets and quotes (no recursion, strings skipped). Raises ValueError (also
+    UnicodeDecodeError, a ValueError) on bad or too deep input."""
+    s = data.decode('utf-8') if isinstance(data, (bytes, bytearray)) else data
+    if s.count('[') + s.count('{') > max_depth:
+        depth, in_str, skip = 0, False, -1
+        for m in _JSON_TOKENS.finditer(s):
+            i, c = m.start(), m.group()
+            if i == skip: continue                        # the character after a backslash
+            if in_str:
+                if c == '\\': skip = i + 1
+                elif c == '"': in_str = False
+            elif c == '"': in_str = True
+            elif c in '[{':
+                depth += 1
+                if depth > max_depth: raise ValueError('json too deep')
+            elif c in ']}': depth -= 1
+    try: return json.loads(s)
+    except RecursionError: raise ValueError('json too deep')
 
 
 def _ip(addr):
@@ -44,6 +72,24 @@ def lan_client_ok(addr, allow=None):
     if ip.is_loopback: return True
     if allow: return str(ip) in allow
     return (ip.is_private or ip.is_link_local) and not ip.is_unspecified and not ip.is_multicast
+
+
+def container_gateway(marks=('/.dockerenv', '/run/.containerenv'), route_file='/proc/net/route'):
+    """Docker/Podman in bridge mode (no --net=host): every home-network client reaches the helper through NAT, so the helper
+    sees the container's default gateway (a 172.17.x.x address) instead of the TV. -> that gateway address, or '' (not in a
+    container, or host networking: then the gateway is the home router, which never calls the helper).
+    Only the standard Linux files are read; anything unexpected -> ''."""
+    if not any(os.path.exists(m) for m in marks): return ''
+    try:
+        with open(route_file, encoding='ascii', errors='replace') as f: lines = f.read(64 << 10).splitlines()[1:]
+    except OSError:
+        return ''
+    for ln in lines:
+        p = ln.split()
+        if len(p) >= 3 and p[1] == '00000000' and re.fullmatch(r'[0-9A-Fa-f]{8}', p[2]) and p[2] != '00000000':
+            gw = socket.inet_ntoa(struct.pack('<I', int(p[2], 16)))
+            return gw if is_private_ipv4(gw) else ''
+    return ''
 
 
 def own_lan_ip(towards=None):
@@ -159,7 +205,7 @@ def http_get(url, headers=None, timeout=3):
 def parse_identity(data):
     """PMS /identity (JSON or XML) -> machineIdentifier or None."""
     try:
-        d = json.loads(data.decode('utf-8'))
+        d = json_loads(data)
         return (d.get('MediaContainer') or {}).get('machineIdentifier')
     except (ValueError, AttributeError, UnicodeDecodeError):
         pass

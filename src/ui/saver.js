@@ -39,11 +39,20 @@
    * z-index an den beiden Ebenen nicht aus – es zaehlt die DOM-Reihenfolge. Dann lag nach jedem zweiten Tausch die ALTE Ebene oben:
    * die Aufraeum-Stufe machte sie schwarz (rest0), das naechste Bild lud in sie und erschien sofort unter dem alten Titel (Bild des einen Films
    * unter dem Titel des vorigen). Die vordere Ebene steht deshalb immer auch im DOM oben (onTop), z-index bleibt fuer Browser, die ihn beachten. */
+  /* Nutzerbefund 05.11. (TV, nach ~35 Min.): die gemerkte Ebene (upper) stimmte nicht mehr mit dem DOM ueberein ("aufraeumen: OBEN"),
+   * ab da lud jedes Bild in die sichtbare Ebene (Bild eins voraus, Titel eins zurueck). Deshalb zaehlt jetzt immer die tatsaechliche
+   * DOM-Reihenfolge (domTop); weicht die Notiz ab, wird das protokolliert und korrigiert. */
   var upper = null;
+  function domTop() {
+    var p = Ls[0] && Ls[0].w.parentNode, k = p && p.childNodes;
+    for (var i = k ? k.length - 1 : -1; i >= 0; i--) { if (k[i] === Ls[0].w) return Ls[0]; if (k[i] === Ls[1].w) return Ls[1]; }
+    return upper;
+  }
   function onTop(l) {
-    if (upper === l || N.config.saverZOnly) return;      // saverZOnly: nur TV-Gegenprobe (Verhalten bis 1.0.7)
-    var o = Ls[0] === l ? Ls[1] : Ls[0];
-    l.w.parentNode.insertBefore(o.w, l.w);                // andere Ebene direkt VOR l -> l liegt oben (Eltern: el bzw. stg)
+    if (N.config.saverZOnly) return;                      // saverZOnly: nur TV-Gegenprobe (Verhalten bis 1.0.7)
+    var t = domTop();
+    if (upper && t !== upper) warn('ebenen notiz ' + Ls.indexOf(upper) + ' dom ' + Ls.indexOf(t) + ' (korrigiert)');
+    if (t !== l) { var o = Ls[0] === l ? Ls[1] : Ls[0]; l.w.parentNode.insertBefore(o.w, l.w); }   // andere Ebene direkt VOR l -> l oben
     upper = l;
   }
   function mark(st) { step = st; stepAt = now(); }
@@ -149,7 +158,8 @@
   S.key = function () { act(); if (!S.on) return false; S.stop(); return true; };
   function rest() { var k = N.idle ? N.idle.lastKey() : 0; return now() - Math.max(k, lastAct); }
   function playerState() {
-    var st = N.router.topName() === 'player' && N.player && N.player.status ? N.player.status() : null;
+    var tn = N.router.topName(), st = tn === 'player' && N.player && N.player.status ? N.player.status()
+      : tn === 'liveplayer' && N.live && N.live.status ? N.live.status() : null;   // Fernsehen (LIVE-4): laufender Sender = Wiedergabe
     return { playing: !!(st && st.active && !st.paused), paused: !!(st && st.active && st.paused), item: st ? st.item : null };
   }
   function tick() {
@@ -457,7 +467,7 @@
     });
     function go() {
       mark('fx');
-      N.log('saver zeigt "' + (r.x.title || '') + '" ' + String(r.x.pm ? r.x.thumb : r.x.art).replace(/\/\d{6,}$/, '') + ' | Ebene ' + Ls.indexOf(B) + (upper === B ? ' oben' : upper ? ' UNTEN' : '') + ' (' + fx + ')');
+      var dt = domTop(); N.log('saver zeigt "' + (r.x.title || '') + '" ' + String(r.x.pm ? r.x.thumb : r.x.art).replace(/\/\d{6,}$/, '') + ' | Ebene ' + Ls.indexOf(B) + (dt === B ? ' oben' : ' UNTEN') + (dt !== upper ? ' NOTIZ ' + Ls.indexOf(upper) : '') + ' (' + fx + ')');
       var d = D.go(F, B, ms(fx));
       lastDur = d;
       if (hard) { pmSet(r); place(); setInfo(r.x); }
@@ -481,7 +491,9 @@
     later(CLEAN_MS, function () {
       cleaning = false;
       if (old === front()) return;                         // inzwischen erneut getauscht (sehr kurzer Takt)
-      N.log('saver aufraeumen: Ebene ' + Ls.indexOf(old) + (upper === old ? ' OBEN (wird schwarz ueber dem Bild)' : ' unten'));
+      var top = domTop();
+      N.log('saver aufraeumen: Ebene ' + Ls.indexOf(old) + (top === old ? ' OBEN (wird schwarz ueber dem Bild)' : ' unten'));
+      if (top === old) { warn('alte Ebene ' + Ls.indexOf(old) + ' oben beim Aufraeumen (korrigiert)'); upper = old; onTop(front()); }   // nie in die sichtbare Ebene laden
       rest0(old); N.img.drop(old.img); N.img.drop(old.pst); hideTiles();
       if (kind !== 'paused') later(PREP_MS, prepare);
     });

@@ -111,16 +111,23 @@ function settingsData() {
     var s = factory();
     var list;
     try { list = s.__defs(); } finally { for (ck in keep) caps[ck] = keep[ck]; }
-    list.forEach(function (cat) {
-      if (cats.indexOf(cat.id) < 0) cats.push(cat.id);
+    list.forEach(function (cat, ci) {
+      /* a category or row that only a later scenario shows goes right after its neighbour in that scenario's list, so the tables
+       * follow the app's order (e.g. "Quality limit on mobile data" under "… over the internet", not at the end) */
+      if (cats.indexOf(cat.id) < 0) cats.splice(ci > 0 && cats.indexOf(list[ci - 1].id) >= 0 ? cats.indexOf(list[ci - 1].id) + 1 : cats.length, 0, cat.id);
+      var prev = null;
       cat.rows.forEach(function (d) {
         var key = d.id, r = rows[key];
-        if (sc.extra && r) return;
+        if (sc.extra && r) { prev = key; return; }
         if (!r) {
           r = rows[key] = { id: d.id, cat: cat.id, type: d.type, label: N.t(d.label), desc: N.t(d.desc), help: d.help ? N.t(d.help) : '',
             ddesc: [], store: storeOf(d), values: null, def: {}, scen: [] };
-          order.push(key);
+          var at = prev ? order.indexOf(prev) : -1, mine = cat.rows.map(function (x) { return x.id; });
+          /* rows of other scenarios that follow the neighbour stay in front (e.g. sign-out stays last behind the setup rows) */
+          while (at >= 0 && at + 1 < order.length && rows[order[at + 1]].cat === cat.id && mine.indexOf(order[at + 1]) < 0) at++;
+          if (at >= 0) order.splice(at + 1, 0, key); else order.push(key);
         }
+        prev = key;
         r.scen.push(sc.id);
         if (d.ddesc) {
           var dk = typeof d.ddesc === 'function' ? [] : [d.ddesc];
@@ -149,6 +156,8 @@ function storeOf(d) {
   if (/setLang/.test(f)) return 'state.lang';
   return '';
 }
+/* what a multi-select row picks from (its entries depend on the profile or are long, so they are named, not listed) */
+var MULTI_OF = { saverLibs: 'this profile’s libraries', liveRegions: 'regions' };
 function genSettings() {
   var d = settingsData(), out = [];
   out.push('Availability codes: ' + SCEN.map(function (s) { return '**' + s.id + '** = ' + s.name; }).join(' · ') +
@@ -160,7 +169,7 @@ function genSettings() {
       var def = r.def[r.scen[0]], other = r.scen.filter(function (k) { return r.def[k] !== def; });
       var defTxt = r.type === 'action' || (r.type === 'value' && r.id !== 'others') ? '–' :
         esc(def) + (other.length ? ' (' + other.map(function (k) { return k + ': ' + esc(r.def[k]); }).join(', ') + ')' : '');
-      var vals = r.type === 'toggle' ? 'On / Off' : r.multi ? 'multi-select of this profile’s libraries' : r.values ? r.values.map(function (v) { return esc(v.t) + (v.s ? ' (' + esc(v.s) + ')' : ''); }).join(' · ') :
+      var vals = r.type === 'toggle' ? 'On / Off' : r.multi ? 'multi-select of ' + (MULTI_OF[r.id] || 'these values') : r.values ? r.values.map(function (v) { return esc(v.t) + (v.s ? ' (' + esc(v.s) + ')' : ''); }).join(' · ') :
         r.type === 'action' ? '(opens a screen/dialog)' : r.type === 'value' ? '(read-only)' : '';
       var expl = esc(r.desc) + (r.ddesc.length ? ' *Dimmed:* ' + r.ddesc.map(esc).join(' / ') : '');
       out.push('| ' + code(r.id) + ' | ' + esc(r.label) + ' | ' + (r.store ? code(r.store) : '–') + ' | ' + r.type + ' | ' + defTxt + ' | ' + vals + ' | ' + expl + ' | ' + r.scen.join(' ') + ' |');
@@ -231,10 +240,10 @@ function helperData() {
   var port = /HELPER_PORT = (\d+)/.exec(t);
   return { routes: routes, ups: ups, lists: lists, port: port ? port[1] : '?' };
 }
-var ROUTE_PATH = { item: '/watchlist/<24 hex>', discover: '/discover/<list>' };
+var ROUTE_PATH = { item: '/watchlist/<24 hex>', discover: '/discover/<list>', live: '/live/<token>/…' };
 function genHelper() {
   var h = helperData(), o = [];
-  o.push('Default port ' + code(h.port) + '. Hello route `GET /neo-helper` needs no key. All other routes need `X-Neo-Key` + `X-Neo-Profile` headers.', '',
+  o.push('Default port ' + code(h.port) + '. Hello route `GET /neo-helper` needs no key. All other routes are signed (protocol 2, see below); `X-Neo-Profile` names the profile.', '',
     '| TV route | Allowed query keys |', '|---|---|');
   h.routes.forEach(function (r) { o.push('| ' + code(ROUTE_PATH[r.route] || r.route) + ' | ' + (r.keys.length ? r.keys.map(code).join(', ') : '–') + ' |'); });
   o.push('', 'Discover lists (`/discover/<list>`): ' + h.lists.map(function (l) { return code(l.id) + ' (hubs ' + l.hubs.map(code).join(' + ') + (l.when !== 'None' ? ', ' + l.when : '') + ')'; }).join(' · '), '',
@@ -1063,6 +1072,8 @@ function check() {
   });
   /* files of the design system (design/README.md, accent palette, icon columns) – npm run spec regenerates them too */
   require('./design_doc.js').stale().forEach(function (f) { problems.unshift(f + ': generated from design/tokens.json / design/icons but stale. Run `npm run spec` and commit the result.'); });
+  /* the helper's channel table (allow-list for live TV, LIVE-10) – generated from src/live/channels.js */
+  require('./live_data.js').stale().forEach(function (f) { problems.unshift(f + ': generated from src/live/channels.js but stale. Run `npm run spec` and commit the result.'); });
   return problems;
 }
 module.exports = { generate: generate, generateAll: generateAll, check: check, settingsData: settingsData, routesData: routesData,
@@ -1080,6 +1091,7 @@ function main(argv) {
   if (checkOnly) problems = check();
   else {
     require('./design_doc.js').write().forEach(function (f) { console.log('spec: design file updated: ' + f); });
+    require('./live_data.js').write().forEach(function (f) { console.log('spec: helper channel table updated: ' + f); });
     var g = generateAll(null, { ack: ack });
     g.files.forEach(function (f) {
       if (f.out !== f.text) { fs.writeFileSync(path.join(ROOT, f.rel), f.out); console.log('spec: generated content updated in ' + f.rel); }

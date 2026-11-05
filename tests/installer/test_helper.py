@@ -170,6 +170,37 @@ class AllowList(unittest.TestCase):
         self.assertTrue(all(c[1].startswith(('https://discover.provider.plex.tv/', 'https://metadata.provider.plex.tv/library/metadata/')) for c in f.calls))
 
 
+class SharedSlimFixture(unittest.TestCase):
+    """tests/synthetic/plextv-slim.json: the same inputs and expected outputs are checked against N.ptv (src/plex/plextv.js,
+    the in-app helper of platforms with caps.plexTvDirect) in tests/plextv.test.js - both sides must give exactly these."""
+    @classmethod
+    def setUpClass(cls):
+        p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'synthetic', 'plextv-slim.json')
+        with open(p, encoding='utf-8') as f: cls.F = json.load(f)
+
+    def test_allowed(self):
+        for m, u, want in self.F['allowed']: self.assertEqual(HP.upstream_allowed(m, u), want, u)
+
+    def test_safe_img(self):
+        for u, want in self.F['safe_img']: self.assertEqual(HP.safe_img(u), want, u)
+
+    def test_slim(self):
+        for md_, want in self.F['slim']: self.assertEqual(HP.slim(md_), want)
+
+    def test_details_slim(self):
+        for md_, want in self.F['details_slim']: self.assertEqual(HP.details_slim(md_), want)
+
+    def test_pick(self):
+        for c in self.F['pick']:
+            self.assertEqual(HP.pick(self.F['pick_items'], c['type'], c['when'], c['today'], c['size']), c['out'], (c['type'], c['when'], c['size']))
+
+    def test_state(self):
+        h = make(fetch=lambda m, u, hd, timeout=10: (200, json.dumps(self._cur).encode()))
+        for d, ids, want in self.F['state']:
+            self._cur = d
+            self.assertEqual(h.state(OWNER, ids), want)
+
+
 class Lan(unittest.TestCase):
     def test_private_only(self):
         h = make()
@@ -490,7 +521,11 @@ class WizardHelper(unittest.TestCase):
         key = self.setup_json()['helper']['key']
         self.w.set_helper(True, True, '192.0.2.77'); self.w.build()
         cfg = self.setup_json()
-        self.assertEqual(cfg['helper'], {'url': 'http://192.0.2.77:%d' % (self.w.update.port or HP.HELPER_PORT), 'key': key})
+        sign = cfg['helper'].get('sign', '')
+        self.assertRegex(sign, r'^[0-9a-f]{64}$')                   # signing key (protocol 2), only via the package
+        self.assertEqual(cfg['helper'], {'url': 'http://192.0.2.77:%d' % (self.w.update.port or HP.HELPER_PORT), 'key': key, 'sign': sign})
+        self.w.build()
+        self.assertEqual(self.setup_json()['helper']['sign'], sign)    # kept on every new setup: installed TVs keep working
         self.assertRaises(StepError, self.w.set_helper, True, True, '8.8.8.8')
 
     def test_not_remembered_and_off(self):
@@ -508,7 +543,7 @@ class WizardHelper(unittest.TestCase):
         self.w.helper_start()
         self.assertTrue(self.w.public_state()['helper']['running'])
         base = 'http://127.0.0.1:%d' % self.w.update.port
-        with urllib.request.urlopen(base + '/neo-helper', timeout=5) as r: self.assertEqual(json.loads(r.read())['features'], ['watchlist', 'discover', 'servers', 'details', 'nb'])
+        with urllib.request.urlopen(base + '/neo-helper', timeout=5) as r: self.assertEqual(json.loads(r.read())['features'], ['watchlist', 'discover', 'servers', 'details', 'nb', 'live', 'sig2'])
         self.w.update_start()
         with urllib.request.urlopen(base + '/neo-helper', timeout=5) as r: self.assertIn('update', json.loads(r.read())['features'])
         self.w.update_stop()

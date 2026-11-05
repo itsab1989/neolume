@@ -3,12 +3,36 @@
  * (Anker = eigener Titel desselben Typs aus den Bibliotheken des aktiven Profils), Abgleich per Plex-GUID in EINER Anfrage
  * GET /library/all?guid=a,b,c (Alt-Agenten: Titel + Jahr). Bilder fremder Titel ueber /photo/:/transcode (N.img.url).
  * Merkliste nur mit dem optionalen Helfer (setup.json "helper" bzw. config.json "helperUrl"); ohne Helfer KEINE Anfrage dorthin.
+ * Plattform mit caps.plexTvDirect (Apple, kein setup.json): dieselben Helfer-Routen beantwortet N.ptv in der App direkt bei
+ * plex.tv (D.direct(); gleiche Regeln/Kuerzung wie der Helfer) – helper() bleibt dann leer, es gibt keine Helfer-Probe.
  * Reine Logik (parse/group/match/…) ist DOM-frei und in Node getestet (tests/discover.test.js). */
 (function (N) {
   var U = N.util, M = N.model;
   var AGENT = { movie: 'tv.plex.agents.movie', show: 'tv.plex.agents.series' }, LTYPE = { movie: 1, show: 2 };
   var GUID = /^plex:\/\/(movie|show)\/([0-9a-f]{12,40})$/, HEX = /^[0-9a-f]{12,40}$/;
   var infoCache = new N.LRU(30), anchors = {}, helperOk = null, helperDisc = false, helperFeat = [], helperT = null, helperBase = '', helperDownAt = 0, noWl = {}, downShown = false, PORT = '32499';   // anchors je Profil-uuid: {movie: rk|'' , show: rk|''}
+  /* Helfer-Signatur (Protokoll 2, 05.11.2026): Signaturschluessel aus setup.json helper.sign (kommt einmal mit dem App-Paket, geht
+   * nie uebers Netz; nur in dieser Closure, nie in N.session.pkg, nie im Protokoll) bzw. config.json helperSign (Entwicklung).
+   * Mit Schluessel signiert die App jede Helfer-Anfrage und schickt KEIN X-Neo-Key; ohne (Paket von vor 1.0.17) wie bisher
+   * X-Neo-Key – der Helfer derselben Einrichtung hat dann auch keinen Signaturschluessel. Gleich in installer/neosetup/helper.py
+   * sig_message/verify. problem: '' | resetup | oldhelper | time | nat (ehrliche Meldung, s. helperFail). */
+  var SIGN = /^[0-9a-f]{64}$/, sign = '', problem = '', problemShown = '';
+  if (N.ext && N.ext.on) N.ext.on('setup:parse', function (d) { var h = d && d.helper; sign = h && typeof h.sign === 'string' && SIGN.test(h.sign) ? h.sign : ''; });
+  function utf8(s) { var b = [], t = unescape(encodeURIComponent(s)); for (var i = 0; i < t.length; i++) b.push(t.charCodeAt(i)); return b; }
+  function hexBytes(h) { var b = []; for (var i = 0; i + 1 < h.length; i += 2) b.push(parseInt(h.substr(i, 2), 16)); return b; }
+  function hmac(key, msg) {                                                   // HMAC-SHA256 (RFC 2104) ueber N.sha256 -> hex
+    var k = utf8(key), i, ip = [], op = [];
+    if (k.length > 64) k = hexBytes(N.sha256.hex(k));
+    for (i = 0; i < 64; i++) { var v = i < k.length ? k[i] : 0; ip.push(v ^ 0x36); op.push(v ^ 0x5c); }
+    return N.sha256.hex(op.concat(hexBytes(N.sha256.hex(ip.concat(utf8(msg))))));
+  }
+  function nonce() {
+    var s = '', b = null, i;
+    try { if (window.crypto && window.crypto.getRandomValues) { b = new Uint8Array(12); window.crypto.getRandomValues(b); } } catch (e) { b = null; }
+    for (i = 0; i < 12; i++) { var v = b ? b[i] : Math.floor(Math.random() * 256); s += (v < 16 ? '0' : '') + v.toString(16); }
+    return s;
+  }
+  function signKey() { return sign || (N.config.helperSign && SIGN.test(N.config.helperSign) ? N.config.helperSign : ''); }
 
   var D = {
     DELAY: 700, MAX_EXT: 30, TIMEOUT: 15000,
@@ -32,7 +56,25 @@
       if (h && h.url) return h.url;
       return N.config.helperUrl && N.setupFile ? N.setupFile.lanUri(N.config.helperUrl) || '' : '';
     },
+    /* plex.tv direkt statt Helfer (caps.plexTvDirect, angemeldet, kein setup.json): N.ptv beantwortet die Helfer-Routen */
+    direct: function () { return !!(N.ptv && N.ptv.on()); },
     helperKey: function () { var S = N.session, h = S && S.pkg && S.pkg.helper; return h && h.key || N.config.helperKey || ''; },
+    /* signierter Text – gleich in helper.py sig_message */
+    sigMsg: function (method, path, ts, nc, profile, body) { return ['neo-2', method, path, ts, nc, profile, N.sha256.hex(utf8(body || ''))].join('\n'); },
+    /* Kopfzeilen einer Helfer-Anfrage (path mit Abfrage, genau wie gesendet); profile: uuid oder '' (Fernsehen) */
+    helperHeaders: function (method, path, profile, body) {
+      var h = { 'Accept': 'application/json' }, k = signKey();
+      if (profile === undefined) profile = N.session && N.session.profile ? N.session.profile.uuid : '';
+      if (profile) h['X-Neo-Profile'] = profile;
+      if (!k) { var key = D.helperKey(); if (key) h['X-Neo-Key'] = key; return h; }   // Paket von vor 1.0.17 (Helfer ebenso)
+      var ts = String(Math.floor((N.clock ? N.clock.now() : U.now()) / 1000)), nc = nonce();
+      h['X-Neo-Sv'] = '2'; h['X-Neo-Time'] = ts; h['X-Neo-Nonce'] = nc; h['X-Neo-Sig'] = hmac(k, D.sigMsg(method, path, ts, nc, profile, body));
+      return h;
+    },
+    signs: function () { return !!signKey(); },
+    _sign: function (k) { sign = typeof k === 'string' && SIGN.test(k) ? k : ''; },   // Tests (sonst nur setup.json)
+    _hmac: hmac,
+    helperProblem: function () { return problem; },
     /* Erkennung im Heimnetz (Orsay kann kein UDP -> kein GDM/SSDP): feste Port-Probe NUR an Adressen aus setup.json, in dieser
      * Reihenfolge: eingetragene Helfer-Adresse, Einrichtungs-Computer (computer.address:updatePort), Rechner des PMS (:32499).
      * Hilft, wenn sich die Adresse per DHCP geaendert hat oder der Helfer neben dem PMS (NAS) laeuft. Kein Netz-Scan.
@@ -51,22 +93,24 @@
     /* Merkliste sichtbar? Helfer konfiguriert + (noch nicht als fehlend erkannt) + Schalter + kein Kinderprofil + nicht "Freund"
      * + der Helfer kennt das Profil (404 "profile" = z. B. Profil mit Plex-PIN, bei der Einrichtung uebersprungen) */
     watchlistOn: function () {
-      var S = N.session;
-      if (!D.helper() || helperOk === false || !S || !S.profile || S.isKid() || S.profile.src === 'friend' || noWl[S.profile.uuid]) return false;
+      var S = N.session, dir = D.direct();
+      if ((!dir && (!D.helper() || helperOk === false)) || !S || !S.profile || S.isKid() || S.profile.src === 'friend' || noWl[S.profile.uuid]) return false;
       return !(S.settings && S.settings.watchlist === false);
     },
     /* Inspiration Stufe 2 ("Gerade beliebt" usw., N.insp): Helfer meldet "discover":true + Entdecken an + kein Kinderprofil */
     discoverOn: function () {
       var S = N.session;
-      return !!D.helper() && helperOk === true && helperDisc && !!S && !!S.profile && !S.isKid() && D.enabled();
+      return (D.direct() || (!!D.helper() && helperOk === true && helperDisc)) && !!S && !!S.profile && !S.isKid() && D.enabled();
     },
-    helperState: function () { return !D.helper() ? 'none' : helperOk === null ? 'unknown' : helperOk ? 'ok' : 'down'; },
+    helperState: function () { return D.direct() ? 'ok' : !D.helper() ? 'none' : helperOk === null ? 'unknown' : helperOk ? 'ok' : 'down'; },
     /* einmal je Start: GET <kandidat>/neo-helper (3 s je Kandidat) -> watchlist:true? Nicht erreichbar -> 'down'; nach
      * RETRY ms darf ein erneuter Aufruf (Entdecken/Einstellungen oeffnen) wieder probieren. */
-    probeHelper: function (cb) {
+    probeHelper: function (cb, now) {
+      if (D.direct()) { if (cb) setTimeout(function () { cb(true); }, 0); return; }   // plex.tv direkt: nichts zu pruefen
       var cands = D.helperCands();
       if (!cands.length) { helperOk = null; if (cb) cb(false); return; }
-      if (helperOk === false && N.util.now() - helperDownAt > D.RETRY && !helperT) helperOk = null;
+      // now: sofort neu pruefen (z. B. "Erneut versuchen" beim Fernsehen, TV-Test 05.11.: Helfer wieder da, App wartete 60 s)
+      if (helperOk === false && (now || N.util.now() - helperDownAt > D.RETRY) && !helperT) helperOk = null;
       if (helperOk !== null) { if (cb) cb(helperOk); return; }
       if (helperT) { if (cb) helperT.push(cb); return; }
       helperT = cb ? [cb] : [];
@@ -76,11 +120,13 @@
         if (!ok) { helperDisc = false; helperDownAt = N.util.now(); }
         var l = helperT; helperT = null;
         for (var i = 0; i < l.length; i++) l[i](helperOk);
+        N.evt.emit('helper:state', { ok: ok });          // z. B. Fernsehen: mit Helfer auch die Sender mit getrenntem Ton (LIVE-10)
       }
       (function next() {
         if (k >= cands.length) { fin(false); return; }
         var base = cands[k++];
         N.http.request({ url: base + '/neo-helper', headers: { 'Accept': 'application/json' }, timeout: 3000, retries: 0, no401: true, dedupe: false }, function (err, d) {
+          if (err && D.problemOf(err) === 'nat') { problem = 'nat'; D.problemToast('nat'); }   // Docker-Bridge mit eingetragener TV-Adresse
           if (err || !d || d.name !== 'plex-neo-helper' || d.watchlist !== true) { next(); return; }
           helperBase = base === D.helperConf() ? '' : base;
           helperDisc = d.discover === true;
@@ -92,12 +138,39 @@
     },
     RETRY: 60000,
     /* Helfer erreichbar und kann diese Funktion (aus /neo-helper features) */
-    helperHas: function (f) { return helperOk === true && helperFeat.indexOf(f) >= 0; },
-    _resetHelper: function () { helperOk = null; helperDisc = false; helperFeat = []; helperT = null; helperBase = ''; helperDownAt = 0; noWl = {}; downShown = false; },
+    helperHas: function (f) { return D.direct() ? N.ptv.FEATURES.indexOf(f) >= 0 : helperOk === true && helperFeat.indexOf(f) >= 0; },
+    _resetHelper: function () { helperOk = null; helperDisc = false; helperFeat = []; helperT = null; helperBase = ''; helperDownAt = 0; noWl = {}; downShown = false; problem = ''; problemShown = ''; },
+    /* Antwort des Helfers -> ehrliche Ursache ('' = keine bekannte): Signatur-Umstellung (beide Richtungen), Uhr, Docker-Bridge */
+    problemOf: function (err) {
+      var c = err && err.body && err.body.error;
+      if (!err || err.type !== 'http' || typeof c !== 'string') return '';
+      if (err.status === 401 && (c === 'sig_required' || c === 'no_sig')) return 'resetup';   // App-Paket und Helfer passen nicht (neu erstellen)
+      if (err.status === 401 && c === 'key' && signKey()) return 'oldhelper';                  // Helfer kennt Protokoll 2 noch nicht
+      if (err.status === 401 && c === 'time') return 'time';
+      if (err.status === 403 && c === 'nat') return 'nat';
+      return '';
+    },
+    problemToast: function (p) {
+      if (!p || problemShown === p) return;
+      problemShown = p;
+      if (N.ui && N.ui.toast) N.ui.toast.show(N.t('toast.helper.' + p), { icon: 'info' });
+    },
     /* Fehler einer Helfer-Anfrage auswerten: nicht erreichbar -> 'down' (Merkliste/Trends weg, Einstellungen erklaeren es);
      * 404 {error:"profile"} -> Merkliste fuer dieses Profil aus. Rueckgabe: 'down' | 'profile' | '' */
     helperFail: function (err) {
       if (!err || err.type === 'aborted') return '';
+      if (D.direct()) {                            // plex.tv direkt: kein Helfer, der ausfallen koennte – nur "Profil ohne Token" merken
+        if (err.status === 404 && err.body && err.body.error === 'profile' && N.session.profile) { noWl[N.session.profile.uuid] = true; return 'profile'; }
+        return '';
+      }
+      var p = D.problemOf(err);
+      if (p) {                                     // Merkliste/Trends aus wie "nicht erreichbar", Einstellungen nennen den einen Schritt
+        problem = p; helperOk = false; helperDisc = false; helperDownAt = N.util.now();
+        if (N.diag) N.diag.log('warn', 'helper ' + p);
+        D.problemToast(p);
+        N.evt.emit('helper:down', {});
+        return 'problem';
+      }
       if (err.type === 'network' || err.type === 'timeout') {
         helperOk = false; helperDisc = false; helperDownAt = N.util.now();
         N.evt.emit('helper:down', {});
@@ -114,10 +187,11 @@
     },
     /* GET an den Helfer (nur feste Routen, nie mit Plex-Token); ohne Helfer-Adresse KEINE Anfrage */
     helperGet: function (path, cb) {
+      if (D.direct()) return N.ptv.request('GET', path, function (err, d) { if (err) D.helperFail(err); cb(err, d); });
       if (!D.helper()) { setTimeout(function () { cb({ type: 'nohelper' }); }, 0); return { abort: function () {} }; }
       return N.http.request({ url: D.helper() + path, timeout: 10000, retries: 1, no401: true, dedupe: false,
-        headers: { 'Accept': 'application/json', 'X-Neo-Profile': N.session.profile ? N.session.profile.uuid : '', 'X-Neo-Key': D.helperKey() } },
-        function (err, d, meta) { if (err) D.helperFail(err); cb(err, d, meta); });
+        headers: D.helperHeaders('GET', path), resign: function () { return D.helperHeaders('GET', path); } },   // Wiederholung neu signiert
+        function (err, d, meta) { if (err) D.helperFail(err); else problem = ''; cb(err, d, meta); });
     },
     /* ---------- reine Logik ---------- */
     guidOk: function (g) { return typeof g === 'string' && GUID.test(g); },
@@ -388,9 +462,10 @@
       req: function (method, path, cb) {
         if (!D.watchlistOn()) { setTimeout(function () { cb({ type: 'nohelper' }); }, 0); return { abort: function () {} }; }
         if (method !== 'GET' && N.config.readOnly) { N.log('readOnly: ' + method + ' helper' + path + ' unterdrueckt'); setTimeout(function () { cb(null, {}); }, 0); return { abort: function () {} }; }
+        if (D.direct()) return N.ptv.request(method, path, function (err, d) { if (err) err.helper = D.helperFail(err); cb(err, d); });
         return N.http.request({ method: method, url: D.helper() + path, timeout: 10000, retries: method === 'GET' ? 1 : 0, no401: true, dedupe: false,
-          headers: { 'Accept': 'application/json', 'X-Neo-Profile': N.session.profile ? N.session.profile.uuid : '', 'X-Neo-Key': D.helperKey() } },
-          function (err, d, meta) { if (err) err.helper = D.helperFail(err); cb(err, d, meta); });
+          headers: D.helperHeaders(method, path), resign: function () { return D.helperHeaders(method, path); } },
+          function (err, d, meta) { if (err) err.helper = D.helperFail(err); else problem = ''; cb(err, d, meta); });
       },
       /* Merkliste -> fremde Eintraege (Helfer liefert {items:[{id,guid,title,year,summary,thumb,type}], total}) */
       parse: function (d) {

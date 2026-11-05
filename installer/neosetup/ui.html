@@ -115,9 +115,9 @@ dd{margin:0;word-break:break-word}
       helperText: 'Dein Fernseher kann plex.tv nicht selbst erreichen (seine Verschlüsselung ist zu alt). Der Helfer ist ein kleines Programm, das auf diesem Computer (oder einem NAS) läuft und für ihn nur deine Plex-Merkliste, die Reihen „Gerade beliebt“, „Neu erschienen“ und „Bald verfügbar“ sowie Infos zu Titeln holt, die nicht auf deinem Server sind (Inhalt, Genres, Besetzung). Ohne Helfer funktioniert alles andere genauso.',
       helperWhat: 'Was macht der Helfer genau?',
       helperWhy: [
-        'Was er holt: deine Plex-Merkliste (auch wenn du am Fernseher etwas vormerkst oder entfernst, gibt er das an plex.tv weiter), die Entdecken-Reihen „Gerade beliebt“, „Neu erschienen“ und „Bald verfügbar“ und – wenn du in Entdecken einen Titel öffnest, der nicht auf deinem Server ist – dessen Inhalt, Genres, Laufzeit und Besetzung aus dem Plex-Katalog. Nutzt du freigegebene Server anderer Leute, fragt er außerdem deren aktuelle Adresse ab. Mehr holt er nicht aus dem Internet.',
+        'Was er holt: deine Plex-Merkliste (auch wenn du am Fernseher etwas vormerkst oder entfernst, gibt er das an plex.tv weiter), die Entdecken-Reihen „Gerade beliebt“, „Neu erschienen“ und „Bald verfügbar“ und – wenn du in Entdecken einen Titel öffnest, der nicht auf deinem Server ist – dessen Inhalt, Genres, Laufzeit und Besetzung aus dem Plex-Katalog. Nutzt du freigegebene Server anderer Leute, fragt er außerdem deren aktuelle Adresse ab. Ist „Live-TV“ an, holt er beim Abspielen eines Senders von ARD oder ZDF Bild und Ton bei diesem Sender und gibt sie dem Fernseher als einen Strom (der Player von 2014 kann den getrennten Ton dieser Sender nicht selbst dazunehmen). Mehr holt er nicht aus dem Internet.',
         'Warum es ihn braucht: plex.tv verlangt eine neuere Verschlüsselung (TLS 1.2). Dein Fernseher (2014) kann nur ältere (bis TLS 1.1) und kommt deshalb nicht selbst an plex.tv heran. Der Helfer spricht verschlüsselt mit plex.tv und reicht nur diese Listen und Infos im Heimnetz an den Fernseher weiter.',
-        'Was er nicht tut: Er leitet keine Videos weiter (die kommen immer direkt von deinem Plex-Server), ist aus dem Internet nicht erreichbar und reicht keine Anfragen für andere weiter. Er antwortet nur Geräten in deinem Heimnetz, ruft im Internet nur feste plex.tv-Adressen ab und schickt Daten ins Internet nur an plex.tv.',
+        'Was er nicht tut: Er leitet keine Videos deines Plex-Servers weiter (die kommen immer direkt vom Server), ist aus dem Internet nicht erreichbar und reicht keine Anfragen für andere weiter. Er antwortet nur Geräten in deinem Heimnetz und ruft im Internet nur feste plex.tv-Adressen und – für Live-TV – die Adressen der Sender aus der Senderliste der App ab, nie eine Adresse, die ihm jemand schickt. Fernsehen speichert er nicht.',
         'Was gespeichert wird: die Zugangsdatei helper.json (nur für dich lesbar) im Einstellungsordner unten. Dauerhaft installiert kommen eine Programmkopie, ein Autostart-Eintrag und ein Protokoll (ohne Zugangsdaten) dazu.',
         'Ist der Helfer aus, läuft die App ganz normal weiter – nur Merkliste, diese Reihen und die Infos zu Titeln außerhalb deines Servers fehlen. Komplett entfernen: Knopf „Helfer entfernen …“.'
       ],
@@ -138,7 +138,7 @@ dd{margin:0;word-break:break-word}
       svcNas: 'Der Helfer ist für ein anderes Gerät eingerichtet (z. B. ein NAS) – starte ihn dort (Anleitung: Abschnitt „NAS / Docker“) und installiere ihn nicht hier, sonst laufen zwei Helfer.',
       svcLocalRunning: 'Der Helfer läuft gerade in diesem Programm. Nach „Helfer dauerhaft installieren“ übernimmt der Hintergrund-Helfer.',
       svcLog: 'Protokoll:', svcReport: 'Ergebnis:',
-      removeConfirm: 'Helfer wirklich entfernen?\n\nEntfernt werden: Autostart, Programmkopie, Einstellungen und Zugangsdatei des Helfers; bei plex.tv – wenn möglich – sein Geräteeintrag.\n\nDanach zeigt der Fernseher Merkliste, Trends und Infos zu Titeln außerhalb deines Servers nicht mehr, alles andere läuft weiter. Bis du das App-Paket ohne „Helfer einrichten“ neu erstellt und auf den Fernseher gebracht hast, meldet die App kurz „Helfer von __APP__ nicht erreichbar“, wenn sie ihn sucht. Wieder einrichten kannst du ihn jederzeit mit „Helfer einrichten“.',
+      removeConfirm: 'Helfer wirklich entfernen?\n\nEntfernt werden: Autostart, Programmkopie, Einstellungen und Zugangsdatei des Helfers; bei plex.tv – wenn möglich – sein Geräteeintrag.\n\nDanach zeigt der Fernseher Merkliste, Trends und Infos zu Titeln außerhalb deines Servers nicht mehr, alles andere läuft weiter. Bis du das App-Paket ohne „Helfer einrichten“ neu erstellt und auf den Fernseher gebracht hast, meldet die App kurz „Helfer von __APP__ nicht erreichbar“, wenn sie ihn sucht. Wieder einrichten kannst du ihn jederzeit mit „Helfer einrichten“ – er bekommt dann einen neuen Signaturschlüssel, und jeder Fernseher braucht ein neues App-Paket.',
       helperOn: 'Helfer einrichten', helperRemember: 'Zugang auf diesem Computer merken (nötig für „Helfer dauerhaft installieren“; Datei nur für dich lesbar)',
       helperAddr: 'Helfer läuft auf einem anderen Gerät, z. B. NAS (IP-Adresse, optional)',
       helperStart: 'Helfer starten', helperStop: 'Helfer stoppen', helperRunning: function (p) { return 'Helfer läuft auf Port ' + p + ' (nur Heimnetz)'; },
@@ -147,6 +147,11 @@ dd{margin:0;word-break:break-word}
       quit: 'Programm beenden', quitConfirm: 'Programm wirklich beenden? Sync-Server, Update-Server und der hier gestartete Helfer werden gestoppt. Ein dauerhaft installierter Helfer läuft weiter.',
       quitDone: 'Das Programm ist beendet. Du kannst dieses Fenster schließen.',
       helperForget: 'Helfer entfernen …',
+      signNew: 'Neuen Signaturschlüssel erzeugen …',
+      signNewWhy: 'Mit dem Signaturschlüssel beweist die App dem Helfer, dass eine Anfrage von deinem Fernseher kommt. Er steckt im App-Paket und in der Zugangsdatei helper.json. Erzeuge einen neuen, wenn eines davon in fremde Hände gekommen sein könnte – z. B. ein altes App-Paket weitergegeben, die Zugangsdatei kopiert oder ein Fernseher verkauft.',
+      signNewConfirm: 'Neuen Signaturschlüssel erzeugen?\n\nDer Helfer nimmt dann keine Anfrage mit dem alten Schlüssel mehr an. Jeder Fernseher braucht danach ein neues App-Paket: „App-Paket erstellen“ und auf jeden Fernseher bringen (auch auf einen zweiten). Bis dahin zeigt die App dort „Helfer: App-Paket bitte neu erstellen“ und Merkliste und Trends fehlen.\n\nProfile und der verbundene Fernseher bleiben, nichts muss neu eingerichtet werden.',
+      signNewDone: 'Neuer Signaturschlüssel ist erzeugt. Jetzt „App-Paket erstellen“ und das Paket auf jeden Fernseher bringen – vorher zeigt die App dort „Helfer: App-Paket bitte neu erstellen“.',
+      signNewNas: 'Läuft der Helfer auf einem anderen Gerät (NAS): nach „App-Paket erstellen“ die neue helper.json dorthin kopieren und den Helfer neu starten.',
       othersTitle: 'Weitere Server (optional)',
       othersText: 'Hat jemand seinen Plex-Server mit dir geteilt, z. B. ein Freund? Dann kann __APP__ dessen Bibliotheken zusätzlich in der Seitenleiste zeigen. Jedes Profil bekommt nur die Server, die mit genau diesem Profil geteilt sind. Ohne Haken bleibt alles wie bisher.',
       othersScan: 'Freigegebene Server suchen', othersScanning: 'Suche und prüfe Server …', othersRescan: 'Erneut suchen',
@@ -226,9 +231,9 @@ dd{margin:0;word-break:break-word}
       helperText: 'Your TV cannot reach plex.tv by itself (its encryption is too old). The helper is a small program that runs on this computer (or a NAS) and fetches only your Plex watchlist, the rows “Trending now”, “Just released” and “Coming soon”, and details of titles that are not on your server (story, genres, cast) for it. Everything else works the same without it.',
       helperWhat: 'What exactly does the helper do?',
       helperWhy: [
-        'What it fetches: your Plex watchlist (and when you add or remove a title on the TV, it passes that on to plex.tv), the Discover rows “Trending now”, “Just released” and “Coming soon”, and – when you open a title in Discover that is not on your server – its story, genres, runtime and cast from the Plex catalogue. If you use servers other people shared with you, it also looks up their current address. It fetches nothing else from the internet.',
+        'What it fetches: your Plex watchlist (and when you add or remove a title on the TV, it passes that on to plex.tv), the Discover rows “Trending now”, “Just released” and “Coming soon”, and – when you open a title in Discover that is not on your server – its story, genres, runtime and cast from the Plex catalogue. If you use servers other people shared with you, it also looks up their current address. When Live TV is on and you play an ARD or ZDF channel, it fetches picture and sound from that broadcaster and hands them to the TV as one stream (the 2014 player cannot add the separate sound of these channels by itself). It fetches nothing else from the internet.',
         'Why it is needed: plex.tv requires newer encryption (TLS 1.2). Your 2014 TV only knows older versions (up to TLS 1.1), so it cannot reach plex.tv by itself. The helper talks to plex.tv encrypted and passes only these lists and details on to the TV in your home network.',
-        'What it does not do: it never passes on video (videos always come straight from your Plex server), it cannot be reached from the internet, and it does not pass on requests for anyone else. It only answers devices in your home network, only calls fixed plex.tv addresses on the internet and sends data to the internet only to plex.tv.',
+        'What it does not do: it never passes on videos of your Plex server (they always come straight from the server), it cannot be reached from the internet, and it does not pass on requests for anyone else. It only answers devices in your home network and on the internet only calls fixed plex.tv addresses and – for Live TV – the broadcaster addresses of the app's channel list, never an address someone sends it. It does not store live TV.',
         'What is stored: the access file helper.json (readable only by you) in the settings folder below. When installed permanently, a program copy, an autostart entry and a log (without access data) are added.',
         'When the helper is off, the app keeps working as usual – only the watchlist, these rows and the details of titles outside your server are missing. To remove it completely: button “Remove helper …”.'
       ],
@@ -249,7 +254,7 @@ dd{margin:0;word-break:break-word}
       svcNas: 'The helper is set up for another device (e.g. a NAS) – start it there (see section “NAS / Docker”) and don’t install it here, otherwise two helpers would run.',
       svcLocalRunning: 'The helper is currently running inside this program. After “Install helper permanently” the background helper takes over.',
       svcLog: 'Log:', svcReport: 'Result:',
-      removeConfirm: 'Really remove the helper?\n\nThis removes the helper\'s autostart, program copy, settings and access file and, if possible, its device entry at plex.tv.\n\nAfterwards the TV no longer shows the watchlist, trends and details of titles outside your server; everything else keeps working. Until you create the app package again without “Set up the helper” and put it on the TV, the app briefly shows “__APP__ helper not reachable” when it looks for it. You can set it up again at any time with “Set up the helper”.',
+      removeConfirm: 'Really remove the helper?\n\nThis removes the helper\'s autostart, program copy, settings and access file and, if possible, its device entry at plex.tv.\n\nAfterwards the TV no longer shows the watchlist, trends and details of titles outside your server; everything else keeps working. Until you create the app package again without “Set up the helper” and put it on the TV, the app briefly shows “__APP__ helper not reachable” when it looks for it. You can set it up again at any time with “Set up the helper” – it then gets a new signing key, and every TV needs a new app package.',
       helperOn: 'Set up the helper', helperRemember: 'Remember access on this computer (needed for “Install helper permanently”; file readable only by you)',
       helperAddr: 'The helper runs on another device, e.g. a NAS (IP address, optional)',
       helperStart: 'Start helper', helperStop: 'Stop helper', helperRunning: function (p) { return 'Helper running on port ' + p + ' (home network only)'; },
@@ -258,6 +263,11 @@ dd{margin:0;word-break:break-word}
       quit: 'Quit program', quitConfirm: 'Really quit? The sync server, the update server and the helper started here will stop. A permanently installed helper keeps running.',
       quitDone: 'The program has stopped. You can close this window.',
       helperForget: 'Remove helper …',
+      signNew: 'Create a new signing key …',
+      signNewWhy: 'With the signing key the app proves to the helper that a request comes from your TV. It is in the app package and in the access file helper.json. Create a new one if either of them may have got into other hands – for example an old app package passed on, the access file copied or a TV sold.',
+      signNewConfirm: 'Create a new signing key?\n\nThe helper then accepts no request with the old key. Afterwards every TV needs a new app package: “Create app package” and put it on every TV (a second one too). Until then the app there shows “Helper: please rebuild the app package” and the watchlist and trends are missing.\n\nProfiles and the connected TV stay; nothing has to be set up again.',
+      signNewDone: 'A new signing key has been created. Now click “Create app package” and put the package on every TV – until then the app there shows “Helper: please rebuild the app package”.',
+      signNewNas: 'If the helper runs on another device (NAS): after “Create app package”, copy the new helper.json there and restart the helper.',
       othersTitle: 'Other servers (optional)',
       othersText: 'Has someone shared their Plex server with you, e.g. a friend? Then __APP__ can also show its libraries in the sidebar. Each profile only gets the servers shared with exactly that profile. Without a tick, everything stays as before.',
       othersScan: 'Search shared servers', othersScanning: 'Searching and checking servers …', othersRescan: 'Search again',
@@ -554,6 +564,11 @@ dd{margin:0;word-break:break-word}
       c.appendChild(h('button', { 'class': 'secondary', disabled: !!busy, onclick: function () { act(hp.running ? 'helper_stop' : 'helper_start'); } }, hp.running ? L.helperStop : L.helperStart));
     }
     if (sv) c.appendChild(serviceBox(L, hp, sv));
+    if (hp.signNew) c.appendChild(h('p', { 'class': 'note', role: 'status', text: L.signNewDone + (hp.address ? ' ' + L.signNewNas : '') }));
+    c.appendChild(h('details', null, h('summary', { text: L.signNew }), h('p', { 'class': 'muted', text: L.signNewWhy }),
+      h('button', { 'class': 'secondary', disabled: !!busy, onclick: function () {
+        if (window.confirm(L.signNewConfirm)) act('helper_new_sign');
+      } }, L.signNew)));
     c.appendChild(h('button', { 'class': 'secondary', disabled: !!busy, onclick: function () {
       if (!window.confirm(L.removeConfirm)) return;
       act('helper_uninstall', { keep: false }, L.svcRemoving);

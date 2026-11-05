@@ -66,7 +66,7 @@
           dtask = null;
           if (dead) return;
           px = info || null;
-          hstate = info ? 'ok' : !D.helper() ? 'none' : err && err.type === 'nohelper' ? (D.helperState() === 'ok' ? 'old' : 'down') : err && (err.type === 'network' || err.type === 'timeout') ? 'down' : 'fail';
+          hstate = info ? 'ok' : D.direct && D.direct() ? 'fail' : !D.helper() ? 'none' : err && err.type === 'nohelper' ? (D.helperState() === 'ok' ? 'old' : 'down') : err && (err.type === 'network' || err.type === 'timeout') ? 'down' : 'fail';   // plex.tv direkt (N.ptv): nie ein Satz ueber den Helfer
           apply();
           if (!bgDone) { bgDone = true; hero.loadBg(x && x.art || it.art || '', it.thumb || x && x.thumb || '', it.title); }   // ein Hintergrund: Art, sonst Poster unscharf
         });

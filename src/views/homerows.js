@@ -436,6 +436,7 @@
       if (p.group === 'new') { lib = c.libOf(p.lib); return N.t('home.row.newIn', { library: lib ? lib.title : '' }); }
       if (p.group === 'hub') return hubLabel(it.id, c);
       if (p.group === 'ext') return N.ext.call('home:label', it.id) || it.id;   // Reihe einer Erweiterung
+      if (p.group === 'live') return N.t('live.row');  // Fernsehen (LIVE-6)
       return c.cat && c.cat.pl && c.cat.pl.title && c.cat.lang === N.i18n.lang() ? c.cat.pl.title : N.t('home.row.playlists');
     },
     val: function (it, c) {
@@ -446,6 +447,7 @@
     desc: function (it, c) {
       var p = HR.parse(it.id);
       if (p.group === 'ext') return N.ext.call('home:desc', it.id) || '';
+      if (p.group === 'live') return N.t('set.hr.tv.desc');
       if (it.id === 'ab') return N.t('mu.hr.ab.desc');   // M4
       if (it.id === 'cw' || it.id === 'deck' || it.id === 'pl') return N.t('set.hr.' + it.id + '.desc');
       var lib = c.libOf(p.lib), name = lib ? lib.title : '';
@@ -462,19 +464,36 @@
     setting: 'railItems', model: N.railRows, noCatalog: true,
     keys: { title: 'set.railItems', how: 'set.ri.how', help: 'set.ri.help', resetDesc: 'set.ri.reset.desc', resetText: 'dlg.riReset.text',
       always: 'set.ri.always', lockedToast: 'toast.riLocked' },
-    avail: function () { return N.railRows.avail(N.ui.rail.allLibs(), !!(N.disc && N.disc.enabled())); },
+    avail: function () { return N.railRows.avail(N.ui.rail.allLibs(), !!(N.disc && N.disc.enabled()), N.ui.rail.live()); },
     locked: function (it) { return !!N.railRows.LOCKED[it.id]; },
     label: function (it) {
       if (it.id === 'search' || it.id === 'discover' || it.id === 'home') return N.t('nav.' + it.id);
+      if (it.id === 'livetv') return N.t('nav.live');
       var lib = railLib(it.id);
       return lib ? lib.title : it.id;
     },
     val: function (it) { var lib = railLib(it.id); return lib && lib.srv ? lib.srvName : ''; },   // Weitere Server: Herkunft rechts
     desc: function (it) {
-      if (it.id === 'search' || it.id === 'discover' || it.id === 'home') return N.t('set.ri.' + it.id + '.desc');
+      if (it.id === 'search' || it.id === 'discover' || it.id === 'home' || it.id === 'livetv') return N.t('set.ri.' + it.id + '.desc');
       var lib = railLib(it.id);
       if (lib && lib.srv) return N.t('set.ri.xlib.desc', { library: lib.title, server: lib.srvName, n: N.ui.rail.MAX });
       return N.t('set.ri.lib.desc', { library: lib ? lib.title : '' });
+    }
+  }));
+
+  /* ---------- "Fernsehsender auf der Startseite" (SPEC LIVE-6): welche Sender in der Reihe "Fernsehen" stehen und in welcher
+   * Reihenfolge – gleiche Liste wie "Startseite anpassen" (OK an/aus, Gelb verschieben, Standard unten). Sender der eingeschalteten
+   * Regionen; Standard: die Hauptprogramme (Daten: home). Erreichbar ueber Einstellungen, den Bereich Fernsehen und die Reihe (TOOLS). */
+  N.router.define('livehome', editor({
+    setting: 'liveHome', model: N.liveLogic.rows, noCatalog: true,
+    keys: { title: 'set.liveHome', how: 'set.lh.how', help: 'set.lh.help', resetDesc: 'set.lh.reset.desc', resetText: 'dlg.lhReset.text' },
+    avail: function () { return N.live.homeAvail(); },
+    label: function (it) { var c = N.liveLogic.channel(it.id); return c ? c.name : it.id; },
+    val: function (it) { var c = N.liveLogic.channel(it.id); return c ? N.live.regionName(c.region) : ''; },
+    desc: function (it) {
+      var c = N.liveLogic.channel(it.id);
+      if (!c) return '';
+      return N.t(c.geo ? 'set.lh.ch.geo.desc' : 'set.lh.ch.desc', { channel: c.name, region: N.live.regionName(c.region), country: c.geo ? N.t('live.country.' + c.geo) : '' });
     }
   }));
 })(N);

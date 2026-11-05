@@ -6,13 +6,19 @@ and offers a few FIXED plain-HTTP JSON routes to the TV. It is NOT a proxy:
 - every TV route maps to one hard-coded plex.tv URL pattern (ROUTES/UPSTREAM below); the TV never sends a URL or host,
 - every upstream URL is checked against UPSTREAM (host + method + path regex + allowed query keys) before it is fetched,
 - https only, certificate checks on, redirects are never followed, 10 s timeout, 256 KB response cap,
-- only clients on private networks (optionally only the TV's address), shared key from setup.json, per-client rate limit,
+- only clients on private networks (optionally only the TV's address), per-client rate limit,
+- every route except the hello is SIGNED (protocol 2): HMAC-SHA256 with the signing key that reaches the TV inside every app
+  package (setup.json helper.sign; "Create a new signing key" in the setup program replaces it) over neo-2|method|path+query|time|nonce|profile|SHA-256(body); time +-120 s, a nonce is
+  never accepted twice (also when the request is refused before the check: burn). No key travels over the home network
+  apart from the app package (the old X-Neo-Key went along in plain text and is
+  refused once helper.json has a signing key; only a helper.json from an older setup without one still takes it),
 - plex.tv tokens of the chosen profiles stay in this process (and, if "remember" is ticked, in a 0600 file); they are
   never sent to the TV, never logged; answers to the TV are slim JSON (no tokens, no streaming/provider fields).
 
 Live check of the upstream endpoints: docs/research/discover.md "Helfer: live geprueft" (read-only GETs, 27.10.2026).
 Python 3 standard library only.
 """
+import hashlib
 import hmac
 import json
 import os
@@ -26,8 +32,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import VERSION, brand, ext
-from .netutil import is_private_ipv4, other_candidate_uris
+from . import VERSION, brand, ext, live
+from .netutil import container_gateway, is_private_ipv4, json_loads, other_candidate_uris
 import ipaddress
 
 HELPER_PORT = 32499                      # shared with the update server (same LanServer)
@@ -42,6 +48,13 @@ PLEX_TV = 'plex.tv'
 HEX = re.compile(r'^[0-9a-f]{24}$')
 UUID = re.compile(r'^[A-Za-z0-9-]{4,64}$')
 KEY = re.compile(r'^[A-Za-z0-9_-]{16,128}$')
+SIGN = re.compile(r'^[0-9a-f]{64}$')         # signing key (helper.json "sign", setup.json helper.sign)
+NONCE = re.compile(r'^[0-9a-f]{12,64}$')
+SIG = re.compile(r'^[0-9a-f]{64}$')
+SKEW = 120                               # seconds the TV clock may differ (the app corrects its clock, CLK-1)
+NONCE_TTL = 600
+NONCE_MAX = 2000                         # per client (rate limit 30 requests / 10 s -> at most 1800 in 10 min)
+NONCE_CLIENTS = 32
 GUID = re.compile(r'^plex://(movie|show)/([0-9a-f]{24})$')
 IMG_HOSTS = ('images.plex.tv', 'metadata-static.plex.tv', 'image.tmdb.org', 'artworks.thetvdb.com')
 
@@ -151,8 +164,8 @@ def slim(md):
 
 
 def metadata_list(data):
-    try: d = json.loads(data.decode('utf-8'))
-    except (ValueError, UnicodeDecodeError): raise HelperError(502, 'parse')
+    try: d = json_loads(data)
+    except ValueError: raise HelperError(502, 'parse')
     mc = d.get('MediaContainer') if isinstance(d, dict) else None
     if not isinstance(mc, dict): raise HelperError(502, 'parse')
     md = mc.get('Metadata') or []
@@ -243,14 +256,18 @@ def store_path():
 PLEX_PAGE_MAX = 100        # discover.provider.plex.tv lehnt X-Plex-Container-Size > 100 mit 400 ab (live geprueft 27.10.)
 
 
-STORE_KEYS = ('kind', 'schema', 'key', 'owner', 'allow', 'profiles')
+STORE_KEYS = ('kind', 'schema', 'key', 'sign', 'signOld', 'owner', 'allow', 'profiles')
+SIGN_OLD = 4                             # retired signing keys kept to recognise an old app package
 
 
 class Store(object):
     """Helper configuration: shared key, port, allowed TV address, plex.tv token per profile uuid.
     Kept in memory; saved only on request to a file readable by the current user only (0600)."""
-    def __init__(self, key=None, profiles=None, allow='', owner=''):
+    def __init__(self, key=None, profiles=None, allow='', owner='', sign='', sign_old=None):
         self.key = key if isinstance(key, str) and KEY.match(key) else secrets.token_urlsafe(24)
+        self._sign = sign if isinstance(sign, str) and SIGN.match(sign) else ''
+        # retired signing keys ("Create a new signing key"): never accepted, only to tell an old app package "create it again"
+        self.sign_old = [k for k in (sign_old or []) if isinstance(k, str) and SIGN.match(k)][-SIGN_OLD:]
         self.profiles = {}                # uuid -> {'token', 'title', 'kind'}
         self.owner = owner
         self.allow = allow
@@ -264,6 +281,37 @@ class Store(object):
         if kind == 'owner': self.owner = uuid
         return True
 
+    @property
+    def sign(self):
+        """Signing key of the TV routes ('' = helper.json from a setup before 1.0.17; that TV package has none either).
+        Private edition: the first version of this key was called "arrSig" (kept in extra) - same key, same TVs."""
+        if self._sign: return self._sign
+        a = self.extra.get('arrSig')
+        return a if isinstance(a, str) and SIGN.match(a) else ''
+
+    @sign.setter
+    def sign(self, v):
+        self._sign = v if isinstance(v, str) and SIGN.match(v) else ''
+
+    def new_sign(self):
+        """Make the signing key once (setup program); a new setup keeps it, so installed TVs keep working."""
+        if not self.sign: self._sign = secrets.token_hex(32)
+        return self.sign
+
+    def rotate_sign(self):
+        """Button "Create a new signing key": a fresh key; the old one is only kept to recognise old app packages (they get
+        401 no_sig = "create the app package again"). Every TV needs a new app package afterwards."""
+        old = self.sign
+        if old and old not in self.sign_old: self.sign_old = (self.sign_old + [old])[-SIGN_OLD:]
+        self.extra.pop('arrSig', None)
+        self._sign = secrets.token_hex(32)
+        while self._sign in self.sign_old: self._sign = secrets.token_hex(32)
+        return self._sign
+
+    def retired(self, msg, sig):
+        """Is `sig` a valid HMAC of `msg` under a retired signing key (old app package)?"""
+        return any(hmac.compare_digest(hmac.new(k.encode('utf-8'), msg.encode('utf-8'), hashlib.sha256).hexdigest(), sig) for k in self.sign_old)
+
     def token(self, uuid):
         p = self.profiles.get(uuid)
         return p and p['token']
@@ -276,6 +324,8 @@ class Store(object):
         d = dict((k, v) for k, v in self.extra.items() if k not in STORE_KEYS)
         d.update({'kind': 'plexneo-helper', 'schema': 1, 'key': self.key, 'owner': self.owner, 'allow': self.allow,
                   'profiles': self.profiles})
+        if self.sign: d['sign'] = self.sign
+        if self.sign_old: d['signOld'] = list(self.sign_old)
         return d
 
     @classmethod
@@ -283,7 +333,7 @@ class Store(object):
         if not isinstance(d, dict) or d.get('kind') != 'plexneo-helper' or d.get('schema') != 1: raise ValueError('helper file')
         from .netutil import is_private_ipv4
         allow = d.get('allow') if isinstance(d.get('allow'), str) and is_private_ipv4(d.get('allow')) else ''
-        s = cls(d.get('key'), {}, allow)
+        s = cls(d.get('key'), {}, allow, sign=d.get('sign'), sign_old=d.get('signOld') if isinstance(d.get('signOld'), list) else None)
         for u, p in (d.get('profiles') or {}).items():
             if isinstance(p, dict): s.add(u, p.get('token'), p.get('title', ''), p.get('kind', 'home'))
         if not s.profiles: raise ValueError('no profiles')
@@ -334,6 +384,34 @@ class RateLimit(object):
             return True
 
 
+# ---------------------------------------------------------------- signatures (protocol 2)
+def sig_message(method, path, ts, nonce, profile, body=b''):
+    """Signed text of a TV request - the same in src/plex/discover.js (N.disc.sigMsg)."""
+    return '\n'.join(['neo-2', method, path, ts, nonce, profile, hashlib.sha256(body or b'').hexdigest()])
+
+
+class Nonces(object):
+    """Nonces of the last NONCE_TTL seconds, at most NONCE_MAX per client and NONCE_CLIENTS clients (one client cannot push
+    out another); a replay is checked across all clients."""
+    def __init__(self):
+        self.d = {}
+        self.lock = threading.Lock()
+
+    def use(self, client, nonce, now):
+        with self.lock:
+            for c in list(self.d):
+                m = self.d[c]
+                for n in [n for n, t in m.items() if now - t > NONCE_TTL]: del m[n]
+                if not m: del self.d[c]
+            if any(nonce in m for m in self.d.values()): raise HelperError(401, 'replay')
+            mine = self.d.get(client)
+            if mine is None:
+                if len(self.d) >= NONCE_CLIENTS: raise HelperError(429, 'rate')
+                mine = self.d[client] = {}
+            if len(mine) >= NONCE_MAX: raise HelperError(429, 'rate')
+            mine[nonce] = now
+
+
 # ---------------------------------------------------------------- the helper
 class Helper(object):
     def __init__(self, store, client_id, fetch=None, clock=time.time, rate=None):
@@ -349,6 +427,11 @@ class Helper(object):
         self.background = False           # installed helper (background.py): the setup page then shows it as such
         self.store_path = None            # helper.json this helper runs from (extensions may save their block there)
         self.ext = ext.helper_apis(self)    # routes of optional extensions of the edition (ext.py); public: none
+        self.live = live.Live()             # live TV for the 2014 TV: picture + separate sound joined (live.py, SPEC LIVE-10)
+        self.nonces = Nonces()
+        self.nat_gw = container_gateway()   # Docker bridge mode: the address every LAN client seems to come from ('' = none)
+        self.nat_seen = False
+        self.log = None                     # optional callable(text): headless/background log (never keys or tokens)
 
     # --- plex.tv ---
     def _headers(self, token, lang='de'):
@@ -396,7 +479,7 @@ class Helper(object):
     def state(self, uuid, ids):
         tok = self.store.token(uuid)
         data = self.call('GET', DISCOVER, '/library/metadata/%s/userState' % ','.join(ids), None, tok)
-        try: us = (json.loads(data.decode('utf-8')).get('MediaContainer') or {}).get('UserState') or []
+        try: us = (json_loads(data).get('MediaContainer') or {}).get('UserState') or []
         except (ValueError, UnicodeDecodeError, AttributeError): raise HelperError(502, 'parse')
         if isinstance(us, dict): us = [us]
         on = dict((i, False) for i in ids)
@@ -435,7 +518,7 @@ class Helper(object):
         def get():
             from .plextv import parse_resources
             data = self.call('GET', PLEX_TV, '/api/v2/resources', [('includeHttps', 0), ('includeRelay', 0), ('includeIPv6', 0)], tok)
-            try: res = parse_resources(json.loads(data.decode('utf-8')))
+            try: res = parse_resources(json_loads(data))
             except (ValueError, UnicodeDecodeError): raise HelperError(502, 'parse')
             return {'servers': [{'id': r['machineIdentifier'], 'uris': other_candidate_uris(r)}
                                 for r in res if not r['owned'] and not r.get('httpsRequired')][:20]}
@@ -455,10 +538,64 @@ class Helper(object):
     # --- TV-facing request handling (pure; LanServer passes method/path/headers/client) ---
     def hello(self):
         d = {'name': 'plex-neo-helper', 'version': VERSION, 'brand': brand.CURRENT.get('slug', ''), 'watchlist': True, 'discover': True,
-             'features': ['watchlist', 'discover', 'servers', 'details', 'nb'] + (['update'] if self.update_on else [])}
+             'features': ['watchlist', 'discover', 'servers', 'details', 'nb', 'live', 'sig2'] + (['update'] if self.update_on else [])}
         for x in self.ext: d['features'] += [f for f in x.features() if f not in d['features']]
         if self.background: d['background'] = True
+        if self.nat_seen: d['nat'] = True                 # the app explains: start the container with host networking
         return d
+
+    def is_nat(self, client):
+        """Request through the NAT of a Docker bridge network: the helper cannot tell the TV from any other device."""
+        if not (self.nat_gw and str(client) == self.nat_gw): return False
+        if not self.nat_seen:
+            self.nat_seen = True
+            if self.log:
+                self.log('Docker im Bridge-Modus: der Helfer sieht nur %s statt der Adresse des Fernsehers. Bitte den Container mit '
+                         'Host-Netzwerk starten (--net=host bzw. network_mode: host). / Docker bridge mode: the helper only sees %s '
+                         'instead of the TV\'s address. Please start the container with host networking.' % (self.nat_gw, self.nat_gw))
+        return True
+
+    def deny(self, client):
+        """Error for a client outside the allowed addresses: 'nat' (Docker bridge, fixable) or 'lan_only'."""
+        return HelperError(403, 'nat' if self.is_nat(client) else 'lan_only')
+
+    def verify(self, method, raw_path, headers, client, body=b'', bind=True):
+        """Protocol 2 (signed with the signing key, never a key in plain text) -> profile uuid ('' allowed). Without a signing
+        key in helper.json (setup before 1.0.17) the old shared key is still taken - the TV package of that setup has no
+        signing key either. A TV that signs meets such a helper -> 401 no_sig; a TV that sends only the plain key to a helper
+        with a signing key -> 401 sig_required (both: "create the app package again"). Never both ways for one helper."""
+        key = self.store.sign
+        sv = str(headers.get('X-Neo-Sv') or '')
+        uuid = str(headers.get('X-Neo-Profile') or '')
+        if uuid and not UUID.match(uuid): raise HelperError(400, 'profile')
+        if not key:
+            if sv == '2': raise HelperError(401, 'no_sig')
+            if not hmac.compare_digest(str(headers.get('X-Neo-Key') or ''), self.store.key): raise HelperError(401, 'key')
+            return uuid
+        if sv != '2': raise HelperError(401, 'sig_required')
+        ts, nonce, sig = str(headers.get('X-Neo-Time') or ''), str(headers.get('X-Neo-Nonce') or ''), str(headers.get('X-Neo-Sig') or '').lower()
+        if not re.match(r'^\d{9,11}$', ts) or not NONCE.match(nonce) or not SIG.match(sig): raise HelperError(401, 'sig')
+        msg = sig_message(method, raw_path, ts, nonce, uuid, body)
+        want = hmac.new(key.encode('utf-8'), msg.encode('utf-8'), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(want, sig):
+            # signed with a retired key (new signing key made in the setup program): the TV needs a new app package
+            raise HelperError(401, 'no_sig' if self.store.retired(msg, sig) else 'sig')
+        now = self.clock()
+        if abs(now - int(ts)) > SKEW: raise HelperError(401, 'time')
+        self.nonces.use(str(client or ''), nonce, now)
+        if not bind: return uuid
+        for x in self.ext:                                  # e.g. "Anfragen": the TV is bound on its first signed contact
+            fn = getattr(x, 'signed', None)
+            if fn: fn(client)
+        return uuid
+
+    def burn(self, method, raw_path, headers, client, body=b''):
+        """A request is refused BEFORE its signature is checked (address filter, rate limit): if it is validly signed, use up
+        its nonce anyway. Otherwise someone reading along could send the refused request again from another address within
+        120 s and get the answer. HMAC is cheap, so the rate limit still keeps the expensive work (plex.tv) away. Never binds,
+        never raises."""
+        try: self.verify(method, raw_path, headers, client, body, bind=False)
+        except HelperError: pass
 
     def open_path(self, path):
         """An extension route that any home-network client may use right now (LanServer: beyond the TV-only allow-list)."""
@@ -477,13 +614,18 @@ class Helper(object):
             try:
                 if not host_ok(headers.get('Host')): raise HelperError(403, 'host')
                 opened = bool(getattr(x, 'open_path', None) and x.open_path(path))
-                if not client_ok(client, '' if opened else self.store.allow): raise HelperError(403, 'lan_only')
-                if not self.rate.ok(client): raise HelperError(429, 'rate')
+                err = None
+                if not client_ok(client, '' if opened else self.store.allow) or (self.store.allow and self.is_nat(client)): err = self.deny(client)
+                elif not self.rate.ok(client): err = HelperError(429, 'rate')
+                if err:
+                    if getattr(x, 'burn', None): x.burn(method, path, qs, headers, body, client)
+                    raise err
                 return x.handle(method, path, qs, headers, body, client)
             except HelperError as e:
                 return e.status, {'error': e.code}
             except Exception:
                 return 500, {'error': 'internal'}
+        if path.startswith('/live/'): return self._live(method, path, qs, headers, client)
         if method == 'POST': return None
         if not (path == '/neo-helper' or path == '/watchlist' or path.startswith('/watchlist/') or path.startswith('/discover/') or path in ('/servers', '/details')):
             return None
@@ -495,14 +637,22 @@ class Helper(object):
         except Exception:                                  # never a traceback (could carry request data) to stderr/TV
             return 500, {'error': 'internal'}
 
+    def _gate(self, method, raw_path, headers, client):
+        """Address filter + rate limit; a refused signed request still uses up its nonce (burn)."""
+        err = None
+        if not client_ok(client, self.store.allow) or (self.store.allow and self.is_nat(client)): err = self.deny(client)
+        elif not self.rate.ok(client): err = HelperError(429, 'rate')
+        if err:
+            if raw_path.partition('?')[0] != '/neo-helper': self.burn(method, raw_path, headers, client)
+            raise err
+
     def _route(self, method, path, qs, headers, client):
-        if not client_ok(client, self.store.allow): raise HelperError(403, 'lan_only')
-        if not self.rate.ok(client): raise HelperError(429, 'rate')
+        self.is_nat(client)                                  # notice a Docker bridge once (hello: 'nat', log)
+        self._gate(method, path + ('?' + qs if qs else ''), headers, client)
         if path == '/neo-helper':
             if method != 'GET': raise HelperError(405, 'method')
             return self.hello()
-        if not hmac.compare_digest(str(headers.get('X-Neo-Key') or ''), self.store.key): raise HelperError(401, 'key')
-        uuid = str(headers.get('X-Neo-Profile') or '')
+        uuid = self.verify(method, path + ('?' + qs if qs else ''), headers, client)
         if not UUID.match(uuid): raise HelperError(400, 'profile')
         q = parse_qs(qs)
         route = path if path in ('/watchlist', '/watchlist/state', '/servers', '/details') else 'item' if path.startswith('/watchlist/') else 'discover'
@@ -538,6 +688,41 @@ class Helper(object):
         if not self.store.token(uuid) and not self.store.token(self.store.owner): raise HelperError(404, 'profile')
         return self.discover(uuid, lst, q_choice(q, 'type', {'movie': 1, 'show': 2}, None, required=True), q_int(q, 'size', 20, 1, 30))
 
+    def _live(self, method, path, qs, headers, client):
+        """Live TV routes (live.py): /live/open (key header) hands out a session path; the TV's player then fetches
+        /live/<token>/index.m3u8 and /live/<token>/s<n>.ts (no headers possible: the token in the path is the key, bound to
+        this client); DELETE /live/<token> ends it. Same LAN, Host and rate rules as every route."""
+        from .lanserver import Raw
+        try:
+            if not host_ok(headers.get('Host')): raise HelperError(403, 'host')
+            if path == '/live/open': self._gate('GET', path + ('?' + qs if qs else ''), headers, client)
+            else:
+                if not client_ok(client, self.store.allow) or (self.store.allow and self.is_nat(client)): raise self.deny(client)
+                if not self.rate.ok(client): raise HelperError(429, 'rate')
+            if path == '/live/open':
+                if method != 'GET': raise HelperError(405, 'method')
+                self.verify('GET', path + ('?' + qs if qs else ''), headers, client)    # signed; the session token below stays per client
+                q = parse_qs(qs)
+                check_keys(q, '/live/open')
+                h = q.get('h') or str(live.DEFAULT_H)
+                if not re.fullmatch(r'\d{3,4}', h): raise HelperError(400, 'h')
+                return 200, self.live.open(q.get('ch') or '', client, int(h))
+            m = re.fullmatch(r'/live/([A-Za-z0-9_-]{32})(?:/(index\.m3u8|s\d{1,12}\.ts))?', path)
+            if not m or qs: raise HelperError(404, 'route')
+            tok, name = m.group(1), m.group(2)
+            if not name:
+                if method != 'DELETE': raise HelperError(405, 'method')
+                return 200, {'ok': self.live.close(tok, client)}
+            if method != 'GET': raise HelperError(405, 'method')
+            if name == 'index.m3u8': return 200, Raw(self.live.playlist(tok, client), 'application/vnd.apple.mpegurl')
+            return 200, Raw(self.live.segment(tok, name, client), 'video/mp2t')
+        except HelperError as e:
+            return e.status, {'error': e.code}
+        except live.LiveError as e:
+            return e.status, {'error': e.code}
+        except Exception:
+            return 500, {'error': 'internal'}
+
     def _need_profile(self, uuid):
         if not self.store.token(uuid): raise HelperError(404, 'profile')     # e.g. profile with a Plex PIN
 
@@ -562,7 +747,7 @@ def host_ok(host):
 
 
 ROUTE_KEYS = {'/watchlist': ('type', 'start', 'size'), '/watchlist/state': ('ids',), 'item': (), 'discover': ('type', 'size'), '/servers': (),
-              '/details': ('id', 'lang')}
+              '/details': ('id', 'lang'), '/live/open': ('ch', 'h'), 'live': ()}
 LANGS = {'de': 1, 'en': 1, 'nb': 1}     # nb: Norwegian (Bokmål) app language since 03.11.2026; announced as feature 'nb'
 
 
@@ -627,6 +812,12 @@ def run_headless(path=None, port=HELPER_PORT, bind='0.0.0.0', out=None, wait=Fal
     srv = LanServer('helper', port, allow=[store.allow] if store.allow else None, bind=bind)
     srv.api = Helper(store, cid)
     srv.api.store_path = path or store_path()
+    def _log(msg):
+        try: out.write(time.strftime('%Y-%m-%d %H:%M:%S ') + msg + '\n'); out.flush()
+        except (OSError, ValueError): pass
+    srv.api.log = _log
+    if srv.api.nat_gw: _log('Container erkannt, Netz-Gateway %s: kommen Anfragen von dort, laeuft Docker im Bridge-Modus (bitte --net=host). / '
+                            'Container detected, gateway %s: requests from there mean Docker bridge mode (please use --net=host).' % (srv.api.nat_gw, srv.api.nat_gw))
     srv.start()
     try:                                                   # Docker/systemd stop with SIGTERM -> clean shutdown
         import signal

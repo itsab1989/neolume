@@ -1,8 +1,9 @@
 /* Ansicht 'nowplaying' – Jetzt laeuft (M4; research 3.2/3.3). Liest nur den Zustand von N.audio (Wiedergabe laeuft weiter, wenn
  * die Ansicht geschlossen wird). Hintergrund Art bzw. Cover unscharf + Scrim, Cover 400x400 links, rechts Ueberzeile, Titel, Interpret,
  * Album bzw. Kapitel, Fortschrittsbalken + Zeiten (max. 1x/s), Knopfreihe (Sprite-Symbole) mit Label unter dem fokussierten Knopf:
- *   Musik:    ⏮ · −x · ⏯ · +x · ⏭ · Zufall · Wiederholen (aus/alle/einen) · Warteschlange · Sleep-Timer
- *   Hoerbuch: Kapitel zurueck · −x · ⏯ · +x · Kapitel vor · Kapitel · Sleep-Timer (inkl. "Ende des Kapitels"); kein Zufall/Wiederholen
+ *   Musik:    ⏮ · −x · ⏯ · +x · ⏭ · Zufall · Wiederholen (aus/alle/einen) · Warteschlange · Sleep-Timer · Beenden
+ *   Hoerbuch: Kapitel zurueck · −x · ⏯ · +x · Kapitel vor · Kapitel · Sleep-Timer (inkl. "Ende des Kapitels") · Beenden; kein Zufall/Wiederholen
+ *   "Beenden" (■) = STOP-Taste (die Smart-Touch-Fernbedienung hat keine): Wiedergabe aus, zurueck zum Stoebern (Nutzerwunsch 05.11.)
  * Ein System mit dem Video-Player (28.10.): gleiche Mitte ⏮ −x ⏯ +x ⏭, gleiche Play-Form (64 x 56), Aufschrift mit Vorzeichen,
  * Sprungweiten aus den Einstellungen (Musik: "Pfeiltasten & Knoepfe", Hoerbuch: "Vor-/Rueckspulen", Standard 10 bzw. 30 s),
  * RW/FF = "Vor-/Rueckspulen"; wiederholte Spruenge sammeln (N.SeekAcc: Ziel sofort auf dem Balken, EIN Sprung nach 600 ms Ruhe).
@@ -13,7 +14,7 @@
  * "Balken dehnt sich" (B): ueber dem Balken stehen Titel/Interpret/Kapitel, darunter liegen Zeitzeile und Knopfreihe eng – eine
  * zusaetzliche Leiste haette dort keinen sicheren Platz (TV-Befund 28.10.). */
 (function (N) {
-  var U = N.util, MU = N.music, F = N.fmt, TVG = { X0: 600, BY: 488, BAR_X: 600, BAR_W: 536, BAR_Y: 404 };   // Lagen am TV (flexibel: npGeom)
+  var U = N.util, MU = N.music, F = N.fmt, TVG = { X0: 600, BY: 488, BAR_X: 600, BAR_W: 536, BAR_Y: 404 }, TV_R = 1216;   // Lagen am TV (flexibel: npGeom)
   N.router.define('nowplaying', function () {
     var s = { rail: N.ui.rail && N.ui.rail.cur || 'home', wheelKeys: ['LEFT', 'RIGHT'], news: 'top' };   // HOME-13: Hinweis oben rechts (frei)   // Seitenleiste sichtbar (Feedback-Regel 3)
     var X0 = TVG.X0, BY = TVG.BY, BAR_X = TVG.BAR_X, BAR_W = TVG.BAR_W, BAR_Y = TVG.BAR_Y;
@@ -95,22 +96,22 @@
     };
     /* Knopfreihe je Modus (einmal je Modus aufgebaut, kein Umbau im Tastenpfad) */
     function buildButtons() {
-      var want = book() ? ['prev', 'back', 'pp', 'fwd', 'next', 'chapters', 'sleep'] : ['prev', 'back', 'pp', 'fwd', 'next', 'shuffle', 'repeat', 'queue', 'sleep'];
+      var want = book() ? ['prev', 'back', 'pp', 'fwd', 'next', 'chapters', 'sleep', 'stop'] : ['prev', 'back', 'pp', 'fwd', 'next', 'shuffle', 'repeat', 'queue', 'sleep', 'stop'];
       if (want.join() === ids.join()) return;
       for (var k in btnEl) if (btnEl[k].parentNode) btnEl[k].parentNode.removeChild(btnEl[k]);
       btnEl = {}; dots = {}; ids = want;
+      var n = ids.length, bw = (n - 1) * 48 + 64;
       if (G) {                                         // flexibel: Luecke so, dass alle Knoepfe in die Breite passen (4–16), schmal mittig
-        var n = ids.length, bw = (n - 1) * 48 + 64;
         BG = Math.max(4, Math.min(16, Math.floor((G.tw - bw) / (n - 1))));
         XB = G.stk ? G.tx + Math.round((G.tw - bw - (n - 1) * BG) / 2) : G.tx;
-      }
+      } else BG = Math.min(16, Math.floor((TV_R - X0 - bw) / (n - 1)));   // TV: bis zum Rand der sicheren Flaeche (Musik 10 Knoepfe: 13, Hoerbuch 16)
       var x = XB;
       for (var i = 0; i < ids.length; i++) {
         var id = ids[i], lg = id === 'pp', b = U.el('div', 'pl-b np-b' + (lg ? ' lg' : ''), root, 'left:' + x + 'px;top:' + (lg ? BY - 4 : BY) + 'px');
         b._x = x; b._w = lg ? 64 : 48; b._y = lg ? BY - 4 : BY; b._h = lg ? 56 : 48;
         if (id === 'back' || id === 'fwd') { var nm = U.txt('div', 'num', b, ''); if (id === 'back') numB = nm; else numF = nm; }
         else {
-          var ic = N.ui.icon(b, { prev: 'prev', pp: 'pause', next: 'next', shuffle: 'shuffle', repeat: 'repeat', queue: 'chapters', chapters: 'chapters', sleep: 'moon' }[id]);
+          var ic = N.ui.icon(b, { prev: 'prev', pp: 'pause', next: 'next', shuffle: 'shuffle', repeat: 'repeat', queue: 'chapters', chapters: 'chapters', sleep: 'moon', stop: 'stop' }[id]);
           if (id === 'pp') ppIc = ic; if (id === 'repeat') repIc = ic;
         }
         if (id === 'shuffle' || id === 'repeat' || id === 'sleep') dots[id] = U.el('i', 'np-dot', b, 'display:none');
@@ -136,14 +137,15 @@
         case 'queue': return N.t('mu.b.queue');
         case 'chapters': return N.t('mu.b.chapters');
         case 'sleep': return c && c.sleep.mode !== 'off' ? sleepText() : N.t('pl.sleep');
+        case 'stop': return N.t('mu.b.stop');
       }
       return '';
     }
     function paintLabel() {
       var b = btnEl[fb]; if (!b) return;
       U.setText(lblT, label(fb));
-      // mittig unter dem Knopf, aber nie links aus der Inhaltsspalte (x 600) heraus – wie das Label im Video
-      var c = b._x + b._w / 2, w = lblT.parentNode.offsetWidth || 0, x = Math.max(X0, c - w / 2);
+      // mittig unter dem Knopf, aber nie aus der Inhaltsspalte (links x 600, rechts Rand der sicheren Flaeche bzw. Spaltenende) heraus
+      var c = b._x + b._w / 2, w = lblT.parentNode.offsetWidth || 0, x = Math.max(X0, Math.min(c - w / 2, (G ? G.tx + G.tw : TV_R) - w));
       lbl.style.left = Math.round(x + w / 2 - 150) + 'px';
     }
     function setFb(id) { U.cls(btnEl[fb], 'is-focus', false); fb = id; U.cls(btnEl[fb], 'is-focus', true); N.fx.move(btnEl[fb]); paintLabel(); }
@@ -237,6 +239,7 @@
         case 'repeat': var r = c.cycleRepeat(); N.ui.toast.show(N.t('mu.b.repeat.' + r), { icon: 'confirm' }); break;
         case 'queue': case 'chapters': listPanel(); break;
         case 'sleep': sleepPanel(); break;
+        case 'stop': acc.cancel(); c.stop('STOP'); N.router.back(); return;   // wie die STOP-Taste
       }
       paintToggles();
     }

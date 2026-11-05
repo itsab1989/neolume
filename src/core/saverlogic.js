@@ -60,8 +60,15 @@
    * xc = Mitte des Uebergangs unter der Oberkante der Uhrzeile, gti = Oberkante der Titelbuchstaben, gb = Mitte des unteren Auslaufs
    * unter dem Text. Erzeugt von tools/make_assets.js (ambScrims, mit ambField), geprueft in tests/saver.test.js (Kontrast auf Weiss an
    * jedem Buchstaben, Ende hinter der Zeile, oben schmal, buendig, keine Stufe). */
-  var AMB = { iw: 1100, k: 1.05, hx: { a: 0.72, s1: 75, s2: 200, c: 200, tail: 230 }, sc: 38, so: 60, offc: 52, offt: 60, offs: 36,
-    gck: 14, gcb: 66, xc: 77, gti: 8, gb: 18, zref: 100, zref2: 136, ihu: 420, ihd: 420 };
+  /* Nutzerbefund 05.11. (1.0.16: zur Bildmitte hin endete die Abdunklung sehr dicht hinter dem Zeilenende bzw. ueber der Uhr/unter der
+   * letzten Zeile – unausgewogen neben dem breiten dunklen Rand): der Auslauf zur Mitte ist um ~45 % gestreckt (s1 75 -> 110 mit
+   * offc/offt/offs 52/60/36 -> 76/88/53, so 60 -> 88 mit gb 18 -> 34, zref/zref2 +3: dieselbe Form, nur laenger; Deckkraft am Zeilenende wie in 1.0.16). Bis
+   * alpha < 0,02 vom letzten Buchstaben: waagrecht 160/168 -> 230/242 px (Uhr/Text), senkrecht ~124 -> ~181 px (ueber der Uhr) bzw.
+   * ~112 -> ~160 px (unter der letzten Zeile). Zum Seiten-/Bildschirmrand hin unveraendert. u/d sind senkrecht nur ein Hintergrund mit
+   * weicher Kante und gleichmaessigem Rest – sie liegen in halber Hoehe vor (vs, ihu/ihd = Anzeigehoehe), damit die laengere Kante
+   * nicht mehr Speicher kostet. */
+  var AMB = { iw: 1100, k: 1.05, hx: { a: 0.72, s1: 110, s2: 200, c: 200, tail: 250 }, sc: 38, so: 88, offc: 76, offt: 88, offs: 53,
+    gck: 14, gcb: 66, xc: 77, gti: 8, gb: 34, zref: 103, zref2: 139, ihu: 640, ihd: 640, vs: 2 };
   function erfc(x) {   // Abramowitz/Stegun 7.1.26 (Fehler < 1,5e-7)
     var z = Math.abs(x), t = 1 / (1 + 0.3275911 * z);
     var q = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) * Math.exp(-z * z);
@@ -71,12 +78,13 @@
   function ambCk() { return AMB.xc - AMB.gck + 0.6 * AMB.so; }           // c: Abstand Einblenden ueber der Uhr -> Ausblenden darunter
   function ambSize(k) {
     var A = AMB, To = tl(A.so), Tc = tl(A.sc);
-    return { u: [A.iw, A.ihu], d: [A.iw, A.ihd], c: [A.iw, To + Math.round(ambCk()) + Tc], z: [A.iw, Tc + A.zref + To], z2: [A.iw, Tc + A.zref2 + To] }[k];
+    return { u: [A.iw, A.ihu / A.vs], d: [A.iw, A.ihd / A.vs], c: [A.iw, To + Math.round(ambCk()) + Tc], z: [A.iw, Tc + A.zref + To], z2: [A.iw, Tc + A.zref2 + To] }[k];
   }
   function ambImg(k, r) { return 'scrim-saver-a' + k + (r ? '-r' : '') + '.png'; }
   /* Deckkraft des Bilds k (u/d/c/z/z2, r gespiegelt) an Pixelmitte (x, y) – Quelle fuer tools/make_assets.js */
   function ambField(k, r, x, y) {
     var A = AMB, H = A.hx, To = tl(A.so), Tc = tl(A.sc), S = ambSize(k), u = (r ? S[0] - x : x) - (S[0] - H.tail), v;
+    if (k === 'u' || k === 'd') { y *= A.vs; S = [S[0], S[1] * A.vs]; }   // halbe Hoehe gespeichert: y in Anzeige-px
     function rise(c, sg) { return 0.5 * erfc((c - y) / sg); }            // 0 -> 1 um y = c
     function fall(c, sg) { return 0.5 * erfc((y - c) / sg); }            // 1 -> 0 um y = c
     v = k === 'u' ? rise(To, A.so) : k === 'd' ? fall(S[1] - To, A.so) : k === 'c' ? rise(To, A.so) * fall(To + Math.round(ambCk()), A.sc) :

@@ -44,11 +44,16 @@ class Wizard(object):
         except (OSError, ValueError):
             self.helper_store, self.helper_remember = None, True
         self.helper_wanted = self.helper_store is not None
+        # TV address of an earlier setup that was not remembered in the settings: keep it (the TV keeps working unchanged)
+        if not self.tv_address and self.helper_store and self.helper_store.allow: self.tv_address = self.helper_store.allow
+        self.tv_fetched = ''                   # address that downloaded the app package just now (the TV; sync lock)
+        self.sync.on_fetch = self._fetched
         self.helper_address = ''               # other device (NAS) running the helper; '' = this computer
         self.helper_skipped = []               # profile titles without watchlist (Plex PIN)
         self.helper = None
         self._service_ctx = service_ctx        # installed helper (service.py); created on first use
         self.service_report = None             # last install/remove report for the page
+        self.sign_new = False                  # "Create a new signing key" pressed, no app package with it yet
         self.reset()
 
     # ---------- helpers ----------
@@ -72,6 +77,13 @@ class Wizard(object):
         self.others_skipped = []                # profile titles that could not be checked (Plex PIN)
         if getattr(self, 'sync', None) and self.sync.running: self.sync.stop()
         ext.reset(self)
+
+    def _fetched(self, addr, path):
+        """Sync server served a file: the device that downloads the app package is the TV (only the device that fetched
+        widgetlist.xml first gets it, see LanServer.lock_path). Extensions may bind the helper to it (ext.tv_fetched)."""
+        if path != '/' + brand.package_name() or addr.startswith('127.') or addr == '::1': return
+        self.tv_fetched = addr
+        ext.tv_fetched(self, addr)
 
     def _need(self, what):
         if what == 'login' and not self.token: raise StepError('not_logged_in')
@@ -253,6 +265,7 @@ class Wizard(object):
         self.build_info = {'size': len(data), 'profiles': len(cfg['profiles']), 'apps': [a['title'] for a in apps],
                            'appVersion': self.app_version, 'resetPins': bool(reset_pins), 'helper': bool(hcfg),
                            'others': [e['name'] for e in self.others if e.get('include')]}
+        if hcfg: self.sign_new = False
         if self.sync.running: self._load_sync()
         return self.build_info
 
@@ -310,7 +323,9 @@ class Wizard(object):
         """Collect the plex.tv tokens for the helper: owner = this sign-in; Plex Home profiles WITHOUT a Plex PIN via
         switch (the setup never asks for PINs). Key stays the same on re-setup (TVs keep working)."""
         old = self.helper_store
-        store = helpermod.Store(old.key if old else None, allow=self.tv_address)
+        store = helpermod.Store(old.key if old else None, allow=self.tv_address, sign=old.sign if old else '',
+                                sign_old=old.sign_old if old else None)
+        store.new_sign()                         # signing key (protocol 2): once, kept on every new setup
         protected = dict((u['id'], u.get('protected')) for u in self.home)
         skipped = []
         for p in self.profiles:
@@ -329,7 +344,7 @@ class Wizard(object):
         else: helpermod.Store.forget(self.helper_file)
         if self.helper: self.helper.store = store
         host = self.helper_address or ip
-        return {'url': 'http://%s:%d' % (host, self.update.port or helpermod.HELPER_PORT), 'key': store.key}
+        return {'url': 'http://%s:%d' % (host, self.update.port or helpermod.HELPER_PORT), 'key': store.key, 'sign': store.sign}
 
     # ---------- installed helper (background service, service.py) ----------
     def service_ctx(self):
@@ -367,6 +382,20 @@ class Wizard(object):
             self.package = None
         self.service_report = r.to_json()
         return self.service_report
+
+    def helper_new_sign(self):
+        """Button "Create a new signing key" (helper card): the helper refuses every app package made before it (401 no_sig, the
+        TV says "create the app package again") - for when an old package or the computer's helper.json may have been copied.
+        Profiles, the TV binding of an edition (extra) and the shared key stay. Every TV needs a new app package afterwards."""
+        st = self.helper_store
+        if not st: raise StepError('no_helper')
+        st.rotate_sign()
+        if self.helper_remember: st.save(self.helper_file)        # an installed helper reads the changed file within seconds
+        if self.helper: self.helper.store = st
+        self.package = None
+        if self.sync.running: self.sync_stop()                   # the package loaded there still has the old key
+        self.sign_new = True
+        return {'ok': True}
 
     def helper_tray(self, on):
         try: service.set_tray(self.service_ctx(), bool(on))
@@ -435,7 +464,7 @@ class Wizard(object):
             return [{'t': int(t), 'client': c, 'path': p, 'status': s} for t, c, p, s in srv.events[-30:]]
         return {
             'clientId': self.client_id[:8] + '…',
-            'lang': self.lang, 'remember': self.remember, 'tvAddress': self.tv_address,
+            'lang': self.lang, 'remember': self.remember, 'tvAddress': self.tv_address, 'tvFetched': self.tv_fetched,
             'pending': sorted(self.pins),
             'loggedIn': bool(self.token),
             'account': {'title': self.account['title'], 'thumb': self.account['thumb']} if self.account else None,
@@ -460,6 +489,6 @@ class Wizard(object):
                        'address': self.helper_address, 'running': bool(self.update.running and self.update.api),
                        'port': self.update.port, 'profiles': self.helper_store.summary() if self.helper_store else [],
                        'skipped': self.helper_skipped, 'events': ev(self.update) if self.update.api else [],
-                       'service': self.service_state(), 'report': self.service_report},
+                       'service': self.service_state(), 'report': self.service_report, 'signNew': self.sign_new},
             'ext': ext.state(self),
         }

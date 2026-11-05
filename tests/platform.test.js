@@ -34,7 +34,7 @@ test('Minimal-Adapter erfuellt den Vertrag; use() setzt N.platform mit Standard-
 
 test('Standard-caps = heutiges Verhalten des Fernsehers (alles aus, setup.json/Helfer an, SEF)', function () {
   var d = load().N.Platform.defaults();
-  ['tls12', 'touch', 'textInput', 'pip', 'secureStore', 'backgroundAudio', 'webLogin', 'cellular', 'haptic'].forEach(function (k) { assert.strictEqual(d[k], false, k); });
+  ['tls12', 'touch', 'textInput', 'pip', 'secureStore', 'backgroundAudio', 'webLogin', 'cellular', 'haptic', 'liveSubs'].forEach(function (k) { assert.strictEqual(d[k], false, k); });
   assert.strictEqual(d.setupFile, true); assert.strictEqual(d.helper, true);
   assert.strictEqual(d.trick, 'sef'); assert.strictEqual(d.subsEmbedded, 'sef');
   assert.strictEqual(d.exit, true); assert.strictEqual(d.focusRing, 'always'); assert.strictEqual(d.scroll, 'focus');

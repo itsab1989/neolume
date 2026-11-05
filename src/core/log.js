@@ -16,6 +16,8 @@
         .replace(new RegExp('(X-Plex-Token|accessToken|authToken|authenticationToken|token|X-Api-Key|api[_-]?key|X-Neo-Key|X-Neo-Sig)' + SEP + '[^&"\'\\s,;}%]+', 'gi'), '$1$2***')
         .replace(new RegExp(PRE + '(pin)' + SEP + '[^&"\'\\s,;}%]+', 'gi'), '$1$2$3***')
         .replace(new RegExp(PRE + '(code)' + SEP + '[A-Za-z0-9]{4,8}(?![A-Za-z0-9])', 'gi'), '$1$2$3***')
+        // Sitzungs-Token des Helfers im Pfad der Fernseh-Adresse (/live/<token>/index.m3u8, SPEC LIVE-10; Review 05.11. Z5)
+        .replace(/\/live\/[A-Za-z0-9_-]{16,}/g, '/live/***')
         // oeffentliche IPv4-Adressen (weitere Server uebers Internet) nie ins Protokoll; Heimnetz-Adressen bleiben (Fehlersuche)
         .replace(/(^|[^0-9.])(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?![0-9.])/g, function (m, pre, a, b, c) {
           a = Number(a); b = Number(b); c = Number(c);

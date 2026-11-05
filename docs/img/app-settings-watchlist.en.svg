@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="800" height="556" viewBox="0 0 800 556" role="img" aria-labelledby="t d">
 <title id="t">Neolume: watchlist in Settings</title>
-<desc id="d">Sketch of the Neolume settings: categories on the left, “Display” chosen. On the right the rows “Discover in the sidebar”, “Watchlist” (highlighted, switched on), “Customize inspiration” and “Only titles you don’t have yet”. Note: without the helper, Watchlist says “Not set up”.</desc>
+<desc id="d">Sketch of the Neolume settings: categories on the left, “Live TV &amp; Discover” chosen. On the right the rows “Discover in the sidebar”, “Watchlist” (highlighted, switched on), “Customize inspiration” and “Only titles you don’t have yet”. Note: without the helper, Watchlist says “Not set up”.</desc>
 <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff7a1a"/></marker><linearGradient id="scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2747"/><stop offset="1" stop-color="#0c1127"/></linearGradient><linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3c8fe8"/><stop offset="1" stop-color="#1f62c8"/></linearGradient><linearGradient id="neo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16181b"/><stop offset="1" stop-color="#0e0f11"/></linearGradient></defs>
 <rect x="8" y="8" width="784" height="455" rx="18" fill="#20232a" stroke="#d5d9e0" stroke-width="4"/>
 <rect x="24" y="24" width="752" height="423" rx="4" fill="url(#neo)"/>
@@ -16,15 +16,17 @@
 <line x1="44" y1="390" x2="44" y2="410" stroke="#ffffff" stroke-width="3"/>
 <text x="110" y="70" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#f2f2f2" text-anchor="start">Settings</text>
 <text x="122" y="116" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#a7abb2" text-anchor="start">Playback</text>
-<text x="122" y="154" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#a7abb2" text-anchor="start">Audio &amp; subtitles</text>
-<text x="122" y="192" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#a7abb2" text-anchor="start">Anime</text>
-<line x1="110" y1="214" x2="110" y2="234" stroke="#ffffff" stroke-width="3"/>
-<text x="122" y="230" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="bold" fill="#ffffff" text-anchor="start">Display</text>
-<text x="122" y="268" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#a7abb2" text-anchor="start">Profile &amp; account</text>
-<text x="122" y="306" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#a7abb2" text-anchor="start">Diagnostics</text>
-<text x="122" y="344" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#a7abb2" text-anchor="start">Help &amp; info</text>
-<circle cx="104" cy="224" r="12" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
-<text x="104" y="228.56" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13.8" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<text x="122" y="152" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#a7abb2" text-anchor="start">Audio &amp; subtitles</text>
+<text x="122" y="188" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#a7abb2" text-anchor="start">Anime</text>
+<text x="122" y="224" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#a7abb2" text-anchor="start">Home &amp; appearance</text>
+<text x="122" y="260" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#a7abb2" text-anchor="start">Language &amp; controls</text>
+<line x1="110" y1="280" x2="110" y2="300" stroke="#ffffff" stroke-width="3"/>
+<text x="122" y="296" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="bold" fill="#ffffff" text-anchor="start">Live TV &amp; Discover</text>
+<text x="122" y="332" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#a7abb2" text-anchor="start">Screensaver</text>
+<text x="122" y="368" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#a7abb2" text-anchor="start">Profile &amp; account</text>
+<text x="122" y="404" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#a7abb2" text-anchor="start">Help &amp; diagnostics</text>
+<circle cx="104" cy="290" r="12" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="104" y="294.56" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13.8" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
 <rect x="330" y="92" width="160" height="10" rx="5" fill="#ffffff" fill-opacity="0.18"/>
 <line x1="330" y1="166" x2="750" y2="166" stroke="#2c3036" stroke-width="1"/>
 <text x="336" y="150" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="bold" fill="#ffffff" text-anchor="start">Discover in the sidebar</text>
@@ -49,7 +51,7 @@
 <rect x="8" y="474" width="784" height="76" rx="10" fill="#f3f4f6" stroke="#d0d4da" stroke-width="1.5"/>
 <circle cx="32" cy="497" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
 <text x="32" y="501.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
-<text x="52" y="503" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">In Neolume: Settings → Display</text>
+<text x="52" y="503" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">In Neolume: Settings → Live TV &amp; Discover</text>
 <circle cx="32" cy="527" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
 <text x="32" y="531.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
 <text x="52" y="533" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">“Watchlist” can be switched on = the TV has found the helper</text>

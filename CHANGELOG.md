@@ -5,6 +5,59 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.17] - 2026-11-05
+
+### Added
+- **Live TV from public broadcasters (optional, off by default).** Settings › Live TV & Discover › “Live TV” adds an area
+  to the sidebar with the channels that show their programme freely online themselves – Das Erste, ZDF, arte, 3sat,
+  phoenix, the regional channels and more, plus arte in French, channels from Denmark and Australia and international
+  services (DW English, Arirang TV and others). The region of your country is on first; channels that only stream inside
+  their country say so when you play them elsewhere. Tiles in the four library views, “what's on now” where the
+  broadcaster offers it, an optional “Live TV” row on Home with your own channels and order, and a live player with a
+  sleep timer that switches channels calmly when you zap quickly – channel up goes to the next channel, like on any TV.
+  No unofficial IPTV, nothing with copy protection or a sign-in; when it's off, nothing changes and nothing is requested
+  online.
+- **On the 2014 TV all ARD and ZDF channels play through the helper.** They send their sound as a separate track, which
+  the TV's player cannot combine, so the helper joins picture and sound into one stream (pure Python, no ffmpeg needed,
+  stores nothing, about 2 % of one CPU core per stream). “Automatic” picks 720p; up to 1080p played smoothly in our test.
+  Without the helper the TV shows only the channels it can play itself and says how many more the helper brings.
+  Channels and whole regions the TV cannot play at all (newer encryption only, or a stream format it doesn't know) are
+  not offered there. If the helper stops answering during playback, the message says so, and “Try again” works as soon
+  as it is back.
+
+### Changed
+- **Settings are easier to find your way around.** Clear sections instead of one long “Display” list: Playback,
+  Audio & subtitles, Anime, Home & appearance, Language & controls, Live TV & Discover, Screensaver, Profile & account
+  and Help & diagnostics. The longest list now has 18 rows instead of 37. Clearer names, too – for example “Selection
+  colour”, “Fewer animations” and “Quality limit at home / over the internet”.
+- **A Stop button in Now playing** (music and audiobooks) – handy with the touch remote, which has no STOP key.
+- **Details from a friend's server open faster.** Title and buttons appear first, trailer and rows follow; a slow relay
+  connection is no longer remembered as the preferred way.
+- **Live TV tiles keep a clear gap** – the slightly enlarged focused tile no longer seems to merge with its neighbour.
+
+### Fixed
+- **Screensaver picture and title belong together again.** After a long run the picture could be one step ahead of its
+  title (the picture of the next title under the name of the current one). The screensaver now checks the real stacking
+  of its two picture layers on every change and corrects it at once.
+- **The sign-in hint is a complete sentence** when the address of the helper service isn't known (“… on the .” before).
+
+### Security
+- **The helper key no longer travels through your home network.** Watchlist, Discover, details, other servers and live TV
+  now sign every request to the helper with a key that reaches the TV only inside the app package; before, the
+  shared key went along in plain text and anyone listening in could reuse it. After the update, run the setup program once
+  and install the new app package. The signing key still travels inside every app package (plain http, like the profile
+  tokens); if an old package or the access file may have got into other hands, **Create a new signing key …** in the
+  helper card replaces it (every TV then needs a new app package). A request the helper turns away (for example because of
+  the rate limit) can no longer be sent again by someone listening in. If the app package and the helper don't match, the TV says so in one sentence
+  (“Helper: please rebuild the app package” or “Please update the helper”) instead of failing silently.
+- **Live TV through the helper is locked down.** The TV only sends a channel name, never an address; the helper fetches
+  only from the broadcasters' own hosts over https, never from devices in your home network, with limits on size, time,
+  sessions and data per minute. Three independent reviews checked it.
+- **Docker bridge mode is recognised.** Without host networking the helper cannot tell the TV from other devices; it now
+  notices this, writes it to its log and the TV asks for `--net=host`.
+
+If live TV now runs on your old TV too, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.16] - 2026-11-04
 
 ### Changed

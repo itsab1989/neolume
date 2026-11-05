@@ -16,13 +16,23 @@
     S: { cols: 9, w: 96, h: 96, sx: 112, sy: 164, capX: 0, capY: 108, tier: 'squareXS', cls: 'sq-xs', after: 4 },
     list: { cols: 1, w: 976, h: 56, sx: 0, sy: 68, capX: 64, capY: 4, tier: 'listSq', cls: 'list-sq', after: 7, noScale: true }
   };
+  /* Fernsehen (SPEC LIVE-2): Senderkacheln im Querformat 16:9 in denselben vier Ansichten (Gross 4 x 224x126, Mittel 5 x 176x99,
+   * Klein 7 x 116x65, Liste mit Logo-Feld 96x54; LW/LH = Logo-Feld der Liste). Unterzeile = Laeuft gerade */
+  var TV = {
+    // 24 px Abstand (wie die Mediathek): bei 8 px ragte die vergroesserte Fokus-Kachel (x1,08) in die Nachbarin, helle Logokarten
+    // wirkten verschmolzen (TV-Befund 05.11.); Spaltenraster sx/sy unveraendert
+    L: { cols: 4, w: 224, h: 126, sx: 248, sy: 207, capX: 0, capY: 138, tier: 'landM', cls: 'tv-l', after: 3 },
+    M: { cols: 5, w: 176, h: 99, sx: 200, sy: 180, capX: 0, capY: 111, tier: 'landS', cls: 'tv-m', after: 3 },
+    S: { cols: 7, w: 116, h: 65, sx: 140, sy: 140, capX: 0, capY: 73, tier: 'landXS', cls: 'tv-s', after: 4 },
+    list: { cols: 1, w: 976, h: 64, sx: 0, sy: 76, capX: 116, capY: 8, tier: 'listLand', cls: 'list-tv', after: 6, noScale: true, lw: 96, lh: 54 }
+  };
   /* area {w, h}: Flaeche der Ansicht (flexible Flaeche auf Apple, N.screen.area); ohne bzw. bei 1280x720 genau die Tabelle oben.
    * Spalten: so viele, wie links ab X0 bis 144 px vor dem rechten Rand passen (dort die A–Z-Leiste) – bei 1280 5/6/9.
    * Zeilen: AFTER waechst um die zusaetzliche Hoehe; VIS = Unterkante des zeigbaren Bereichs (TV 632).
    * ahead (optional, caps.images 'fast'): so viele Zeilen mehr Vorrat ueber und unter dem Fenster (Bilder ohne sichtbares Nachladen,
    * Apple Nr. 13) und beim Seiten-Vorladen; ohne bzw. 0 genau die TV-Werte */
   function make(size, square, area, ahead) {
-    var d = (square ? SQ[size] : SIZES[size]) || (square ? SQ.L : SIZES.L);
+    var T = square === 'tv' ? TV : square ? SQ : SIZES, d = T[size] || T.L;
     var AW = area && area.w > 0 ? area.w : 1280, AH = area && area.h > 0 ? area.h : 720, VIS = AH - 88;
     var cols = d.cols, after = d.after;
     var RES = area && area.r > 0 ? area.r : 144;                         // rechts frei (A–Z-Leiste); schmale Flaeche M/K: 88
@@ -43,7 +53,7 @@
     ahead = ahead > 0 ? Math.round(ahead) : 0;
     after += ahead;
     var G = {
-      size: SIZES[size] ? size : 'L', square: !!square, COLS: cols, X0: X0, Y0: 176, W: d.w, H: d.h, SX: d.sx, SY: d.sy, CAP_X: d.capX, CAP_Y: d.capY,
+      size: SIZES[size] ? size : 'L', square: square === true, tv: square === 'tv', LW: d.lw || 0, LH: d.lh || 0, COLS: cols, X0: X0, Y0: 176, W: d.w, H: d.h, SX: d.sx, SY: d.sy, CAP_X: d.capX, CAP_Y: d.capY,
       TIER: d.tier, CLS: d.cls, NO_SCALE: !!d.noScale, PAGE: 50, BEFORE: 1 + ahead, AFTER: after, AW: AW, AH: AH, VIS: VIS, AHEAD: ahead,
       POOL: (1 + ahead + after + 1) * cols,
       row: function (i) { return Math.floor(i / G.COLS); },
@@ -118,6 +128,7 @@
   base.make = make;
   base.SIZES = SIZES;
   base.SQ = SQ;
+  base.TV = TV;
   base.VIEWS = ['L', 'M', 'S', 'list'];
   N.GridMath = base;
 })(N);

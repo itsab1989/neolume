@@ -5,10 +5,11 @@
  * square = quadratisches Cover; scrim = andere Abdunklung (Kuenstlerseite: scrim-np.png, Fotos oft hell, F24). Elemente werden VOR dem Seiten-Container angelegt, der Info-Block (makeInfo) danach.
  * Einstellung "Hintergrundbilder" aus (N.comfort.backgrounds): kein Bild, ruhige Farbflaeche je Titel (wie ohne jedes Bild). */
 (function (N) {
-  var U = N.util, HERO_X = 208, HERO_Y = 188, REST = 300;
+  var U = N.util, HERO_X = 208, HERO_Y = 188, REST = 300, FADE = 240;   // FADE: spaetes Bild in der Detailkarte (quickBg)
   function DetHero(root, o) {
     o = o || {};
     this.sq = !!o.square; this.on = true; this.lift = 0; this.needBg = true; this.dead = false; this.chipEls = [];
+    this.quick = !!o.quick; this.waits = []; this.bgSet = false; this.late = false;   // quick: Detailkarte (P.whenBg), am TV nie
     this.hx = o.narrow ? 0 : HERO_X;                 // schmale Karte (Apple, Klasse K): kein Plakat, Info ab der Inhaltskante
     this.bgc = U.el('div', 'full', root, 'display:none');
     this.bg = U.el('img', 'full', root); this.bg.src = N.img.BLANK; this.bg.style.visibility = 'hidden';
@@ -79,16 +80,69 @@
   };
   /* Hintergrund: Art scharf, sonst Cover unscharf (vom Server vorgerechnet). title = fuer die Farbflaeche, wenn Bilder aus sind */
   P.loadBg = function (path, thumb, title) {
-    if (!path && !thumb) return;
+    if (!path && !thumb) { if (this.quick) this.settle(); return; }
     this.needBg = false;
-    if (N.comfort && !N.comfort.backgrounds()) { this.solid(title !== undefined ? title : this.title); return; }
-    var self = this, b = N.img.bg(path, thumb);    // Art scharf, sonst Cover unscharf (640 breit, blur vom Server, mittig beschnitten)
-    if (!b) return;
+    if (N.comfort && !N.comfort.backgrounds()) { this.solid(title !== undefined ? title : this.title); this.settle(); return; }
+    var self = this, b = N.img.bg(path, thumb), g = this.bgGen = (this.bgGen || 0) + 1;   // Art scharf, sonst Cover unscharf (640 breit, blur vom Server, mittig beschnitten)
+    if (!b) { this.settle(); return; }
+    if (this.quick) { this.quickBg(b, g); return; }
     setTimeout(function () {
-      if (self.dead) return;
-      self.bg.onload = function () { self.bg.onload = null; if (!self.dead) { N.img.fit(self.bg, b.soft); U.raf(function () { self.bg.style.visibility = 'visible'; }); } };
+      if (self.dead || g !== self.bgGen) return;
+      self.bg.onload = function () { self.bg.onload = null; if (!self.dead && g === self.bgGen) { N.img.fit(self.bg, b.soft); U.raf(function () { if (g === self.bgGen) self.bg.style.visibility = 'visible'; }); } };
       self.bg.src = b.url;
     }, N.idle.restFor() < REST ? REST : 0);
+  };
+  /* Detailkarte (o.quick, SPEC DET-21; Nutzerbefund iPad/Mac 05.11.: Karte glitt meist ohne Bild hoch, es kam erst oben – der Abruf
+   * wartete auf die Metadaten-Antwort und danach noch REST ms Ruhe): sofort holen und vorab dekodieren (N.img.fetch), dann erst ins
+   * sichtbare <img> – es ist damit beim ersten Malen fertig. Die Karte wartet darauf hoechstens kurz (whenBg); kommt das Bild nach
+   * der Frist (late), blendet es weich ein (ohne Blende bei "Weniger Animationen"). */
+  P.quickBg = function (b, g) {
+    var self = this, el = this.bg, fin = false;
+    /* dieselbe URL laeuft schon (Antwort mit anderem Thumb, gleichem Art): weiter darauf warten, nicht abbrechen und neu holen */
+    if (this.bgH && this.bgHu === b.url) { this.bgHg = g; return; }
+    if (this.bgH) { this.bgH.cancel(); this.bgH = null; }
+    if (this.bgSet && el._pnBg === b.url) { this.settle(); return; }   // steht schon (gleiche Bilder nach der Antwort)
+    this.bgHu = b.url; this.bgHg = g;
+    var h = N.img.fetch(b.url, function (ok, w, hh) {
+      fin = true;
+      g = self.bgHg;
+      if (self.dead || g !== self.bgGen) return;
+      self.bgH = null;
+      if (ok) {
+        var fx = self.late && !self.bgSet && !N.fx.reduced(), st = el.style;   // Bildwechsel (bgSet) ohne Blende: kein dunkles Loch
+        el.onload = null;
+        if (fx) { st.webkitTransition = st.transition = 'opacity ' + FADE + 'ms ease-out'; st.opacity = '0'; }
+        else if (st.opacity) { st.webkitTransition = st.transition = 'none'; st.opacity = ''; }
+        N.img.fit(el, b.soft, w, hh);
+        el.src = b.url; el._pnBg = b.url; self.bgSet = true;
+        st.visibility = 'visible';
+        if (fx) U.raf(function () { U.raf(function () { if (g === self.bgGen) st.opacity = '1'; }); });
+      }
+      self.settle();
+    });
+    if (!fin) this.bgH = h;                          // ohne Bild-Objekt meldet fetch sofort (dann nichts mehr offen)
+  };
+  /* Karte darf gleiten: Hintergrund steht, gibt es nicht oder kam nicht (Fehler) – wartende Aufrufer von whenBg weiter */
+  P.settle = function () {
+    this.settled = true;
+    var w = this.waits; this.waits = [];
+    for (var i = 0; i < w.length; i++) w[i]();
+  };
+  /* cb, sobald der Hintergrund bereit ist (settle), spaetestens nach ms (dann late: spaetes Bild blendet ein). Nur Detailkarte. */
+  P.whenBg = function (cb, ms) {
+    if (this.settled || this.dead) { cb(); return; }
+    var self = this;
+    this.waits.push(cb);
+    setTimeout(function () { if (!self.settled && !self.dead) { self.late = true; var w = self.waits; self.waits = []; for (var i = 0; i < w.length; i++) w[i](); } }, ms || 0);
+  };
+  /* Hintergrund wieder weg (vorab gesetztes Bild, dann Fehlerseite; DET-13): wie vor dem ersten loadBg */
+  P.clearBg = function () {
+    this.bgGen = (this.bgGen || 0) + 1;
+    this.bg.onload = null;
+    if (this.bgH) { this.bgH.cancel(); this.bgH = null; }
+    this.bgSet = false; this.bg._pnBg = '';
+    this.bg.style.visibility = 'hidden';
+    this.settle();
   };
   P.setPoster = function (thumb, title) {
     var self = this;
@@ -110,6 +164,6 @@
     if (this.hdr) U.cls(this.hdr, 'on', !on);
   };
   P.vis = function (on) { U.vis(this.pc, on); U.vis(this.info, on); };
-  P.destroy = function () { this.dead = true; N.img.drop(this.poster); };
+  P.destroy = function () { this.dead = true; this.waits = []; if (this.bgH) { this.bgH.cancel(); this.bgH = null; } N.img.drop(this.poster); };
   N.ui.DetHero = DetHero;
 })(N);

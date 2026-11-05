@@ -21,6 +21,10 @@
   N.router.define('details', function (params) {
     var it0 = params.it || {}, isShow = it0.type === 'show' || it0.type === 'season' || it0.type === 'episode';
     var showRk = it0.type === 'show' ? it0.rk : it0.showRk || it0.rk;
+    /* DET-12: Serie, die (noch) nicht auf dem Server ist, deren Staffeln aber eine Erweiterung kennt (it0.virt): keine PMS-Anfragen,
+     * Kopf aus dem Eintrag selbst, alle Staffeln von der Erweiterung (blass), kein Abspielen/Gesehen/Ton */
+    var virt = !!it0.virt && it0.type === 'show';
+    if (virt) showRk = '';
     // Seitenleiste auch hier (Nutzer-Feedback 26.10.: links nicht leer, LEFT aus der ersten Spalte erreicht sie); markiert die Bibliothek
     // ohne Bibliothek am Eintrag: bisherige Markierung halten, nach dem Laden die Bibliothek der Metadaten (TV-Befund 26.10.)
     // Weitere Server (N.srv): Titel eines fremden Servers -> alle Anfragen dorthin, Herkunft in der Ueberzeile
@@ -50,6 +54,7 @@
     var wishS = it0.type === 'season' ? it0.s : it0.type === 'episode' ? it0.s : null, wishE = it0.type === 'episode' ? it0.e : 0;
     var jump = { digits: '', t: 0 }, bubbleTm = 0, onPlayed = null, onWatched = null, onAnime = null, epMeta = new N.LRU(30);
     var xt = null, baseSeasons = [], pmsEps = null, btnDirty = false;   // optionale Erweiterung (core/ext.js 'details:open'): Steuerobjekt
+    var moreWant = false;                               // DET-13: nachgeladene Extras/Aehnliche warten aufs Einsetzen
     /* TV-Befund 1.0.5: "Staffel 2" stand sofort, "Staffel 1" (nur im Katalog der Erweiterung) ploppte kurz danach davor. Meldet die
      * Erweiterung, dass ihre Staffeln noch kommen (xt.pending()), wird die Reiterzeile erst gebaut, wenn sie da sind (X.ready/X.tabs,
      * hoechstens HOLD ms); Folgen der gewaehlten (vorhandenen) Staffel laden trotzdem sofort. tabSig: zuletzt gebaute Reiter.
@@ -58,7 +63,7 @@
 
     /* Schnittstelle fuer eine optionale Erweiterung (N.ext 'details:open'): lesen + gezielt neu zeichnen, ohne Fokussprung */
     var X = {
-      it: function () { return d ? d.it : it0; }, isShow: isShow, showRk: showRk, srv: srv, d: function () { return d; },
+      it: function () { return d ? d.it : it0; }, isShow: isShow, showRk: showRk, srv: srv, virt: virt, d: function () { return d; },
       zone: function () { return zone; }, seasons: function () { return seasons; }, season: function () { return seasons[sIdx]; },
       eps: function () { return eps; }, focusedEp: function () { return zone === 'eps' ? eps[epRow.f] : null; }, dead: function () { return dead; },
       /* Knoepfe neu (Erweiterung fuegt vor "⋯" ein): der fokussierte Knopf bleibt stehen; liegt der Fokus auf "⋯", erst beim Verlassen */
@@ -118,6 +123,9 @@
       /* eine Karte der Reihe geaendert/ersetzt (Marke, Titel jetzt auf dem Server) bzw. ohne i alle sichtbaren -> nur diese neu */
       simRefresh: function (i) { var r = simRow(); if (dead || !r) return; if (i === undefined) r.row.refreshAll(); else r.row.refreshItem(i); if (zone === 'row' && rows[rk] === r) N.idle.add(updateHints, 'det-hints'); },
       away: function () { return away; },
+      /* Reihen unter dem Kopf (ids) und die fokussierte Reihe 'id:Spalte' (lesen; Tests DET-13) */
+      rowIds: function () { var a = []; for (var i = 0; i < rows.length; i++) a.push(rows[i].id); return a; },
+      rowFocus: function () { return zone === 'row' && rows[rk] ? rows[rk].id + ':' + rows[rk].row.f : ''; },
       hints: function () { N.idle.add(updateHints, 'det-hints'); }
     };
 
@@ -128,7 +136,7 @@
       if (card) { host = cpage = U.el('div', 'cd-page', root); cpage.style.width = cardW() + 'px'; }
       /* Hintergrund, Poster links (fest, blendet in den Abschnitten aus) und Info-Block: gemeinsame Mechanik N.ui.DetHero
        * (auch Album/Hoerbuch/Kuenstler; Feedback-Regeln 3 und 11) */
-      hero = new N.ui.DetHero(host, { narrow: NARROW });
+      hero = new N.ui.DetHero(host, { narrow: NARROW, quick: card });   // quick: Hintergrund sofort + vorab dekodiert (Karte, DET-21)
       if (card) U.el('div', 'cd-bgfade', host);            // Hintergrundbild laeuft unten in die Kartenfarbe aus
       pg = U.el('div', 'pg', host);
       hero.makeInfo(host, { chips: 2, hdr: 'scrim-hdr.png' });
@@ -219,8 +227,9 @@
     /* ---------- Buttons ---------- */
     function buildButtons(x) {
       while (bar.firstChild) bar.removeChild(bar.firstChild);
-      bdefs = D.buttons(x, d); btns = []; btnRects = null; btnDirty = false;
+      bdefs = virt ? [] : D.buttons(x, d); btns = []; btnRects = null; btnDirty = false;
       if (xt && xt.buttons) xt.buttons(bdefs, x);
+      if (virt && !bdefs.length) bdefs.push({ id: 'back', t: N.t('err.btn.back') });   // DET-12: nie ohne Knopf (Fokus braucht einen)
       for (var i = 0; i < bdefs.length; i++) {
         var b = U.el('div', bdefs[i].icon ? 'btn inl ib' : 'btn inl', bar);
         if (bdefs[i].icon) N.ui.icon(b, bdefs[i].icon);
@@ -265,23 +274,38 @@
       if (re) seasonCache.clear();
       /* Erweiterung schon vor den Antworten: sie weiss so frueh wie moeglich, ob sie Staffeln ergaenzt (pending, s. tabHold) */
       if (!xt && N.ext.has('details:open')) xt = N.ext.call('details:open', X) || null;
-      var mrk = isShow ? showRk : it0.rk;
-      track(get('/library/metadata/' + mrk, D.query(isShow ? 'show' : 'movie'), { timeout: 12000 }, function (err, dd) {
+      if (virt) { loadVirt(); return; }
+      var mrk = isShow ? showRk : it0.rk, lean = !!srv;   // DET-13: Weitere Server erst schlank, Extras/Aehnliche danach
+      moreWant = false;
+      /* Weitere Server und Detailkarte (DET-21): Hintergrund/Poster gleich aus dem Eintrag (Bildpfade ggf. mit Server-Marke), nicht
+       * erst nach der Antwort – spart eine Runde (uebers Internet); die Karte gleitet so mit Bild hoch. Gleiche Pfade werden danach
+       * nicht noch einmal gesetzt. Eigener Server am TV wie bisher (erst nach der Antwort). */
+      var pic = (lean || card) && !d && (it0.art || it0.thumb) ? (it0.art || '') + '|' + (it0.thumb || '') : '';
+      if (pic) { hero.loadBg(it0.art, it0.thumb, it0.title); hero.setPoster(it0.thumb, it0.title); }
+      else if (card && !d) hero.settle();                // Eintrag ohne Bild: Karte wartet nicht
+      track(get('/library/metadata/' + mrk, D.query(isShow ? 'show' : 'movie', lean), { timeout: 12000 }, function (err, dd) {
         if (g !== gen || dead) return;
         var m = !err && dd && dd.MediaContainer && dd.MediaContainer.Metadata && dd.MediaContainer.Metadata[0];
-        if (!m) { onError(err); return; }
+        if (!m) { if (pic) hero.clearBg(); onError(err); return; }   // vorab gesetzter Hintergrund: Fehlerseite wie bisher ohne Bild
         N.anime.learn(ak(mrk), m);                        // Anime je Titel: Signale aus den vollen Detaildaten (Genres ungekuerzt)
+        var prev = d;
         d = D.parse(m, kinds());
+        // Neu laden (nach dem Player): bis die Nachlade-Antwort da ist, die bisherigen Extras/Aehnlichen behalten (kein Wegspringen der Reihen)
+        if (lean && prev) { d.extras = prev.extras; d.trailer = prev.trailer; d.related = prev.related; }
         if (!d.lib) d.lib = Number(dd.MediaContainer.librarySectionID) || it0.lib || 0;
         if (!isShow || zone === 'btn') paintInfo(d.it);
         buildButtons(d.it);
         if (d.lib && s.rail !== railId(d.lib)) { s.rail = railId(d.lib); if (N.router.top() === s) N.ui.rail.attach(s.rail); }
-        hero.loadBg(d.it.art || it0.art, d.it.thumb || it0.thumb, d.it.title);
-        hero.setPoster(d.it.thumb || it0.thumb, d.it.title);   // ohne jedes Bild: Farbflaeche, bis ein Folgenbild kommt
+        var a1 = d.it.art || it0.art, t1 = d.it.thumb || it0.thumb;
+        if (!pic || pic !== (a1 || '') + '|' + (t1 || '')) {
+          hero.loadBg(a1, t1, d.it.title);
+          hero.setPoster(t1, d.it.title);                  // ohne jedes Bild: Farbflaeche, bis ein Folgenbild kommt
+        }
         if (hero.needBg) bgFromEpisodes();
         buildRows();
         if (isShow) N.theme.play(d.theme);
         N.idle.add(updateHints, 'det-hints');
+        if (lean) N.idle.add(function () { if (g === gen && !dead) loadMore(mrk, g); }, 'det-more');
       }));
       if (isShow) track(get('/library/metadata/' + showRk + '/children', { excludeElements: N.hubs.EXCL }, { timeout: 12000 }, function (err, dd) {
         if (g !== gen || dead) return;
@@ -299,6 +323,95 @@
         var keep = pl ? D.pickSeason(seasons, pl.s, null) : seasons[sIdx] && re ? sIdx : D.pickSeason(seasons, wishS, d && d.ondeck);
         selectSeason(keep, true, pl && seasons[keep] && seasons[keep].index === pl.s ? pl.e : undefined);
       }));
+    }
+    /* DET-13 (Weitere Server, Nutzerbefund iPad 05.11.): Extras + Aehnliche Titel nach dem Zeichnen im Leerlauf; hoechstens eine
+     * Wiederholung. Fehler -> Seite bleibt, wie sie ist (die Reihen fehlen still, Protokoll-Warnung). */
+    function loadMore(mrk, g) {
+      track(get('/library/metadata/' + mrk, D.moreQuery(), { timeout: 12000, retries: D.MORE_RETRIES, dedupe: false }, function (err, dd) {
+        if (g !== gen || dead || !d) return;
+        var m = !err && dd && dd.MediaContainer && dd.MediaContainer.Metadata && dd.MediaContainer.Metadata[0];
+        if (!m) { if (err && err.type !== 'aborted') N.diag.log('warn', 'det more ' + (err.status || err.type)); return; }
+        if (!D.more(d, m, kinds())) return;
+        moreWant = true;
+        applyMore();
+      }));
+    }
+    /* Nachgeladenes einsetzen, ohne dass Fokus/Ring springen: Knoepfe (Trailer) mit demselben fokussierten Knopf; Reihen an ihre
+     * Stelle (Besetzung, Extras, Aehnliche), bestehende Reihen bleiben stehen. Steht der Fokus in einer Reihe, deren Platz oder
+     * Inhalt sich aendern wuerde, wartet es, bis der Fokus die Reihen verlaesst bzw. die Seite wieder vorn ist. */
+    function applyMore() {
+      if (!moreWant || dead || !d) return;
+      var defs = rowDefs(), i, j, old = {};
+      for (i = 0; i < rows.length; i++) old[rows[i].id] = rows[i];
+      if (away || zone === 'state') return;
+      if (zone === 'row' && rows[rk]) {
+        var cid = rows[rk].id, ci = -1;
+        for (i = 0; i < defs.length; i++) if (defs[i].id === cid) ci = i;
+        if (ci !== rk || !sameItems(rows[rk].row.model.items, defs[ci].items)) return;   // spaeter (toBtn/toTabs/toEps/toRow)
+      }
+      moreWant = false;
+      if (!isShow && d.trailer) keepButtons();
+      var out = [];
+      for (i = 0; i < defs.length; i++) {
+        var r = old[defs[i].id], y = out.length ? out[out.length - 1].top + PITCH[out[out.length - 1].row.model.kind] : isShow ? SEC + ANCHOR + PITCH.land : PEEK;
+        if (r) {
+          delete old[defs[i].id];
+          if (!sameItems(r.row.model.items, defs[i].items)) r.row.setModel(defs[i], 0);
+          if (r.top !== y) { r.top = y; r.row.setTop(y); }
+          out.push(r);
+        } else {
+          var nr = new N.ui.Row(pg, { captions: function () { return true; }, w: card ? cardW() : 0, free: RFREE });
+          nr.setModel(defs[i], 0); nr.setTop(y);
+          out.push({ row: nr, top: y, id: defs[i].id });
+        }
+      }
+      for (var k in old) if (old.hasOwnProperty(k)) {
+        old[k].row.clear(); if (old[k].row.el.parentNode) old[k].row.el.parentNode.removeChild(old[k].row.el);
+        for (j = rdrv.length - 1; j >= 0; j--) if (rdrv[j].row === old[k].row) { rdrv[j].d.stop(); rdrv.splice(j, 1); }
+      }
+      if (zone === 'row') for (i = 0; i < out.length; i++) if (rows[rk] && out[i] === rows[rk]) { rk = i; break; }
+      rows = out;
+      hideAbove();
+      N.idle.add(updateHints, 'det-hints');
+    }
+    function sameItems(a, b) {
+      if (a === b) return true;
+      if (!a || !b || a.length !== b.length) return false;
+      for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+      return true;
+    }
+    /* Knoepfe neu (Trailer kam nach), der fokussierte Knopf bleibt derselbe (gleiche id) */
+    function keepButtons() {
+      var id = zone === 'btn' && bdefs[bf] ? bdefs[bf].id : null;
+      buildButtons(d.it);
+      if (!id) return;
+      for (var i = 0; i < bdefs.length; i++) if (bdefs[i].id === id && i !== bf) { U.cls(btns[bf], 'is-focus', false); bf = i; if (!away) U.cls(btns[bf], 'is-focus', true); break; }
+    }
+    /* DET-12: Kopf aus dem Eintrag (Titel, Jahr, Beschreibung, Bilder), Staffeln nur von der Erweiterung; die Reiter warten wie sonst
+     * auf sie (xt.pending, hoechstens HOLD), dann wird die Start-Staffel gewaehlt (xt.startSeason, sonst die erste) */
+    function loadVirt() {
+      d = { it: it0, sum: String(it0.sum || ''), tagline: '', studio: '', genres: [], directors: [], writers: [], date: '', cast: [], extras: [], trailer: null,
+        related: [], ondeck: null, media: [], theme: '', lib: it0.lib || 0 };
+      if (zone === 'btn') paintInfo(d.it);
+      buildButtons(d.it);
+      hero.loadBg(it0.art || '', it0.thumb || '', it0.title);
+      hero.setPoster(it0.thumb || '', it0.title);
+      buildRows();
+      baseSeasons = [];
+      if (!tabSig && !tabHold && xt && xt.pending && xt.pending()) {
+        tabHold = true;
+        tabWait();
+        tabHoldT = setTimeout(function () { tabHoldT = 0; if (!dead) releaseTabs(); }, HOLD);
+      }
+      applySeasons();
+      buildTabs();
+      virtPick();
+      N.idle.add(updateHints, 'det-hints');
+    }
+    function virtPick() {
+      if (!virt || shownS !== null || tabHold || !seasons.length) return;
+      var w = xt && xt.startSeason ? xt.startSeason(seasons) : -1;
+      selectSeason(w >= 0 && w < seasons.length ? w : D.pickSeason(seasons, wishS, null), true);
     }
     function onError(err) {
       var kind = N.errs.kind(err, 'pms'), sn = srv ? N.srv.name(srv) : '';
@@ -323,12 +436,13 @@
     function applySeasons() { seasons = xt && xt.seasons ? xt.seasons(baseSeasons.slice()) || baseSeasons : baseSeasons; }
     /* Reiter neu (Erweiterung hat Staffeln ergaenzt/geaendert): gewaehlte und fokussierte Staffel bleiben dieselben (gleiche Nummer) */
     function retab() {
-      if (dead || !baseSeasons.length) return;
+      if (dead || (!baseSeasons.length && !virt)) return;
       var cur = seasons[sIdx], fi = seasons[tabF];
       applySeasons();
       sIdx = D.seasonPos(seasons, cur, sIdx); tabF = D.seasonPos(seasons, fi, tabF);
       if (D.tabSig(seasons) !== tabSig) buildTabs();
       markTabs();
+      virtPick();
     }
     /* TV-Test 29.10.: erstes Oeffnen ohne gemerkten Stand dauerte ~2,4 s (Katalog), HOLD 1 s war zu kurz – "Staffel 1" rutschte danach
      * vor "Staffel 2". Jetzt hoechstens 2,5 s; solange steht an der Stelle der Reiter ein dezenter Lade-Platzhalter (nichts darunter
@@ -476,6 +590,7 @@
      *    in der Reiter-Zeile (Klasse ss-solo). Platzhalter einer Erweiterung (miss) zaehlen nicht: der Streifen zeigt nur
      *    Folgen auf dem Server (TV-Befund 28.10.: sonst "Folge 1 von 12" mit Balken statt der Felder). Nur Schreiben, kein Messen. */
     function paintStrip() {
+      if (!strip) return;                                 // Film: kein Streifen (afterWatched rief sonst strip.render auf undefined)
       // ganz fehlende Staffel (Katalog der Erweiterung): kein leerer Streifen (TV-Test 29.10.: duenne Linie ohne Text)
       var st = N.session.settings || {}, se = seasons[sIdx], epOn = !!st.episodeProgress && !!se && !se.virtual, sbl = st.seriesProgress && se ? N.SeasonStrip.seriesBar(baseSeasons, se.index, TIGHT ? SW() : 0) : { mode: 'none' };   // nur Staffeln vom Server (ohne Katalog-Staffeln der Erweiterung, sonst springt die Zahl)
       var i;
@@ -517,6 +632,10 @@
       for (var i = 0; i < rows.length; i++) { rows[i].row.clear(); if (rows[i].row.el.parentNode) rows[i].row.el.parentNode.removeChild(rows[i].row.el); }
       rows = [];
       for (i = rdrv.length - 1; i >= 0; i--) if (rdrv[i].row !== epRow) { rdrv[i].d.stop(); rdrv.splice(i, 1); }   // Antriebe der alten Reihen
+      var defs = rowDefs();
+      for (i = 0; i < defs.length; i++) addRow(defs[i]);
+    }
+    function rowDefs() {
       var defs = [];
       if (d.cast.length) defs.push({ id: 'cast', kind: 'cast', tk: 'det.row.cast', items: d.cast });
       if (d.extras.length) defs.push({ id: 'extras', kind: 'land', tk: 'det.row.extras', items: d.extras });
@@ -524,7 +643,7 @@
       var sim = d.related.length ? d.related[0].items : [];
       if (xt && xt.similar) sim = xt.similar(sim) || sim;
       if (sim.length) defs.push({ id: 'similar', kind: 'poster', tk: 'det.row.similar', items: sim });
-      for (i = 0; i < defs.length; i++) addRow(defs[i]);
+      return defs;
     }
     function addRow(def) {
       var y = rows.length ? rows[rows.length - 1].top + PITCH[rows[rows.length - 1].row.model.kind] : isShow ? SEC + ANCHOR + PITCH.land : PEEK;
@@ -587,8 +706,9 @@
       U.cls(btns[bf], 'is-focus', true); paintLabel();
       if (d && infoFor !== d.it) infoLater(d.it);
       if (isShow) N.idle.add(function () { if (!dead) paintStrip(); }, 'det-strip');   // Marker wieder auf der naechsten Folge (nicht die zuletzt fokussierte)
-      markTabs(); N.router.refreshHints();
+      markTabs(); N.router.refreshHints(); moreSoon();
     }
+    function moreSoon() { if (moreWant) N.idle.add(applyMore, 'det-more-apply'); }   // DET-13: zurueckgehaltene Reihen jetzt einsetzen
     function toTabs() {
       if (tabHold) releaseTabs();                          // Nutzer will zu den Reitern: nicht weiter warten
       if (!seasons.length) return;
@@ -596,7 +716,7 @@
       leaveZone(); zone = 'tabs'; setOff(SEC); heroInfo(false); ring.hide(); dimButtons(true);
       tabF = sIdx; markTabs(); scrollTabs();
       if (!tabInfo(seasons[sIdx]) && eps[epRow.f]) infoLater(eps[epRow.f]);
-      N.router.refreshHints();
+      N.router.refreshHints(); moreSoon();
     }
     function toEps() {
       if (seasonT && epRow && epRow.vis === false) { clearTimeout(seasonT); seasonT = 0; loadSeason(sIdx); }   // Karten der neuen Staffel sofort
@@ -604,7 +724,7 @@
       leaveZone(); zone = 'eps'; setOff(fitLow(SEC, SEC + 392 + (epRow ? epRow.g.h : 0))); heroInfo(false); dimButtons(true); markTabs();
       epRow.setFocused(true); placeRing(epRing(epRow.ringPos()));
       infoLater(eps[epRow.f]); ensureEpPages();
-      N.router.refreshHints();
+      N.router.refreshHints(); moreSoon();
     }
     function toRow(i) {
       if (!rows[i]) return;
@@ -612,7 +732,7 @@
       setOff(fitLow(rowOff(i), rows[i].top + 52 + rows[i].row.g.capY)); heroInfo(false);
       rows[i].row.setFocused(true); rows[i].row.boost(); placeRing(rows[i].row.ringPos());
       if (d && infoFor !== d.it && !isShow) infoLater(d.it);
-      N.router.refreshHints();
+      N.router.refreshHints(); moreSoon();
     }
     function down() {
       if (zone === 'btn') { if (isShow && seasons.length) toTabs(); else if (isShow && epRow.count()) toEps(); else toRow(0); }
@@ -640,7 +760,7 @@
     function play(x, how) { N.theme.stop(true); N.details.play(x, how); }
     /* Hauptaktion: Film abspielen bzw. naechste Folge der Serie */
     function playMain(how) {
-      if (!d) return;
+      if (!d || virt) return;
       if (!isShow) { play(d.it, how); return; }
       if (d.ondeck) { play(d.ondeck, how); return; }
       play(d.it, how);
@@ -651,6 +771,7 @@
       else if (id === 'trailer' && d && d.trailer) playExtra(d.trailer);
       else if (id === 'watched') toggleWatched(d ? d.it : null);
       else if (id === 'more') menu();
+      else if (id === 'back') N.router.back();
       else if (xt && xt.button) xt.button(id);
     }
     function playExtra(x) {
@@ -658,7 +779,7 @@
       play(p, 'start');
     }
     function toggleWatched(x) {
-      if (!x || !M.isVideo(x)) return;
+      if (!x || !x.rk || !M.isVideo(x)) return;           // ohne Server-Kennung (DET-12, Katalog-Staffel) nichts zu markieren
       N.watch.toggle(x, { label: d ? d.it.title : '', changed: function (y, w) { afterWatched(y, w); }, reverted: function (y) { afterWatched(y, M.watched(y)); } });
     }
     /* Darstellung nach Gesehen-Aenderung: Folge -> Karte + Staffel-Zahlen; Staffel/Serie -> alle betroffenen Folgen */
@@ -725,6 +846,7 @@
     }
     function menu() {
       var x = focusedItem(), b = [];
+      if (virt && zone !== 'eps') { showInfo(); return; }  // DET-12: nichts abzuspielen oder zu markieren – TOOLS zeigt die Infos
       if (zone === 'eps' && x) { b.push({ id: 'play', t: N.t('menu.play') }); if (M.progress(x) > 0) b.push({ id: 'start', t: N.t('menu.fromStart') }); }
       if (x && M.isVideo(x)) b.push({ id: 'watched', t: N.t(M.watched(x) ? 'menu.markUnwatched' : 'menu.markWatched') });
       if (zone !== 'row' && zone !== 'tabs') b.push({ id: 'tracks', t: N.t(isShow && zone === 'btn' ? 'det.menu.tracksShow' : 'det.menu.tracks') });
@@ -751,7 +873,7 @@
       }
       var t = D.info(x, d), al = N.anime.infoLine(x);
       if (al) t = al + '\n\n' + t;                   // Grund der Anime-Einordnung (nur wenn die Kategorie gezeigt wird)
-      if (isShow && seasons.length) {
+      if (isShow && seasons.length && !virt) {
         var all = 0, seen = 0;
         for (var i = 0; i < seasons.length; i++) if (seasons[i].index !== 0) { all += seasons[i].leaf; seen += seasons[i].vleaf; }
         t = U.trim(t + '\n\n' + N.t('det.seriesInfo', { k: seen, n: all }), N.det.MAXI);
@@ -791,9 +913,9 @@
       if (sb.on) return [{ k: 'ret', t: 'hint.back' }];
       /* Rot/Gruen nur, wo sie etwas tun: Knoepfe und echte Folgen (TV-Test 29.10.: auf dem Reiter einer ganz fehlenden Staffel stand
        * "Von vorne / Ton & UT"; in der Reiter-Zeile tun beide nichts) */
-      var x = focusedItem(), list = zone === 'btn' || (zone === 'eps' && x) ? [{ k: 'red', t: 'hint.fromStart' }, { k: 'green', t: 'hint.tracks' }] : [];
+      var x = focusedItem(), list = (zone === 'btn' && !virt) || (zone === 'eps' && x) ? [{ k: 'red', t: 'hint.fromStart' }, { k: 'green', t: 'hint.tracks' }] : [];
       if (zone === 'row' && x && x.ext) return [{ k: 'OK', t: 'hint.details' }, N.disc.blueHint()];   // Karte ausserhalb des Servers: nur Details
-      if (x && M.isVideo(x)) list.push({ k: 'yellow', t: M.watched(x) ? 'hint.markUnwatched' : 'hint.markWatched' });
+      if (x && x.rk && M.isVideo(x)) list.push({ k: 'yellow', t: M.watched(x) ? 'hint.markUnwatched' : 'hint.markWatched' });
       list.push(N.disc.blueHint());
       if (list.length < 5) list.push({ k: 'INFO', t: 'hint.details' });
       if (xt && xt.hints) list = xt.hints(zone === 'eps' ? eps[epRow.f] : null, list) || list;
@@ -813,7 +935,7 @@
       var sr = simRow();
       if (sr && xt && xt.similarList) sr.row.refreshAll();   // Marken von Erweiterungs-Karten koennen sich geaendert haben (Anfrage auf deren Seite)
       if (d && isShow) N.theme.play(d.theme);
-      N.router.refreshHints();
+      N.router.refreshHints(); moreSoon();
     };
     s.leave = function () {
       away = true; N.theme.stop();
@@ -1097,6 +1219,8 @@
       return ptrAct(b.z === 'eps' ? { z: 'eps' } : { z: 'row', i: b.i }, x, kind);
     }
     /* Router (Kartengesten): ganz oben -> Ziehen nach unten schliesst; waagerecht ausserhalb einer Reihe -> zurueck */
+    /* frisch geoeffnete Karte gleitet, sobald der Hintergrund bereit ist, spaetestens nach ms (N.ui.card.go, DET-21) */
+    if (card) s.cardWait = function (cb, ms) { hero.whenBg(cb, ms); };
     s.cardTop = function () { return !card || cy <= 0.5; };
     s.cardBackOk = function (x, y) { return !card || sb.on || !bandAt(y + cy); };
     /* Mac: Rad/Trackpad rollt die Seite frei (ungedrosselt; N.pointer.wheel) */
@@ -1341,6 +1465,7 @@
   N.details = {
     open: function (it) {
       if (!it) return;
+      if (N.idle) N.idle.cancel('det-warm');              // Vorladen einer anderen Karte (warm) nicht mehr noetig
       if (N.music.open(it)) return;                       // M4: Album, Kuenstler, Hoerbuch
       if (!N.model.isVideo(it)) { N.router.push('soon', { area: 'details', label: N.t('soon.music') }); return; }
       N.router.push('details', { it: it });
@@ -1348,6 +1473,13 @@
     /* Tipp/Klick auf eine Kachel (Startseite, Mediathek) mit Detailkarte (caps.details 'card', Nr. 12/16): Film, Serie, Staffel,
      * Folge, Album, Kuenstler oeffnen die Karte – auch Weiterschauen-Kacheln (am TV spielen sie ab). true = erledigt; sonst (TV,
      * Tasten, "Alle anzeigen", fremde Titel, Sammlungen, Titel) bleibt es beim bisherigen Weg der Ansicht. */
+    /* Fokus/Hover auf einer Kachel (Startseite, Mediathek) mit Detailkarte (DET-21): Hintergrund der Karte im Leerlauf vorladen –
+     * nur fuer die fokussierte Karte (ein Abruf zur Zeit, N.img.prefetch), nicht bei Finger-Bedienung (der Tipp oeffnet sofort und
+     * holt das Bild selbst). Am TV (keine Karte) ohne Wirkung. */
+    warm: function (it) {
+      if (!it || it.all || it.ext || it.virt || !N.ui.card || !N.ui.card.on() || N.input.mode === 'touch' || !N.model.isVideo(it)) return;
+      N.idle.add(function () { var b = N.img.bg(it.art, it.thumb); if (b) N.img.prefetch(b.url); }, 'det-warm');
+    },
     tap: function (it) {
       if (!it || it.all || it.ext || !N.ui.card || !N.ui.card.on() || N.input.mode === 'key') return false;
       if (!N.model.isVideo(it) && it.type !== 'album' && it.type !== 'artist') return false;

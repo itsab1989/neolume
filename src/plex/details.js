@@ -10,11 +10,21 @@
   var MAXI = 4000;                                   // INFO-Text: nur Sicherheitsgrenze (Beschreibungen kommen mit hoechstens 1500 Zeichen)
   var D = {
     MAXI: MAXI,
-    /* Filmdetails: eine Anfrage (Player nutzt die Metadaten wieder) */
-    query: function (type) {
-      if (type === 'show') return { includeOnDeck: 1, includeRelated: 1, includeExtras: 1, checkFiles: 0, includeReviews: 0 };
-      return { includeExtras: 1, includeRelated: 1, includeOnDeck: 1, includeChapters: 1, includeMarkers: 1, checkFiles: 0, includeReviews: 0 };
+    /* Detailanfrage. Eigener Server: eine Anfrage mit Extras + Aehnlichen (+ OnDeck bei Serien). Kapitel/Marker braucht die Seite
+     * nicht (der Player holt seine Metadaten selbst mit includeMarkers/includeChapters, player/playback.js) – weg seit 05.11.,
+     * der Server rechnet weniger, die Seite bleibt gleich. lean (Weitere Server, Nutzerbefund iPad 05.11.): nur die schlanken
+     * Metadaten (Kopf, Knoepfe, Besetzung, OnDeck); Extras/Aehnliche kommen danach mit moreQuery (DET-13). */
+    query: function (type, lean) {
+      var q = type === 'show' ? { includeOnDeck: 1 } : {};
+      if (!lean) { q.includeRelated = 1; q.includeExtras = 1; }
+      q.checkFiles = 0; q.includeReviews = 0;
+      return q;
     },
+    /* Nachlade-Anfrage (DET-13): nur Extras + Aehnliche; Besetzung/Personen stehen schon aus der schlanken Antwort */
+    moreQuery: function () {
+      return { includeExtras: 1, includeRelated: 1, includeOnDeck: 0, checkFiles: 0, includeReviews: 0, excludeElements: 'Role,Director,Writer,Producer,Country' };
+    },
+    MORE_RETRIES: 1,                                   // schwere Nachlade-Anfrage: hoechstens eine Wiederholung (Seite steht schon)
     /* Folgen einer Staffel seitenweise (50), ohne Besetzung */
     seasonQuery: function (start, size) {
       return { 'X-Plex-Container-Start': start, 'X-Plex-Container-Size': size || 50, excludeElements: 'Role,Director,Writer,Producer,Country,Genre,Image,UltraBlurColors,Guid,Rating' };
@@ -26,23 +36,29 @@
         cast: [], extras: [], trailer: null, related: [], ondeck: null, media: m.Media || [], theme: tp(m.theme || ''), lib: num(m.librarySectionID) };
       var i, r = m.Role || [];
       for (i = 0; i < r.length && i < 20; i++) d.cast.push({ rk: 'p' + r[i].id, type: 'person', id: r[i].id, title: String(r[i].tag || ''), role: String(r[i].role || ''), thumb: tp(r[i].thumb || ''), vc: 0, off: 0, dur: 0, leaf: 0, vleaf: 0 });
-      var ex = m.Extras && m.Extras.Metadata || [];
+      D.more(d, m, kinds);
+      var od = m.OnDeck && m.OnDeck.Metadata;
+      if (od) d.ondeck = M.norm(od, kinds);
+      return d;
+    },
+    /* Extras (Trailer) und "Aehnliche Titel" aus m in das Detail-Modell d (parse bzw. Nachlade-Antwort, DET-13). true = etwas dazu */
+    more: function (d, m, kinds) {
+      var i, ex = m && m.Extras && m.Extras.Metadata || [];
+      d.extras = []; d.trailer = null; d.related = [];
       for (i = 0; i < ex.length && i < 20; i++) {
         var x = M.norm(ex[i], kinds);
         x.extra = true; x.still = tp(ex[i].thumb || ''); x.sub = String(ex[i].subtype || '');
         d.extras.push(x);
         if (!d.trailer && (x.sub === 'trailer' || Number(ex[i].extraType) === 1)) d.trailer = x;
       }
-      var hubs = m.Related && m.Related.Hub || [];
+      var hubs = m && m.Related && m.Related.Hub || [];
       for (i = 0; i < hubs.length; i++) {
         var h = hubs[i], id = String(h.hubIdentifier || '');
         if (!/similar/.test(id)) continue;                 // "Aehnliche Titel" (movie.similar / tv.similar); nur Titel des eigenen Servers
         var items = M.normList(h.Metadata || [], kinds);
         if (items.length) d.related.push({ title: String(h.title || ''), items: items });
       }
-      var od = m.OnDeck && m.OnDeck.Metadata;
-      if (od) d.ondeck = M.norm(od, kinds);
-      return d;
+      return d.extras.length > 0 || d.related.length > 0;
     },
     /* /children der Serie -> Staffeln, Specials (Staffel 0) zuletzt */
     seasons: function (json) {

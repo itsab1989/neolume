@@ -15,6 +15,7 @@
  *   rail: Markierung der Seitenleiste (Standard: die Bibliothek)} */
 (function (N) {
   var U = N.util, M = N.model, G = N.GridMath, L = N.lib, REST = 300;
+  var MIXC = new N.LRU(300);                               // LIB-13: Stellen eingemischter Karten (Bibliothek + Filter + Stand + Schluessel)
   var REG_X = 1160, REG_Y = 168, REG_STEP = 17, LETTERS = '#ABCDEFGHIJKLMNOPQRSTUVWXYZ', LIST_MAX = 300;   // LETTERS: je Bildschirm neu (Sprache, N.lib.letters)
 
   N.router.define('library', function (params) {
@@ -46,7 +47,12 @@
     // Reiter mit Quelle (tab.src): Liste waechst seitenweise (src.load im Leerlauf, wenn der Fokus 2 Zeilen vor dem Ende ist), eigenes
     // Sortieren & Filter (src.tabs/pick) + Ansicht, Hinweis unter der letzten Zeile (src.end), Statuszeile (src.status), Optionen (src.menu/act)
     var xtab = '', xsrc = null, listItems = null;   // listItems: geladene HOME-14-Liste (Ansicht wechseln laedt nicht neu)
-    var loadSig = '', restoreRk = null, keyed = false;   // LIB-10: Stand der Bibliothek beim Laden (N.libwatch), fokussierter Titel beim Neuladen
+    var loadSig = '', restoreRk = null, keyed = false;
+    /* LIB-13 eingemischte Karten einer Erweiterung (N.ext 'lib:mix'): mx = Antwort der Erweiterung fuer diesen Ladevorgang, mm = Abbildung
+     * Server-Index <-> Raster-Index (N.lib.mixPlan, mp = Plan bis die Stellen am Anfang da sind, held = so lange zurueckgehaltene Seiten), chars0 = Buchstaben des Servers, sN = Titel beim Server, p0 = Seite 0 mit fertigen Stellen
+     * bzw. (leere Bibliothek) wartend, mixQuiet = seit dem Zeichnen keine Taste/kein Zeiger (spaete Karten duerfen noch dazu, hoechstens
+     * MIX_WAIT ms), mixDirty = Menge hat sich geaendert (neu laden beim naechsten Betreten, nie darin – LIB-10) */
+    var mx = null, mm = null, mp = null, held = {}, chars0Ok = false, mixWait = false, mixT = 0, p0 = null, chars0 = [], sN = -1, mixDirty = false, mixQuiet = false, MIX_WAIT = 1500;   // LIB-10: Stand der Bibliothek beim Laden (N.libwatch), fokussierter Titel beim Neuladen
     var restoreF = 0, zone = 'grid', cf = 0, regCh = '', regT = 0, t9 = { d: '', c: 0, t: 0 }, bubbleTm = 0, dead = false, away = false, railOpen = false, onScanned = null;
 
     /* ---------- Aufbau ---------- */
@@ -174,7 +180,8 @@
       if (mode() === 'colls') { U.setText(statT, N.tn('lib.status.colls', n)); return; }
       if (mode() === 'x') { U.setText(statT, (xsrc ? xsrc.status(n) : N.ext.call('lib:status', lib, xtab, n)) || ''); return; }
       if (coll || list) { U.setText(statT, N.tn('lib.status.items', n)); return; }
-      U.setText(statT, L.status(n, total, prefs, qlib()) + (once ? ' · ' + N.t('lib.status.once') : ''));   // HOME-14: Sortierung nur fuer diesen Besuch
+      var mn = mm ? mm.n : 0, ms = mn && mx.status ? mx.status(mn) : '';
+      U.setText(statT, L.status(n - mn, total, prefs, qlib()) + (ms ? ' · ' + ms : '') + (once ? ' · ' + N.t('lib.status.once') : ''));   // HOME-14: Sortierung nur fuer diesen Besuch
     }
 
     /* ---------- Daten ---------- */
@@ -196,20 +203,202 @@
         var mc = !err && d && d.MediaContainer;
         if (!mc) { pages[p] = 0; if (n < 0) onError(err); else N.diag.log('warn', 'library page ' + p + ' ' + (err && (err.status || err.type))); return; }
         var list = M.normList(mc.Metadata || [], kinds(), mc.librarySectionID || (mode() === 'lib' ? lib.id : 0), true), start = p * G.PAGE, size = Number(mc.totalSize !== undefined ? mc.totalSize : list.length);
-        for (var i = 0; i < list.length; i++) items[start + i] = list[i];
         if (n < 0) {
-          if (restoreRk) for (var j = 0; j < list.length; j++) if (list[j] && list[j].rk === restoreRk) { restoreF = start + j; break; }
-          restoreRk = null; n = size; firstPaint(); return;
+          sN = size;
+          /* LIB-13: Stellen am Anfang schon da (meist gemerkt) -> gleich mit Karten; leere Bibliothek -> kurz warten (sonst "leer" und gleich
+           * danach Karten); sonst Seite 0 SOFORT zeichnen (Review 05.11. M4: vorher bis 1,5 s Warten auf die Zaehlungen), Karten nach (mixLate) */
+          if (mm || !mixWait) { page0(list, start, size); return; }
+          if (!size) { p0 = { list: list, start: start, size: size }; if (!mixT) mixT = setTimeout(function () { mixT = 0; if (g === gen && !dead && mixWait) mixOff(); }, MIX_WAIT); return; }
+          page0(list, start, size);
+          mixQuiet = true; if (!mixT) mixT = setTimeout(function () { mixT = 0; if (g === gen && !dead && mixWait) mixOff(); }, MIX_WAIT);
+          return;
         }
-        grid.refresh(start, start + list.length - 1);
-        if (start <= grid.f && grid.f < start + list.length) { N.idle.add(updateHints, 'lib-hints'); amb.focus(cur()); }
+        pageN(p, list, start);
       }));
+    }
+    /* Server-Index -> Raster-Index (LIB-13; ohne eingemischte Karten gleich) */
+    function vi(s0) { return mm ? mm.toV(s0) : s0; }
+    function put(list, start) { for (var i = 0; i < list.length; i++) items[vi(start + i)] = list[i]; }
+    function page0(list, start, size) {
+      put(list, start);
+      if (mm) mixCards(0);
+      if (restoreRk) for (var j = 0; j < list.length; j++) if (list[j] && list[j].rk === restoreRk) { restoreF = vi(start + j); break; }
+      restoreRk = null; n = size + (mm ? mm.n : 0); firstPaint();
+    }
+    /* weitere Seite p: erst die Karten zaehlen, die diesen Bereich betreffen (wenige kleine Anfragen, sonst keine), dann einsortieren */
+    function pageN(p, list, start) {
+      if (mixWait && mx) { held[p] = { list: list, start: start }; return; }   // Stellen am Anfang noch offen: Seite wartet (unsichtbar, Platzhalter)
+      var g = gen, todo = mm ? mm.need(start, start + G.PAGE - 1) : [];
+      if (todo.length) { mixCount(todo, g, function () { if (g === gen && !dead) pageN(p, list, start); }); return; }
+      put(list, start);
+      var a = vi(start), b = vi(start + list.length - 1), c = mm ? mixCards(p) : null;
+      if (c) { a = Math.min(a, c[0]); b = Math.max(b, c[1]); }
+      grid.refresh(a, b);
+      if (a <= grid.f && grid.f <= b) { N.idle.add(updateHints, 'lib-hints'); amb.focus(cur()); }
+    }
+    /* ---------- LIB-13: Karten einer Erweiterung in die Titelsortierung mischen ----------
+     * Stelle je Karte = Zahl der Server-Titel davor: dieselbe Abfrage wie Seite 0 (Filter) mit titleSort<<=<Schluessel> und Groesse 0
+     * (~250 Byte; am PMS 1.43 geprueft: Zaehlung = Lage in sort=titleSort). Je Bibliothek + Filter + Stand der Bibliothek 10 min gemerkt.
+     * Bis L.MIX_MAX Karten (Plan N.lib.mixPlan): beim Oeffnen gezaehlt werden nur die Karten der ersten beiden Seiten (Bereich aus dem
+     * Buchstaben-Index, der ohnehin geladen wird) und ladende Karten (Blick, ob schon da); jede weitere Seite zaehlt vor dem Einsortieren
+     * die Karten ihres Bereichs. Seite 0 wartet nicht: kommen die Stellen spaeter (hoechstens MIX_WAIT ms, vor der ersten Taste), werden
+     * die Karten HINTER dem fokussierten Titel in einem Schritt eingesetzt (Fokus und Ring bleiben auf demselben Titel); Karten an/vor
+     * dem Fokus fallen fuer diesen Besuch weg (beim naechsten Oeffnen sofort dabei, Stellen gemerkt). */
+    function mixOn() { return mode() === 'lib' && !srv && !music && !coll && !params.actor && !list && !once && L.mixable(prefs) && N.ext.has('lib:mix'); }
+    function mixStart() {
+      mx = null; mm = null; mp = null; mixWait = false; mixQuiet = false; p0 = null; held = {}; mixDirty = false; mixBusy = {}; chars0Ok = false;
+      if (mixT) { clearTimeout(mixT); mixT = 0; }
+      if (!mixOn()) return;
+      var x = N.ext.call('lib:mix', lib, mixRepaint), g = gen;
+      if (!x) return;
+      if ((!x.items || !x.items.length) && x.later) {                 // Erweiterung laedt ihre Liste noch: Karten ggf. nach (mixLate)
+        mx = x; mixWait = true;
+        x.later(function (y) {
+          if (g !== gen || dead || !mixWait || mx !== x) return;
+          if (!y || !y.items || !y.items.length) { mixOff(); return; }
+          mx = y; mixPlan(g);
+        });
+        return;
+      }
+      if (!x.items || !x.items.length) return;
+      mx = x; mixWait = true;
+    }
+    /* Plan, sobald Karten und Buchstaben-Index da sind; dann die Stellen fuer den Anfang (Seiten 0 und 1) und ladende Karten */
+    function mixPlan(g) {
+      if (!mx || !mx.items || !mx.items.length || !chars0Ok || mp) return;
+      var l = mx.items.slice(0, L.MIX_MAX), keys = [];
+      for (var i = 0; i < l.length; i++) keys.push(L.mixKey(l[i].key || l[i].title));
+      mp = L.mixPlan(keys, chars0, !!prefs.desc);
+      mp.cards = l;
+      var first = mp.need(0, 2 * G.PAGE - 1), near = [];
+      mp.order().forEach(function (o) { if (l[o.j].near && mx.same && near.length < 12) near.push(o); });
+      var todo = first.slice();
+      near.forEach(function (o) { if (todo.indexOf(o) < 0) todo.push(o); });
+      mixCount(todo, g, function () {
+        var left = near.length;
+        if (!left) { mixSettle(g); return; }
+        near.forEach(function (o) {
+          if (o.k < 0) { if (!--left) mixSettle(g); return; }
+          /* Karte kurz vor der Ankunft (c.near): steht der Titel schon beim Server (erster Titel ab dieser Stelle, 1 Eintrag)? Dann faellt
+           * die Karte weg – nie dieselbe Karte doppelt, auch wenn die Erweiterung es noch nicht weiss */
+          var q2 = U.extend({}, L.filterQuery(prefs, qlib()));
+          q2.sort = 'titleSort:asc'; q2['X-Plex-Container-Start'] = o.b; q2['X-Plex-Container-Size'] = 1; q2.includeGuids = 1; q2.excludeElements = N.hubs.EXCL;
+          track(get('/library/sections/' + lib.id + '/all', q2, { timeout: 8000, retries: 0 }, function (e2, d2) {
+            if (g !== gen || dead || !mp) return;
+            var md = !e2 && d2 && d2.MediaContainer && d2.MediaContainer.Metadata && d2.MediaContainer.Metadata[0];
+            if (md && mx.same(l[o.j], md)) mp.drop(o);
+            if (!--left) mixSettle(g);
+          }));
+        });
+      });
+    }
+    /* Stellen der Karten os zaehlen (gemerkte sofort), dann done(). Fehler: am Anfang faellt die Karte weg; spaeter steht sie am Anfang
+     * ihres Bereichs (die Abbildung bleibt stimmig). Zaehlung ausserhalb des Bereichs (Buchstaben anders sortiert): geklemmt, beim
+     * naechsten Betreten neu (mixDirty). */
+    var mixBusy = {};
+    function mixCount(os, g, done) {
+      var left = os.length, fq = L.filterQuery(prefs, qlib()), sig = N.libwatch.sig(lib.id) || '', l = mp.cards;
+      if (!left) { done(); return; }
+      function got(o, t) {
+        if (g !== gen || dead || !mp) return;
+        if (o.k < 0) {
+          if (t >= 0) { if (!mp.set(o, t)) { mixDirty = true; N.diag.log('warn', 'lib mix: Stelle ausserhalb des Buchstabens'); } }
+          else if (mixWait) mp.drop(o); else mp.set(o, prefs.desc ? mp.total - o.lo : o.lo);
+        }
+        if (!--left) done();
+      }
+      os.forEach(function (o) {
+        var key = L.mixKey(l[o.j].key || l[o.j].title), ck = libKey + '|' + JSON.stringify(fq) + '|' + sig + '|' + key.toLowerCase(), hit = MIXC.get(ck);
+        if (o.k >= 0) { got(o, o.b); return; }
+        if (hit && U.now() - hit.t < 600000) { got(o, hit.v); return; }
+        if (mixBusy[ck]) { mixBusy[ck].push(function (t) { got(o, t); }); return; }
+        var w = mixBusy[ck] = [function (t) { got(o, t); }], q = U.extend({}, fq);
+        q['titleSort<<'] = key; q['X-Plex-Container-Start'] = 0; q['X-Plex-Container-Size'] = 0;
+        track(get('/library/sections/' + lib.id + '/all', q, { timeout: 8000, retries: 0 }, function (err, d) {
+          if (mixBusy[ck] === w) delete mixBusy[ck];
+          var t = !err && d && d.MediaContainer ? Number(d.MediaContainer.totalSize) : NaN;
+          if (!isNaN(t)) MIXC.set(ck, { t: U.now(), v: t });
+          for (var i = 0; i < w.length; i++) w[i](isNaN(t) ? -1 : t);
+        }));
+      });
+    }
+    /* Karten der Server-Seite p ins Raster (Stelle bekannt, im Bereich der Seite; die letzte Seite auch Karten ganz am Ende) -> [a, b] | null */
+    function mixCards(p) {
+      var a = p * G.PAGE, b = a + G.PAGE - 1, last = Math.max(0, Math.ceil(sN / G.PAGE) - 1), r = null;
+      for (var j = 0; j < mm.n; j++) {
+        var o = mm.order()[j];
+        if (o.k < 0 || o.k < a || (o.k > b && p !== last)) continue;
+        var v = o.k + j;
+        items[v] = mm.cards[o.j];
+        r = r ? [Math.min(r[0], v), Math.max(r[1], v)] : [v, v];
+      }
+      return r;
+    }
+    function mixLetters() { var out = []; for (var j = 0; mm && j < mm.n; j++) { var c = mm.cards[mm.order()[j].j]; out.push(L.mixLetter(L.mixKey(c.key || c.title))); }; return out; }
+    /* Anfang fertig gezaehlt: wartet Seite 0 noch -> gleich mit Karten; schon gezeichnet -> mixLate; leere Bibliothek wartet in p0 */
+    function mixSettle(g) {
+      if (g !== gen || dead || !mixWait || !mp) return;
+      if (!mp.n) { mixOff(); return; }
+      if (p0) { mixDone(); return; }
+      if (n >= 0) { mixLate(); return; }
+      mixWait = false; mm = mp;                                           // Seite 0 kommt noch: sie nimmt die Abbildung gleich mit
+      if (chars0.length) chars = L.mixChars(chars0, mixLetters());
+    }
+    /* keine Karten fuer diesen Besuch: zurueckgehaltene Seiten ohne Abbildung einsortieren */
+    function mixOff() {
+      if (mixT) { clearTimeout(mixT); mixT = 0; }
+      mixWait = false; mixQuiet = false; mx = null; mm = null; mp = null;
+      var z = p0; p0 = null;
+      if (z) page0(z.list, z.start, z.size);
+      flushHeld();
+    }
+    function flushHeld() { var h = held; held = {}; for (var p in h) if (h.hasOwnProperty(p)) pageN(Number(p), h[p].list, h[p].start); }
+    /* Stellen nach dem ersten Zeichnen (M4): nur ohne Taste seit dem Zeichnen und binnen MIX_WAIT; eingesetzt werden nur Karten hinter dem
+     * Fokus (Stelle k > grid.f: der fokussierte Titel behaelt seinen Index, Ring und Fokus springen nicht; die Karten dahinter ruecken
+     * einmal auf). Karten an/vor dem Fokus fallen fuer diesen Besuch weg (beim naechsten Oeffnen sofort dabei, Stellen 10 min gemerkt). */
+    function mixLate() {
+      if (!(mixQuiet && n > 0)) { mixOff(); return; }
+      if (mixT) { clearTimeout(mixT); mixT = 0; }
+      mixWait = false; mixQuiet = false;
+      var f = grid.f, j, k;
+      var ol = mp.order().slice();
+      for (j = 0; j < ol.length; j++) if (ol[j].k >= 0 && ol[j].k <= f) mp.drop(ol[j]);
+      if (!mp.n) { mx = null; mp = null; flushHeld(); return; }
+      mm = mp;
+      var nw = [];
+      for (k in items) if (items.hasOwnProperty(k) && items[k]) nw[mm.toV(Number(k))] = items[k];
+      items = nw;
+      mixCards(0);
+      n = sN + mm.n;
+      if (chars0.length) chars = L.mixChars(chars0, mixLetters());
+      grid.grow(items, n);
+      grid.refresh(f + 1, n - 1);                                         // nur Zellen hinter dem Fokus neu (Fokuszelle bleibt)
+      paintStatus(); paintReg(true);
+      if (zone === 'grid') N.idle.add(updateHints, 'lib-hints');
+      flushHeld();
+    }
+    function mixDone() {
+      if (mixT) { clearTimeout(mixT); mixT = 0; }
+      mixWait = false; mm = mp;
+      if (chars0.length) chars = L.mixChars(chars0, mixLetters());
+      var z = p0; p0 = null;
+      if (z) page0(z.list, z.start, z.size);
+      flushHeld();
+    }
+    /* Erweiterung meldet: Stand einzelner Karten neu (gleiche Menge) -> nur diese neu zeichnen; Menge anders -> beim naechsten Betreten */
+    function mixRepaint() {
+      if (dead || !mm || !mx) return;
+      var x = mixOn() ? N.ext.call('lib:mix', lib, mixRepaint) : null;
+      if (!x || x.sig !== mx.sig) { mixDirty = true; return; }
+      if (away || n <= 0) return;
+      for (var j = 0; j < mm.n; j++) { var v = mm.pos(j); if (v >= 0) grid.refresh(v, v); }
+      if (zone === 'grid' && mm.phAt(grid.f) >= 0) N.idle.add(updateHints, 'lib-hints');
     }
     /* alles neu laden (Sortierung/Filter/Reiter geaendert, Rueckkehr nach Scan) */
     function reload(keepF) {
       gen++; abortAll();
       loadSig = srv ? '' : N.libwatch.sig(lib.id);
-      items = []; n = -1; pages = {}; chars = []; total = -1;
+      items = []; n = -1; pages = {}; chars = []; chars0 = []; total = -1; sN = -1;
       if (!keepF) restoreF = 0;
       grid.clear(); ring.hide(); sb.hide(); hideReg(); U.show(skel, true);
       if (G.size !== L.view(prefs) || !!G.square !== music) { G = N.GridMath.make(L.view(prefs), music, A, AHEAD); grid.setGeom(G); }   // Ansicht Gross/Mittel/Klein/Liste
@@ -219,12 +408,15 @@
       if (mode() === 'x') { items = N.ext.call('lib:items', lib, xtab) || []; n = items.length; firstPaint(); return; }
       if (list) { if (list.src === 'x' || listItems) { items = listItems || []; n = items.length; firstPaint(); } else loadList(); return; }   // Erweiterung fehlt: leer
       if (srv && !N.srv.conn(srv)) U.setText(statT, N.t('srv.connecting', { server: lib.srvName || N.srv.name(srv) }));   // weiterer Server: Verbindung wird geprueft
+      mixStart();
       loadPage(0);
       var g = gen;
       if (mode() === 'lib') {
         if (L.hasRegister(prefs)) track(get('/library/sections/' + lib.id + '/firstCharacter', L.filterQuery(prefs, qlib()), null, function (err, d) {
-          if (g !== gen || err) return;
-          chars = L.chars(d); if (n >= 0) paintReg(true);
+          if (g !== gen) return;
+          if (err) { if (mixWait) mixOff(); return; }                   // ohne Buchstaben-Index keine Stellen: diesmal ohne Karten
+          chars0 = L.chars(d); chars0Ok = true; chars = mm ? L.mixChars(chars0, mixLetters()) : chars0; if (n >= 0) paintReg(true);
+          mixPlan(g);
         }));
         if (L.hasFilter(prefs)) track(get('/library/sections/' + lib.id + '/all', { type: L.typeNum(qlib()), 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 0 }, null, function (err, d) {
           if (g !== gen || err || !d || !d.MediaContainer) return;
@@ -257,7 +449,7 @@
       amb.focus(cur()); amb.data();
       if (xsrc) grid.endNote(xEnd());
     }
-    function ensurePages() { if (xsrc) { xNear(); return; } var ps = G.pagesFor(n, grid.r); for (var i = 0; i < ps.length; i++) loadPage(ps[i]); }
+    function ensurePages() { if (xsrc) { xNear(); return; } var ps = G.pagesFor(n, grid.r); if (mm) ps = L.mixPages(mm, ps, G.PAGE, sN); for (var i = 0; i < ps.length; i++) loadPage(ps[i]); }
     /* ---------- Reiter mit Quelle (Erweiterung) ---------- */
     function xPanel() { return !!(xsrc && xsrc.tabs); }
     function xEnd() { return n > 0 && !xsrc.more() ? xsrc.end() || '' : ''; }
@@ -400,7 +592,8 @@
       if (N.pointer && N.pointer.follow) N.pointer.follow();
     }
     function updateHints() { N.router.refreshHints(); }
-    function afterMove() { ensurePages(); regLater(); N.idle.add(updateHints, 'lib-hints'); amb.focus(cur()); }   // amb: nur merken (Wechsel nach Ruhe)
+    function afterMove() { ensurePages(); regLater(); N.idle.add(updateHints, 'lib-hints'); amb.focus(cur()); if (DWARM && N.details.warm) N.details.warm(cur()); }   // amb: nur merken (Wechsel nach Ruhe)
+    var DWARM = !!(N.ui.card && N.ui.card.on());       // Detailkarte (Apple): Hintergrund der fokussierten Karte vorladen (DET-21); TV: nie
     function moveTo(i) { placeRing(grid.focusTo(i)); afterMove(); }
     function setChip(i, force) {
       if (!chips.length) return;
@@ -442,6 +635,7 @@
     function open(it) {
       if (!it) return;
       if (it.ext && xsrc && xsrc.open && xsrc.open(it)) return;          // Reiter mit Quelle: z. B. schon vorhandener Titel -> echte Seite
+      if (it.ext && mm && mx && mx.open && mx.open(it, s.rail)) return;    // LIB-13: eingemischte Karte – die Erweiterung waehlt die Seite
       if (it.ext) { N.router.push('extdetails', { it: it, rail: s.rail }); return; }   // Titel ausserhalb des Servers (Erweiterungs-Reiter); Marke bleibt auf der Bibliothek (TV-Test 29.10.)
       if (it.type === 'collection') { N.router.push('library', { lib: lib, coll: { rk: it.rk, title: it.title } }); return; }
       if (list && (list.src === 'cw' || list.src === 'deck') && M.isLeaf(it)) { N.player.play(it, 'ask'); return; }   // wie auf der Startseite: OK spielt ab
@@ -558,13 +752,14 @@
         changed: function (x, w) {
           // Filter "Ungesehen"/"Gesehen": Karte verschwindet (SPEC 6.3.1)
           if (mode() === 'lib' && ((st === 'unwatched' && w) || (st === 'watched' && !w) || (st === 'started' && w))) {
+            if (mm) { mm.cut(idx); sN--; }                     // LIB-13: eingemischte Karten dahinter ruecken mit
             if (!grid.removeAt(idx)) { n = 0; showEmpty(); } else { n = grid.n; placeRing(grid.ringPos()); }
             paintStatus();
           } else grid.refresh(idx, idx);
           N.idle.add(updateHints, 'lib-hints'); amb.focus(cur());
         },
         reverted: function (x) {
-          if (grid.items[idx] !== x && grid.items.indexOf(x) < 0) { sb.hide(); if (zone === 'state') zone = 'grid'; grid.setFocused(true); grid.insertAt(Math.min(idx, grid.n), x); n = grid.n; placeRing(grid.ringPos()); paintStatus(); }
+          if (grid.items[idx] !== x && grid.items.indexOf(x) < 0) { sb.hide(); if (zone === 'state') zone = 'grid'; grid.setFocused(true); var at = Math.min(idx, grid.n); if (mm) { mm.ins(at); sN++; } grid.insertAt(at, x); n = grid.n; placeRing(grid.ringPos()); paintStatus(); }
           else grid.refresh(0, grid.n - 1);
           N.idle.add(updateHints, 'lib-hints');
         }
@@ -662,10 +857,17 @@
      * eine kleine Anfrage im Leerlauf – kommt die Antwort, bevor eine Taste gedrueckt wurde, wird gleich neu geladen, sonst beim
      * naechsten Betreten. Reiter einer Erweiterung und Bibliotheken weiterer Server: unveraendert. */
     function changed() { var sg = N.libwatch.sig(lib.id); if (!loadSig && sg) loadSig = sg; return !!(loadSig && sg && sg !== loadSig); }
+    /* LIB-13: Menge der eingemischten Karten anders als beim Laden (neue Anfrage, Ankunft) – nur beim Betreten geprueft */
+    function mixChanged() {
+      if (mixDirty) return true;
+      if (!mixOn()) return !!mm;
+      var x = N.ext.call('lib:mix', lib, mixRepaint);
+      return (x && x.items && x.items.length ? x.sig : '') !== (mm && mx ? mx.sig : '');
+    }
     function relaunch() { var it = cur(); restoreRk = it ? it.rk : null; restoreF = grid.f; reload(true); }
     function fresh() {
       if (srv || mode() === 'x' || list || n < 0) return false;
-      if (changed()) { relaunch(); return true; }
+      if (changed() || mixChanged()) { relaunch(); return true; }
       keyed = false;
       var g = gen;
       N.idle.add(function () {
@@ -691,6 +893,7 @@
     };
     s.destroy = function () {
       dead = true; gen++; abortAll();
+      if (mixT) clearTimeout(mixT);
       if (onScanned) N.evt.off('library:scanned', onScanned);
       if (bubbleTm) clearTimeout(bubbleTm);
       amb.destroy();
@@ -706,7 +909,7 @@
     function up() { if (params.sec && !sub) N.app.sectionBack(); else N.router.back(); }
 
     s.onKey = function (k) {
-      keyed = true;
+      keyed = true; mixQuiet = false;
       if (N.keys.isDigit(k)) { if (zone === 'grid' || zone === 'reg') digit(k); return true; }
       if (k === 'BLUE') { N.router.push(N.disc.blueView()); return true; }
       if (zone === 'state') {
@@ -766,7 +969,7 @@
 
     /* ---------- Zeiger (Index-Mathe) ---------- */
     s.pointer = function (x, y, kind) {
-      keyed = true;
+      keyed = true; mixQuiet = false;
       if (eat) { if (kind === 'click') eat = false; return true; }   // Beruehrung hat den Schwung angehalten: nichts oeffnen
       if (sb.on && zone === 'state') return sb.pointer(x, y, kind);
       if (y >= 120 && y < 152 && chipRects) {

@@ -24,6 +24,7 @@
     try { raw = N.platform.tv.language(); } catch (e) {}
     var nav = (window.navigator && (navigator.language || navigator.userLanguage)) || '';
     N.log('lang raw tvmw=' + raw + ' nav=' + nav);
+    N.i18n.sys = typeof raw === 'string' && /^[a-z]{2,3}([-_]|$)/i.test(raw) ? raw : String(nav);   // Sprach-Tag des Geraets ("de-DE"): Land fuer Fernsehen (LIVE-7)
     // TVMW liefert u. U. eine Zahl (Samsung-Enum) – dann zaehlt navigator.language; alles Unbekannte -> Deutsch
     return N.i18n.detect(typeof raw === 'string' && raw ? raw : nav);
   }
@@ -58,7 +59,8 @@
       // Sprachtabelle (eigene Datei i18n/<lang>.js, nur die aktive) parallel zu setup.json laden: Sprache aus state.json bzw. TV
       var pre = N.store.get('state.json'), wait = 2, args = null;
       function go() { if (--wait === 0) A.boot(args[0], args[1], t0); }
-      N.i18n.load(pre && pre.lang || tvLanguage(), function () { mark('i18n-datei'); go(); });
+      var sysLang = tvLanguage();                                       // immer: das Land daraus braucht Fernsehen (LIVE-7)
+      N.i18n.load(pre && pre.lang || sysLang, function () { mark('i18n-datei'); go(); });
       N.setupFile.read(ctx, function (pkg, why) {
         mark('setup');
         var st = N.setupFile.timing();   // P7: Datei-Lesen vs. blockierter Hauptthread unterscheiden (docs/P7-TV-TEST.md)
@@ -142,7 +144,7 @@
         if (R.topName() !== 'home') R.reset('home');
         return true;
       }
-      var name = id === 'settings' || id === 'search' || id === 'discover' ? id : 'library';   // P4: Entdecken
+      var name = id === 'settings' || id === 'search' || id === 'discover' || id === 'livetv' ? id : 'library';   // P4: Entdecken; LIVE-1: Fernsehen
       // sec: Bereich aus der Seitenleiste (NAV-5) – oben angekommen fuehrt RETURN ueber N.app.sectionBack weiter, nicht per Router zurueck
       var params = name !== 'library' ? { sec: 1 } : { lib: lib, sec: 1 }, tp = R.topParams();
       if (R.topName() === name && (name !== 'library' || (tp && tp.lib && lib && tp.lib.id === lib.id && (tp.lib.srv || '') === (lib.srv || '') && !tp.coll && !tp.actor))) return false;

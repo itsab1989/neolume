@@ -8,6 +8,7 @@ import socketserver
 import threading
 
 from . import brand, ext
+from .netutil import json_loads
 from .package import PackageError
 from .plextv import PlexError
 from .wizard import StepError
@@ -65,6 +66,7 @@ def _actions(w):
         'helper_install': lambda a: w.helper_install(_bool(a.get('tray', True)), _opt_str(a.get('lang'))),
         'helper_uninstall': lambda a: w.helper_uninstall(_bool(a.get('keep', False))),
         'helper_tray': lambda a: w.helper_tray(_bool(a.get('on', True))),
+        'helper_new_sign': lambda a: w.helper_new_sign(),
         'helper_bg': lambda a: w.helper_bg(_bool(a.get('run', True))),
         'finish': lambda a: w.finish(),
         'logout': lambda a: w.reset(),
@@ -135,7 +137,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if (self.headers.get('Content-Type') or '').split(';')[0].strip() != 'application/json':
             return self._json(415, {'ok': False, 'error': 'content_type'})
         try:
-            args = json.loads(self.rfile.read(n).decode('utf-8') or '{}')
+            args = json_loads(self.rfile.read(n).decode('utf-8') or '{}')     # nesting limit on every Python version
             if not isinstance(args, dict): raise ValueError
         except (ValueError, RecursionError):        # deeply nested JSON must not kill the handler with a traceback
             return self._json(400, {'ok': False, 'error': 'bad_input'})

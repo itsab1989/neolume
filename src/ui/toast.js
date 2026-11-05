@@ -20,6 +20,7 @@
     var top = N.router && N.router.top ? N.router.top() : null;
     U.cls(T.el, 'low', o.low !== undefined ? !!o.low : !!(top && top.toastLow));
     U.cls(T.el, 'high', !!(top && top.toastHigh) && !o.low);
+    U.cls(T.el, 'under', !!(top && top.toastUnder));      // Einstellungen: unter der Beschreibung statt ueber der Bereichsliste (Layout 05.11.: 10. Bereich verdeckt)
     U.cls(T.el, 'on', true);
     T.timer = setTimeout(T.hide, o.ms || (o.undo ? 6000 : 4000));
     T.undoKey = o.undo ? o.undoKey || 'YELLOW' : '';

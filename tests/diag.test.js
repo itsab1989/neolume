@@ -13,6 +13,10 @@ test('Schwaerzung: Token, PINs und Codes vor dem Speichern', function () {
   assert.ok(!/4711/.test(D.redact('switch?pin=4711')));
   assert.ok(!/4711/.test(D.redact('{"pin":"4711"}')));
   assert.ok(!/AB12/.test(D.redact('{"id":5,"code":"AB12"}')));
+  // Sitzungs-Token des Helfers (Fernsehen, Review 05.11. Z5): nie im Protokoll; der Weg zum Oeffnen bleibt lesbar
+  var tok = 'aB3_-x' + new Array(27).join('k');
+  assert.strictEqual(D.redact('live de-daserste helper http://192.0.2.10:32499/live/' + tok + '/index.m3u8'), 'live de-daserste helper http://192.0.2.10:32499/live/***/index.m3u8');
+  assert.strictEqual(D.redact('GET /live/open?ch=de-zdf&h=540'), 'GET /live/open?ch=de-zdf&h=540');
   assert.strictEqual(D.redact('Startseite geladen in 120ms'), 'Startseite geladen in 120ms');
 });
 

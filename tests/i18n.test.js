@@ -42,7 +42,7 @@ test('jeder im Code benutzte Schluessel existiert in beiden Sprachen', function 
   // zusammengesetzte Schluessel
   ['main', 'kid', 'teen'].forEach(function (k) { used['prof.sub.' + k] = 1; });
   ['network', 'server', 'proxy', 'auth', 'generic'].forEach(function (k) { used['err.' + k + '.title'] = used['err.' + k + '.text'] = 1; });
-  ['display', 'account', 'diag', 'help'].forEach(function (k) { used['set.cat.' + k] = used['set.cat.' + k + '.desc'] = 1; });
+  ['look', 'controls', 'live', 'account', 'help'].forEach(function (k) { used['set.cat.' + k] = used['set.cat.' + k + '.desc'] = 1; });
   ['dlg.markShow', 'dlg.unmarkShow', 'dlg.markSeason', 'dlg.unmarkSeason'].forEach(function (k) { used[k + '.title'] = used[k + '.text'] = 1; });
   ['de', 'en', 'nb'].forEach(function (l) { used['lang.' + l] = 1; });
   ['login.step2', 'login.step3', 'soon.details', 'soon.player', 'empty.home.title', 'empty.home.text', 'empty.home.kids.title', 'empty.home.kids.text'].forEach(function (k) { used[k] = 1; });

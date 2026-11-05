@@ -21,7 +21,7 @@ var SAFE = {
 /* bewusst harmlos, obwohl der Name anders klingt */
 var NOT_RISKY = {};
 /* zur Laufzeit gebaute Knopflisten (Kontextmenues ohne Abbrechen-Knopf, Fehlerbox der Startseite mit genau einem Knopf) */
-var DYN = ['src/views/album.js', 'src/views/details.js', 'src/views/home.js', 'src/views/homerows.js', 'src/views/library.js'];   // homerows: Verschieben/Entfernen per langem Druck (Apple Nr. 26)
+var DYN = ['src/views/album.js', 'src/views/details.js', 'src/views/home.js', 'src/views/homerows.js', 'src/views/library.js', 'src/views/liveplayer.js', 'src/views/livetv.js'];   // liveplayer: Fehlerblock (Erneut/Anderer Sender), livetv: Optionen (Ansehen, Ansicht, Regionen, Sender)   // homerows: Verschieben/Entfernen per langem Druck (Apple Nr. 26)
 
 function pub() {
   var r = D.scan(SRC, ROOT);

@@ -128,9 +128,10 @@
     var all = !!it.all, src = all ? '' : land ? it.still : it.thumb;
     /* HOME-14 "Alle anzeigen": ruhige Karte (Flaeche + Raster-Symbol im Abzeichen-Element + Text), Text erst hier (Sprache) */
     U.setText(e.ph, all ? (it.alln ? N.t('home.row.allN', { n: it.alln }) : N.t('home.row.all')) : it.title);
-    var phc = all ? 'ph all' : !src && g.kind !== 'cast' ? 'ph fb ' + N.ui.fbClass(it) : 'ph';   // ohne Bild: farbige Titelkarte (F28), nie grau
+    var phc = all ? 'ph all' : it.logo ? 'ph lg' : !src && g.kind !== 'cast' ? 'ph fb ' + N.ui.fbClass(it) : 'ph';   // ohne Bild: farbige Titelkarte (F28), nie grau; Senderlogo: Name bis zum Logo
     if (e.phc !== phc) { e.phc = phc; e.phEl.className = phc; }
-    N.img.want(e.img, src ? N.img.url(src, tier) : '', prio);
+    e.img.pnLogo = it.logo ? [g.w, g.h] : null;         // Fernsehen (LIVE-3): Logo ganz, mittig auf heller Flaeche (N.img logoFit)
+    N.img.want(e.img, src ? N.img.url(src, tier, it.logo ? N.img.LOGO : undefined) : '', prio);
     var b = all ? { b: 'all', n: '' } : M.badge(it), bc = b.b ? 'bdg ' + b.b : 'bdg';
     if (e.bc !== bc) { e.bc = bc; e.badge.className = bc; }
     U.setText(e.badgeT, b.n);
@@ -141,7 +142,7 @@
       e.pw = pw;
     }
     if (this.showCaptions()) {
-      var c = all ? ['', ''] : this.opts.caption ? this.opts.caption(it) : it.type === 'person' ? [it.title, it.role] : land ? M.landCaption(it) : M.posterCaption(it);
+      var c = all ? ['', ''] : this.opts.caption ? this.opts.caption(it) : it.type === 'person' ? [it.title, it.role] : it.type === 'live' ? [it.title, it.sub || ''] : land ? M.landCaption(it) : M.posterCaption(it);
       U.setText(e.t1, c[0]); U.setText(e.t2, c[1]);
     }
     if (!e.on) { e.card.style.display = ''; e.on = true; }
@@ -190,7 +191,7 @@
       var e = this.byIdx[i], it = this.item(i);
       if (!e || !it) continue;
       var src = isLand(this.g) ? it.still : it.thumb;
-      if (src) N.img.want(e.img, N.img.url(src, tierOf(this.g)), 0);
+      if (src) N.img.want(e.img, N.img.url(src, tierOf(this.g), it.logo ? N.img.LOGO : undefined), 0);
     }
   };
   /* Bild-URLs der Spalten [a, b] (geklemmt) – fuer N.img.warm (Startseite: Karten ausserhalb des Bildschirms vorab dekodieren) */
@@ -199,7 +200,7 @@
     var n = this.count(), land = isLand(this.g), tier = tierOf(this.g);
     for (var i = Math.max(0, a); i <= Math.min(n - 1, b); i++) {
       var it = this.model.items[i], src = it && (land ? it.still : it.thumb);
-      if (src) out.push(N.img.url(src, tier));
+      if (src) out.push(N.img.url(src, tier, it.logo ? N.img.LOGO : undefined));
     }
     return out;
   };

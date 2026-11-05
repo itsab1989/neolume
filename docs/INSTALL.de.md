@@ -310,7 +310,7 @@ Hast du **„Helfer einrichten“** angekreuzt? Dann das Programm **noch nicht**
    Eine PIN gilt nur für Neolume auf diesem Fernseher.
 4. Die Startseite lädt Weiterschauen, Nächste Folgen und Neues aus deinen Bibliotheken.
 5. Nach kurzer Zeit auf der Startseite zeigt eine Karte **„So bedienst du Neolume“** die Tasten. Du findest sie später unter
-   **Einstellungen** → **Hilfe & Info**.
+   **Einstellungen** → **Hilfe & Diagnose**.
 
 ![Skizze der Profilwahl von Neolume „Wer schaut gerade?“ mit vier Beispielprofilen und dem Hinweis „Erwachsenenprofile schützen?“ mit den Knöpfen Verstanden und Später erinnern](img/app-profiles.de.svg)
 
@@ -321,7 +321,7 @@ Ab jetzt spricht Neolume **nur mit deinem Server**. Dein Computer kann aus bleib
 | Taste | Was sie tut |
 |---|---|
 | Pfeiltasten, `OK` | Bewegen, auswählen |
-| `RETURN` | Zurück. In einer Bibliothek, der Suche, Entdecken oder den Einstellungen erst nach oben, dann zur Startseite (oder zum Bereich davor – *Zurück aus einem Bereich* unter **Einstellungen → Oberfläche**). Auf der Startseite: zur ersten Karte, dann *Beenden*. Die Seitenleiste öffnet ◀ |
+| `RETURN` | Zurück. In einer Bibliothek, der Suche, Entdecken oder den Einstellungen erst nach oben, dann zur Startseite (oder zum Bereich davor – *Zurück aus einem Bereich* unter **Einstellungen → Sprache & Bedienung**). Auf der Startseite: zur ersten Karte, dann *Beenden*. Die Seitenleiste öffnet ◀ |
 | `PLAY` / `PAUSE` / `STOP` | Wiedergabe |
 | `◄◄` / `►►` | Zurück / vor springen (in Listen: mehrere Einträge springen) |
 | `TOOLS` | Optionen zum markierten Eintrag (im Player das Menü „Mehr“) |
@@ -452,10 +452,14 @@ genau diese eine Aufgabe für den Fernseher übernimmt:
 - **Was er holt:** deine Plex-Merkliste (merkst du am Fernseher etwas vor oder entfernst es, gibt er das an plex.tv weiter)
   die drei Entdecken-Reihen und – wenn du in „Entdecken“ einen Titel öffnest, der nicht auf deinem Server ist – dessen
   Inhalt, Genres, Laufzeit und Besetzung aus dem Plex-Katalog. Sonst nichts. Nutzt du [freigegebene Server anderer Leute](#14-weitere-server-optional),
-  fragt er außerdem deren aktuelle Adresse ab.
-- **Was er nicht tut:** keine Videos weiterleiten (Videos kommen immer direkt von deinem Plex-Server), nicht aus dem Internet
-  erreichbar, leitet keine fremden Anfragen weiter. Er antwortet nur Geräten in deinem Heimnetz,
-  ruft nur eine feste Liste von plex.tv-Adressen ab und schickt Daten nur an plex.tv.
+  fragt er außerdem deren aktuelle Adresse ab. Ist **Live-TV** an, holt er beim Abspielen eines Senders von ARD oder ZDF
+  außerdem Bild und Ton bei diesem Sender und gibt dem Fernseher einen Strom – der Player des Fernsehers von 2014 kann den
+  getrennten Ton dieser Sender nicht selbst dazunehmen, ohne Helfer fehlen sie deshalb am Fernseher.
+- **Was er nicht tut:** keine Videos deines Plex-Servers weiterleiten (die kommen immer direkt vom Server), nicht aus dem
+  Internet erreichbar, leitet keine fremden Anfragen weiter. Er antwortet nur Geräten in deinem Heimnetz, ruft nur eine feste
+  Liste von plex.tv-Adressen und – für Live-TV – die Senderadressen aus der Senderliste der App ab (nie eine Adresse, die
+  ihm jemand schickt) und schickt Daten nur dorthin. Live-TV läuft nur ein paar Sekunden lang durch seinen Speicher und wird
+  nie gespeichert.
 - **Was er speichert:** die Zugangsdatei `helper.json` – nur für dein Benutzerkonto lesbar – im Einstellungsordner
   (Mac: `~/Library/Application Support/NeolumeSetup`, Windows: `%APPDATA%\NeolumeSetup`, Linux: `~/.config/NeolumeSetup`).
   Dauerhaft installiert (13.3) zusätzlich eine Programmkopie, einen Autostart-Eintrag und ein Protokoll (`helper.log`,
@@ -563,17 +567,17 @@ holt das Symbol zurück. Unter Linux gibt es kein Symbol.
 ### 13.5 Prüfen, ob es funktioniert
 
 **Am Fernseher:**
-1. Neolume öffnen → **Einstellungen** → **Oberfläche** → **Merkliste**. Sie lässt sich schalten und ist an.
+1. Neolume öffnen → **Einstellungen** → **Live-TV & Entdecken** → **Merkliste**. Sie lässt sich schalten und ist an.
    - Dort steht **„Nicht eingerichtet“**: Das App-Paket auf dem Fernseher kennt noch keinen Helfer – **„Helfer einrichten“**
      ankreuzen, Paket erstellen und erneut syncen (13.2).
    - Die Zeile ist grau mit *„Der Helfer von Neolume antwortet gerade nicht …“*: Der Fernseher kennt den Helfer, erreicht ihn aber
      nicht – siehe [13.9](#139-fehlerbehebung-beim-helfer). Neolume versucht es nach einer Minute erneut.
 2. In der Seitenleiste **Entdecken** öffnen: Dort stehen **Deine Merkliste** und – bevor du tippst – die Reihen „Gerade
-   beliebt“, „Neu erschienen“, „Bald verfügbar“ (welche Reihen: **Einstellungen** → **Oberfläche** → **Inspiration
+   beliebt“, „Neu erschienen“, „Bald verfügbar“ (welche Reihen: **Einstellungen** → **Live-TV & Entdecken** → **Inspiration
    anpassen**). Standardmäßig schlagen sie nur Titel vor, die noch nicht auf deinem Server sind (**Einstellungen** →
-   **Oberfläche** → **Nur Titel, die du noch nicht hast**).
+   **Live-TV & Entdecken** → **Nur Titel, die du noch nicht hast**).
 
-![Skizze der Einstellungen von Neolume: Oberfläche gewählt (1), die Zeile Merkliste eingeschaltet und markiert (2), dazu Entdecken in der Seitenleiste, Inspiration anpassen und Nur Titel, die du noch nicht hast](img/app-settings-watchlist.de.svg)
+![Skizze der Einstellungen von Neolume: Live-TV & Entdecken gewählt (1), die Zeile Merkliste eingeschaltet und markiert (2), dazu Entdecken in der Seitenleiste, Inspiration anpassen und Nur Titel, die du noch nicht hast](img/app-settings-watchlist.de.svg)
 
 **Am Computer** – die drei Zustandszeilen im Symbol-Menü:
 
@@ -592,6 +596,13 @@ Ohne Symbol: Die Helfer-Karte meldet **„Läuft im Hintergrund“**, oder `--he
   `--install-helper` starten.
 - **Neue Profile oder neue Einrichtung:** einfach die Einrichtung erneut ausführen (**„Helfer einrichten“** bleibt angekreuzt →
   **„App-Paket erstellen“**). Der installierte Helfer übernimmt die neue Zugangsdatei nach wenigen Sekunden von selbst.
+- **Neuer Signaturschlüssel:** Mit dem Signaturschlüssel beweist die App dem Helfer, dass eine Anfrage von deinem Fernseher
+  kommt. Er steckt in jedem App-Paket und in `helper.json`. Hast du ein altes App-Paket weitergegeben, die Zugangsdatei
+  kopiert oder einen Fernseher verkauft, öffne in der Helfer-Karte **„Neuen Signaturschlüssel erzeugen …“** und bestätige.
+  Danach nimmt der Helfer nichts mehr mit dem alten Schlüssel an: Klicke **„App-Paket erstellen“** und bring das Paket auf
+  **jeden** Fernseher (Abschnitt 7) – bis dahin zeigt die App dort *„Helfer: App-Paket bitte neu erstellen“*. Profile und alles
+  andere bleiben. Läuft der Helfer auf einem NAS: danach die neue `helper.json` dorthin kopieren und den Container neu starten
+  (13.8).
 
 ### 13.7 Vollständig entfernen
 
@@ -647,6 +658,12 @@ auf einem Computer mit Browser.
    Synology Container Manager: **Projekt → Erstellen**, die
    [`docker-compose.yml`](https://github.com/itsab1989/neolume/blob/main/installer/docker-compose.yml) einfügen und `user:` anpassen.
 4. Nach einer neuen Einrichtung die neue `helper.json` auf das NAS kopieren und den Container neu starten.
+
+**Warum Host-Netzwerk?** Ohne `--net=host` (Bridge-Modus, Standard von Docker) kommen alle Geräte über die Adresse des
+Docker-Netzes (eine Adresse `172.17.x.x`) beim Helfer an. Er kann deinen Fernseher dann nicht von anderen Geräten unterscheiden.
+Der Helfer erkennt das selbst: Er schreibt es in sein Protokoll (`docker logs neolume-helper`), und der Fernseher zeigt, sobald eine Funktion deshalb nicht geht,
+„Helfer: Docker mit Host-Netzwerk starten“. Abhilfe: Container löschen und mit `--net=host` (bzw. `network_mode: host`)
+neu anlegen – `helper.json` bleibt, nichts muss neu eingerichtet werden.
 
 Der Docker-Helfer hat kein Symbol; entfernen: Container und `helper.json` auf dem NAS löschen (die Kopie auf dem Computer
 behalten, wenn du ihn später mit demselben Schlüssel wieder einrichten willst).
@@ -770,7 +787,7 @@ deinem eigenen Server** zeigen – standardmäßig aus.
 2. Gewünschte Server ankreuzen, **„App-Paket erstellen“** und wie gewohnt aufspielen. Jedes Profil bekommt nur die Server, die
    für **dieses** Profil freigegeben sind.
 3. Am Fernseher stehen die Bibliotheken in der Seitenleiste mit dem Zusatz „von <Server>“. Ausblenden oder verschieben kannst
-   du sie unter **Einstellungen → Oberfläche → Seitenleiste anpassen**. Suche und Startseite bleiben bei deinem eigenen Server.
+   du sie unter **Einstellungen → Sprache & Bedienung → Seitenleiste anpassen**. Suche und Startseite bleiben bei deinem eigenen Server.
 
 Was die Anzeige neben einem Server bedeutet:
 - **erreichbar** – passt, der Fernseher kann ihn nutzen.

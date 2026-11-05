@@ -64,6 +64,7 @@
       m = /^new-(\d+)$/.exec(id);
       if (m) return { group: 'new', lib: Number(m[1]) };
       if (/^x-/.test(id)) return { group: 'ext' };
+      if (id === 'tv') return { group: 'live' };       // Fernsehen (SPEC LIVE-6): Sender aus N.live, nicht vom Server
       return { group: id === 'pl' ? 'pl' : 'base' };   // 'ab' = Weiterhoeren (M4) ist eine Grundreihe
     },
     /* verfuegbare Reihen in Standard-Reihenfolge: libs = Film/Serien-Bibliotheken, cat = Katalog {hubs:[...], pl:{title}} */
@@ -71,6 +72,7 @@
       var out = [{ id: 'cw', def: true }, { id: 'deck', def: true }], i, al = cat && cat.alibs || [];
       for (i = 0; i < al.length; i++) if (al[i].kind === 'audio') { out.push({ id: 'ab', def: true }); break; }   // M4: Weiterhoeren (nur mit Hoerbuch-Bibliothek)
       for (i = 0; libs && i < libs.length; i++) out.push({ id: 'new-' + libs[i].id, def: true });
+      if (N.live && N.live.allowed()) out.push({ id: 'tv', def: false });   // Fernsehen (LIVE-6): Standard aus, Sender in "Fernsehsender auf der Startseite"
       var hubs = cat && cat.hubs || [];
       for (i = 0; i < hubs.length; i++) out.push({ id: hubs[i].id, def: false });
       if (cat && cat.pl) out.push({ id: 'pl', def: false });
@@ -193,13 +195,17 @@
    * (view/store/move) fuer den gemeinsamen Listen-Editor (views/homerows.js). */
   var RR = {
     LOCKED: { home: 1 },
-    avail: function (libs, disc) {
+    /* live: Einstellung "Fernsehen" an (N.live.allowed: Erwachsene; SPEC LIVE-1) – Eintrag hinter den Bibliotheken, eingeschaltet
+     * (wer Fernsehen einschaltet, will den Bereich sehen); ist die Einstellung aus, gibt es den Eintrag nicht – auch nicht im Editor */
+    avail: function (libs, disc, live) {
       var out = [{ id: 'search', def: true }];
       if (disc) out.push({ id: 'discover', def: true });
       out.push({ id: 'home', def: true });
       for (var i = 0; libs && i < libs.length; i++) out.push({ id: RR.libId(libs[i]), def: true });
+      if (live) out.push({ id: 'livetv', def: RR.LIVE_DEF });
       return out;
     },
+    LIVE_DEF: true,
     /* Eintrags-ID einer Bibliothek: eigener Server 'lib-<id>', weiterer Server (lib.srv) 'xlib-<machineId>-<id>' */
     libId: function (lib) { return lib.srv ? 'xlib-' + lib.srv + '-' + lib.id : 'lib-' + lib.id; },
     merge: function (saved, avail) {
@@ -211,7 +217,7 @@
         seen[x.id] = 1;
         out.push({ id: x.id, on: !!x.on || !!RR.LOCKED[x.id], avail: !!am[x.id] });
       }
-      for (i = 0; i < avail.length; i++) if (!seen[avail[i].id]) out.push({ id: avail[i].id, on: true, avail: true });   // neu: an, ans Ende
+      for (i = 0; i < avail.length; i++) if (!seen[avail[i].id]) out.push({ id: avail[i].id, on: avail[i].def !== false, avail: true });   // neu: mit Standard (meist an), ans Ende
       return out;
     },
     view: function (saved, avail) {

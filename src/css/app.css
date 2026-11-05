@@ -197,6 +197,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
   z-index: @z.toast@; opacity: 0; visibility: hidden; -webkit-transform: translate3d(0,16px,0);
   -webkit-transition: -webkit-transform @mo.base@ @mo.ease@, opacity @mo.base@ @mo.ease@; }
 #pn-toast.low { top: 628px; }
+#pn-toast.low.under { left: 464px; width: 448px; }   /* Einstellungen: buendig unter .set-desc (x 464), frei von der Bereichsliste (x 144–424) und vor den Tastenhinweisen (ab x ~930) */
 #pn-toast.high { left: @l.safe-x@; top: 124px; }   /* Player: unter der Titel-Insel (y 36–108), weg von Bedien-Insel und Untertiteln */
 #pn-toast.on { opacity: 1; visibility: visible; -webkit-transform: translate3d(0,0,0); }
 #pn-toast .ic { left: 14px; top: 12px; }
@@ -365,7 +366,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .skel { position: absolute; left: 0; top: 0; width: @l.screen-w@; height: @l.screen-h@; }
 .skel i { position: absolute; background: @c.surface-2@; border-radius: @r.sm@; }
 .stb .big { position: absolute; left: 0; top: 0; width: 64px; height: 64px; background-image: url(@A/icons.png); background-repeat: no-repeat;
-  -webkit-background-size: 1984px 256px; background-size: 1984px 256px; background-position: -704px -128px; }
+  -webkit-background-size: 2112px 256px; background-size: 2112px 256px;   /* = Sprite-Breite x 2 (33 Spalten, mit "stop") */ background-position: -704px -128px; }
 .stb .st { position: absolute; left: 0; top: 88px; width: 800px; }
 .stb .sx { position: absolute; left: 0; top: 140px; width: 640px; }
 .stb .sb { position: absolute; left: 0; top: 240px; width: 800px; height: 48px; white-space: nowrap; }
@@ -941,3 +942,21 @@ body { color: @c.text-1@; font-family: @ty.family@;
  * Ueberzug ersetzt den Balken, die Zeit-Blase zeigt die feine Zielzeit, die Zeiten weichen ihr nicht (Blase liegt darueber) */
 .np-hv { position: absolute; top: 414px; width: 96px; height: 28px; border-radius: @r.sm@; background: @c.surface-3@; text-align: center; font-size: 18px; line-height: 28px; color: @c.text-1@; }
 .np-lp .np-bar { visibility: hidden; }
+/* Fernsehen (SPEC LIVE-2/3/4): Senderkacheln 16:9 mit 24 px Abstand (Gross tv-l 224x126, Mittel tv-m 176x99, Klein tv-s 116x65, Liste list-tv
+ * mit Logo-Feld 96x54). Logo (img.lgi, N.img logoFit) deckt die Karte mit heller Flaeche, Logo mittig; bis zum Laden bzw. ohne Logo
+ * steht der Sendername (.ph.lg) mittig auf der Karte */
+.card-tv-l { width: 224px; height: 126px; } .card-tv-l img { width: 224px; height: 126px; } .cap-tv-l { width: 224px; } .fr-tv-l { width: 240px; height: 142px; }
+.card-tv-m { width: 176px; height: 99px; } .card-tv-m img { width: 176px; height: 99px; } .cap-tv-m { width: 176px; } .fr-tv-m { width: 192px; height: 115px; }
+.card-tv-s { width: 116px; height: 65px; } .card-tv-s img { width: 116px; height: 65px; } .cap-tv-s { width: 116px; } .fr-tv-s { width: 132px; height: 81px; }
+.card-list-tv { width: 976px; height: 64px; background: @c.surface-1@; }
+.card-list-tv img { left: 4px; top: 5px; width: 96px; height: 54px; border-radius: @r.xs@; }
+.card-list-tv .ph { display: none; } .card-list-tv.is-focus { -webkit-transform: translate3d(0,0,0); }   /* Liste: nicht vergroessern (wie .card-list), Ring zeigt den Fokus */
+.cap-list-tv { width: 840px; } .fr-list-tv { width: 992px; height: 80px; }
+.card img.lgi { background: @c.logo-bg@; }
+.card .ph.lg { left: 8px; right: 8px; top: 0; bottom: 0; max-height: none; padding-top: 0; text-align: center; color: @c.text-1@; font-size: 18px; line-height: 22px;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-box-pack: center; -webkit-line-clamp: 3; }
+.card-list-tv .ph.lg { display: none; }
+/* Live-Player: Marke LIVE in der Zeitzeile (mittig), laufende Sendung links unter den Zeiten */
+.lv-pill { position: absolute; left: 536px; top: 42px; width: 80px; height: 26px; border-radius: 13px; background: @c.text-1@; text-align: center;
+  font-size: 16px; line-height: 26px; font-weight: 700; color: @c.on-accent@; }   /* neutral wie die Spul-Pille (PRIN-3) */
+.lv-now { width: 400px; }

@@ -39,6 +39,7 @@ Dark theme. Contrast numbers are measured against `bg`. Rules: body text never b
 | `@c.line-soft@` | `#23262A` | Separator between settings rows (quieter than line) |
 | `@c.disabled-bg@` | `#1E2125` | Background of a locked player button (previous/next at the start/end of a queue), a little quieter than surface-3 |
 | `@c.key-rim@` | `#585E66` | Key cap outline, login step circles, selected season segment |
+| `@c.logo-bg@` | `#E6E8EB` | Light tile behind TV channel logos (Live TV, LIVE-3): logos are made for light backgrounds; the logo is the artwork of the tile |
 | `@c.thumb-bg@` | `#24272B` | Placeholder behind small thumbnails in panel lists |
 | `@c.text-1@` | `#F2F2F2` | Primary text, neutral badges, active tab, rail marker, toggle track (on). 17.1:1 |
 | `@c.text-2@` | `#B7BBC0` | Secondary text, meta lines, watched cell of the season strip. 9.9:1 |
@@ -80,7 +81,7 @@ Dark theme. Contrast numbers are measured against `bg`. Rules: body text never b
 
 ## Accent palette
 
-The accent colour means focus or progress only. The user picks one of these colours (Settings > Display > Accent colour). In CSS always write @accent@ (not a palette token): tools/build.js fills in the brand default and generates one `.ac-<id>` variant per other colour. Each brand profile (brand/<id>.json) picks its default with `accentId` and may override that colour's value with its own `accent` (that override lives only in the brand profile). Every colour must reach 4.5:1 with on-accent text on it and 4.5:1 on `panel` (tests/accent.test.js). Generated into src/core/accent.js (PALETTE). The same colours are offered for the badges on cards (Settings > Display > Badge colour, ACC-2; CSS token @badge@, default `text-1`).
+The accent colour means focus or progress only. The user picks one of these colours (Settings > Home & appearance > Selection colour). In CSS always write @accent@ (not a palette token): tools/build.js fills in the brand default and generates one `.ac-<id>` variant per other colour. Each brand profile (brand/<id>.json) picks its default with `accentId` and may override that colour's value with its own `accent` (that override lives only in the brand profile). Every colour must reach 4.5:1 with on-accent text on it and 4.5:1 on `panel` (tests/accent.test.js). Generated into src/core/accent.js (PALETTE). The same colours are offered for the badges on cards (Settings > Display > Badge colour, ACC-2; CSS token @badge@, default `text-1`).
 
 | Token | Value | Use |
 |---|---|---|
@@ -266,3 +267,5 @@ Sources: `design/icons/<name>.svg`. Column order: `design/icons/order.json` (app
 | 28 | `ff` | <img src="icons/ff.svg" width="28" height="28" alt="ff"> | `-896px` |
 | 29 | `rw` | <img src="icons/rw.svg" width="28" height="28" alt="rw"> | `-928px` |
 | 30 | `grid` | <img src="icons/grid.svg" width="28" height="28" alt="grid"> | `-960px` |
+| 31 | `live` | <img src="icons/live.svg" width="28" height="28" alt="live"> | `-992px` |
+| 32 | `stop` | <img src="icons/stop.svg" width="28" height="28" alt="stop"> | `-1024px` |

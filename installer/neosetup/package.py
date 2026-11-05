@@ -182,7 +182,9 @@ def make_config(client_id, server, uri_list, profiles, computer_ip=None, update_
             if lst: prof['servers'] = lst
         cfg['serversSchema'] = SERVERS_SCHEMA
     if reset_pins: cfg['resetAppPins'] = True
-    if helper: cfg['helper'] = {'url': helper['url'], 'key': helper['key']}     # optional helper (no plex.tv tokens here)
+    if helper:                                     # optional helper (no plex.tv tokens here)
+        cfg['helper'] = {'url': helper['url'], 'key': helper['key']}
+        if helper.get('sign'): cfg['helper']['sign'] = helper['sign']   # signing key: reaches the TV only this way (protocol 2)
     return cfg
 
 

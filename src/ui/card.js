@@ -11,6 +11,9 @@
  * - Gesten fuehrt N.router.pan (Ziehen nach unten, Mitte -> rechts); hier nur die Darstellung (drag/settle/ghost). */
 (function (N) {
   var U = N.util, GAP = 32, MAC_X = 48, MAC_Y = 40, CW = 1280, BTN = 60, OPEN_MS = 280, LEVEL_MS = 240;
+  /* Hoechstens so lange wartet eine frisch geoeffnete Karte unten auf ihr Hintergrundbild (scr.cardWait, SPEC DET-21 [T]): kurz
+   * genug, dass der Tipp sofort wirkt, lang genug fuer ein Bild aus dem Zwischenspeicher bzw. einen schnellen Server im Heimnetz */
+  var WAIT_MS = 150;
 
   /* rein: Karte in einer Flaeche W x H. touch = Finger-Geraet (volle Breite), sonst Maus/Trackpad (mittiges Feld).
    * cls (optional, Groessenklasse der Flaeche, 10-screens.md 6.3): M und K immer volle Breite (auch mit Maus), ohne Verkleinern –
@@ -39,7 +42,7 @@
     return g;
   }
 
-  var C = { geom: geom, BTN: BTN, OPEN_MS: OPEN_MS, LEVEL_MS: LEVEL_MS, el: null, shown: false, g: null, closing: 0, ghosts: [] };
+  var C = { geom: geom, BTN: BTN, OPEN_MS: OPEN_MS, LEVEL_MS: LEVEL_MS, WAIT_MS: WAIT_MS, el: null, shown: false, g: null, closing: 0, ghosts: [], held: null };
   function caps() { return N.platform && N.platform.caps || {}; }
   /* Karte an? (Plattform-Faehigkeit; am TV immer false) */
   C.on = function () { return caps().details === 'card'; };
@@ -93,24 +96,43 @@
   };
   /* Knopf oben links: 'x' (erste Ebene) | 'back' */
   C.button = function (kind) { U.cls(C.btn, 'is-x', kind !== 'back'); U.cls(C.btn, 'is-back', kind === 'back'); };
-  /* Karte zeigen; fresh = sie war zu -> von unten hereingleiten */
-  C.show = function (fresh) {
+  /* Karte zeigen; fresh = sie war zu -> von unten hereingleiten. hold (Ansicht hat scr.cardWait): erst unten bereitstellen, gleiten
+   * (bzw. bei "Weniger Animationen" erscheinen) erst mit C.go – sobald das Bild bereit ist, spaetestens nach WAIT_MS */
+  C.show = function (fresh, hold) {
     if (!C.el) return;
     if (fresh) C.flush();
     if (C.shown && !fresh) return;
     C.layout();
     C.shown = true;
     U.show(C.el, true);
+    C.held = null;
+    if (fresh && hold) { C.held = { t: 0 }; tf(C.sheet, 0, C.g.h + C.g.y, 0); fade(C.dim, 0, 0); return; }
+    slideIn(fresh);
+  };
+  function slideIn(fresh) {
     if (fresh && anim()) {
       tf(C.sheet, 0, C.g.h + C.g.y, 0); fade(C.dim, 0, 0);
       C.el.offsetWidth;                              // Startlage festschreiben, dann gleiten
       tf(C.sheet, 0, 0, OPEN_MS); fade(C.dim, 1, OPEN_MS);
     } else { tf(C.sheet, 0, 0, 0); fade(C.dim, 1, 0); }
+  }
+  /* bereitgestellte Karte loslassen (Router nach scr.enter): wait(done, ms) der Ansicht ruft done, sobald ihr Bild bereit ist */
+  C.go = function (wait) {
+    var h = C.held;
+    if (!h) return;
+    function done() {
+      if (C.held !== h) return;
+      C.held = null; clearTimeout(h.t);
+      if (C.shown) slideIn(true);
+    }
+    h.t = setTimeout(done, WAIT_MS);
+    if (wait) wait(done, WAIT_MS); else done();
   };
   /* Karte zu: nach unten hinaus, dann Element(e) entfernen; ohne Animation sofort */
   C.hide = function (animate, done) {
     if (!C.el || !C.shown) { if (done) done(); return; }
     C.shown = false;
+    if (C.held) { clearTimeout(C.held.t); C.held = null; }
     function end() {
       C.closing = 0;
       if (!C.shown) U.show(C.el, false);
