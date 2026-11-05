@@ -112,6 +112,7 @@ class Connections(unittest.TestCase):
                 if not b: break
                 out += b
         except socket.timeout: pass
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError): pass   # Windows: closed by the server = reset/abort (CI 05.11.)
         return out
 
     def test_idle_connections_capped(self):
