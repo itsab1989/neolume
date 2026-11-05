@@ -2,7 +2,7 @@
  * Netz-Standards sind im Repo leer: tools/build.js setzt die lokalen Werte aus local.json (git-ignoriert) ins gebaute app.js. */
 (function (N) {
   var C = {
-    version: '1.0.17',
+    version: '1.0.18',
     product: N.brand.name,
     platform: N.platform.info.platform,               // X-Plex-Kopfzeilen je Plattform (N.platform.info, Adapter)
     platformVersion: N.platform.info.platformVersion,

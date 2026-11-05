@@ -5,6 +5,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.18] - 2026-11-05
+
+### Fixed
+- **The setup program shows its page again.** In 1.0.17 one English help text contained a straight apostrophe that ended
+  the page's script early, so the setup program opened with an empty page. The app on the TV and a helper that was already
+  running were not affected. A new test now checks the setup program's scripts before every release.
+
+Sorry for the hiccup – if 1.0.18 now sets up smoothly, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.17] - 2026-11-05
 
 ### Added
