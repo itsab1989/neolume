@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="518" viewBox="0 0 800 518" role="img" aria-labelledby="t d">
+<title id="t">Neolume on the Mac: sign-in</title>
+<desc id="d">Sketch of the Neolume sign-in page on the Mac: the Neolume wordmark, “Connect your Plex account”, the teal button Sign in with Plex (1) and below it Sign in with code (2).</desc>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff7a1a"/></marker><linearGradient id="scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2747"/><stop offset="1" stop-color="#0c1127"/></linearGradient><linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3c8fe8"/><stop offset="1" stop-color="#1f62c8"/></linearGradient><linearGradient id="neo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16181b"/><stop offset="1" stop-color="#0e0f11"/></linearGradient></defs>
+<rect x="8" y="8" width="784" height="420" rx="12" fill="#3b5f8a" stroke="#d5d9e0" stroke-width="3"/>
+<path d="M10 310 Q 200 230 400 300 T 790 270 L790 426 L10 426 Z" fill="#2c4a6e"/>
+<rect x="40" y="30" width="720" height="380" rx="12" fill="url(#neo)" stroke="#3a3d42" stroke-width="1"/>
+<circle cx="60" cy="50" r="6" fill="#ff5f57"/>
+<circle cx="78" cy="50" r="6" fill="#febc2e"/>
+<circle cx="96" cy="50" r="6" fill="#28c840"/>
+<text x="100" y="108" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="24" font-weight="bold" fill="#f2f2f2" text-anchor="start">Neo</text>
+<text x="145.283" y="108" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="24" font-weight="bold" fill="#2EC4B6" text-anchor="start">lume</text>
+<text x="100" y="156" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#f2f2f2" text-anchor="start">Connect your Plex account</text>
+<text x="100" y="190" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#c4c7cc" text-anchor="start">Sign in right here on this device. The official Plex sign-in page opens for this.</text>
+<rect x="100" y="246" width="300" height="46" rx="9" fill="#2EC4B6"/>
+<text x="250" y="275" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="bold" fill="#0e0f11" text-anchor="middle">Sign in with Plex</text>
+<circle cx="100" cy="246" r="13" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="100" y="250.94" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.95" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<text x="100" y="332" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#c4c7cc" text-anchor="start">Not working here? Then sign in with a code on your phone or computer.</text>
+<rect x="100" y="348" width="159.384" height="40" rx="8" fill="#2f3338"/>
+<text x="179.692" y="374" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="bold" fill="#ffffff" text-anchor="middle">Sign in with code</text>
+<circle cx="100" cy="348" r="13" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="100" y="352.94" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.95" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<rect x="8" y="436" width="784" height="76" rx="10" fill="#f3f4f6" stroke="#d0d4da" stroke-width="1.5"/>
+<circle cx="32" cy="459" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="463.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<text x="52" y="465" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">Opens the official Plex sign-in page in a macOS window – sign in there as usual</text>
+<circle cx="32" cy="489" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="493.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<text x="52" y="495" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">Fallback: show a code and confirm it on plex.tv/link with your phone or computer</text>
+</svg>

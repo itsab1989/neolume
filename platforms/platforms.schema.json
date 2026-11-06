@@ -22,13 +22,14 @@
       }
     },
     "osVersions": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 2, "maxLength": 60 }, "description": "TV operating system(s) and version(s), e.g. 'webOS 6.0'." },
+    "deviceType": { "enum": ["tv", "computer"], "description": "Optional. tv (default) = a TV or streaming box, listed under 'Which TVs work?'; computer = a desktop app (e.g. Mac), listed in the small table 'Other devices' below it." },
     "route": { "enum": ["web", "native"], "description": "web = the shared ES5 core in the TV's browser engine (src/ unchanged, thin adapter); native = own source tree that reuses the logic modules (PORTING-WITH-AI.md)." },
     "installChannel": {
       "type": "object",
       "required": ["type", "computerNeededAfterInstall"],
       "additionalProperties": false,
       "properties": {
-        "type": { "enum": ["user-app-sync", "developer-mode", "sideload", "store"], "description": "How the app gets onto the TV." },
+        "type": { "enum": ["user-app-sync", "developer-mode", "sideload", "store", "download"], "description": "How the app gets onto the TV (or computer). download = the app file is downloaded and opened directly, e.g. a Mac app that macOS asks once to open (not notarised)." },
         "needsAccount": { "type": "string", "maxLength": 120, "description": "Account the TV or the developer tool needs, in plain words." },
         "expires": { "type": "string", "maxLength": 160, "description": "Does the installation expire (e.g. developer mode sessions)? Plain words." },
         "computerNeededAfterInstall": { "type": "boolean", "description": "Must a computer keep running after the installation?" }

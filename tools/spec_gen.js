@@ -532,7 +532,7 @@ function genPortsHtml(specText) {
 /* One platform.json per TV system the maintainer offers a download for (multi-platform plan, step 0). The table "Which TVs
  * work?" in the READMEs and on the website is generated from them; ports.json stays the list of other people's apps. */
 var PLAT_STATUS = {
-  en: { 'maintainer-tested': '✅ tested on a real TV by the maintainer', 'community-tested': '🟡 tested by a contributor (not by the maintainer)',
+  en: { 'maintainer-tested': '✅ tested on a real device by the maintainer', 'community-tested': '🟡 tested by a contributor (not by the maintainer)',
     experimental: '🧪 experimental – no download yet', planned: '⬜ planned' },
   de: { 'maintainer-tested': '✅ vom Entwickler an einem echten Gerät getestet', 'community-tested': '🟡 von einem Mitwirkenden getestet (nicht vom Entwickler)',
     experimental: '🧪 im Versuch – noch kein Download', planned: '⬜ geplant' }
@@ -576,15 +576,26 @@ function platRows(d, lang, o) {
     g.push('[' + (de ? 'Englisch' : 'English') + '](' + o.guide + p.guide.en + ')');
     if (p.guide.de && !de) g.push('[Deutsch](' + o.guide + p.guide.de + ')');
     var lt = p.lastTested ? p.lastTested.version + ' (' + p.lastTested.date + (p.lastTested.model ? ', ' + p.lastTested.model : '') + ')' : '–';
-    return { name: name, models: models, dl: dl, guide: g.join(' · '), servers: p.mediaServers.map(function (x) { return SERVER_NAME[x] || x; }).join(', '), tested: lt, status: st[p.status] };
+    return { pc: p.deviceType === 'computer', name: name, models: models, dl: dl, guide: g.join(' · '), servers: p.mediaServers.map(function (x) { return SERVER_NAME[x] || x; }).join(', '), tested: lt, status: st[p.status] };
   });
 }
-function platTable(rows, de) {
-  var o = [de ? '| Fernseher-System | Modelle | Download | Anleitung | Medienserver | Zuletzt am echten Gerät getestet | Stand |'
+/* pc = the small table "Other devices" (deviceType "computer", e.g. Mac) below the TV table; otherwise the TV systems */
+function platTable(rows, de, pc) {
+  var o = [pc ? (de ? '| Gerät | Modelle | Download | Anleitung | Medienserver | Zuletzt am echten Gerät getestet | Stand |'
+    : '| Device | Models | Download | Installation guide | Media servers | Last tested on a real device | Status |')
+    : de ? '| Fernseher-System | Modelle | Download | Anleitung | Medienserver | Zuletzt am echten Gerät getestet | Stand |'
     : '| TV system | Models | Download | Installation guide | Media servers | Last tested on a real TV | Status |', '|---|---|---|---|---|---|---|'];
   rows.forEach(function (r) {
     o.push('| **' + esc(r.name) + '** | ' + r.models.map(esc).join('<br>') + ' | ' + r.dl + ' | ' + r.guide + ' | ' + esc(r.servers) + ' | ' + esc(r.tested) + ' | ' + esc(r.status) + ' |');
   });
+  return o;
+}
+function tvRows(rows) { return rows.filter(function (r) { return !r.pc; }); }
+function pcRows(rows) { return rows.filter(function (r) { return r.pc; }); }
+/* markdown: TV table, then (if any) "Other devices" with its own table */
+function platTables(rows, de) {
+  var o = platTable(tvRows(rows), de, false), pc = pcRows(rows);
+  if (pc.length) o = o.concat(['', de ? '**Weitere Geräte** (eigene App für den Computer):' : '**Other devices** (own app for the computer):', ''], platTable(pc, de, true));
   return o;
 }
 function genPlatforms(specText, lang) {
@@ -593,7 +604,7 @@ function genPlatforms(specText, lang) {
     return p.artifact.format === 'setup-program' ? (de ? '[Einrichtungsprogramm](#download) für deinen Computer, enthält die TV-App' : '[Setup program](#download) for your computer – it contains the TV app')
       : '[' + esc(p.artifact.name.replace('{slug}', JSON.parse(rd('brand/public.json')).slug)) + '](https://github.com/' + repoOf() + '/releases/latest)';
   } });
-  var o = [de ? 'Für diese Fernseher gibt es einen fertigen Download:' : 'These TVs have a ready-made download:', ''].concat(platTable(rows, de));
+  var o = [de ? 'Für diese Fernseher gibt es einen fertigen Download:' : 'These TVs have a ready-made download:', ''].concat(platTables(rows, de));
   o.push('', de ? (d.ports ? 'Apps, die andere für weitere Fernseher gebaut haben, stehen in den [Community-Portierungen](PORTS.md) (nur Links).'
     : 'Für weitere Fernseher gibt es noch keine Community-Portierung – deine könnte die erste sein: [Community-Portierungen](PORTS.md).')
     : (d.ports ? 'Apps that other people built for more TVs are listed under [community ports](PORTS.md) (links only).'
@@ -604,16 +615,22 @@ function genPlatforms(specText, lang) {
 function genPlatformsPrivate(specText) {
   var d = platformsData(specText), repo = JSON.parse(rd('brand/private.json')).repo;
   var rows = platRows(d, 'de', { edition: 'private', guide: PUB, download: function () { return '[neuestes Release](https://github.com/' + repo + '/releases/latest)'; } });
-  return { text: ['Fernseher-Systeme mit fertigem Download (aus `' + PUB + 'platforms/*/platform.json`):', ''].concat(platTable(rows, true)).join('\n'), ids: [] };
+  return { text: ['Fernseher-Systeme mit fertigem Download (aus `' + PUB + 'platforms/*/platform.json`):', ''].concat(platTables(rows, true)).join('\n'), ids: [] };
 }
 function genPlatformsHtml(specText) {
   var d = platformsData(specText), base = 'https://github.com/' + repoOf() + '/blob/main/';
-  var o = ['    <div class="table-wrap"><table>', '      <thead><tr><th>TV system</th><th>Models</th><th>Guide</th><th>Media servers</th><th>Last tested on a real TV</th><th>Status</th></tr></thead>', '      <tbody>'];
-  platRows(d, 'en', { edition: 'public', guide: base, download: function () { return ''; } }).forEach(function (r) {
-    var g = r.guide.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (a, t, u) { return '<a href="' + ht(u) + '">' + ht(t) + '</a>'; });
-    o.push('        <tr><td><b>' + ht(r.name) + '</b></td><td>' + r.models.map(ht).join('<br>') + '</td><td>' + g + '</td><td>' + ht(r.servers) + '</td><td>' + ht(r.tested) + '</td><td>' + ht(r.status) + '</td></tr>');
-  });
-  o.push('      </tbody>', '    </table></div>');
+  var rows = platRows(d, 'en', { edition: 'public', guide: base, download: function () { return ''; } });
+  function table(list, pc) {
+    var o = ['    <div class="table-wrap"><table>', '      <thead><tr><th>' + (pc ? 'Device' : 'TV system') + '</th><th>Models</th><th>Guide</th><th>Media servers</th><th>Last tested on a real ' + (pc ? 'device' : 'TV') + '</th><th>Status</th></tr></thead>', '      <tbody>'];
+    list.forEach(function (r) {
+      var g = r.guide.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (a, t, u) { return '<a href="' + ht(u) + '">' + ht(t) + '</a>'; });
+      o.push('        <tr><td><b>' + ht(r.name) + '</b></td><td>' + r.models.map(ht).join('<br>') + '</td><td>' + g + '</td><td>' + ht(r.servers) + '</td><td>' + ht(r.tested) + '</td><td>' + ht(r.status) + '</td></tr>');
+    });
+    o.push('      </tbody>', '    </table></div>');
+    return o;
+  }
+  var o = table(tvRows(rows), false), pc = pcRows(rows);
+  if (pc.length) o = o.concat(['    <p><b>Other devices</b> (own app for the computer):</p>'], table(pc, true));
   return { text: o.join('\n'), ids: [] };
 }
 

@@ -10,6 +10,7 @@ page. The same overview with pictures: the **[website](https://itsab1989.github.
 |---|---|
 | [Installation guide](INSTALL.md) · [Installationsanleitung](INSTALL.de.md) | Every step from download to the first start on the TV, with drawings of the TV menus and troubleshooting |
 | [Android TV / Google TV](install/android-tv.md) · [Deutsch](install/android-tv.de.md) | Experimental: installing Neolume on Android TV or Google TV with the Downloader app, sign-in with a code, in-app updates, tips and troubleshooting |
+| [Mac](install/mac.md) · [Deutsch](install/mac.de.md) | Experimental: the Mac app (macOS 14 or newer) – download, the one-time “Open Anyway” step, sign-in, keyboard shortcuts, updating and troubleshooting |
 | [FAQ](FAQ.md) · [Häufige Fragen](FAQ.de.md) | Which TVs work, Plex Pass, the optional helper, screensaver, where RETURN takes you, the new-content notice, privacy, updating and removing the app |
 | [Changelog](../CHANGELOG.md) | What changed in each version |
 | [Latest release](https://github.com/itsab1989/neolume/releases/latest) | The setup program for Windows, macOS and Linux (the TV app is inside) |

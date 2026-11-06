@@ -33,7 +33,7 @@
     "public": true,
     "private": true
   },
-  "status": "experimental",
+  "status": "maintainer-tested",
   "lastTested": {
     "version": "1.0.19",
     "date": "2026-11-06",

@@ -213,8 +213,14 @@ These TVs have a ready-made download:
 
 | TV system | Models | Download | Installation guide | Media servers | Last tested on a real TV | Status |
 |---|---|---|---|---|---|---|
-| **Android TV / Google TV** | TVs and streaming boxes with Android TV or Google TV (e.g. TCL 32S5K) | – | [English](docs/install/android-tv.md) · [Deutsch](docs/install/android-tv.de.md) | Plex | 1.0.19 (2026-11-06, TCL 32S5K (Google TV, Android 11, 1 GB RAM)) | 🧪 experimental – no download yet |
-| **Samsung Smart TV 2014 (Orsay)** | 2014 H series (e.g. UE48H8000, UE40H6400)<br>2014 HU series, 4K (e.g. UE55HU7500) | [Setup program](#download) for your computer – it contains the TV app | [English](docs/INSTALL.md) · [Deutsch](docs/INSTALL.de.md) | Plex | 1.0.19 (2026-11-06, UE48H8000) | ✅ tested on a real TV by the maintainer |
+| **Android TV / Google TV** | TVs and streaming boxes with Android TV or Google TV (e.g. TCL 32S5K) | [android-tv.apk](https://github.com/itsab1989/neolume/releases/latest) | [English](docs/install/android-tv.md) · [Deutsch](docs/install/android-tv.de.md) | Plex | 1.0.19 (2026-11-06, TCL 32S5K (Google TV, Android 11, 1 GB RAM)) | ✅ tested on a real device by the maintainer |
+| **Samsung Smart TV 2014 (Orsay)** | 2014 H series (e.g. UE48H8000, UE40H6400)<br>2014 HU series, 4K (e.g. UE55HU7500) | [Setup program](#download) for your computer – it contains the TV app | [English](docs/INSTALL.md) · [Deutsch](docs/INSTALL.de.md) | Plex | 1.0.19 (2026-11-06, UE48H8000) | ✅ tested on a real device by the maintainer |
+
+**Other devices** (own app for the computer):
+
+| Device | Models | Download | Installation guide | Media servers | Last tested on a real device | Status |
+|---|---|---|---|---|---|---|
+| **Apple Mac** | Mac with an Apple chip or an Intel processor (own Mac app) | [neolume-mac.zip](https://github.com/itsab1989/neolume/releases/latest) | [English](docs/install/mac.md) · [Deutsch](docs/install/mac.de.md) | Plex | 1.0.19 (2026-11-06, Mac (Apple chip)) | ✅ tested on a real device by the maintainer |
 
 No community port for other TVs yet – yours could be the first: [community ports](PORTS.md).
 <!-- /gen:platforms -->

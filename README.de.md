@@ -163,8 +163,14 @@ Für diese Fernseher gibt es einen fertigen Download:
 
 | Fernseher-System | Modelle | Download | Anleitung | Medienserver | Zuletzt am echten Gerät getestet | Stand |
 |---|---|---|---|---|---|---|
-| **Android TV / Google TV** | Fernseher und Streaming-Boxen mit Android TV oder Google TV (z. B. TCL 32S5K) | – | [Deutsch](docs/install/android-tv.de.md) · [Englisch](docs/install/android-tv.md) | Plex | 1.0.19 (2026-11-06, TCL 32S5K (Google TV, Android 11, 1 GB RAM)) | 🧪 im Versuch – noch kein Download |
+| **Android TV / Google TV** | Fernseher und Streaming-Boxen mit Android TV oder Google TV (z. B. TCL 32S5K) | [android-tv.apk](https://github.com/itsab1989/neolume/releases/latest) | [Deutsch](docs/install/android-tv.de.md) · [Englisch](docs/install/android-tv.md) | Plex | 1.0.19 (2026-11-06, TCL 32S5K (Google TV, Android 11, 1 GB RAM)) | ✅ vom Entwickler an einem echten Gerät getestet |
 | **Samsung Smart TV 2014 (Orsay)** | H-Serie 2014 (z. B. UE48H8000, UE40H6400)<br>HU-Serie 2014, 4K (z. B. UE55HU7500) | [Einrichtungsprogramm](#download) für deinen Computer, enthält die TV-App | [Deutsch](docs/INSTALL.de.md) · [Englisch](docs/INSTALL.md) | Plex | 1.0.19 (2026-11-06, UE48H8000) | ✅ vom Entwickler an einem echten Gerät getestet |
+
+**Weitere Geräte** (eigene App für den Computer):
+
+| Gerät | Modelle | Download | Anleitung | Medienserver | Zuletzt am echten Gerät getestet | Stand |
+|---|---|---|---|---|---|---|
+| **Apple Mac** | Mac mit Apple-Chip oder Intel-Prozessor (eigene Mac-App) | [neolume-mac.zip](https://github.com/itsab1989/neolume/releases/latest) | [Deutsch](docs/install/mac.de.md) · [Englisch](docs/install/mac.md) | Plex | 1.0.19 (2026-11-06, Mac (Apple chip)) | ✅ vom Entwickler an einem echten Gerät getestet |
 
 Für weitere Fernseher gibt es noch keine Community-Portierung – deine könnte die erste sein: [Community-Portierungen](PORTS.md).
 <!-- /gen:platforms-de -->

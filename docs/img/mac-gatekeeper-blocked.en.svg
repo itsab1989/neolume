@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="478" viewBox="0 0 800 478" role="img" aria-labelledby="t d">
+<title id="t">macOS: “Neolume” Not Opened</title>
+<desc id="d">Sketch of the macOS message on the first start: Neolume icon, “Apple could not verify “Neolume” is free of malware …”, below the buttons Done (outlined in orange, 1) and Move to Trash.</desc>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff7a1a"/></marker><linearGradient id="scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2747"/><stop offset="1" stop-color="#0c1127"/></linearGradient><linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3c8fe8"/><stop offset="1" stop-color="#1f62c8"/></linearGradient><linearGradient id="neo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16181b"/><stop offset="1" stop-color="#0e0f11"/></linearGradient></defs>
+<rect x="8" y="8" width="784" height="380" rx="12" fill="#3b5f8a" stroke="#d5d9e0" stroke-width="3"/>
+<path d="M10 270 Q 200 190 400 260 T 790 230 L790 386 L10 386 Z" fill="#2c4a6e"/>
+<rect x="230" y="40" width="340" height="330" rx="14" fill="#ececee" stroke="#b9bec6" stroke-width="1"/>
+<g transform="translate(364 66) scale(0.0590164)"><rect x="0" y="0" width="1220" height="1000" rx="150" fill="#16181b"/><rect x="236" y="280" width="290" height="436" rx="34" fill="#2A2E33"/><rect x="566" y="196" width="388" height="584" rx="44" fill="#33383e"/><rect x="534" y="164" width="452" height="648" rx="72" fill="none" stroke="#2EC4B6" stroke-width="32"/><path d="M704 404 L704 572 L846 488 Z" fill="#F2F2F2" stroke="#F2F2F2" stroke-width="26" stroke-linejoin="round"/></g>
+<text x="400" y="168" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="bold" fill="#1d1d1f" text-anchor="middle">“Neolume” Not Opened</text>
+<text x="400" y="196" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#3a3a3c" text-anchor="middle">Apple could not verify “Neolume” is</text>
+<text x="400" y="215" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#3a3a3c" text-anchor="middle">free of malware that may harm your</text>
+<text x="400" y="234" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#3a3a3c" text-anchor="middle">Mac or compromise your privacy.</text>
+<rect x="250" y="280" width="300" height="30" rx="8" fill="#1f6fe0"/>
+<text x="400" y="300" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">Done</text>
+<rect x="250" y="320" width="300" height="30" rx="8" fill="#ffffff" stroke="#c7cad0" stroke-width="1"/>
+<text x="400" y="340" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#1d1d1f" text-anchor="middle">Move to Trash</text>
+<rect x="246" y="276" width="308" height="38" rx="10" fill="none" stroke="#ff7a1a" stroke-width="2.5"/>
+<circle cx="246" cy="276" r="13" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="246" y="280.94" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.95" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<rect x="8" y="396" width="784" height="76" rx="10" fill="#f3f4f6" stroke="#d0d4da" stroke-width="1.5"/>
+<circle cx="32" cy="419" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="423.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<text x="52" y="425" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">Choose “Done” – not “Move to Trash”. Then continue with “Open Anyway”</text>
+<text x="24" y="455" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#4b5563" text-anchor="start">The exact wording differs a little between macOS versions (still to be checked).</text>
+</svg>

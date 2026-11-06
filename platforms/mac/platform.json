@@ -1,0 +1,68 @@
+{
+  "$schema": "../platforms.schema.json",
+  "id": "mac",
+  "name": "Apple Mac",
+  "brand": "Apple",
+  "modelFamilies": [
+    "Mac with an Apple chip or an Intel processor (own Mac app)"
+  ],
+  "de": {
+    "name": "Apple Mac",
+    "modelFamilies": [
+      "Mac mit Apple-Chip oder Intel-Prozessor (eigene Mac-App)"
+    ]
+  },
+  "osVersions": [
+    "macOS 14 or newer"
+  ],
+  "deviceType": "computer",
+  "route": "web",
+  "installChannel": {
+    "type": "download",
+    "needsAccount": "none – no Apple developer account; macOS asks once to open the app (not notarised)",
+    "computerNeededAfterInstall": false
+  },
+  "artifact": {
+    "format": "zip",
+    "name": "{slug}-mac.zip",
+    "signing": "developer-key"
+  },
+  "mediaServers": [
+    "plex"
+  ],
+  "status": "maintainer-tested",
+  "guide": {
+    "en": "docs/install/mac.md",
+    "de": "docs/install/mac.de.md"
+  },
+  "maintainer": "itsab1989",
+  "features": {
+    "A1": "done",
+    "A2": "done",
+    "A3": "done",
+    "A4": "done",
+    "A5": "done",
+    "A6": "done",
+    "A7": "done",
+    "A8": "done",
+    "A9": "partial",
+    "A10": "partial",
+    "A11": "done",
+    "A12": "done",
+    "A13": "done",
+    "A14": "done",
+    "A15": "done",
+    "A16": "done",
+    "A17": "partial",
+    "A18": "done",
+    "A19": "partial",
+    "A20": "partial"
+  },
+  "notes": "Same app core in a WebKit view inside a small Mac app (Mac Catalyst, Intel and Apple chip). Signs in directly with plex.tv, so no setup program and no helper. Signed with the project’s own certificate, not notarised: macOS asks once (Open Anyway).",
+  "lastTested": {
+    "version": "1.0.19",
+    "date": "2026-11-06",
+    "model": "Mac (Apple chip)",
+    "testPlan": "smoke"
+  }
+}

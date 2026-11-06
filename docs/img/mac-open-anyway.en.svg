@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="528" viewBox="0 0 800 528" role="img" aria-labelledby="t d">
+<title id="t">macOS: “Open Anyway”</title>
+<desc id="d">Sketch of System Settings: on the left “Privacy &amp; Security” selected (1), on the right in the Security section ““Neolume” was blocked to protect your Mac.” with the button Open Anyway (outlined in orange, 2). Grey bars stand for other entries.</desc>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff7a1a"/></marker><linearGradient id="scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2747"/><stop offset="1" stop-color="#0c1127"/></linearGradient><linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3c8fe8"/><stop offset="1" stop-color="#1f62c8"/></linearGradient><linearGradient id="neo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16181b"/><stop offset="1" stop-color="#0e0f11"/></linearGradient></defs>
+<rect x="8" y="8" width="784" height="400" rx="12" fill="#3b5f8a" stroke="#d5d9e0" stroke-width="3"/>
+<path d="M10 290 Q 200 210 400 280 T 790 250 L790 406 L10 406 Z" fill="#2c4a6e"/>
+<rect x="40" y="34" width="720" height="360" rx="12" fill="#ffffff" stroke="#9da3ab" stroke-width="1"/>
+<circle cx="60" cy="54" r="6" fill="#ff5f57"/>
+<circle cx="78" cy="54" r="6" fill="#febc2e"/>
+<circle cx="96" cy="54" r="6" fill="#28c840"/>
+<rect x="41" y="74" width="200" height="319" rx="0" fill="#f1f1f3"/>
+<rect x="62" y="90" width="110" height="10" rx="5" fill="#6b6b70" fill-opacity="0.3"/>
+<rect x="62" y="124" width="127" height="10" rx="5" fill="#6b6b70" fill-opacity="0.3"/>
+<rect x="62" y="158" width="144" height="10" rx="5" fill="#6b6b70" fill-opacity="0.3"/>
+<rect x="50" y="182" width="182" height="28" rx="6" fill="#1f6fe0"/>
+<text x="62" y="201" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="start">Privacy &amp; Security</text>
+<rect x="62" y="226" width="138" height="10" rx="5" fill="#6b6b70" fill-opacity="0.3"/>
+<rect x="62" y="260" width="115" height="10" rx="5" fill="#6b6b70" fill-opacity="0.3"/>
+<circle cx="50" cy="182" r="12" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="50" y="186.56" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13.8" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<text x="262" y="98" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="bold" fill="#1d1d1f" text-anchor="start">Privacy &amp; Security</text>
+<rect x="262" y="120" width="300" height="10" rx="5" fill="#6b6b70" fill-opacity="0.25"/>
+<rect x="262" y="138" width="240" height="10" rx="5" fill="#6b6b70" fill-opacity="0.25"/>
+<text x="262" y="184" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#6b6b70" text-anchor="start">Security</text>
+<rect x="262" y="196" width="476" height="120" rx="8" fill="#f5f5f7" stroke="#e0e0e3" stroke-width="1"/>
+<text x="278" y="226" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#1d1d1f" text-anchor="start">“Neolume” was blocked to protect</text>
+<text x="278" y="245" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#1d1d1f" text-anchor="start">your Mac.</text>
+<rect x="607.115" y="264" width="114.885" height="30" rx="7" fill="#ffffff" stroke="#c7cad0" stroke-width="1"/>
+<text x="664.558" y="284" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#1d1d1f" text-anchor="middle">Open Anyway</text>
+<rect x="603.115" y="260" width="122.885" height="38" rx="9" fill="none" stroke="#ff7a1a" stroke-width="2.5"/>
+<circle cx="603.115" cy="260" r="12" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="603.115" y="264.56" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13.8" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<rect x="262" y="340" width="200" height="10" rx="5" fill="#6b6b70" fill-opacity="0.25"/>
+<rect x="262" y="360" width="260" height="10" rx="5" fill="#6b6b70" fill-opacity="0.25"/>
+<rect x="8" y="416" width="784" height="106" rx="10" fill="#f3f4f6" stroke="#d0d4da" stroke-width="1.5"/>
+<circle cx="32" cy="439" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="443.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<text x="52" y="445" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">Apple menu  › System Settings › Privacy &amp; Security</text>
+<circle cx="32" cy="469" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="473.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<text x="52" y="475" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">Scroll down to “Security”, click “Open Anyway”, confirm with your password or Touch ID</text>
+<text x="24" y="505" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#4b5563" text-anchor="start">The button only appears after you tried to open Neolume once – and only for about an hour.</text>
+</svg>

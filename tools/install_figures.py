@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Schematic drawings for the installation guides (public/docs/INSTALL(.de).md, public/docs/install/android-tv(.de).md).
+"""Schematic drawings for the installation guides (public/docs/INSTALL(.de).md, public/docs/install/android-tv(.de).md,
+public/docs/install/mac(.de).md).
 
     python3 tools/install_figures.py            # writes public/docs/img/*.svg (English + German)
 
@@ -1620,6 +1621,162 @@ def fig_remote_tcl(lang):
                       'There is no play/pause button.'))
 
 
+# ---------------------------------------------------------------- Mac app (docs/install/mac.md)
+def mac_window(s, x, y, w, h, title=None, bg='#ffffff', dark=False):
+    """macOS window: rounded frame, traffic lights, optional title (sketch, not a screenshot)."""
+    s.rect(x, y, w, h, bg, '#9da3ab' if not dark else '#3a3d42', 1, 12)
+    for i, c in enumerate(['#ff5f57', '#febc2e', '#28c840']):
+        s.circle(x + 20 + i * 18, y + 20, 6, c)
+    if title: s.text(x + w / 2, y + 25, title, 14, '#1d1d1f' if not dark else '#e8eaed', 'bold', 'middle')
+
+
+def mac_desktop(s, h):
+    s.rect(8, 8, 784, h, '#3b5f8a', '#d5d9e0', 3, 12)
+    s.add('<path d="M10 %g Q 200 %g 400 %g T 790 %g L790 %g L10 %g Z" fill="#2c4a6e"/>' % (h - 110, h - 190, h - 120, h - 150, h + 6, h + 6))
+
+
+def folder_icon(s, x, y, size, color='#5aa6f2'):
+    s.rect(x, y + size * 0.12, size * 0.42, size * 0.2, color, None, 0, size * 0.06)
+    s.rect(x, y + size * 0.22, size, size * 0.66, color, None, 0, size * 0.08)
+    s.rect(x, y + size * 0.3, size, size * 0.58, '#7fbaf5', None, 0, size * 0.08)
+
+
+def fig_mac_drag(lang):
+    s = Svg(800, 0)
+    mac_desktop(s, 360)
+    mac_window(s, 40, 40, 720, 300, 'neolume-mac')
+    s.line(40, 44 + 34, 760, 44 + 34, '#e3e1dc', 1)
+    # left: the app from the zip, right: Applications folder
+    neolume_icon(s, 140, 140, 120)
+    s.text(200, 270, APP, 15, '#1d1d1f', 'bold', 'middle')
+    s.rect(122, 124, 156, 164, 'none', ORANGE, 2.5, 12)
+    s.badge(122, 124, '1', 13)
+    folder_icon(s, 530, 130, 120)
+    s.text(590, 270, T(lang, 'Programme', 'Applications'), 15, '#1d1d1f', 'bold', 'middle')
+    s.arrow(292, 200, 512, 200)
+    s.text(402, 188, T(lang, 'ziehen', 'drag'), 14, ORANGE, 'bold', 'middle')
+    s.badge(530, 124, '2', 13)
+    s.h = 372
+    end = legend(s, 376, [('1', T(lang, 'Doppelklick auf das heruntergeladene Zip – daneben erscheint die App Neolume',
+                                       'Double-click the downloaded zip – the app Neolume appears next to it')),
+                          ('2', T(lang, 'Neolume in den Ordner Programme ziehen (Finder › Seitenleiste › Programme)',
+                                       'Drag Neolume into the Applications folder (Finder › sidebar › Applications)')),
+                          T(lang, 'Skizze: Zip-Inhalt und Ordner liegen bei dir in zwei Finder-Fenstern.',
+                                  'Sketch: on your Mac the zip content and the folder are in two Finder windows.')])
+    s.h = end + 6
+    return s.render(T(lang, 'Mac: Neolume in „Programme“ ziehen', 'Mac: drag Neolume into “Applications”'),
+                    T(lang, 'Skizze eines Finder-Fensters: links das App-Symbol Neolume (1), ein orangefarbener Pfeil „ziehen“ zum blauen Ordner Programme (2).',
+                      'Sketch of a Finder window: on the left the Neolume app icon (1), an orange arrow “drag” to the blue Applications folder (2).'))
+
+
+def fig_mac_blocked(lang):
+    s = Svg(800, 0)
+    mac_desktop(s, 380)
+    x, y, w, h = 230, 40, 340, 330
+    s.rect(x, y, w, h, '#ececee', '#b9bec6', 1, 14)
+    neolume_icon(s, x + w / 2 - 36, y + 26, 72)
+    lines = T(lang, ['„Neolume“ wurde nicht geöffnet', ''], ['“Neolume” Not Opened', ''])
+    s.text(x + w / 2, y + 128, lines[0], 15, '#1d1d1f', 'bold', 'middle')
+    body = T(lang, ['Apple konnte nicht überprüfen, ob', '„Neolume“ frei von Schadsoftware ist,', 'die deinen Mac schädigen oder deine', 'Privatsphäre gefährden kann.'],
+             ['Apple could not verify “Neolume” is', 'free of malware that may harm your', 'Mac or compromise your privacy.'])
+    for i, t in enumerate(body): s.text(x + w / 2, y + 156 + i * 19, t, 13, '#3a3a3c', 'normal', 'middle')
+    b1 = T(lang, 'Fertig', 'Done'); b2 = T(lang, 'In den Papierkorb legen', 'Move to Trash')
+    s.rect(x + 20, y + 240, w - 40, 30, '#1f6fe0', None, 0, 8)
+    s.text(x + w / 2, y + 260, b1, 14, '#ffffff', 'bold', 'middle')
+    s.rect(x + 20, y + 280, w - 40, 30, '#ffffff', '#c7cad0', 1, 8)
+    s.text(x + w / 2, y + 300, b2, 14, '#1d1d1f', 'normal', 'middle')
+    s.rect(x + 16, y + 236, w - 32, 38, 'none', ORANGE, 2.5, 10)
+    s.badge(x + 16, y + 236, '1', 13)
+    s.h = 392
+    end = legend(s, 396, [('1', T(lang, '„Fertig“ wählen – nicht „In den Papierkorb legen“. Danach weiter mit „Dennoch öffnen“',
+                                       'Choose “Done” – not “Move to Trash”. Then continue with “Open Anyway”')),
+                          T(lang, 'Wortlaut je nach macOS-Version etwas anders (noch zu prüfen).',
+                                  'The exact wording differs a little between macOS versions (still to be checked).')])
+    s.h = end + 6
+    return s.render(T(lang, 'macOS: „Neolume“ wurde nicht geöffnet', 'macOS: “Neolume” Not Opened'),
+                    T(lang, 'Skizze der macOS-Meldung beim ersten Öffnen: Neolume-Symbol, „Apple konnte nicht überprüfen, ob „Neolume“ frei von Schadsoftware ist …“, darunter die Knöpfe Fertig (orange umrandet, 1) und In den Papierkorb legen.',
+                      'Sketch of the macOS message on the first start: Neolume icon, “Apple could not verify “Neolume” is free of malware …”, below the buttons Done (outlined in orange, 1) and Move to Trash.'))
+
+
+def fig_mac_open_anyway(lang):
+    s = Svg(800, 0)
+    mac_desktop(s, 400)
+    x, y, w, h = 40, 34, 720, 360
+    mac_window(s, x, y, w, h)
+    # sidebar
+    s.rect(x + 1, y + 40, 200, h - 41, '#f1f1f3')
+    side = [None, None, None, T(lang, 'Datenschutz & Sicherheit', 'Privacy & Security'), None, None]
+    for i, t in enumerate(side):
+        yy = y + 62 + i * 34
+        if t:
+            s.rect(x + 10, yy - 16, 182, 28, '#1f6fe0', None, 0, 6)
+            s.text(x + 22, yy + 3, t, 13, '#ffffff', 'bold')
+        else:
+            s.bar(x + 22, yy - 6, 110 + (i * 17) % 40, 10, '#6b6b70', 0.3)
+    s.badge(x + 10, y + 62 + 3 * 34 - 16, '1', 12)
+    cx = x + 222
+    s.text(cx, y + 64, T(lang, 'Datenschutz & Sicherheit', 'Privacy & Security'), 17, '#1d1d1f', 'bold')
+    s.bar(cx, y + 86, 300, 10, '#6b6b70', 0.25)
+    s.bar(cx, y + 104, 240, 10, '#6b6b70', 0.25)
+    s.text(cx, y + 150, T(lang, 'Sicherheit', 'Security'), 14, '#6b6b70', 'bold')
+    s.rect(cx, y + 162, w - 244, 120, '#f5f5f7', '#e0e0e3', 1, 8)
+    s.text(cx + 16, y + 192, T(lang, '„Neolume“ wurde blockiert, um deinen', '“Neolume” was blocked to protect'), 13, '#1d1d1f')
+    s.text(cx + 16, y + 211, T(lang, 'Mac zu schützen.', 'your Mac.'), 13, '#1d1d1f')
+    btn = T(lang, 'Dennoch öffnen', 'Open Anyway')
+    bw = tw(btn, 13, True) + 30
+    bx = cx + w - 244 - bw - 16
+    s.rect(bx, y + 230, bw, 30, '#ffffff', '#c7cad0', 1, 7)
+    s.text(bx + bw / 2, y + 250, btn, 13, '#1d1d1f', 'bold', 'middle')
+    s.rect(bx - 4, y + 226, bw + 8, 38, 'none', ORANGE, 2.5, 9)
+    s.badge(bx - 4, y + 226, '2', 12)
+    s.bar(cx, y + 306, 200, 10, '#6b6b70', 0.25)
+    s.bar(cx, y + 326, 260, 10, '#6b6b70', 0.25)
+    s.h = 412
+    end = legend(s, 416, [('1', T(lang, 'Apple-Menü  › Systemeinstellungen › Datenschutz & Sicherheit', 'Apple menu  › System Settings › Privacy & Security')),
+                          ('2', T(lang, 'Bis „Sicherheit“ scrollen, „Dennoch öffnen“ klicken, mit Passwort/Touch ID bestätigen',
+                                       'Scroll down to “Security”, click “Open Anyway”, confirm with your password or Touch ID')),
+                          T(lang, 'Der Knopf erscheint erst, nachdem du Neolume einmal öffnen wolltest – und nur etwa eine Stunde lang.',
+                                  'The button only appears after you tried to open Neolume once – and only for about an hour.')])
+    s.h = end + 6
+    return s.render(T(lang, 'macOS: „Dennoch öffnen“', 'macOS: “Open Anyway”'),
+                    T(lang, 'Skizze der Systemeinstellungen: links „Datenschutz & Sicherheit“ markiert (1), rechts im Abschnitt Sicherheit „„Neolume“ wurde blockiert, um deinen Mac zu schützen.“ mit dem Knopf Dennoch öffnen (orange umrandet, 2). Graue Balken stehen für andere Einträge.',
+                      'Sketch of System Settings: on the left “Privacy & Security” selected (1), on the right in the Security section ““Neolume” was blocked to protect your Mac.” with the button Open Anyway (outlined in orange, 2). Grey bars stand for other entries.'))
+
+
+def fig_mac_signin(lang):
+    s = Svg(800, 0)
+    mac_desktop(s, 420)
+    x, y, w, h = 40, 30, 720, 380
+    s.rect(x, y, w, h, 'url(#neo)', '#3a3d42', 1, 12)
+    for i, c in enumerate(['#ff5f57', '#febc2e', '#28c840']): s.circle(x + 20 + i * 18, y + 20, 6, c)
+    s.text(x + 60, y + 78, 'Neo', 24, '#f2f2f2', 'bold')
+    s.text(x + 60 + tw('Neo', 24, True), y + 78, 'lume', 24, TEAL, 'bold')
+    s.text(x + 60, y + 126, T(lang, 'Mit deinem Plex-Konto verbinden', 'Connect your Plex account'), 26, '#f2f2f2', 'bold')
+    for i, t in enumerate(wrap(T(lang, 'Melde dich direkt hier auf diesem Gerät an. Dafür öffnet sich die offizielle Anmeldeseite von Plex.',
+                                 'Sign in right here on this device. The official Plex sign-in page opens for this.'), 15, 600)):
+        s.text(x + 60, y + 160 + i * 22, t, 15, '#c4c7cc')
+    b1 = T(lang, 'Mit Plex anmelden', 'Sign in with Plex')
+    s.rect(x + 60, y + 216, 300, 46, TEAL, None, 0, 9)
+    s.text(x + 210, y + 245, b1, 17, '#0e0f11', 'bold', 'middle')
+    s.badge(x + 60, y + 216, '1', 13)
+    s.text(x + 60, y + 302, T(lang, 'Klappt es hier nicht? Dann melde dich mit einem Code über Handy oder Computer an.',
+                              'Not working here? Then sign in with a code on your phone or computer.'), 14, '#c4c7cc')
+    b2 = T(lang, 'Mit Code anmelden', 'Sign in with code')
+    bw = tw(b2, 15, True) + 36
+    s.rect(x + 60, y + 318, bw, 40, '#2f3338', None, 0, 8)
+    s.text(x + 60 + bw / 2, y + 344, b2, 15, '#ffffff', 'bold', 'middle')
+    s.badge(x + 60, y + 318, '2', 13)
+    s.h = 432
+    end = legend(s, 436, [('1', T(lang, 'Öffnet die offizielle Plex-Anmeldeseite in einem macOS-Fenster – dort wie gewohnt anmelden',
+                                       'Opens the official Plex sign-in page in a macOS window – sign in there as usual')),
+                          ('2', T(lang, 'Ausweg: Code anzeigen und auf plex.tv/link mit Handy oder Computer bestätigen',
+                                       'Fallback: show a code and confirm it on plex.tv/link with your phone or computer'))])
+    s.h = end + 6
+    return s.render(T(lang, 'Neolume am Mac: Anmeldung', 'Neolume on the Mac: sign-in'),
+                    T(lang, 'Skizze der Anmeldeseite von Neolume am Mac: Schriftzug Neolume, „Mit deinem Plex-Konto verbinden“, der türkise Knopf Mit Plex anmelden (1) und darunter Mit Code anmelden (2).',
+                      'Sketch of the Neolume sign-in page on the Mac: the Neolume wordmark, “Connect your Plex account”, the teal button Sign in with Plex (1) and below it Sign in with code (2).'))
+
+
 FIGS = [
     ('overview', fig_overview), ('remote', fig_remote),
     ('tv-menu-smarthub', fig_tv_menu), ('tv-account-develop', fig_tv_account), ('tv-smarthub-apps', fig_tv_smarthub),
@@ -1635,6 +1792,9 @@ FIGS = [
     ('atv-downloader', fig_atv_downloader), ('atv-install-confirm', fig_atv_install), ('atv-signin', fig_atv_signin),
     ('atv-update-dialog', fig_atv_update_dialog), ('atv-update-allow', fig_atv_update_allow),
     ('atv-update-confirm', fig_atv_update_confirm), ('atv-about-build', fig_atv_about), ('atv-developer-options', fig_atv_devopts),
+    # Mac (docs/install/mac.md)
+    ('mac-drag-to-apps', fig_mac_drag), ('mac-gatekeeper-blocked', fig_mac_blocked), ('mac-open-anyway', fig_mac_open_anyway),
+    ('mac-signin', fig_mac_signin),
 ]
 
 
