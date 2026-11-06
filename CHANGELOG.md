@@ -11,8 +11,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - **Android TV / Google TV is on its way.** The app now runs on a Google TV set (tested on a TCL 32S5K with 1 GB of
   memory): sign-in on the TV, profiles, all screens, playback with the TV's own video player (smooth live TV, many files
   played directly without the server converting them, the screen switches to 50 Hz for 25 fps films) and app updates
-  from inside the app. A step-by-step install guide for beginners is in the docs; a public download follows once it has
-  been tested on more sets.
+  from inside the app. Download: `android-tv.apk` in this release (experimental – tested on one set so far); it updates
+  itself from GitHub and needs no computer. The step-by-step guide with pictures for beginners is in
+  `docs/install/android-tv.md`.
 
 ### Changed
 - **Lighter, softer shadow behind the screensaver text ("Ambient").** The dark area behind the clock and the title no
