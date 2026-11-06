@@ -162,5 +162,33 @@ class SharedPort(unittest.TestCase):
             s.stop()
 
 
+class StreamDeadline(unittest.TestCase):
+    """A streamed answer (app package) stops after STREAM_DEADLINE in total: a trickling reader never holds a thread for ever."""
+    def test_deadline_ends_stream_and_runs_done(self):
+        import io
+        done = []
+
+        class Api(object):
+            def handle(self, method, path, headers, client):
+                if path != '/app/android.apk': return None
+                return 200, lanserver.Raw(None, 'application/octet-stream', [], stream=io.BytesIO(b'x' * 200000), size=200000,
+                                          done=lambda: done.append(1))
+        s = LanServer('update', 0, bind='127.0.0.1')
+        s.api = Api()
+        s.start()
+        self.addCleanup(s.stop)
+        old = lanserver.STREAM_DEADLINE
+        try:
+            r = send(s.port, b'GET /app/android.apk HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n')
+            self.assertEqual(len(r.split(b'\r\n\r\n', 1)[1]), 200000)          # normal case: whole file
+            lanserver.STREAM_DEADLINE = -1
+            r = send(s.port, b'GET /app/android.apk HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n')
+            self.assertEqual(status(r), 200)
+            self.assertEqual(r.split(b'\r\n\r\n', 1)[1], b'')                   # deadline passed: no more body, connection closed
+            self.assertEqual(done, [1, 1])
+        finally:
+            lanserver.STREAM_DEADLINE = old
+
+
 if __name__ == '__main__':
     unittest.main()

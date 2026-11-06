@@ -12,10 +12,12 @@
   var U = N.util, M = N.model, D = N.det, REST = 300, ANCHOR = 340, TMORE = 44, SEC = 248, PEEK = 580, HOLD = 2500;
   var SS_A = 276, SS_B = 300;                         // schmale Karte: Zeilen des Streifens/Serien-Balkens ueber den Reitern (Abschnitt-px)
   var PITCH = { land: 288, poster: 360, cast: 248 };
-  /* Poster-Reihen (Aehnliche Titel, Sammlung) stehen beim Fokus LIFT px hoeher: Karte 264 px ab Anker + 52 endet bei 656, der Ring
-   * (Karte + 8 px, Fokus-Vergroesserung 1.08) bei ~675 – ueber dem Text der Hinweisleiste (y 656). Nutzerbefund 30.10. Mit 28 px
-   * endet der Ring bei ~647. Querformat (162) und Besetzung (120) passen am Anker. */
-  var LIFT = 28;
+  /* Reihen-Anker beim Fokus: die ganze Reihe samt Beschriftung (Titel + Unterzeile, CAPH = 24 + 22) endet ueber dem deckenden Teil
+   * des unteren Bands (fade-bottom ab y 632, deckend ab 652; CAP_END = 648). Querformat (Kopf 52 + 184 + 46 -> 622) und Besetzung
+   * (-> 574) passen am Anker 340. Poster-Reihen (Aehnliche Titel, Sammlung) stehen LIFT px hoeher: am Anker endete schon die Karte
+   * bei 656 (Ring ueber der Hinweisleiste, Befund 30.10.), mit 28 px lag die Beschriftung bei 644–690 unter dem Band (Befund 06.11.:
+   * nur blasser Text). 652 - 4 - 46 - 280 - 52 = 270 -> LIFT 70; der Kopf steht dann bei y 270, unter dem Info-Block (endet bei 244). */
+  var CAPH = 46, CAP_END = 648, LIFT = ANCHOR - (CAP_END - CAPH - N.RowMath.GEOM.poster.capY - 52);
   function anchorOf(kind) { return kind === 'poster' ? ANCHOR - LIFT : ANCHOR; }
 
   N.router.define('details', function (params) {
@@ -360,7 +362,7 @@
           if (r.top !== y) { r.top = y; r.row.setTop(y); }
           out.push(r);
         } else {
-          var nr = new N.ui.Row(pg, { captions: function () { return true; }, w: card ? cardW() : 0, free: RFREE });
+          var nr = newRow(defs[i]);
           nr.setModel(defs[i], 0); nr.setTop(y);
           out.push({ row: nr, top: y, id: defs[i].id });
         }
@@ -645,9 +647,15 @@
       if (sim.length) defs.push({ id: 'similar', kind: 'poster', tk: 'det.row.similar', items: sim });
       return defs;
     }
+    /* Reihe unter dem Kopf. Poster-Reihen: Ausschnitt (.rclip, sonst 340) hoch genug fuer die Beschriftung unter der Karte
+     * (Kopf 52 + capY 280 + CAPH 46 = 378 -> 384); vorher schnitt er sie nach 8 px ab (Befund 06.11.) */
+    function newRow(def) {
+      return new N.ui.Row(pg, { captions: function () { return true; }, w: card ? cardW() : 0, free: RFREE,
+        clipH: def.kind === 'poster' ? 384 : 0 });
+    }
     function addRow(def) {
       var y = rows.length ? rows[rows.length - 1].top + PITCH[rows[rows.length - 1].row.model.kind] : isShow ? SEC + ANCHOR + PITCH.land : PEEK;
-      var r = new N.ui.Row(pg, { captions: function () { return true; }, w: card ? cardW() : 0, free: RFREE });
+      var r = newRow(def);
       r.setModel(def, 0); r.setTop(y);
       rows.push({ row: r, top: y, id: def.id });
     }
@@ -696,7 +704,18 @@
      * (Seite y 448–496) mit 16 Abstand ganz im Bild ist; sonst 0 */
     /* Karte auf flacher Flaeche (Befund 03.11., iPhone quer mit Tastatur: Fokus-Reihe halb unter der Hinweisleiste): Versatz o mindestens
      * so gross, dass die Reihe bis bottom (Seiten-y) mit Platz fuer die Hinweisleiste (88) im Bild ist; TV/Seite: o unveraendert */
-    function fitLow(o, bottom) { return card ? Math.max(o, Math.min(cardMax(), bottom + 88 - cardH())) : o; }
+    /* Platz unter einer Reihe fuer das Hinweisband (Karten-px): sonst 88; auf schmalen Geraeten bricht das Band in zwei Zeilen um
+     * und steht hoeher (iPhone SE hochkant mit Tastatur: Reihe "Aehnliche Titel" lag darunter, Befund 06.11.) -> am Band messen */
+    var hroom = 88;                                      // zuletzt gemessen (pageBottom laeuft beim Rollen je Bild: nicht messen)
+    function hintRoom() { hroom = measureHint(); return hroom; }
+    function measureHint() {
+      var C = N.ui.card, h = document.getElementById('pn-hints'), g = C.g;
+      if (!card || !h || !C.body || !g || h.className.indexOf('hid') >= 0 || !h.offsetHeight) return 88;
+      var br = C.body.getBoundingClientRect(), hr = h.getBoundingClientRect();
+      if (!br.height || hr.top >= br.bottom) return 88;
+      return Math.max(88, Math.ceil((br.bottom - hr.top) * g.ch / br.height) + 12);
+    }
+    function fitLow(o, bottom) { return card ? Math.max(o, Math.min(cardMax(), bottom + hintRoom() - cardH())) : o; }
     function btnOff() { return card ? Math.max(0, 512 - cardH()) : 0; }
     function btnFit() { var bo = btnOff(); if (bo && cpage && cy < bo) cardTo(bo, false); }   // erster Aufbau: Knopfreihe ins Bild
     function toBtn() {
@@ -729,10 +748,12 @@
     function toRow(i) {
       if (!rows[i]) return;
       leaveZone(); zone = 'row'; rk = i; dimButtons(true);
-      setOff(fitLow(rowOff(i), rows[i].top + 52 + rows[i].row.g.capY)); heroInfo(false);
-      rows[i].row.setFocused(true); rows[i].row.boost(); placeRing(rows[i].row.ringPos());
+      rows[i].row.setFocused(true);
+      N.router.refreshHints();                            // erst die Hinweise der Reihe, dann messen (fitLow -> hintRoom)
+      setOff(fitLow(rowOff(i), rows[i].top + 52 + rows[i].row.g.capY + CAPH)); heroInfo(false);
+      rows[i].row.boost(); placeRing(rows[i].row.ringPos());
       if (d && infoFor !== d.it && !isShow) infoLater(d.it);
-      N.router.refreshHints(); moreSoon();
+      moreSoon();
     }
     function down() {
       if (zone === 'btn') { if (isShow && seasons.length) toTabs(); else if (isShow && epRow.count()) toEps(); else toRow(0); }
@@ -915,9 +936,11 @@
        * "Von vorne / Ton & UT"; in der Reiter-Zeile tun beide nichts) */
       var x = focusedItem(), list = (zone === 'btn' && !virt) || (zone === 'eps' && x) ? [{ k: 'red', t: 'hint.fromStart' }, { k: 'green', t: 'hint.tracks' }] : [];
       if (zone === 'row' && x && x.ext) return [{ k: 'OK', t: 'hint.details' }, N.disc.blueHint()];   // Karte ausserhalb des Servers: nur Details
-      if (x && x.rk && M.isVideo(x)) list.push({ k: 'yellow', t: M.watched(x) ? 'hint.markUnwatched' : 'hint.markWatched' });
+      /* Reihen: GELB und INFO wirken nur in "Aehnliche Titel" (onKey); auf Besetzung/Extras stand "INFO Details" ohne Wirkung */
+      var rowOk = zone !== 'row' || (rows[rk] && rows[rk].id === 'similar');
+      if (rowOk && x && x.rk && M.isVideo(x)) list.push({ k: 'yellow', t: M.watched(x) ? 'hint.markUnwatched' : 'hint.markWatched' });
       list.push(N.disc.blueHint());
-      if (list.length < 5) list.push({ k: 'INFO', t: 'hint.details' });
+      if (rowOk && list.length < 5) list.push({ k: 'INFO', t: 'hint.details' });
       if (xt && xt.hints) list = xt.hints(zone === 'eps' ? eps[epRow.f] : null, list) || list;
       return list;
     };
@@ -1173,7 +1196,7 @@
     /* Unterkante des Inhalts (Seiten-px): letzte Reihe samt Beschriftung, sonst Folgenreihe bzw. erster Bildschirm */
     function pageBottom() {
       var b = isShow && epRow ? SEC + ANCHOR + 52 + 162 + 150 : 720, i;
-      for (i = 0; i < rows.length; i++) b = Math.max(b, rows[i].top + 52 + rows[i].row.g.capY + 150);   // Beschriftung + Platz ueber der Hinweisleiste
+      for (i = 0; i < rows.length; i++) b = Math.max(b, rows[i].top + 52 + rows[i].row.g.capY + Math.max(150, CAPH + hroom));   // Beschriftung + Platz ueber der Hinweisleiste
       return Math.max(b, 720);
     }
     function cardMax() { return Math.max(0, pageBottom() - cardH()); }

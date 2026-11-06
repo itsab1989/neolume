@@ -341,16 +341,29 @@ class Store(object):
         return s
 
     def save(self, path=None):
+        """Write helper.json atomically. One lock around snapshot + write (two threads saving at once - e.g. the setup program
+        and a request binding a TV - never interleave or rename each other's file); a unique temporary name per save."""
         path = path or store_path()
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        tmp = path + '.tmp'
-        try: os.remove(tmp)                # never write the tokens through a planted file/symlink (O_EXCL below)
-        except OSError: pass
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0), 0o600)   # Windows: per-user %APPDATA% ACL
-        with os.fdopen(fd, 'w', encoding='utf-8') as f: json.dump(self.to_json(), f)
-        try: os.chmod(tmp, 0o600)
-        except OSError: pass
-        os.replace(tmp, path)
+        with _SAVE_LOCK:
+            for attempt in range(3):           # another thread changed a dict while it was copied (RuntimeError): copy again
+                try:
+                    data = json.dumps(self.to_json())
+                    break
+                except RuntimeError:
+                    if attempt == 2: raise
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            tmp = '%s.%s.tmp' % (path, secrets.token_hex(6))
+            # O_EXCL + O_NOFOLLOW: never write the tokens through a planted file/symlink. Windows: per-user %APPDATA% ACL
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+            try:
+                with os.fdopen(fd, 'w', encoding='utf-8') as f: f.write(data)
+                try: os.chmod(tmp, 0o600)
+                except OSError: pass
+                os.replace(tmp, path)
+            except BaseException:
+                try: os.remove(tmp)
+                except OSError: pass
+                raise
         return path
 
     @classmethod
@@ -362,6 +375,9 @@ class Store(object):
     def forget(path=None):
         try: os.remove(path or store_path())
         except OSError: pass
+
+
+_SAVE_LOCK = threading.RLock()            # Store.save: one writer at a time (all stores of this process)
 
 
 # ---------------------------------------------------------------- rate limit

@@ -14,6 +14,8 @@
 (function (N) {
   var U = N.util, MAX = 5;
   var COLOR = { red: ['k-red', 'A'], green: ['k-green', 'B'], yellow: ['k-yellow', 'C'], blue: ['k-blue', 'D'] };
+  /* Aufdruck der Farbtasten je Fernbedienung (N.platform.keys.colorText, z. B. TCL: R/G/Y/B); fehlt er: A–D (Samsung) */
+  function colorText(k) { var t = N.platform && N.platform.keys && N.platform.keys.colorText; return t && typeof t[k] === 'string' ? t[k] : null; }
   var H = { el: null, items: [], sig: '' }, WAKE_MS = 4000, wakeT = 0, awake = false, hidden = false;
   H.MODES = ['always', 'brief', 'off'];
   /* Modus aus den Einstellungen des Profils; ohne Profil (Anmeldung, Profilwahl) und bei fehlendem/unbekanntem Wert: immer */
@@ -104,7 +106,7 @@
       if (c && cl !== null) c = null;                  // Apple (NAV-26): keine Farbquadrate, neutrale Kappe mit der echten Taste/Geste
       if (c) {
         e.k.style.display = ''; e.kt.style.display = 'none';
-        e.k.className = 'k ' + c[0]; U.setText(e.kT, N.keys.label(d.k) || c[1]);
+        e.k.className = 'k ' + c[0]; U.setText(e.kT, N.keys.label(d.k) || colorText(d.k) || c[1]);
       } else {
         e.k.style.display = 'none'; e.kt.style.display = '';
         var ret = d.k === 'ret';

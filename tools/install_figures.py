@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Schematic drawings for the installation guide (public/docs/INSTALL.md / INSTALL.de.md).
+"""Schematic drawings for the installation guides (public/docs/INSTALL(.de).md, public/docs/install/android-tv(.de).md).
 
     python3 tools/install_figures.py            # writes public/docs/img/*.svg (English + German)
 
@@ -10,6 +10,7 @@ light frame (readable on GitHub's light and dark theme), only invented example v
 public brand only. Entries we have not verified word for word on a TV are drawn as grey bars instead of guessed labels.
 Python 3 standard library only.
 """
+import math
 import os
 import sys
 
@@ -1177,6 +1178,448 @@ def fig_remote(lang):
                       'buttons.'))
 
 
+# ---------------------------------------------------------------- Android TV / Google TV (docs/install/android-tv.md)
+# Menu names as seen on a TCL set with Google TV (Android TV 11), German UI; the English names are those of Android TV's
+# English UI. Entries whose English wording we did not see on a TV are drawn as grey bars. The functions take the app name
+# and the download address, so the private edition can draw the same sketches with its own name
+# (tools/private/install_figures_private.py).
+ATV_URL = 'https://github.com/itsab1989/neolume/releases/latest/download/android-tv.apk'
+ATV_PANEL, ATV_TXT, ATV_MUTED, ATV_FOCUS, ATV_ON = '#26282c', '#e8eaed', '#9aa0a6', '#e8eaed', '#8ab4f8'
+ATV_NEW = '1.0.19'          # example version in the update sketches
+ICON_PLAY = '#c9ced6'       # play symbol of the neutral icon for other app names (another edition may set its own colour)
+
+
+def wrap(text, size, width, bold=False):
+    """Greedy line wrap with the rough text width tw()."""
+    out, cur = [], ''
+    for word in str(text).split(' '):
+        cand = (cur + ' ' + word).strip()
+        if cur and tw(cand, size, bold) > width:
+            out.append(cur); cur = word
+        else:
+            cur = cand
+    if cur: out.append(cur)
+    return out
+
+
+def gear(s, cx, cy, r=11, color='#e8eaed'):
+    for i in range(8):
+        a = i * math.pi / 4
+        s.line(cx + math.cos(a) * r * 0.7, cy + math.sin(a) * r * 0.7, cx + math.cos(a) * (r + 3), cy + math.sin(a) * (r + 3), color, 4)
+    s.circle(cx, cy, r * 0.75, 'none', color, 3.5)
+
+
+def atv_home(s):
+    """Google TV start screen, simplified: a row of tabs (grey bars), the gear at the top right, rows of tiles."""
+    tv(s)
+    x = 70
+    for wdt in [70, 60, 52, 64]:
+        s.bar(x, 52, wdt, 12, op=0.35); x += wdt + 26
+    s.circle(700, 58, 14, '#3a4458')
+    gear(s, 740, 58)
+    for r in range(2):
+        y = 120 + r * 150
+        s.bar(70, y - 26, 140, 10, op=0.3)
+        for c in range(5):
+            s.rect(70 + c * 140, y, 124, 96, ['#34507a', '#5a3f6e', '#3f6a5a', '#6e5a3f', '#3f4f6e'][(c + r) % 5], None, 0, 8)
+
+
+def atv_switch(s, x, y, on):
+    s.rect(x, y, 38, 20, ATV_ON if on else '#5f6368', None, 0, 10)
+    s.circle(x + (28 if on else 10), y + 10, 8, '#ffffff')
+
+
+def atv_panel(s, title, rows, sel, x=440, top=None, step=40, size=17, head=None, desc=None):
+    """Settings panel on the right (Google TV opens settings as a panel over the dimmed home screen).
+    rows: label | None (grey bar) | '…' (more entries) | (label|None, value|None, switch None/True/False).
+    Returns the baseline y of every row."""
+    dim(s, 0.55)
+    s.rect(x, SY, SX + SW - x, SH, ATV_PANEL, None, 0, 4)
+    w = SX + SW - x - 56
+    y = SY + 40
+    if head:
+        s.text(x + 28, y, head, 13, ATV_MUTED); y += 30
+    s.text(x + 28, y + 6, title, 23, ATV_TXT); y += 26
+    if desc:
+        for ln in wrap(desc, 13, w):
+            y += 18; s.text(x + 28, y, ln, 13, ATV_MUTED)
+        y += 6
+    y = top if top else y + 30
+    ys = []
+    for i, r in enumerate(rows):
+        lab, val, sw = (r if isinstance(r, tuple) else (r, None, None))
+        f = (i == sel)
+        if f: s.rect(x + 14, y - 23, w + 28, step - 4, ATV_FOCUS, None, 0, 10)
+        col = '#202124' if f else ATV_TXT
+        if lab == '…':
+            s.text(x + 28, y, '⋮', size, ATV_MUTED)
+        elif lab is None:
+            s.bar(x + 28, y - 11, w * 0.5, 10, '#202124' if f else '#ffffff', 0.5 if f else 0.28)
+        else:
+            s.text(x + 28, y, lab, size, col, 'bold' if f else 'normal')
+        if val and sw is None: s.text(x + 28 + w, y, val, 14, '#3c4043' if f else ATV_MUTED, 'normal', 'end')
+        if sw is not None:
+            if val: s.text(x + 28 + w - 48, y, val, 13, '#3c4043' if f else ATV_MUTED, 'normal', 'end')
+            atv_switch(s, x + 28 + w - 38, y - 15, sw)
+        ys.append(y)
+        y += step
+    return ys
+
+
+def toast(s, text, cx=400):
+    w = tw(text, 15) + 40
+    s.rect(cx - w / 2, 396, w, 34, '#3c4043', None, 0, 17)
+    s.text(cx, 418, text, 15, '#ffffff', 'normal', 'middle')
+
+
+def app_icon(s, x, y, size, app):
+    """Public icon for Neolume; any other name (private edition) gets a neutral play symbol."""
+    if app == APP:
+        neolume_icon(s, x, y, size); return
+    h = size * 1000 / 1220.0
+    s.rect(x, y, size, h, '#16181b', '#5f646d', 1, size * 0.12)
+    s.add('<path d="M%g %g L%g %g L%g %g Z" fill="%s"/>' % (x + size * 0.4, y + h * 0.3, x + size * 0.4, y + h * 0.7,
+                                                                x + size * 0.66, y + h * 0.5, ICON_PLAY))
+
+
+def atv_dialog(s, x, y, w, title, lines, buttons, focus_i=None, icon_app=None):
+    """Android dialog (dark system theme): optional icon + app name, title, text, text buttons at the bottom right.
+    Returns the button boxes (x, y, w, h)."""
+    lh = 21
+    h = 40 + (58 if icon_app else 0) + (32 if title else 0) + lh * len(lines) + 66
+    s.rect(x, y, w, h, '#2d2f33', '#5f6368', 1, 12)
+    yy = y + 40
+    if icon_app:
+        app_icon(s, x + 28, y + 22, 44, icon_app)
+        s.text(x + 84, y + 50, icon_app, 18, ATV_TXT, 'bold'); yy = y + 98
+    if title:
+        s.text(x + 28, yy, title, 19 if icon_app else 20, ATV_TXT, 'normal' if icon_app else 'bold'); yy += 32
+    for ln in lines:
+        s.text(x + 28, yy, ln, 15, '#c4c7cc'); yy += lh
+    boxes, bx = [], x + w - 20
+    for b in reversed(buttons):
+        bw = tw(b, 15, True) + 30
+        bx -= bw
+        boxes.insert(0, (bx, y + h - 50, bw, 36))
+        bx -= 10
+    for i, (bx, by, bw, bh) in enumerate(boxes):
+        if focus_i == i: s.rect(bx, by, bw, bh, ATV_FOCUS, None, 0, 8)
+        s.text(bx + bw / 2, by + 24, buttons[i], 15, '#202124' if focus_i == i else ATV_ON, 'bold', 'middle')
+    return boxes
+
+
+def fig_atv_settings(lang):
+    s = Svg(800, 0)
+    atv_home(s)
+    rows = [T(lang, 'Netzwerk & Internet', 'Network & Internet'), T(lang, 'Konten & Anmeldung', 'Accounts & Sign In'), 'Apps',
+            T(lang, 'Geräteeinstellungen', 'Device Preferences'), T(lang, 'Fernbedienungen & Zubehör', 'Remotes & Accessories'), None, None]
+    ys = atv_panel(s, T(lang, 'Einstellungen', 'Settings'), rows, 2, x=430, step=44)
+    s.badge(740, 30, '1', 12)
+    s.badge(430, ys[2] - 6, '2', 13)
+    s.rect(444, ys[3] - 25, 318, 38, 'none', ORANGE, 2.5, 10, ' stroke-dasharray="6 4"')
+    s.badge(430, ys[3] - 6, '3', 13)
+    end = legend(s, 474, [('1', T(lang, 'Startseite: ganz nach oben, nach rechts zum Zahnrad, OK – rechts öffnen sich die Einstellungen',
+                                       'Home screen: all the way up, right to the gear, OK – Settings opens on the right')),
+                          ('2', T(lang, 'Apps: hier erlaubst du Downloader das Installieren (Schritt 3)', 'Apps: here you allow Downloader to install (step 3)')),
+                          ('3', T(lang, 'Geräteeinstellungen: Info, Datum & Uhrzeit (nur für Tipps und den Weg per Computer)',
+                                       'Device Preferences: About, Date & time (only for tips and the computer method)')),
+                          T(lang, 'Graue Balken: weitere Einträge, die du hier nicht brauchst.', 'Grey bars: other entries you do not need here.')])
+    s.h = end + 6
+    return s.render(T(lang, 'Google TV: Einstellungen öffnen', 'Google TV: open Settings'),
+                    T(lang, 'Skizze der Google-TV-Startseite mit dem Zahnrad oben rechts (1). Rechts das Feld „Einstellungen“ mit '
+                            'Netzwerk & Internet, Konten & Anmeldung, Apps (markiert, 2), Geräteeinstellungen (gestrichelt, 3) und '
+                            'Fernbedienungen & Zubehör.',
+                      'Sketch of the Google TV home screen with the gear at the top right (1). On the right the Settings panel with '
+                      'Network & Internet, Accounts & Sign In, Apps (highlighted, 2), Device Preferences (dashed, 3) and Remotes & '
+                      'Accessories.'))
+
+
+def fig_atv_unknown(lang):
+    s = Svg(800, 0)
+    atv_home(s)
+    no = T(lang, 'Nicht zulässig', 'Not allowed')
+    rows = [('Downloader', T(lang, 'Zugelassen', 'Allowed'), True), (None, no, False), (None, no, False), (None, no, False)]
+    ys = atv_panel(s, T(lang, 'Unbekannte Herkunft', 'Unknown sources'), rows, 0, x=380, step=46,
+                   head=T(lang, 'Apps › Sicherheit & Einschränkungen', 'Apps › Security & restrictions'),
+                   desc=T(lang, 'Installation von Apps aus anderen Quellen als dem Play Store zulassen',
+                          'Allow installation of apps from sources other than the Play Store'))
+    s.badge(380, 64, '1', 13)
+    s.badge(380, ys[0] - 6, '2', 13)
+    end = legend(s, 474, [('1', T(lang, 'Einstellungen › Apps › Sicherheit & Einschränkungen › Unbekannte Herkunft',
+                                       'Settings › Apps › Security & restrictions › Unknown sources')),
+                          ('2', T(lang, 'Downloader wählen und OK: der Schalter geht an („Zugelassen“)',
+                                       'Choose Downloader and press OK: the switch turns on (“Allowed”)')),
+                          T(lang, 'Nur Downloader erlauben. Nach der Installation kannst du den Schalter wieder ausschalten.',
+                                  'Allow only Downloader. After the installation you can switch it off again.'),
+                          T(lang, 'Graue Balken: andere Apps auf deinem Fernseher.', 'Grey bars: other apps on your TV.')])
+    s.h = end + 6
+    return s.render(T(lang, 'Android TV: Unbekannte Herkunft', 'Android TV: Unknown sources'),
+                    T(lang, 'Skizze der Seite „Unbekannte Herkunft“ unter Apps › Sicherheit & Einschränkungen: Text „Installation '
+                            'von Apps aus anderen Quellen als dem Play Store zulassen“, darunter eine Liste von Apps mit Schaltern. '
+                            'Downloader ist markiert und „Zugelassen“, die anderen „Nicht zulässig“.',
+                      'Sketch of the page Unknown sources under Apps › Security & restrictions: text “Allow installation of apps '
+                      'from sources other than the Play Store”, below a list of apps with switches. Downloader is highlighted and '
+                      '“Allowed”, the others “Not allowed”.'))
+
+
+def fig_atv_about(lang):
+    s = Svg(800, 0)
+    atv_home(s)
+    if lang == 'de':
+        rows = ['Produktinformationen', 'Softwareaktualisierung', 'Gerätename', 'Neu starten', 'Status', 'Rechtliche Hinweise',
+                'Nutzungsbedingungen', 'Android TV-Modell', '…', 'Android TV OS-Build']
+    else:
+        rows = [None, 'System update', 'Device name', 'Restart', 'Status', 'Legal information', None, None, '…', 'Android TV OS build']
+    ys = atv_panel(s, T(lang, 'Info', 'About'), rows, 9, x=430, step=31, size=16,
+                   head=T(lang, 'Geräteeinstellungen', 'Device Preferences'), top=SY + 112)
+    s.arrow(412, ys[1], 412, ys[9] - 8)
+    s.badge(412, ys[1] - 20, '1', 12)
+    s.badge(430, ys[9] - 6, '2', 13)
+    toast(s, T(lang, 'Du bist jetzt Entwickler!', 'You are now a developer!'), 220)
+    end = legend(s, 474, [('1', T(lang, 'Geräteeinstellungen › Info: mit ▼ ganz nach unten scrollen', 'Device Preferences › About: scroll all the way down with ▼')),
+                          ('2', T(lang, 'Android TV OS-Build markieren und 7-mal OK drücken', 'Highlight Android TV OS build and press OK 7 times')),
+                          T(lang, 'Nur für den Weg per Computer nötig (Abschnitt 11) – nicht für die normale Installation.',
+                                  'Only needed for the computer method (section 11) – not for the normal installation.'),
+                          T(lang, 'Graue Balken: Einträge, die du hier nicht brauchst.', 'Grey bars: entries you do not need here.')])
+    s.h = end + 6
+    return s.render(T(lang, 'Android TV: Info › Android TV OS-Build', 'Android TV: About › Android TV OS build'),
+                    T(lang, 'Skizze der Seite Geräteeinstellungen › Info mit Produktinformationen, Softwareaktualisierung, '
+                            'Gerätename, Neu starten, Status, Rechtliche Hinweise, Nutzungsbedingungen, Android TV-Modell und ganz '
+                            'unten dem markierten Eintrag „Android TV OS-Build“. Unten die Meldung „Du bist jetzt Entwickler!“.',
+                      'Sketch of Device Preferences › About with System update, Device name, Restart, Status, Legal information '
+                      'and at the very bottom the highlighted entry Android TV OS build. At the bottom the message “You are now '
+                      'a developer!”.'))
+
+
+def fig_atv_devopts(lang):
+    s = Svg(800, 0)
+    atv_home(s)
+    rows = [None, None, None, '…', (T(lang, 'USB-Debugging', 'USB debugging'), None, True), None, None]
+    ys = atv_panel(s, T(lang, 'Entwickleroptionen', 'Developer options'), rows, 4, x=430, step=42,
+                   head=T(lang, 'Geräteeinstellungen', 'Device Preferences'))
+    s.badge(430, ys[4] - 6, '1', 13)
+    end = legend(s, 474, [('1', T(lang, 'USB-Debugging markieren und OK – der Schalter geht an; die Rückfrage mit OK bestätigen',
+                                       'Highlight USB debugging and press OK – the switch turns on; confirm the question with OK')),
+                          T(lang, 'Nur für den Weg per Computer (Abschnitt 11). Danach wieder ausschalten.',
+                                  'Only for the computer method (section 11). Switch it off again afterwards.'),
+                          T(lang, 'Graue Balken: weitere Entwicklereinstellungen – dort bitte nichts ändern.',
+                                  'Grey bars: other developer settings – please leave them alone.')])
+    s.h = end + 6
+    return s.render(T(lang, 'Android TV: Entwickleroptionen › USB-Debugging', 'Android TV: Developer options › USB debugging'),
+                    T(lang, 'Skizze der Seite Geräteeinstellungen › Entwickleroptionen: viele Einträge als graue Balken, markiert '
+                            'der Eintrag „USB-Debugging“ mit eingeschaltetem Schalter.',
+                      'Sketch of Device Preferences › Developer options: many entries drawn as grey bars, highlighted the entry '
+                      'USB debugging with its switch on.'))
+
+
+def fig_atv_downloader(lang, app=APP, url=ATV_URL):
+    s = Svg(800, 0)
+    tv(s)
+    s.rect(SX, SY, 190, SH, '#1b1d22', None, 0, 4)
+    s.text(44, 66, 'Downloader', 18, '#ff9a3c', 'bold')
+    s.rect(36, 92, 166, 36, ATV_FOCUS, None, 0, 8)
+    s.text(52, 116, 'Home', 16, '#202124', 'bold')
+    for i in range(4): s.bar(52, 150 + i * 40, 100, 10, op=0.3)
+    s.bar(250, 92, 220, 11, op=0.35)
+    cut = url.find('/releases/')
+    lines = [url] if len(url) <= 56 or cut < 0 else [url[:cut], url[cut:]]
+    bh = 22 + 22 * len(lines)
+    s.rect(250, 118, 400, bh, '#ffffff', ORANGE, 2.5, 6)
+    for i, ln in enumerate(lines): s.text(262, 140 + i * 22, ln, 13, '#202124', 'normal', 'start', MONO)
+    s.rect(664, 118, 80, bh, ORANGE, None, 0, 6)
+    s.text(704, 124 + bh / 2 + 2, 'Go', 18, '#ffffff', 'bold', 'middle')
+    s.badge(250, 118, '1', 13)
+    s.badge(744, 118, '2', 13)
+    s.rect(250, 230, 494, 190, '#2d2f33', None, 0, 10)          # on-screen keyboard (simplified)
+    for r in range(4):
+        for c in range(10):
+            s.rect(262 + c * 47, 244 + r * 42, 40, 34, '#3c4043', None, 0, 5)
+    s.text(497, 439, T(lang, 'Bildschirmtastatur (Skizze)', 'on-screen keyboard (sketch)'), 12, ATV_MUTED, 'normal', 'middle')
+    end = legend(s, 474, [('1', T(lang, 'Ins Adressfeld gehen, OK – die Bildschirmtastatur erscheint. Adresse genau abtippen.',
+                                       'Go to the address box, OK – the on-screen keyboard appears. Type the address exactly.')),
+                          ('2', T(lang, 'Go wählen: Downloader lädt die Datei und öffnet die Installation von ' + app + '.',
+                                       'Choose Go: Downloader fetches the file and opens the installation of ' + app + '.')),
+                          T(lang, 'Jedes Zeichen zählt, auch Groß- und Kleinschreibung. Downloader selbst ist englisch.',
+                                  'Every character counts, including upper and lower case.')])
+    s.h = end + 6
+    return s.render(T(lang, 'Downloader: Adresse der App-Datei eingeben', 'Downloader: enter the address of the app file'),
+                    T(lang, 'Skizze der App Downloader: links das Menü mit „Home“ markiert, rechts das Adressfeld mit '
+                            + url + ' (1) und daneben der Knopf „Go“ (2), darunter die Bildschirmtastatur.',
+                      'Sketch of the Downloader app: on the left the menu with Home highlighted, on the right the address box with '
+                      + url + ' (1) and next to it the Go button (2), below the on-screen keyboard.'))
+
+
+def fig_atv_install(lang, app=APP):
+    s = Svg(800, 0)
+    tv(s)
+    dim(s, 0.4)
+    boxes = atv_dialog(s, 150, 110, 500, T(lang, 'Möchtest du diese App installieren?', 'Do you want to install this app?'), [],
+                       [T(lang, 'Abbrechen', 'Cancel'), T(lang, 'Installieren', 'Install')], icon_app=app)
+    bx, by, bw, bh = boxes[1]
+    s.rect(bx - 3, by - 3, bw + 6, bh + 6, 'none', ORANGE, 3, 10)
+    s.badge(bx + bw, by, '1', 13)
+    end = legend(s, 474, [('1', T(lang, 'Installieren wählen und OK drücken (steht die Markierung auf Abbrechen: erst ►)',
+                                       'Choose Install and press OK (if the highlight is on Cancel: press ► first)')),
+                          T(lang, 'Nach ein paar Sekunden: „App installiert“ – mit Öffnen startest du ' + app + ' gleich.',
+                                  'After a few seconds: “App installed” – Open starts ' + app + ' right away.')])
+    s.h = end + 6
+    return s.render(T(lang, 'Android: „Möchtest du diese App installieren?“', 'Android: “Do you want to install this app?”'),
+                    T(lang, 'Skizze der Rückfrage von Android: oben Symbol und Name ' + app + ', darunter „Möchtest du diese App '
+                            'installieren?“, unten rechts die Knöpfe Abbrechen und Installieren (orange umrandet).',
+                      'Sketch of Android’s question: at the top the icon and the name ' + app + ', below “Do you want to install '
+                      'this app?”, at the bottom right the buttons Cancel and Install (outlined in orange).'))
+
+
+def fig_atv_signin(lang, app=APP):
+    s = Svg(800, 0)
+    tv(s, app_screen=True)
+    s.text(64, 84, T(lang, 'Mit deinem Plex-Konto verbinden', 'Connect your Plex account'), 24, '#f2f2f2', 'bold')
+    steps = [T(lang, '1  Öffne plex.tv/link auf Handy oder Computer.', '1  Open plex.tv/link on your phone or computer.'),
+             T(lang, '2  Melde dich dort mit deinem Plex-Konto an.', '2  Sign in there with your Plex account.'),
+             T(lang, '3  Gib diesen Code ein:', '3  Enter this code:')]
+    for i, t in enumerate(steps): s.text(64, 128 + i * 30, t, 16, '#c4c7cc')
+    s.rect(64, 210, 300, 84, '#22252a', TEAL, 2.5, 12)
+    s.text(214, 268, 'K7QX', 46, '#ffffff', 'bold', 'middle', MONO)
+    s.text(64, 324, T(lang, 'Der Code gilt noch 4:52.', 'This code is valid for 4:52.'), 14, '#a7abb2')
+    s.rect(64, 346, 130, 38, '#2f3338', None, 0, 8)
+    s.text(129, 371, T(lang, 'Neuer Code', 'New code'), 15, '#ffffff', 'bold', 'middle')
+    qx, qy, q = 520, 110, 200                                    # QR sketch, not scannable on purpose
+    s.rect(qx, qy, q, q, '#ffffff', None, 0, 12)
+    for fx, fy in ((qx + 16, qy + 16), (qx + q - 66, qy + 16), (qx + 16, qy + q - 66)):
+        s.rect(fx, fy, 50, 50, '#0e0f11', None, 0, 4); s.rect(fx + 10, fy + 10, 30, 30, '#ffffff'); s.rect(fx + 17, fy + 17, 16, 16, '#0e0f11')
+    for r in range(9):
+        for c in range(9):
+            if (r < 3 and (c < 3 or c > 5)) or (r > 5 and c < 3) or (r * 5 + c * 3 + r * c) % 3: continue
+            s.rect(qx + 18 + c * 18, qy + 18 + r * 18, 14, 14, '#0e0f11')
+    s.text(qx + q / 2, qy + q + 28, T(lang, 'Oder QR-Code scannen – öffnet plex.tv/link', 'Or scan the QR code – opens plex.tv/link'),
+           13, '#c4c7cc', 'normal', 'middle')
+    s.badge(64, 210, '1', 13)
+    s.badge(qx, qy, '2', 13)
+    end = legend(s, 474, [('1', T(lang, 'Auf dem Handy oder Computer plex.tv/link öffnen, anmelden, diesen Code eintippen',
+                                       'On your phone or computer open plex.tv/link, sign in, type this code')),
+                          ('2', T(lang, 'Oder mit der Handykamera den QR-Code scannen – er öffnet dieselbe Seite',
+                                       'Or scan the QR code with your phone camera – it opens the same page')),
+                          T(lang, 'Code und QR-Code sind Beispiele; dein Fernseher zeigt eigene.', 'Code and QR code are examples; your TV shows its own.')])
+    s.h = end + 6
+    return s.render(T(lang, app + ': mit Code anmelden', app + ': sign in with a code'),
+                    T(lang, 'Skizze der Anmeldung von ' + app + ': Überschrift „Mit deinem Plex-Konto verbinden“, drei Schritte, der '
+                            'Beispielcode K7QX in einem Kasten (1), rechts ein QR-Code mit „Oder QR-Code scannen – öffnet '
+                            'plex.tv/link“ (2).',
+                      'Sketch of the ' + app + ' sign-in: heading “Connect your Plex account”, three steps, the example code K7QX in '
+                      'a box (1), on the right a QR code with “Or scan the QR code – opens plex.tv/link” (2).'))
+
+
+def fig_atv_update_dialog(lang, app=APP):
+    s = Svg(800, 0)
+    tv(s, app_screen=True)
+    for r in range(2):
+        for c in range(5): s.rect(70 + c * 140, 90 + r * 160, 124, 120, '#2a2e33', None, 0, 8)
+    dim(s, 0.5)
+    msg = T(lang, 'Für ' + app + ' gibt es ein Update. Jetzt installieren? Das dauert etwa eine Minute; danach startest du die App einfach neu.',
+            'An update for ' + app + ' is available. Install it now? It takes about a minute; then simply start the app again.')
+    boxes = atv_dialog(s, 130, 110, 540, T(lang, 'Neue Version ', 'New version ') + ATV_NEW, wrap(msg, 15, 480),
+                       [T(lang, 'Später', 'Later'), T(lang, 'Installieren', 'Install')])
+    bx, by, bw, bh = boxes[1]
+    s.rect(bx - 3, by - 3, bw + 6, bh + 6, 'none', ORANGE, 3, 10)
+    s.badge(bx + bw, by, '1', 13)
+    end = legend(s, 474, [('1', T(lang, 'Installieren wählen und OK. „Später“ fragt erst in 24 Stunden wieder.',
+                                       'Choose Install and press OK. “Later” asks again after 24 hours.')),
+                          T(lang, 'Die Versionsnummer ist ein Beispiel.', 'The version number is an example.')])
+    s.h = end + 6
+    return s.render(T(lang, app + ': Hinweis auf eine neue Version', app + ': a new version is available'),
+                    T(lang, 'Skizze des Hinweises in ' + app + ': Titel „Neue Version ' + ATV_NEW + '“, Text „' + msg + '“, Knöpfe Später '
+                            'und Installieren (orange umrandet).',
+                      'Sketch of the notice in ' + app + ': title “New version ' + ATV_NEW + '”, text “' + msg + '”, buttons Later and '
+                      'Install (outlined in orange).'))
+
+
+def fig_atv_update_allow(lang, app=APP):
+    s = Svg(800, 0)
+    tv(s, app_screen=True)
+    ys = atv_panel(s, T(lang, 'Installieren unbekannter Apps', 'Install unknown apps'), [(app, None, True)], 0, x=400, step=46, top=SY + 150)
+    s.badge(400, ys[0] - 6, '1', 13)
+    end = legend(s, 474, [('1', T(lang, app + ' markieren und OK – der Schalter geht an', 'Highlight ' + app + ' and press OK – the switch turns on')),
+                          ('2', T(lang, 'Zurück-Taste drücken: Android zeigt dann die Rückfrage zum Update',
+                                       'Press Back: Android then shows its question about the update')),
+                          T(lang, 'Nur vor dem allerersten Update. Erlaubt nur ' + app + ', sich selbst zu aktualisieren.',
+                                  'Only before the very first update. It lets only ' + app + ' update itself.')])
+    s.h = end + 6
+    return s.render(T(lang, 'Android: Installieren unbekannter Apps', 'Android: Install unknown apps'),
+                    T(lang, 'Skizze der Seite „Installieren unbekannter Apps“ mit einer Zeile ' + app + ' und eingeschaltetem Schalter.',
+                      'Sketch of the page Install unknown apps with one row ' + app + ' and its switch on.'))
+
+
+def fig_atv_update_confirm(lang, app=APP):
+    s = Svg(800, 0)
+    tv(s)
+    dim(s, 0.4)
+    txt = T(lang, 'Möchtest du ein Update dieser vorhandenen App installieren? Deine bisherigen Daten gehen dabei nicht verloren.',
+            'Do you want to install an update to this existing app? Your existing data will not be lost.')
+    boxes = atv_dialog(s, 130, 90, 540, None, wrap(txt, 15, 480), [T(lang, 'Abbrechen', 'Cancel'), T(lang, 'Installieren', 'Install')],
+                       focus_i=0, icon_app=app)
+    (ax, ay, aw, ah), (bx, by, bw, bh) = boxes
+    s.rect(bx - 3, by - 3, bw + 6, bh + 6, 'none', ORANGE, 3, 10)
+    s.line(ax + aw / 2, ay + ah + 2, ax + aw / 2, ay + ah + 18, ORANGE, 3)
+    s.arrow(ax + aw / 2, ay + ah + 18, bx + bw / 2, ay + ah + 18)
+    s.line(bx + bw / 2, ay + ah + 18, bx + bw / 2, by + bh + 4, ORANGE, 3)
+    s.badge(ax, ay, '1', 12)
+    s.badge(bx + bw, by, '2', 13)
+    end = legend(s, 474, [('1', T(lang, 'Achtung: Die Markierung steht zuerst auf Abbrechen – einmal ► drücken',
+                                       'Careful: the highlight starts on Cancel – press ► once')),
+                          ('2', T(lang, 'Jetzt ist Installieren markiert: OK drücken. Danach ' + app + ' neu starten.',
+                                       'Now Install is highlighted: press OK. Then start ' + app + ' again.'))])
+    s.h = end + 6
+    return s.render(T(lang, 'Android: Update installieren', 'Android: install the update'),
+                    T(lang, 'Skizze der Rückfrage von Android mit Symbol und Name ' + app + ' und dem Text „' + txt + '“. Die '
+                            'Markierung steht auf Abbrechen (1), ein Pfeil zeigt nach rechts zu Installieren (2).',
+                      'Sketch of Android’s question with the icon and name ' + app + ' and the text “' + txt + '”. The highlight is '
+                      'on Cancel (1), an arrow points right to Install (2).'))
+
+
+def fig_remote_tcl(lang):
+    W = 800
+    s = Svg(W, 0)
+    s.rect(8, 8, W - 16, 300, '#f3f4f6', '#d0d4da', 1.5, 12)
+    s.rect(40, 60, 720, 190, '#2a2d33', '#d5d9e0', 3, 60)
+
+    def key(x, y, w, h, label, hi=False, size=13, fill='#41454d', col='#ffffff', sub=None):
+        s.rect(x, y, w, h, fill, ORANGE if hi else '#5f646d', 3 if hi else 1, 8)
+        s.text(x + w / 2, y + h / 2 + size * 0.36, label, size, col, 'bold', 'middle')
+        if sub: s.text(x + w / 2, y + h + 14, sub, 11, '#c9ced6', 'normal', 'middle')
+    for r in range(3):
+        for c in range(3):
+            key(84 + c * 36, 82 + r * 36, 30, 28, str(1 + r * 3 + c), size=12)
+    key(120, 190, 30, 28, '0', size=12)
+    for i, (c, l) in enumerate(zip(['#e5484d', '#30a46c', '#f5d90a', '#3e63dd'], 'RGYB')):
+        key(212 + (i % 2) * 42, 82 + (i // 2) * 36, 36, 28, l, fill=c, col='#1d1d1f' if l == 'Y' else '#ffffff')
+    key(212, 160, 36, 28, 'ⓘ', size=15, sub='Info')
+    key(254, 160, 36, 28, '≡', size=17, sub=T(lang, 'Optionen', 'Options'))
+    s.rect(330, 80, 140, 140, '#41454d', ORANGE, 3, 70)
+    s.text(400, 102, '▲', 14, '#ffffff', 'normal', 'middle'); s.text(400, 210, '▼', 14, '#ffffff', 'normal', 'middle')
+    s.text(346, 155, '◄', 14, '#ffffff', 'normal', 'middle'); s.text(454, 155, '►', 14, '#ffffff', 'normal', 'middle')
+    s.circle(400, 150, 30, '#5a5f68', ORANGE, 3)
+    s.text(400, 155, 'OK', 15, '#ffffff', 'bold', 'middle')
+    key(500, 86, 56, 36, '↩', True, 18, sub=T(lang, 'Zurück', 'Back'))
+    key(500, 150, 56, 36, '⌂', True, 18, sub='Home')
+    key(590, 86, 40, 54, 'CH', size=12)
+    s.text(610, 80, '▲', 11, '#c9ced6', 'normal', 'middle'); s.text(610, 156, '▼', 11, '#c9ced6', 'normal', 'middle')
+    key(650, 86, 40, 54, 'VOL', size=11)
+    s.text(670, 80, '+', 12, '#c9ced6', 'normal', 'middle'); s.text(670, 156, '–', 12, '#c9ced6', 'normal', 'middle')
+    s.text(640, 196, T(lang, 'keine Play-/Pause-Taste', 'no play/pause button'), 12, '#c9ced6', 'normal', 'middle')
+    s.text(400, 274, T(lang, 'Orange umrandet: die Tasten, die du für die Installation brauchst',
+                       'Orange outline: the buttons you need for the installation'), 15, '#1f2328', 'normal', 'middle')
+    s.text(400, 294, T(lang, '(Skizze einer TCL-Fernbedienung – deine sieht vielleicht anders aus)',
+                       '(sketch of a TCL remote – yours may look different)'), 13, '#4b5563', 'normal', 'middle')
+    s.h = 312
+    return s.render(T(lang, 'Fernbedienung (Android TV): wichtige Tasten', 'Remote (Android TV): the important buttons'),
+                    T(lang, 'Skizze einer TCL-Fernbedienung für Google TV. Hervorgehoben: die Pfeiltasten mit OK in der Mitte, '
+                            'Zurück und Home. Außerdem Zahlentasten 0–9, die Farbtasten R G Y B, Info (ⓘ), die Menütaste (≡), '
+                            'CH ▲▼ und Lautstärke. Eine Play-/Pause-Taste gibt es nicht.',
+                      'Sketch of a TCL remote for Google TV. Highlighted: the arrow buttons with OK in the middle, Back and Home. '
+                      'Also the number buttons 0–9, the colour buttons R G Y B, Info (ⓘ), the menu button (≡), CH ▲▼ and volume. '
+                      'There is no play/pause button.'))
+
+
 FIGS = [
     ('overview', fig_overview), ('remote', fig_remote),
     ('tv-menu-smarthub', fig_tv_menu), ('tv-account-develop', fig_tv_account), ('tv-smarthub-apps', fig_tv_smarthub),
@@ -1187,6 +1630,11 @@ FIGS = [
     ('setup-helper-installed', fig_setup_helper_done),
     ('helper-menu-mac', fig_tray_mac), ('helper-menu-windows', fig_tray_win), ('mac-background-item', fig_mac_background),
     ('windows-firewall', fig_win_firewall), ('windows-startup-apps', fig_win_startup),
+    # Android TV / Google TV (docs/install/android-tv.md)
+    ('remote-tcl', fig_remote_tcl), ('atv-settings', fig_atv_settings), ('atv-unknown-sources', fig_atv_unknown),
+    ('atv-downloader', fig_atv_downloader), ('atv-install-confirm', fig_atv_install), ('atv-signin', fig_atv_signin),
+    ('atv-update-dialog', fig_atv_update_dialog), ('atv-update-allow', fig_atv_update_allow),
+    ('atv-update-confirm', fig_atv_update_confirm), ('atv-about-build', fig_atv_about), ('atv-developer-options', fig_atv_devopts),
 ]
 
 

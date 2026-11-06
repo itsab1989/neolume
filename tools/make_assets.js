@@ -121,16 +121,16 @@ function scrimSoft(c, x, y, edges) {
   if (edges.t) w *= smoother(y / c.win); if (edges.b) w *= smoother((c.h - y) / c.win);
   return c.peak * (1 - Math.exp(-c.k * f)) * w;
 }
-/* Ambient (Nutzerbefund 04.11.: der Eck-Schatten scrim-saver[-br|-tr|-tl].png reichte bei jedem Titel bis x ~950): weiche Stuecke
- * hinter Uhr und Text, so lang wie die Zeilen – Form, Werte und Zusammensetzung siehe src/core/saverlogic.js AMB/ambPieces/ambField
- * (von dort gelesen, eine Quelle). scrim-saver-a{u,d,c,z,z2}[-r].png, Alpha mit +-1/2 Stufe Rauschen. */
+/* Ambient (SAV-4): weicher Fleck um Uhr und Text, auf allen Seiten ausgeblendet, mit Abstand zum Bildschirmrand (Nutzerbefund 06.11.) –
+ * Form, Werte und 9-Teile-Zusammensetzung siehe src/core/saverlogic.js AMB/ambPieces/ambField (von dort gelesen, eine Quelle).
+ * Sprites scrim-saver-a{s,e}[-r].png und scrim-saver-af.png, Alpha mit +-1/2 Stufe Rauschen. */
 function ambScrims(out) {
   var N0 = {}; new Function('N', fs.readFileSync(path.join(ROOT, 'src', 'core', 'saverlogic.js'), 'utf8'))(N0);
   var L = N0.saverLogic;
-  ['u', 'd', 'c', 'z', 'z2'].forEach(function (k) {
-    [false, true].forEach(function (r) {
-      var S = L.ambSize(k);
-      out(L.ambImg(k, r), S[0], S[1], function (x, y) { return L.ambField(k, r, x, y); });
+  ['s', 'f', 'e', 't'].forEach(function (c) {
+    (c === 'f' ? [false] : [false, true]).forEach(function (r) {
+      var S = L.ambSize(c);
+      out(L.ambImg(c, r), S[0], S[1], function (x, y) { return L.ambField(c, r, x, y); });
     });
   });
 }

@@ -5,6 +5,40 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.19] - 2026-11-06
+
+### Added
+- **Android TV / Google TV is on its way.** The app now runs on a Google TV set (tested on a TCL 32S5K with 1 GB of
+  memory): sign-in on the TV, profiles, all screens, playback with the TV's own video player (smooth live TV, many files
+  played directly without the server converting them, the screen switches to 50 Hz for 25 fps films) and app updates
+  from inside the app. A step-by-step install guide for beginners is in the docs; a public download follows once it has
+  been tested on more sets.
+
+### Changed
+- **Lighter, softer shadow behind the screensaver text ("Ambient").** The dark area behind the clock and the title no
+  longer starts at the screen edge (it looked like a gradient coming out of the corner) and no longer shows as a grey
+  patch on bright pictures. Instead every line of text – the clock, each line of the title and the line below it – gets
+  its own soft, light halo that is exactly as wide as that line and fades out on all sides, with a small free strip along
+  the screen edges. The halos are round like soft pills, and where a short line sits under or over a long one (for
+  example a title on two lines) they flow into each other in a gentle curve instead of a sharp step. Nothing is darkened where there is no text. The halo is only as dark as
+  needed to keep the white text easy to read even on snow, sky, a white wall or bright yellow – it is equally light behind
+  every line; the line below the title is now white like the title and a little larger and bolder, so it stays easy to read
+  as well. To leave room for this, the text sits a little further in from the edges.
+
+### Fixed
+- **Screensaver text never without its shadow.** Sometimes the shadow behind the clock and title was missing for one
+  picture (for example right after the screensaver started), so white text stood on the bare picture. The app now
+  measures the text again a moment later if it could not be measured yet.
+- **Key symbols line up.** In the hint bar at the bottom, in the "How to use" card and in the help, all key symbols now
+  have the same height and sit exactly in line with the text next to them (the INFO and TOOLS keys were 2 px taller).
+- **"Similar titles" shows its titles.** On a details page the last row of posters sat so low that the titles under the
+  posters disappeared in the dark band above the hint bar; the row now sits higher and the titles are fully readable.
+- **Text in filter chips is centred** (Library and Search: it sat 1 px too low).
+- **The helper's settings file stays intact** even if two changes are saved at the same moment, and a download from the
+  helper can no longer keep a connection open forever.
+
+If the app now looks a tiny bit tidier on your TV, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.18] - 2026-11-05
 
 ### Fixed

@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="312" viewBox="0 0 800 312" role="img" aria-labelledby="t d">
+<title id="t">Fernbedienung (Android TV): wichtige Tasten</title>
+<desc id="d">Skizze einer TCL-Fernbedienung für Google TV. Hervorgehoben: die Pfeiltasten mit OK in der Mitte, Zurück und Home. Außerdem Zahlentasten 0–9, die Farbtasten R G Y B, Info (ⓘ), die Menütaste (≡), CH ▲▼ und Lautstärke. Eine Play-/Pause-Taste gibt es nicht.</desc>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff7a1a"/></marker><linearGradient id="scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2747"/><stop offset="1" stop-color="#0c1127"/></linearGradient><linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3c8fe8"/><stop offset="1" stop-color="#1f62c8"/></linearGradient><linearGradient id="neo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16181b"/><stop offset="1" stop-color="#0e0f11"/></linearGradient></defs>
+<rect x="8" y="8" width="784" height="300" rx="12" fill="#f3f4f6" stroke="#d0d4da" stroke-width="1.5"/>
+<rect x="40" y="60" width="720" height="190" rx="60" fill="#2a2d33" stroke="#d5d9e0" stroke-width="3"/>
+<rect x="84" y="82" width="30" height="28" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="99" y="100.32" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<rect x="120" y="82" width="30" height="28" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="135" y="100.32" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<rect x="156" y="82" width="30" height="28" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="171" y="100.32" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+<rect x="84" y="118" width="30" height="28" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="99" y="136.32" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">4</text>
+<rect x="120" y="118" width="30" height="28" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="135" y="136.32" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">5</text>
+<rect x="156" y="118" width="30" height="28" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="171" y="136.32" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">6</text>
+<rect x="84" y="154" width="30" height="28" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="99" y="172.32" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">7</text>
+<rect x="120" y="154" width="30" height="28" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="135" y="172.32" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">8</text>
+<rect x="156" y="154" width="30" height="28" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="171" y="172.32" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">9</text>
+<rect x="120" y="190" width="30" height="28" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="135" y="208.32" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">0</text>
+<rect x="212" y="82" width="36" height="28" rx="8" fill="#e5484d" stroke="#5f646d" stroke-width="1"/>
+<text x="230" y="100.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">R</text>
+<rect x="254" y="82" width="36" height="28" rx="8" fill="#30a46c" stroke="#5f646d" stroke-width="1"/>
+<text x="272" y="100.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">G</text>
+<rect x="212" y="118" width="36" height="28" rx="8" fill="#f5d90a" stroke="#5f646d" stroke-width="1"/>
+<text x="230" y="136.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#1d1d1f" text-anchor="middle">Y</text>
+<rect x="254" y="118" width="36" height="28" rx="8" fill="#3e63dd" stroke="#5f646d" stroke-width="1"/>
+<text x="272" y="136.68" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">B</text>
+<rect x="212" y="160" width="36" height="28" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="230" y="179.4" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="bold" fill="#ffffff" text-anchor="middle">ⓘ</text>
+<text x="230" y="202" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#c9ced6" text-anchor="middle">Info</text>
+<rect x="254" y="160" width="36" height="28" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="272" y="180.12" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="17" font-weight="bold" fill="#ffffff" text-anchor="middle">≡</text>
+<text x="272" y="202" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#c9ced6" text-anchor="middle">Optionen</text>
+<rect x="330" y="80" width="140" height="140" rx="70" fill="#41454d" stroke="#ff7a1a" stroke-width="3"/>
+<text x="400" y="102" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#ffffff" text-anchor="middle">▲</text>
+<text x="400" y="210" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#ffffff" text-anchor="middle">▼</text>
+<text x="346" y="155" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#ffffff" text-anchor="middle">◄</text>
+<text x="454" y="155" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#ffffff" text-anchor="middle">►</text>
+<circle cx="400" cy="150" r="30" fill="#5a5f68" stroke="#ff7a1a" stroke-width="3"/>
+<text x="400" y="155" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="bold" fill="#ffffff" text-anchor="middle">OK</text>
+<rect x="500" y="86" width="56" height="36" rx="8" fill="#41454d" stroke="#ff7a1a" stroke-width="3"/>
+<text x="528" y="110.48" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">↩</text>
+<text x="528" y="136" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#c9ced6" text-anchor="middle">Zurück</text>
+<rect x="500" y="150" width="56" height="36" rx="8" fill="#41454d" stroke="#ff7a1a" stroke-width="3"/>
+<text x="528" y="174.48" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">⌂</text>
+<text x="528" y="200" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#c9ced6" text-anchor="middle">Home</text>
+<rect x="590" y="86" width="40" height="54" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="610" y="117.32" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">CH</text>
+<text x="610" y="80" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#c9ced6" text-anchor="middle">▲</text>
+<text x="610" y="156" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="normal" fill="#c9ced6" text-anchor="middle">▼</text>
+<rect x="650" y="86" width="40" height="54" rx="8" fill="#41454d" stroke="#5f646d" stroke-width="1"/>
+<text x="670" y="116.96" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle">VOL</text>
+<text x="670" y="80" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#c9ced6" text-anchor="middle">+</text>
+<text x="670" y="156" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#c9ced6" text-anchor="middle">–</text>
+<text x="640" y="196" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="normal" fill="#c9ced6" text-anchor="middle">keine Play-/Pause-Taste</text>
+<text x="400" y="274" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#1f2328" text-anchor="middle">Orange umrandet: die Tasten, die du für die Installation brauchst</text>
+<text x="400" y="294" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#4b5563" text-anchor="middle">(Skizze einer TCL-Fernbedienung – deine sieht vielleicht anders aus)</text>
+</svg>

@@ -115,8 +115,8 @@
     function picked() { var r = []; for (var j = 0; j < o.entries.length; j++) if (o.entries[j].on) r.push(o.entries[j].id); return r; }
     ov.cancel = function () { close(); if (o.multi && !act && o.onDone) o.onDone(picked()); else if (o.onCancel) o.onCancel(); };
     ov.hints = function () {
-      if (act) return [{ k: 'ENTER', t: 'hint.toggle' }, { k: 'ret', t: 'hint.cancel' }];
-      return o.multi ? [{ k: 'ENTER', t: 'hint.toggle' }, { k: 'ret', t: 'hint.done' }] : [{ k: 'ret', t: o.onCancel ? 'hint.back' : 'hint.cancel' }];
+      if (act) return [{ k: 'OK', t: 'hint.toggle' }, { k: 'ret', t: 'hint.cancel' }];
+      return o.multi ? [{ k: 'OK', t: 'hint.toggle' }, { k: 'ret', t: 'hint.done' }] : [{ k: 'ret', t: o.onCancel ? 'hint.back' : 'hint.cancel' }];
     };
     ov.onKey = function (k) {
       var n = N.nav.list(ov.f, ov.items.length, k, true);

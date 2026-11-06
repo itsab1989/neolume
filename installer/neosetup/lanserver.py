@@ -30,8 +30,11 @@ _LIVE_TOKEN = re.compile(r'/live/[A-Za-z0-9_-]{8,}')
 class Raw(object):
     """Answer of a helper route that is not JSON (e.g. a small page of an edition extension): bytes, content type and extra
     headers (Content-Security-Policy etc.). Built-in routes always answer JSON."""
-    def __init__(self, data, ctype, headers=None):
+    def __init__(self, data, ctype, headers=None, stream=None, size=0, done=None):
         self.data, self.ctype, self.headers = data, ctype, list(headers or [])
+        # large files (app update): stream = open binary file, size = its length; sent in chunks, never read into memory;
+        # done() runs after sending (e.g. frees a transfer slot) – also when the client went away
+        self.stream, self.size, self.done = stream, size, done
 
 
 def host_ok(host):
@@ -66,6 +69,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if res is None: return False
         status, obj = res
         raw = obj if isinstance(obj, Raw) else None
+        if raw and raw.stream is not None: return self._stream(status, raw, head)
         body = raw.data if raw else json.dumps(obj, ensure_ascii=False).encode('utf-8')
         self.send_response(status)
         self.send_header('Content-Type', raw.ctype if raw else 'application/json; charset=utf-8')
@@ -77,6 +81,34 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if not head: self.wfile.write(body)
         self.server.owner.event(self.client_address[0], self.path.split('?', 1)[0][:80], status)
         return True
+
+    def _stream(self, status, raw, head):
+        try:
+            self.send_response(status)
+            self.send_header('Content-Type', raw.ctype)
+            for k, v in raw.headers: self.send_header(k, v)
+            self.send_header('Content-Length', str(raw.size))
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('X-Content-Type-Options', 'nosniff')
+            self.end_headers()
+            left = 0 if head else raw.size
+            deadline = time.monotonic() + STREAM_DEADLINE
+            while left > 0:
+                if time.monotonic() > deadline:        # a reader that hardly takes anything never holds a thread for ever
+                    self.close_connection = True
+                    break
+                chunk = raw.stream.read(min(65536, left))
+                if not chunk: break
+                self.wfile.write(chunk)
+                left -= len(chunk)
+            self.server.owner.event(self.client_address[0], self.path.split('?', 1)[0][:80], status)
+            return True
+        finally:
+            try: raw.stream.close()
+            except Exception: pass
+            if raw.done:
+                try: raw.done()
+                except Exception: pass
 
     def _serve(self, head):
         owner = self.server.owner
@@ -116,6 +148,7 @@ _Handler.do_PUT = _write('PUT')
 _Handler.do_DELETE = _write('DELETE')
 
 
+STREAM_DEADLINE = 600       # s: total time for one streamed answer (app package) – a stalled or trickling reader frees its thread
 MAX_CONN = 64              # open connections in total (one thread each) …
 MAX_CONN_CLIENT = 12       # … and per client address (the TV's player uses 2-4; review 05.11. Z1)
 

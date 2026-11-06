@@ -138,7 +138,7 @@
     if (stg) N.evt.on('screen:resized', function () { if (!S.on) return; fitFlex(); ovSig = ''; place(); fitAmb(); });   // Jalousie/Kacheln: Teile erst bei Bedarf
     ov = U.el('div', 'scs-ov', el);
     scr = U.el('img', 'scs-scr', ov); scr.src = N.img.BLANK;
-    for (i = 0; i < 2; i++) pcs.push(U.el('div', 'scs-pc', ov, 'display:none'));   // Ambient: 2 Stuecke der Abdunklung (SL.ambPieces: Uhr, Text)
+    for (i = 0; i < SL.AMB_MAX; i++) pcs.push(U.el('div', 'scs-pc', ov, 'display:none'));   // Ambient: Halo je Zeile, hoechstens 4 Zeilen (SL.ambPieces, SL.AMB_MAX)
     blk = U.el('div', 'scs-blk', ov);
     /* Text je Zeile in einem span: dessen Breite = Laenge der Zeile (fitAmb); ck/ti/sb sind die Textknoten, ckD/tiD/sbD die Zeilen */
     ckD = U.el('div', 'scs-ck', blk); tiD = U.el('div', 'scs-ti', blk); sbD = U.el('div', 'scs-sb ell', blk);
@@ -533,16 +533,32 @@
    * waehrend die Einblendung unsichtbar ist und nichts laeuft (Schnitt: im selben Frame, dort bewegt sich nichts); nie im 1-s-Takt
    * (die Uhr waechst dort hoechstens um eine Ziffer, off + Auslauf decken das). Kosten: ein Layout des kleinen Info-Blocks. */
   var ovC = null, ovAmb = false, ambPre = null;
-  function rowOf(d, s, two) {
-    if (d.style.display === 'none' || !s.parentNode.offsetWidth) return null;
-    var w = two ? d.offsetWidth : Math.min(s.parentNode.offsetWidth, d.offsetWidth), x0 = blk.offsetLeft + d.offsetLeft;
-    return { e: ovC.r ? ov.offsetWidth - (x0 + d.offsetWidth) + w : x0 + w, top: blk.offsetTop + d.offsetTop, bot: blk.offsetTop + d.offsetTop + d.offsetHeight };
+  /* Zeilen einer Textzeile d (Text s): je Bildschirmzeile { k, e, top }; Titel auf 2 Zeilen: Breite jeder Zeile aus getClientRects des
+   * Spans (Nutzerbefund 06.11.: Abdunklung nur, wo Text ist – nicht so breit wie der Block) */
+  function rowsOf(d, s, k, lh, out) {
+    var sp = s.parentNode;
+    if (d.style.display === 'none' || !sp.offsetWidth || !s.nodeValue) return;
+    var x0 = blk.offsetLeft + d.offsetLeft, top = blk.offsetTop + d.offsetTop, rs = sp.getClientRects ? sp.getClientRects() : null, i, w;
+    var n = rs && rs.length > 1 ? Math.min(rs.length, Math.max(1, Math.round(d.offsetHeight / lh))) : 1;
+    for (i = 0; i < n; i++) {
+      w = Math.min(d.offsetWidth, n > 1 ? Math.round(rs[i].right - rs[i].left) : sp.offsetWidth);
+      out.push({ k: k, e: ovC.r ? ov.offsetWidth - (x0 + d.offsetWidth) + w : x0 + w, top: top + i * lh });
+    }
   }
-  function fitAmb() {
+  /* TV-Befund 06.11.: bei einem Bild fehlte die Abdunklung ganz (Text auf dem blanken Bild). Gemessen wurde, solange der Schoner bzw. die
+   * Einblendung noch nicht gelayoutet war (display:none -> Breite 0 -> keine Zeilen -> keine Teile), und bis zum naechsten Bild misst
+   * niemand nach. Jetzt: ist Text da, aber nichts messbar, wird nach kurzer Zeit erneut gemessen (hoechstens AMB_RETRY Mal je Setzen,
+   * nie im 1-s-Takt); S.start misst nach dem Einblenden des Schoners noch einmal. */
+  var ambTry = 0, AMB_RETRY = 10;
+  function fitAmb(again) {
     var i, list = [];
+    if (!again) ambTry = 0;
     if (ovAmb && ovC) {
-      var tsp = ti.parentNode, tiR = rowOf(tiD, ti, !!(tsp.getClientRects && tsp.getClientRects().length > 1)), sbR = rowOf(sbD, sb, false);   // Titel auf 2 Zeilen: so breit wie der Block
-      list = SL.ambPieces({ w: ov.offsetWidth, h: ov.offsetHeight, r: ovC.r, t: ovC.t, ck: rowOf(ckD, ck, false), ti: tiR, sb: sbR, tb: sbR ? sbR.bot : tiR ? tiR.bot : 0 });
+      var rows = [];
+      rowsOf(ckD, ck, 'ck', 80, rows); rowsOf(tiD, ti, 'ti', 36, rows); rowsOf(sbD, sb, 'sb', 28, rows);
+      list = SL.ambPieces({ w: ov.offsetWidth, h: ov.offsetHeight, r: ovC.r, t: ovC.t, rows: rows });
+      var want = (ckD.style.display !== 'none' && !!ck.nodeValue) || (tiD.style.display !== 'none' && !!(ti.nodeValue || sb.nodeValue));
+      if (want && (!ov.offsetWidth || !rows.length) && ambTry < AMB_RETRY) { ambTry++; later(120, function () { fitAmb(true); }); }
     }
     for (i = 0; i < pcs.length; i++) {
       var e = pcs[i], q = list[i];
@@ -550,10 +566,10 @@
       if (!q) continue;
       var bg = 'url(' + N.assetBase + q.img + ')';
       if (e._bg !== bg) { e._bg = bg; e.style.backgroundImage = bg; }
-      e.style.backgroundPosition = q.pos; e.style.webkitBackgroundSize = q.size; e.style.backgroundSize = q.size;
+      var sz = q.sw + 'px ' + q.sh + 'px';
+      e.style.backgroundPosition = '0 ' + q.py + 'px'; e.style.webkitBackgroundSize = sz; e.style.backgroundSize = sz;
       e.style.top = q.y + 'px'; e.style.height = q.h + 'px'; e.style.width = q.w + 'px';
-      e.style.left = ovC.r ? 'auto' : '0'; e.style.right = ovC.r ? '0' : 'auto';
-      e.setAttribute('data-layout-edge', q.edge.join(','));   // buendig an Seiten- bzw. Bildschirmrand (Layout-Pruefung)
+      e.style.left = ovC.r ? 'auto' : q.x + 'px'; e.style.right = ovC.r ? q.x + 'px' : 'auto';
     }
   }
   function setInfo(x) {
@@ -643,11 +659,12 @@
     U.show(hc, false);
     U.setText(ti, ''); U.setText(sb, ''); setInfo(null);
     U.show(el, true);
+    fitAmb();                                             // jetzt messbar (vorher display:none) – sonst stuende z. B. die Uhr ohne Abdunklung
     if (kind === 'art') preParts(setting('saverFx', 'fade'));   // Teile-Ebenen jetzt (Schwarz), nicht im 1. Uebergang
     if (kind !== 'clock') for (var i = 0; i < 2; i++) Ls[i].psh.src = N.assetBase + SL.SHADOW.tall.f;   // Plakat-Schatten vorladen (unsichtbar)
     if (SL.info(setting('saverInfo', 'ambient'), 0).amb && !ambPre && typeof Image !== 'undefined') {   // Ambient: Stuecke einmal vorladen (kommen mit dem Text, nie danach)
       ambPre = [];
-      ['u', 'd', 'c', 'z', 'z2'].forEach(function (k) { [false, true].forEach(function (r) { var im = new Image(); im.src = N.assetBase + SL.ambImg(k, r); ambPre.push(im); }); });
+      ['s', 'f', 'e', 't'].forEach(function (c) { [false, true].forEach(function (r) { var im = new Image(); im.src = N.assetBase + SL.ambImg(c, r); ambPre.push(im); }); });
     }
     nextAt = 0;                                           // erstes Bild: sobald es da ist (aus Schwarz)
     if (!noArt) prepare(); else nextAt = now() + interval();

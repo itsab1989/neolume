@@ -5,6 +5,8 @@
  *   id, info{platform, platformVersion, device, short, model}   X-Plex-Kopfzeilen, deviceName "<Marke> (<short>)", Protokollkopf
  *   init(ctx)                                              einmal in App.start, vor N.store.init (ctx vom Lader)
  *   keys{name(code, ev), cap{…}, register(names)}           Tastencode -> Tastenname, Tastenkappen, Laufzeit-Registrierung
+ *                                                           optional colorText{red, green, yellow, blue}: Aufdruck der Farbtasten
+ *                                                           dieser Fernbedienung (z. B. 'R'), sonst A–D (Hinweisleiste, Hilfe)
  *   store(ctx) -> {read, write, probe}                      Speicher-Backend (synchron, wie heute ctx.store)
  *   player{create(onEvent) -> {exec, close, fake}, close(), surface}   Form wie N.sef; optional nowPlaying({title, artist, album, art} | null):
  *                                                           "Wird gespielt" des Geraets (SPEC NAV-26)
@@ -88,6 +90,8 @@
         // (Server verpackt nur um). TV-Test 04.11.: der Player des TVs 2014 stuerzt beim Springen (Fortsetzen, Sprung, Ziffern) in
         // einer Datei mit 33+ Spuren ab und reisst den ganzen Fernseher in einen Neustart; 32 laufen. 0 = keine Grenze.
         maxTracks: 32
+        // optional directPlay {containers, video, audio} (Listen mit Komma): Geraet mit eigenem Medienplayer – daraus
+        // add-direct-play-profile im Clientprofil (N.decision.extraFor); fehlt = keins (TV 2014)
       },
       // App-Raster 1280x720; scale = Pixel je App-Pixel. flex: logische Flaeche W x H >= 1280x720 fuellt den Bildschirm
       // (Apple, 08-touch.md 8b); w/h sind dann die Mindestgroesse (Querformat 1280x720), die aktuelle liefert screen.size() (N.screen)

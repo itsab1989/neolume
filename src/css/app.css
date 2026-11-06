@@ -177,13 +177,17 @@ body { color: @c.text-1@; font-family: @ty.family@;
 #pn-hints.hid { opacity: 0; visibility: hidden; -webkit-transition: opacity @mo.slow@ @mo.ease-std@, visibility 0s linear @mo.slow@; }
 .rm #pn-hints.hid { -webkit-transition: none; }
 .hint { display: inline-block; height: 28px; margin-left: @sp.6@; font-size: 16px; line-height: 28px; color: @c.text-2@; vertical-align: top; }
-.hint .k { display: inline-block; width: 22px; height: 22px; border-radius: @r.xs@; margin-right: @sp.2@; margin-top: @sp.1@; vertical-align: top;
+/* Tastenkappen (Farbtaste .k, Textkappe .kt, RETURN-Kappe): alle 22 px hoch und mittig auf der 28-px-Zeile der Beschriftung
+ * (Reihen 3–24, Mitte = Zeilenmitte), line-height = Innenhoehe: Buchstabe in der Kappe und Beschriftung daneben stehen damit
+ * auf derselben Grundlinie – unabhaengig von der Schrift (Inter/Helvetica/Roboto/TV-Schrift). Nutzerbefund 06.11. (Android):
+ * vorher Farbtaste 22 px ab Reihe 4, Textkappe 24 px ab Reihe 2 -> Mitten 1 px versetzt, Beschriftung 2 px ueber der Farbtaste */
+.hint .k { display: inline-block; width: 22px; height: 22px; border-radius: @r.xs@; margin-right: @sp.2@; margin-top: 3px; vertical-align: top;
   text-align: center; font-size: 16px; line-height: 22px; font-weight: 600; color: @c.on-accent@; }
 .k-red { background: @c.danger@; } .k-green { background: @c.success@; } .k-yellow { background: @c.warn@; } .k-blue { background: @c.info@; }
-.hint .kt { display: inline-block; position: relative; height: 24px; padding: 0 6px; margin-right: @sp.2@; margin-top: 2px; vertical-align: top;
-  border: 1px solid @c.key-rim@; border-radius: @r.xs@; font-size: 16px; line-height: 22px; font-weight: 600; color: @c.text-2@; }
+.hint .kt { display: inline-block; position: relative; height: 22px; padding: 0 6px; margin-right: @sp.2@; margin-top: 3px; vertical-align: top;
+  border: 1px solid @c.key-rim@; border-radius: @r.xs@; font-size: 16px; line-height: 20px; font-weight: 600; color: @c.text-2@; }
 .hint .kt.ret { width: 32px; padding: 0; }
-.hint .kt.ret .ic { left: -1px; top: -5px; background-position: -288px -32px; }
+.hint .kt.ret .ic { left: -1px; top: -6px; background-position: -288px -32px; }   /* 32er-Symbol mittig in der 22er-Kappe */
 
 /* ---------- Buttons, Toast, Dialog (SPEC 5.7, 5.12, 5.13) ---------- */
 .btn { position: absolute; height: 48px; padding: 0 22px; border-radius: @r.md@; background: @c.surface-3@; color: @c.text-1@;
@@ -501,6 +505,8 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .scs-ov.r .scs-blk { left: auto; right: @l.safe-x@; text-align: right; } .scs-ov.t .scs-blk { bottom: auto; top: 56px; }
 .scs-ck { font-size: 72px; line-height: 80px; font-weight: 300; color: @c.text-1@; }
 .scs-ti { font-size: 28px; line-height: 36px; font-weight: 600; color: @c.text-1@; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-ambient .scs-blk { left: 96px; bottom: 80px; } .st-ambient.r .scs-blk { left: auto; right: 96px; } .st-ambient.t .scs-blk { bottom: auto; top: 80px; }   /* Abstand fuer den Randauslauf der Abdunklung (SL.AMB mx/my) */
+.st-ambient .scs-sb { color: @c.text-1@; font-size: 22px; font-weight: 600; }   /* gleicher heller Halo wie Uhr/Titel (SL.AMB k): Lesbarkeit ueber halbfette, etwas groessere Schrift statt dunklerem Halo (Nutzerbefund 06.11.) */
 .st-ambient .scs-ti { max-height: 72px; white-space: normal; text-overflow: clip; word-wrap: break-word; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* lange Titel: 2 Zeilen, dann "…" */
 .scs-sb { font-size: @ty.title.size@; line-height: @ty.title.lh@; color: @c.text-soft@; }
 /* Klassisch: die bisherige Insel (Kasten 360 breit, 72 % deckend) */
@@ -673,8 +679,8 @@ body { color: @c.text-1@; font-family: @ty.family@;
 /* Chips (SPEC 5.8): 32 hoch, Radius 6, 16 px 600; aktiv = 1-px-Rahmen text-2 + Text text-1; Fokus Amber */
 .lchips { position: absolute; left: @l.content-x@; top: 120px; width: 1072px; height: 32px; white-space: nowrap; }
 .chip { display: inline-block; position: relative; height: 32px; padding: 0 @sp.3@; margin-right: @sp.3@; border-radius: @r.sm@; background: @c.surface-2@;
-  color: @c.text-2@; font-size: 16px; line-height: 32px; font-weight: 600; vertical-align: top; border: 1px solid @c.surface-2@;
-  -webkit-transform: translate3d(0,0,0); }
+  color: @c.text-2@; font-size: 16px; line-height: 30px; font-weight: 600; vertical-align: top; border: 1px solid @c.surface-2@;
+  -webkit-transform: translate3d(0,0,0); }   /* line-height = Innenhoehe (32 - 2x Rand): Text mittig, vorher 1 px zu tief */
 .sclr { background: transparent; border-color: @c.line@; }   /* Zuletzt gesucht: "Verlauf löschen" nur umrandet; Fokus (.chip.is-focus) gewinnt per Spezifitaet */
 .chip.act { border-color: @c.text-2@; color: @c.text-1@; }
 .chip.is-focus { background: @accent@; border-color: @accent@; color: @c.on-accent@; }

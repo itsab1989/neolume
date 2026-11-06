@@ -1,0 +1,71 @@
+{
+  "$schema": "../platforms.schema.json",
+  "id": "android-tv",
+  "name": "Android TV / Google TV",
+  "brand": "various (e.g. TCL)",
+  "modelFamilies": [
+    "TVs and streaming boxes with Android TV or Google TV (e.g. TCL 32S5K)"
+  ],
+  "de": {
+    "name": "Android TV / Google TV",
+    "modelFamilies": [
+      "Fernseher und Streaming-Boxen mit Android TV oder Google TV (z. B. TCL 32S5K)"
+    ]
+  },
+  "osVersions": [
+    "Android TV 7.0 or newer (tested: Android 11)"
+  ],
+  "route": "web",
+  "installChannel": {
+    "type": "sideload",
+    "needsAccount": "none – the app file is installed with the free Downloader app from the Play Store; no developer account",
+    "computerNeededAfterInstall": false
+  },
+  "artifact": {
+    "format": "apk",
+    "name": "android-tv.apk",
+    "signing": "developer-key"
+  },
+  "mediaServers": [
+    "plex"
+  ],
+  "editions": {
+    "public": true,
+    "private": true
+  },
+  "status": "experimental",
+  "lastTested": {
+    "version": "1.0.19",
+    "date": "2026-11-06",
+    "model": "TCL 32S5K (Google TV, Android 11, 1 GB RAM)",
+    "testPlan": "smoke"
+  },
+  "guide": {
+    "en": "docs/install/android-tv.md",
+    "de": "docs/install/android-tv.de.md"
+  },
+  "maintainer": "itsab1989",
+  "features": {
+    "A1": "partial",
+    "A2": "partial",
+    "A3": "done",
+    "A4": "done",
+    "A5": "done",
+    "A6": "done",
+    "A7": "partial",
+    "A8": "partial",
+    "A9": "done",
+    "A10": "partial",
+    "A11": "partial",
+    "A12": "partial",
+    "A13": "partial",
+    "A14": "partial",
+    "A15": "partial",
+    "A16": "partial",
+    "A17": "partial",
+    "A18": "partial",
+    "A19": "partial",
+    "A20": "done"
+  },
+  "notes": "Same app core in the TV's web engine inside a small Android shell. Signs in on the TV (plex.tv/link) and reaches plex.tv directly, so no setup program and no helper. Updates itself from the public GitHub release (android-tv.apk + android-tv.json)."
+}

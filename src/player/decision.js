@@ -21,6 +21,11 @@
     limits('hevc', c.hevc === undefined ? false : c.hevc, out);
     limits('h264', c.h264, out);
     if (c.streamSelection) out.push('add-settings(DirectPlayStreamSelection=true)');
+    // Geraet mit eigenem Medienplayer (Android TV: ExoPlayer): Container und Codecs, die es direkt spielt
+    var dp = c.directPlay;
+    if (dp && dp.containers && dp.video && dp.audio) {
+      out.push('add-direct-play-profile(type=videoProfile&container=' + dp.containers + '&videoCodec=' + dp.video + '&audioCodec=' + dp.audio + ')');
+    }
     if (c.subtitleTarget) out.push('add-transcode-target(type=subtitleProfile&context=all&protocol=http&container=' + c.subtitleTarget + '&subtitleCodec=' + c.subtitleTarget + ')');
     return out.join('+');
   }

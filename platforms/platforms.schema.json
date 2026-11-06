@@ -40,7 +40,7 @@
       "additionalProperties": false,
       "properties": {
         "format": { "enum": ["setup-program", "ipk", "wgt", "apk", "zip"], "description": "setup-program = a program for the computer that contains the TV app and installs it (2014 Samsung); otherwise the TV package format." },
-        "name": { "type": "string", "pattern": "^\\{slug\\}-[a-z0-9{}.-]+$", "description": "Download file name; {slug} is the brand slug (e.g. 'neolume'), {os}/{arch} the computer for a setup program. Names of existing downloads never change." },
+        "name": { "type": "string", "pattern": "^(?:\\{slug\\}-[a-z0-9{}.-]+|android-tv\\.apk)$", "description": "Download file name; {slug} is the brand slug (e.g. 'neolume'), {os}/{arch} the computer for a setup program. The one exception without {slug} is android-tv.apk: the Android TV app's own update looks for exactly that name in the latest release. Names of existing downloads never change." },
         "signing": { "enum": ["none", "developer-key", "store"], "description": "How the package is signed." }
       }
     },

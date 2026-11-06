@@ -83,6 +83,28 @@ function busyPng(w, h) {
   }
   return writePng(w, h, px);
 }
+/* Heller, unruhiger Grund (Schoner Ambient, Nutzerbefund 06.11.: auf hellen Bildern zeigen sich die Schwaechen – Schnee, Himmel, weisse
+ * Wand): fast weiss (236–255) mit weichen Wolken und feinen hellgrauen Zweigen; schlimmster Fall fuer weisse Schrift neben Weiss */
+function highkeyPng(w, h) {
+  var px = Buffer.alloc(w * h * 4);
+  for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+    var v = 246 + 6 * Math.sin(x / 37 + Math.sin(y / 53) * 2) * Math.cos(y / 41 - x / 97) + 3 * Math.sin((x + 2 * y) / 9);
+    var br = Math.abs(((x * 3 + y * 5) % 211) - 105) < 1.2 || Math.abs(((x * 7 - y * 2 + 4000) % 317) - 150) < 1 ? 1 : 0;   // feine Zweige
+    var o = (y * w + x) * 4; v = Math.max(0, Math.min(255, Math.round(br ? v - 46 : v)));
+    px[o] = v; px[o + 1] = v; px[o + 2] = Math.min(255, v + 2); px[o + 3] = 255;
+  }
+  return writePng(w, h, px);
+}
+/* Sattes Gelb (Schoner Ambient, Nutzerbefund 06.11.: "auf Gelb sieht er immer noch sehr duester aus" – Schwarz ueber Gelb wird oliv):
+ * Sonnenblumen-Gelb mit weichen, helleren und orangeren Flecken */
+function yellowPng(w, h) {
+  var px = Buffer.alloc(w * h * 4);
+  for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+    var t = 0.5 + 0.5 * Math.sin(x / 47 + Math.sin(y / 61) * 2.2) * Math.cos(y / 39 - x / 113), o = (y * w + x) * 4;
+    px[o] = 255; px[o + 1] = Math.round(176 + 52 * t); px[o + 2] = Math.round(10 + 50 * t * t); px[o + 3] = 255;
+  }
+  return writePng(w, h, px);
+}
 /* Ecke unten links (Seitenleiste + Band unten, Seed ambCorner): knallbuntes, helles Titelbild (abgedunkelt wie am PMS, f = darken) –
  * weicher Verlauf aus vier Eckfarben, damit Staerke und Form des Rahmens auf ruhigem, buntem Grund sichtbar sind */
 function gradPng(w, h, f) {
@@ -462,6 +484,8 @@ function startServer(cb) {
       var sv = /^sv[A-Z]/.test(curSeed) && /^\/a\//.test(src);   // Bildschirmschoner-Szenen: helles, dunkles, unruhiges Bild
       if (curSeed === 'ambCorner' && /^\/a\//.test(src)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(gradPng(w, h, function (c) { return darken(c, u.searchParams); })); }
       if (sv && /Color/.test(curSeed)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(gradPng(w, h)); }   // knallbunt, hell
+      if (sv && /Yellow/.test(curSeed)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(yellowPng(w, h)); }
+      if (sv && /Highkey/.test(curSeed)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(highkeyPng(w, h)); }
       if (sv && /Busy/.test(curSeed)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(busyPng(w, h)); }
       if (sv) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(solidPng(w, h, /Bright/.test(curSeed) ? [246, 246, 244] : [14, 14, 16])); }
       cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(solidPng(w, h, darken(colorFor(u.searchParams.get('url') || ''), u.searchParams)));
@@ -489,6 +513,7 @@ function startServer(cb) {
         if (/^sv[A-Z].*Long/.test(curSeed)) pa.MediaContainer.Metadata.forEach(function (m) { m.title = 'Die unglaublich lange Reise des kleinen Leuchtturmwärters ' + m.title + ' bis ans Ende der Welt'; });
         // Nutzerbefund 04.11. (Ambient-Abdunklung): kurzer Titel aus einem Wort, mittlerer Titel (~35 Zeichen, eine Zeile)
         if (/^sv[A-Z].*Short/.test(curSeed)) pa.MediaContainer.Metadata.forEach(function (m) { m.title = 'Glühwurm'; });
+        if (/^sv[A-Z].*Twoword/.test(curSeed)) pa.MediaContainer.Metadata.forEach(function (m) { m.title = 'Stilles Ufer'; });   // 06.11.: kurzer Titel, etwa so breit wie die Uhr
         if (/^sv[A-Z].*Mid/.test(curSeed)) pa.MediaContainer.Metadata.forEach(function (m) { m.title = 'Die Prinzessin und die sieben Raben'; });
         if (/^svPic/.test(curSeed)) pa.MediaContainer.Metadata.forEach(function (m) { if (m.art) m.art = '/library/metadata/' + m.ratingKey + '/art/1'; });   // SAV-5: PMS-Pfade
         if (q.get('addedAt>>') !== null) return json(newsItems(ls[1], q));   // HOME-13: neu seit dem gemerkten Stand
@@ -784,6 +809,11 @@ function makeSeeds(port) {
     seeds[v[0]] = seed({}, { 'settings-aaaa1111.json': { saverInfo: 'ambient', saverLibs: [1], saverFx: 'cut' } },
       JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, saverMs: 1500, saverPos: v[1] }));
   });
+  [['svHighkeyAmbient', 0], ['svHighkeyAmbientPos2', 2], ['svHighkeyAmbientPos3', 3], ['svYellowAmbient', 0], ['svYellowAmbientPos1', 1],   // heller, unruhiger Grund; Gelb (06.11.)
+    ['svBrightAmbientTwoword', 0], ['svBrightAmbientTwowordPos2', 2], ['svBrightNoclockTwowordPos1', 1, false], ['svBrightNoclockTwowordPos3', 3, false]].forEach(function (v) {   // kurzer Titel ~ Uhrbreite
+    seeds[v[0]] = seed({}, { 'settings-aaaa1111.json': { saverInfo: 'ambient', saverLibs: [1], saverFx: 'cut', clock: v[2] !== false } },
+      JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, saverMs: 1500, saverPos: v[1] }));
+  });
   seeds.svBrightNoclockShortPos2 = seed({}, { 'settings-aaaa1111.json': { saverInfo: 'ambient', saverLibs: [1], saverFx: 'cut', clock: false } },
     JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, saverMs: 1500, saverPos: 2 }));
   seeds.svBrightNoclockLongEn = seed({ lang: 'en' }, { 'settings-aaaa1111.json': { saverInfo: 'ambient', saverLibs: [1], saverFx: 'cut', clock: false } }, svCfg);
@@ -1050,6 +1080,11 @@ var SCENES = [
   { name: 'saver-ambient-bright-short', seed: 'svBrightAmbientShort', keys: 'wait6000' }, { name: 'saver-ambient-bright-short-pos2', seed: 'svBrightAmbientShortPos2', keys: 'wait6000' },
   { name: 'saver-ambient-bright-mid-pos1', seed: 'svBrightAmbientMidPos1', keys: 'wait6000' }, { name: 'saver-ambient-bright-mid-pos3', seed: 'svBrightAmbientMidPos3', keys: 'wait6000' },
   { name: 'saver-ambient-bright-long-pos1', seed: 'svBrightAmbientLongPos1', keys: 'wait6000' }, { name: 'saver-ambient-bright-long-pos3', seed: 'svBrightAmbientLongPos3', keys: 'wait6000' },
+  { name: 'saver-ambient-highkey', seed: 'svHighkeyAmbient', keys: 'wait6000' }, { name: 'saver-ambient-highkey-pos2', seed: 'svHighkeyAmbientPos2', keys: 'wait6000' },
+  { name: 'saver-ambient-highkey-pos3', seed: 'svHighkeyAmbientPos3', keys: 'wait6000' },
+  { name: 'saver-ambient-twoword', seed: 'svBrightAmbientTwoword', keys: 'wait6000' }, { name: 'saver-ambient-twoword-pos2', seed: 'svBrightAmbientTwowordPos2', keys: 'wait6000' },
+  { name: 'saver-noclock-twoword-pos1', seed: 'svBrightNoclockTwowordPos1', keys: 'wait6000' }, { name: 'saver-noclock-twoword-pos3', seed: 'svBrightNoclockTwowordPos3', keys: 'wait6000' },
+  { name: 'saver-ambient-yellow', seed: 'svYellowAmbient', keys: 'wait6000' }, { name: 'saver-ambient-yellow-pos1', seed: 'svYellowAmbientPos1', keys: 'wait6000' },
   { name: 'saver-off-busy', seed: 'svBusyOff', keys: 'wait6000' },
   { name: 'saver-fade-done', seed: 'svDarkFade', keys: 'wait7000' },                   // Standard (Ueberblenden) nach dem ersten Bild
   // Einstellungen: Schoner-Zeilen, Auswahl Uebergang/Einblendung, Mehrfachauswahl Bibliotheken

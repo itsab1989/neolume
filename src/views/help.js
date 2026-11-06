@@ -35,7 +35,10 @@
     if (pc !== null) {
       U.txt('span', 'kt', parent, pc); return;             // Nutzer 03.11.: auf Apple keine farbigen TV-Kappen, neutrale Kappe in Textbreite
     }
-    if (c) { U.txt('span', 'k ' + c[0], parent, c[1]); return; }
+    if (c) {
+      var ct = N.platform && N.platform.keys && N.platform.keys.colorText;   // Aufdruck der Farbtasten (TCL: R/G/Y/B), sonst A–D
+      U.txt('span', 'k ' + c[0], parent, ct && typeof ct[k] === 'string' ? ct[k] : c[1]); return;
+    }
     var e = U.el('span', 'kt', parent);
     if (k === 'ret') { e.className = 'kt ret'; N.ui.icon(e, 'ret', 's1'); return; }
     e.appendChild(document.createTextNode(CAPT[k] ? N.t(CAPT[k]) : CAP[k] || k));

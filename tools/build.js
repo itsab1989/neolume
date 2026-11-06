@@ -506,8 +506,9 @@ function build() {
     // Regressionsschutz: alle Unit-Tests laufen im Build; bei Fehlern bleiben die vorherigen Dateien stehen
     if (process.argv.indexOf('--no-test') < 0) {
       var globs = ['tests/*.test.js'].concat(fs.existsSync(path.join(ROOT, 'tests', EXT_DIR)) ? ['tests/' + EXT_DIR + '/*.test.js'] : []);
-      // Apple-Fassung (privat, nicht exportiert): Tests nur, wenn die Ordner vorhanden sind
-      ['platforms/apple/tests', 'platforms/apple/shell/tests', 'platforms/apple/probe/tests', 'platforms/apple/private/tests'].forEach(function (d) { if (fs.existsSync(path.join(ROOT, d))) globs.push(d + '/*.test.js'); });
+      // Apple- und Android-TV-Fassung (privat, nicht exportiert): Tests nur, wenn die Ordner vorhanden sind
+      ['platforms/apple/tests', 'platforms/apple/shell/tests', 'platforms/apple/probe/tests', 'platforms/apple/private/tests',
+        'platforms/android-tv/tests'].forEach(function (d) { if (fs.existsSync(path.join(ROOT, d))) globs.push(d + '/*.test.js'); });
       var r = require('child_process').spawnSync(process.execPath, ['--test'].concat(globs), { cwd: ROOT, stdio: 'inherit' });
       if (r.status !== 0) {
         if (previous) fs.writeFileSync(appPath, previous);

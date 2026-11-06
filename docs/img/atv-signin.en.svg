@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="586" viewBox="0 0 800 586" role="img" aria-labelledby="t d">
+<title id="t">Neolume: sign in with a code</title>
+<desc id="d">Sketch of the Neolume sign-in: heading “Connect your Plex account”, three steps, the example code K7QX in a box (1), on the right a QR code with “Or scan the QR code – opens plex.tv/link” (2).</desc>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff7a1a"/></marker><linearGradient id="scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2747"/><stop offset="1" stop-color="#0c1127"/></linearGradient><linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3c8fe8"/><stop offset="1" stop-color="#1f62c8"/></linearGradient><linearGradient id="neo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16181b"/><stop offset="1" stop-color="#0e0f11"/></linearGradient></defs>
+<rect x="8" y="8" width="784" height="455" rx="18" fill="#20232a" stroke="#d5d9e0" stroke-width="4"/>
+<rect x="24" y="24" width="752" height="423" rx="4" fill="url(#neo)"/>
+<text x="64" y="84" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="24" font-weight="bold" fill="#f2f2f2" text-anchor="start">Connect your Plex account</text>
+<text x="64" y="128" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#c4c7cc" text-anchor="start">1  Open plex.tv/link on your phone or computer.</text>
+<text x="64" y="158" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#c4c7cc" text-anchor="start">2  Sign in there with your Plex account.</text>
+<text x="64" y="188" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#c4c7cc" text-anchor="start">3  Enter this code:</text>
+<rect x="64" y="210" width="300" height="84" rx="12" fill="#22252a" stroke="#2EC4B6" stroke-width="2.5"/>
+<text x="214" y="268" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="46" font-weight="bold" fill="#ffffff" text-anchor="middle">K7QX</text>
+<text x="64" y="324" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#a7abb2" text-anchor="start">This code is valid for 4:52.</text>
+<rect x="64" y="346" width="130" height="38" rx="8" fill="#2f3338"/>
+<text x="129" y="371" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="bold" fill="#ffffff" text-anchor="middle">New code</text>
+<rect x="520" y="110" width="200" height="200" rx="12" fill="#ffffff"/>
+<rect x="536" y="126" width="50" height="50" rx="4" fill="#0e0f11"/>
+<rect x="546" y="136" width="30" height="30" rx="0" fill="#ffffff"/>
+<rect x="553" y="143" width="16" height="16" rx="0" fill="#0e0f11"/>
+<rect x="654" y="126" width="50" height="50" rx="4" fill="#0e0f11"/>
+<rect x="664" y="136" width="30" height="30" rx="0" fill="#ffffff"/>
+<rect x="671" y="143" width="16" height="16" rx="0" fill="#0e0f11"/>
+<rect x="536" y="244" width="50" height="50" rx="4" fill="#0e0f11"/>
+<rect x="546" y="254" width="30" height="30" rx="0" fill="#ffffff"/>
+<rect x="553" y="261" width="16" height="16" rx="0" fill="#0e0f11"/>
+<rect x="592" y="128" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="610" y="128" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="628" y="128" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="610" y="146" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="610" y="164" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="538" y="182" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="556" y="182" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="574" y="182" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="592" y="182" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="610" y="182" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="628" y="182" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="646" y="182" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="664" y="182" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="682" y="182" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="556" y="200" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="610" y="200" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="664" y="200" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="556" y="218" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="610" y="218" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="664" y="218" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="592" y="236" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="610" y="236" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="628" y="236" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="646" y="236" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="664" y="236" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="682" y="236" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="610" y="254" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="664" y="254" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="610" y="272" width="14" height="14" rx="0" fill="#0e0f11"/>
+<rect x="664" y="272" width="14" height="14" rx="0" fill="#0e0f11"/>
+<text x="620" y="338" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#c4c7cc" text-anchor="middle">Or scan the QR code – opens plex.tv/link</text>
+<circle cx="64" cy="210" r="13" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="64" y="214.94" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.95" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<circle cx="520" cy="110" r="13" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="520" y="114.94" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.95" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<rect x="8" y="474" width="784" height="106" rx="10" fill="#f3f4f6" stroke="#d0d4da" stroke-width="1.5"/>
+<circle cx="32" cy="497" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="501.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<text x="52" y="503" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">On your phone or computer open plex.tv/link, sign in, type this code</text>
+<circle cx="32" cy="527" r="11" fill="#ff7a1a" stroke="#ffffff" stroke-width="2"/>
+<text x="32" y="531.18" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.65" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<text x="52" y="533" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#1f2328" text-anchor="start">Or scan the QR code with your phone camera – it opens the same page</text>
+<text x="24" y="563" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#4b5563" text-anchor="start">Code and QR code are examples; your TV shows its own.</text>
+</svg>

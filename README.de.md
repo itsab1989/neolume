@@ -163,7 +163,8 @@ Für diese Fernseher gibt es einen fertigen Download:
 
 | Fernseher-System | Modelle | Download | Anleitung | Medienserver | Zuletzt am echten Gerät getestet | Stand |
 |---|---|---|---|---|---|---|
-| **Samsung Smart TV 2014 (Orsay)** | H-Serie 2014 (z. B. UE48H8000, UE40H6400)<br>HU-Serie 2014, 4K (z. B. UE55HU7500) | [Einrichtungsprogramm](#download) für deinen Computer, enthält die TV-App | [Deutsch](docs/INSTALL.de.md) · [Englisch](docs/INSTALL.md) | Plex | 1.0.17 (2026-11-05, UE48H8000) | ✅ vom Entwickler an einem echten Gerät getestet |
+| **Android TV / Google TV** | Fernseher und Streaming-Boxen mit Android TV oder Google TV (z. B. TCL 32S5K) | – | [Deutsch](docs/install/android-tv.de.md) · [Englisch](docs/install/android-tv.md) | Plex | 1.0.19 (2026-11-06, TCL 32S5K (Google TV, Android 11, 1 GB RAM)) | 🧪 im Versuch – noch kein Download |
+| **Samsung Smart TV 2014 (Orsay)** | H-Serie 2014 (z. B. UE48H8000, UE40H6400)<br>HU-Serie 2014, 4K (z. B. UE55HU7500) | [Einrichtungsprogramm](#download) für deinen Computer, enthält die TV-App | [Deutsch](docs/INSTALL.de.md) · [Englisch](docs/INSTALL.md) | Plex | 1.0.19 (2026-11-06, UE48H8000) | ✅ vom Entwickler an einem echten Gerät getestet |
 
 Für weitere Fernseher gibt es noch keine Community-Portierung – deine könnte die erste sein: [Community-Portierungen](PORTS.md).
 <!-- /gen:platforms-de -->

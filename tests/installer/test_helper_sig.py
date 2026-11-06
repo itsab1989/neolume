@@ -267,5 +267,58 @@ class WizardKeepsTvAddress(unittest.TestCase):
             shutil.rmtree(d)
 
 
+class StoreSaveConcurrency(unittest.TestCase):
+    """helper.json: one lock around snapshot + write, a unique temporary file per save, a dict changed by another thread
+    while it is copied does not lose the save (security review 06.11.2026, L2)."""
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.path = os.path.join(self.dir, 'helper.json')
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def test_parallel_saves_and_changes(self):
+        import threading
+        st = make().store
+        stop = threading.Event()
+
+        def change():
+            i = 0
+            while not stop.is_set():
+                st.extra['x%d' % (i % 50)] = {'n': i}
+                st.extra.pop('x%d' % ((i + 25) % 50), None)
+                i += 1
+        errors = []
+
+        def save():
+            try:
+                for _ in range(40): st.save(self.path)
+            except Exception as e:  # noqa: BLE001
+                errors.append(e)
+        writer = threading.Thread(target=change)
+        writer.start()
+        savers = [threading.Thread(target=save) for _ in range(4)]
+        for t in savers: t.start()
+        for t in savers: t.join()
+        stop.set()
+        writer.join()
+        self.assertEqual(errors, [])
+        with open(self.path) as f: self.assertEqual(json.load(f)['kind'], 'plexneo-helper')
+        self.assertEqual(sorted(os.listdir(self.dir)), ['helper.json'])        # no temporary file left
+
+    def test_retry_after_dict_changed(self):
+        st = make().store
+        real, calls = st.to_json, []
+
+        def flaky():
+            calls.append(1)
+            if len(calls) == 1: raise RuntimeError('dictionary changed size during iteration')
+            return real()
+        st.to_json = flaky
+        st.save(self.path)
+        self.assertEqual(len(calls), 2)
+        with open(self.path) as f: self.assertEqual(json.load(f)['key'], KEY)
+
+
 if __name__ == '__main__':
     unittest.main()

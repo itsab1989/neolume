@@ -33,92 +33,124 @@
   function miniScr(p) { return cornerScr(p).replace('scrim-saver', 'scrim-saver-m'); }
   function cornerEdge(p) { return [p.r ? 'r' : 'l', p.t ? 't' : 'b']; }
   var BAND_EDGE = ['l', 'r', 'b'], BAND_H = 520, BAND_Y = 720 - BAND_H;
-  /* Ambient: Abdunklung, die dem Text folgt (Nutzerbefund 04.11.: der alte Eck-Schatten scrim-saver[-br|-tr|-tl].png – zwei feste
-   * Glocken 420 x 230 um die Ecke und 300 x 150 entlang des Titels – reichte bei jedem Titel bis x ~950, weit ueber die Bildmitte; auf
-   * hellen Bildern stand eine dunkle Wolke neben der Uhr und neben kurzen Titeln, lange Titel reichten trotzdem bis an ihren Rand).
-   * Jetzt zwei weiche Stuecke: eins hinter der Uhr, so lang wie die Uhr, eins hinter Titel + Zeile, so lang wie die laengere der
-   * beiden (gemessen, einmal je Bildwechsel, solange die Einblendung unsichtbar ist – die TV-Schrift laeuft breiter als Inter, feste
-   * Breiten passen nie). Feld eines Stuecks F = hx(x) * v(y):
-   *  - waagrecht hx = a * 0,5 * erfc((x - xe) / s1) + (1 - a) * 0,5 * erfc((x - xe + c) / s2), xe = Zeilenende + off: zum Seitenrand hin
-   *    1, zum Zeilenende hin schon sanft heller (zweiter, langer Teil – sonst wirkt es wie eine dunkle Platte mit weichem Rand), hinter
-   *    der Zeile gaussartig auslaufend (nach ~150 px kaum noch, nach tail px 0; kein Ende, das man sieht);
-   *  - senkrecht v aus erfc-Kanten: aussen (ueber der Uhr, unter dem Text oben) weich mit so, zwischen Uhr und Titel blendet das
-   *    Uhr-Stueck mit 0,5 * erfc(+t) aus und das Text-Stueck mit 0,5 * erfc(-t) ein (sc), um DIESELBE Mitte -> Summe 1: links von
-   *    beiden bleibt das Feld gleichmaessig, rechts davon waechst die Breite weich von der Uhr zum Titel; untere Ecken bis an den
-   *    Bildschirmrand, obere vom Bildschirmrand an.
-   * Bild-Alpha a = 1 - e^(-k * F) -> uebereinander gemalt 1 - e^(-k * (F1 + F2)) = genau die Summe der Felder (tief im Block
-   * 1 - e^(-k) = 0,64, am Zeilenende ~0,45; keine Stufe, kein Kasten).
-   * Bilder je Seite (-r = rechte Ecken, fertig gespiegelt; waagrecht immer beschnitten, das Element zeigt nur den auslaufenden Teil):
-   *  u  oben weich (so), darunter konstant: untere Ecken bis an den unteren Rand; Titel unter der Uhr: senkrecht auf sc/so gestaucht
-   *     = Einblenden (eine gestauchte erfc-Kante bleibt eine)
-   *  d  oben konstant, unten weich (so): obere Ecken vom oberen Rand; Uhr ueber dem Titel: gestaucht = Ausblenden
-   *  c  Uhr in unteren Ecken: oben weich (so), unten Ausblenden (sc); feste Hoehe (die Uhrzeile ist immer 80 hoch)
-   *  z  Titel + Zeile in oberen Ecken: oben Einblenden (sc), unten weich (so); fuer zref (z2: zref2, Titel auf 2 Zeilen) px Abstand
-   *     gerechnet, senkrecht auf den echten Abstand gestreckt (Faktor ~0,9–1,1: passt auf wenige % genau zum Ausblenden der Uhr)
-   * Werte: hx = waagrechte Kurve (a, s1, s2, c, tail), sc/so = Weichheit Uebergang/aussen, offc/offt = off fuer Uhr/Text, offs =
-   * Zuschlag fuer die Zeile (text-soft braucht an ihrem Ende mehr Deckkraft), gck/gcb = Ziffern-Ober-/Unterkante in der Uhrzeile,
-   * xc = Mitte des Uebergangs unter der Oberkante der Uhrzeile, gti = Oberkante der Titelbuchstaben, gb = Mitte des unteren Auslaufs
-   * unter dem Text. Erzeugt von tools/make_assets.js (ambScrims, mit ambField), geprueft in tests/saver.test.js (Kontrast auf Weiss an
-   * jedem Buchstaben, Ende hinter der Zeile, oben schmal, buendig, keine Stufe). */
-  /* Nutzerbefund 05.11. (1.0.16: zur Bildmitte hin endete die Abdunklung sehr dicht hinter dem Zeilenende bzw. ueber der Uhr/unter der
-   * letzten Zeile – unausgewogen neben dem breiten dunklen Rand): der Auslauf zur Mitte ist um ~45 % gestreckt (s1 75 -> 110 mit
-   * offc/offt/offs 52/60/36 -> 76/88/53, so 60 -> 88 mit gb 18 -> 34, zref/zref2 +3: dieselbe Form, nur laenger; Deckkraft am Zeilenende wie in 1.0.16). Bis
-   * alpha < 0,02 vom letzten Buchstaben: waagrecht 160/168 -> 230/242 px (Uhr/Text), senkrecht ~124 -> ~181 px (ueber der Uhr) bzw.
-   * ~112 -> ~160 px (unter der letzten Zeile). Zum Seiten-/Bildschirmrand hin unveraendert. u/d sind senkrecht nur ein Hintergrund mit
-   * weicher Kante und gleichmaessigem Rest – sie liegen in halber Hoehe vor (vs, ihu/ihd = Anzeigehoehe), damit die laengere Kante
-   * nicht mehr Speicher kostet. */
-  var AMB = { iw: 1100, k: 1.05, hx: { a: 0.72, s1: 110, s2: 200, c: 200, tail: 250 }, sc: 38, so: 88, offc: 76, offt: 88, offs: 53,
-    gck: 14, gcb: 66, xc: 77, gti: 8, gb: 34, zref: 103, zref2: 139, ihu: 640, ihd: 640, vs: 2 };
-  function erfc(x) {   // Abramowitz/Stegun 7.1.26 (Fehler < 1,5e-7)
-    var z = Math.abs(x), t = 1 / (1 + 0.3275911 * z);
-    var q = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) * Math.exp(-z * z);
-    return x >= 0 ? q : 2 - q;
+  /* Ambient: Abdunklung, die dem Text folgt (SAV-4). Geschichte: bis 1.0.15 ein fester Eck-Schatten (reichte bei jedem Titel bis x ~950);
+   * 1.0.16 (04./05.11.) zwei Stuecke hinter Uhr und Text, so lang wie die Zeilen, zum Rand hin konstant bis an den Rand; 1.0.19 (06.11.,
+   * "Verlauf aus der Ecke") ein weicher Fleck mit freiem Streifen am Bildschirmrand (Text dafuer 96/80 px innen, app.css .st-ambient).
+   * Nutzerbefund 06.11. abends (Samsung 2014): "auf hellen Bildern wirkt der Hintergrund sehr dunkel wie ein grauer Fleck", "eine Idee
+   * transparenter", keine grauen Flaechen, wo kein Text ist, zum Rand hin "sehr gerade". Jetzt ein Halo JE ZEILE (Uhr, jede Titelzeile,
+   * Zeile darunter – Breite und Hoehe der echten Zeile, gemessen einmal je Bildwechsel), so schwach wie noetig:
+   *  - Feld je Zeile F = H(x) * V(y), Bild-Alpha a = 1 - e^(-k * F) (uebereinander gemalt addieren sich die Felder). Nutzerbefund
+   *    06.11. spaet: "auf Gelb sieht er immer noch sehr duester aus" (Schwarz ueber Gelb = oliv) -> Uhr und Titel sind grosse Schrift
+   *    (WCAG: 3:1 genuegt), k 0,3: hinter ihnen hoechstens 0,26 (vorher 0,45, davor 0,59–0,65 auf grosser Flaeche). Die kleine Zeile
+   *    darunter hat denselben Halo (Nutzerbefund: "ein Teil des Textes ist dunkler hinterlegt – nicht noetig"; mult bleibt 1); sie ist
+   *    dafuer bei Ambient text-1, halbfett und 22 statt 20 px (app.css) und haelt so ebenfalls >= 3:1.
+   *  - Rund (Nutzerbefund 06.11. abends: "manchmal sehr kantig und gerade"): das Zeilenende ist eine weiche Pille (die Reichweite des
+   *    Auslaufs schrumpft zur Ober-/Unterkante der Zeile auf bis zu rmin, Exponent rpow), ebenso die Seitenrand-Rampe oben/unten am Block
+   *    und die Ecke am Bildschirmrand (Viertelkreis, rp 2). Ist eine Zeile viel laenger (> rt + 8 px) als ihre Nachbarin, geht ihr Rand zur Nachbarin rechts
+   *    von deren Ende in einen weichen runden Saum ueber (xtk/xbk mit Uebergangsbild t, Saum stk/sbk) statt einer geraden Kante.
+   *  - Seitenrand: E(x) = smootherstep((x - ep0) / (es - ep0)): die ersten ep0 px frei, 1 ab es (kurz hinter dem ersten Buchstaben);
+   *    oberer/unterer Rand: dasselbe mit ev (der Buchstabe am naechsten zum Rand steht bei my + 6).
+   *  - zur Bildmitte waagrecht: halbe Gauss-Glocke e^(-(u/hs)^2) ab hb px hinter dem Zeilenende (unsichtbar nach ~2,5 hs); hs 56 / vs 40
+   *    (Nutzerbefund 06.11. spaet, kurzer Titel unter der Uhr: "immer noch sehr kantig und gerade") – breit und weich, keine gerade Kante;
+   *    in den Uebergaengen zwischen Zeilen keine Pillen-Einschnuerung (rpx 0: sie zeichnete helle Kerben wie Striche);
+   *    senkrecht ueber der ersten bzw. unter der letzten Zeile: halbe Glocke e^(-(d/vs)^2) ab der Buchstabenkante.
+   *  - zwischen zwei Zeilen: smootherstep ueber 2 * xw um die Mitte der Luecke zwischen den Buchstaben (die obere aus, die untere ein,
+   *    Summe 1): links von beiden gleichmaessig, rechts der kuerzeren nur die laengere – die Form folgt den Zeilen ohne Kasten.
+   * Jede Kante hat eine kompakte Form (davor ist das Feld genau 1), damit sich ein Stueck aus 3 x 3 festen Teilen zusammensetzen laesst
+   * (9-Teile-Prinzip, keine CSS-Verlaeufe/Masken/text-shadow – Build-Verbot am Orsay). Bilder (Sprites, alle Zeilenarten untereinander,
+   * AROWS): Spalte s = Seitenrand (es breit, -r gespiegelt), f = Mitte (2 px, waagrecht gestreckt), e = Auslauf zur Mitte (rw breit,
+   * -r gespiegelt), t = Saum-Uebergang (rt breit, -r gespiegelt). Zeilenarten: m (konstant, fuer die Mitte senkrecht gestreckt), et/eb (Rand oben/unten),
+   * st/sb (weich ueber/unter dem Text), xt/xb (Uebergang ein/aus). Ein Stueck = bis zu 9 Elemente (3 x 3), jedes zeigt nur seinen
+   * Ausschnitt; Pruefungen: tests/saver.test.js (Kontrast an jedem Buchstaben, frei am Rand, nichts neben kurzen Zeilen). */
+  var AMB = { k: 0.3, mult: { ck: 1, ti: 1, sb: 1 }, mx: 96, my: 80, ep0: 8, es: 136, ev: 86, hb: 0, hs: 56, rw: 240, vs: 40, vh: 100, vk: 30, xw: 17, rp: 2, rmin: 0.3, rpow: 0.6, rpx: 0, rt: 110, kh: 88, band: 16,
+    g: { ck: [14, 66], ti: [8, 30], sb: [5, 23] } };   // Buchstabenkanten je Zeilenart (oben, unten) ab Zeilenoberkante
+  var AROWS = [['m', AMB.band], ['et', AMB.ev], ['eb', AMB.ev], ['st', AMB.vh], ['sb', AMB.vh], ['xt', 2 * AMB.xw], ['xb', 2 * AMB.xw],
+    ['xtk', AMB.kh], ['xbk', AMB.kh], ['stk', AMB.kh], ['sbk', AMB.kh]], AROW = {}, ASPR_H = 0;
+  AROWS.forEach(function (r) { AROW[r[0]] = { y: ASPR_H, h: r[1] }; ASPR_H += r[1]; });
+  function smoother(t) { t = Math.max(0, Math.min(1, t)); return t * t * t * (t * (t * 6 - 15) + 10); }
+  function ambT(d, g1) { return Math.max(0, Math.min(1, (d - AMB.ep0) / (g1 - AMB.ep0))); }
+  function ambE(d, g1) { return smoother(ambT(d, g1)); }                                    // Randauslauf: d = Abstand vom Rand
+  /* senkrechte Form der Zeilenart k an y (px ab Zeilenbeginn, Pixelmitte) */
+  function ambV(k, y) {
+    var A = AMB, h = AROW[k].h, X2 = 2 * A.xw, yg = A.xw - 6, d;
+    if (k === 'xbk') return y < X2 ? 1 - smoother(y / X2) : 0;        // Saum: Uebergang oben im Bild, darunter nichts
+    if (k === 'xtk') return y >= h - X2 ? smoother((y - h + X2) / X2) : 0;
+    if (k === 'sbk' || k === 'stk') { d = k === 'sbk' ? y : h - y; return d < yg ? 1 : Math.exp(-Math.pow((d - yg) / A.vk, 2)); }   // weicher Saum der laengeren Zeile
+    return k === 'm' ? 1 : k === 'et' ? ambE(y, A.ev) : k === 'eb' ? ambE(h - y, A.ev) : k === 'st' ? Math.exp(-Math.pow((h - y) / A.vs, 2)) :
+      k === 'sb' ? Math.exp(-Math.pow(y / A.vs, 2)) : k === 'xt' ? smoother(y / h) : 1 - smoother(y / h);
   }
-  function tl(sg) { return Math.round(2.6 * sg); }                      // halbe Laenge einer weichen Kante (danach < 1/255)
-  function ambCk() { return AMB.xc - AMB.gck + 0.6 * AMB.so; }           // c: Abstand Einblenden ueber der Uhr -> Ausblenden darunter
-  function ambSize(k) {
-    var A = AMB, To = tl(A.so), Tc = tl(A.sc);
-    return { u: [A.iw, A.ihu / A.vs], d: [A.iw, A.ihd / A.vs], c: [A.iw, To + Math.round(ambCk()) + Tc], z: [A.iw, Tc + A.zref + To], z2: [A.iw, Tc + A.zref2 + To] }[k];
+  /* waagrechte Form der Spalte c an x (Anzeige-px ab Spaltenbeginn, von der Seite des Seitenrands aus) */
+  function ambH(c, x) { return c === 's' ? ambE(x, AMB.es) : c === 'e' ? Math.exp(-Math.pow(x / AMB.hs, 2)) : 1; }
+  function ambSize(c) { return [c === 's' ? AMB.es : c === 'e' ? AMB.rw : c === 't' ? AMB.rt : 2, ASPR_H]; }      // gespeicherte Bildgroesse
+  function ambImg(c, r) { return 'scrim-saver-a' + c + (r && c !== 'f' ? '-r' : '') + '.png'; }
+  /* Deckkraft des Sprites c (r gespiegelt) an Pixelmitte (x, y) des gespeicherten Bilds – Quelle fuer tools/make_assets.js */
+  function ambField(c, r, x, y) {
+    var A = AMB, S = ambSize(c), i, row, f;
+    for (i = AROWS.length - 1; i >= 0; i--) if (y >= AROW[AROWS[i][0]].y) { row = AROWS[i][0]; break; }
+    var xs = r ? S[0] - x : x, yr = y - AROW[row].y;
+    if (c === 's' && (row === 'et' || row === 'eb')) {     // Ecke am Bildschirmrand: leicht gerundet (Lp-Norm der Restwege)
+      var u = 1 - ambT(xs, A.es), v = 1 - ambT(row === 'et' ? yr : AROW[row].h - yr, A.ev);
+      f = smoother(1 - Math.pow(Math.pow(u, A.rp) + Math.pow(v, A.rp), 1 / A.rp));
+    } else if (c === 't') {                               // Saum der laengeren Zeile: vom Uebergang (wo die kuerzere endet) weich in den runden Saum
+      var hh = Math.exp(-Math.pow(xs / A.hs, 2));
+      f = row === 'xbk' || row === 'xtk' ? ambV(row, yr) * hh + ambV(row === 'xbk' ? 'sbk' : 'stk', yr) * (1 - hh) : 0;
+    } else if (c === 'e') {                               // Zeilenende rund: Reichweite schrumpft zur Ober-/Unterkante (Pille)
+      var V = ambV(row, yr), rho = Math.max(A.rmin, Math.pow(V, /^x/.test(row) ? A.rpx : A.rpow));
+      f = V * ambH('e', xs / rho);
+    } else if (c === 's' && row !== 'm' && !/^x/.test(row)) {   // Seitenrand oben/unten am Block: die Rampe rueckt nach innen -> runde Ecke
+      var Vs = ambV(row, yr), rs = Math.max(A.rmin, Math.pow(Vs, A.rpow));
+      f = Vs * ambE(A.es - (A.es - xs) / rs, A.es);
+    } else f = ambH(c, xs) * ambV(row, yr);
+    return 1 - Math.exp(-A.k * f);
   }
-  function ambImg(k, r) { return 'scrim-saver-a' + k + (r ? '-r' : '') + '.png'; }
-  /* Deckkraft des Bilds k (u/d/c/z/z2, r gespiegelt) an Pixelmitte (x, y) – Quelle fuer tools/make_assets.js */
-  function ambField(k, r, x, y) {
-    var A = AMB, H = A.hx, To = tl(A.so), Tc = tl(A.sc), S = ambSize(k), u = (r ? S[0] - x : x) - (S[0] - H.tail), v;
-    if (k === 'u' || k === 'd') { y *= A.vs; S = [S[0], S[1] * A.vs]; }   // halbe Hoehe gespeichert: y in Anzeige-px
-    function rise(c, sg) { return 0.5 * erfc((c - y) / sg); }            // 0 -> 1 um y = c
-    function fall(c, sg) { return 0.5 * erfc((y - c) / sg); }            // 1 -> 0 um y = c
-    v = k === 'u' ? rise(To, A.so) : k === 'd' ? fall(S[1] - To, A.so) : k === 'c' ? rise(To, A.so) * fall(To + Math.round(ambCk()), A.sc) :
-      rise(Tc, A.sc) * fall(S[1] - To, A.so);
-    return 1 - Math.exp(-A.k * v * (H.a * 0.5 * erfc(u / H.s1) + (1 - H.a) * 0.5 * erfc((u + H.c) / H.s2)));
-  }
-  /* m = { w, h (Behaelter), r, t (Ecke), ck: {e, top} | null (Uhr), ti: {e, top} | null (Titel), sb: {e, top} | null (Zeile),
-   * tb: Unterkante des Texts }; e = Abstand des Zeilenendes vom Seitenrand, top im Behaelter.
-   * -> [{ k, img, y, h, w, pos (background-position), size (background-size), edge }] */
+  /* m = { w, h (Behaelter), r, t (Ecke), rows: [{ k: 'ck'|'ti'|'sb', e, top }] } (je sichtbare Zeile, von oben nach unten; e = Abstand des
+   * Zeilenendes vom Seitenrand, top im Behaelter). -> Teile [{ img, x (Abstand vom Seitenrand), y, w, h, sw, sh (Anzeigegroesse des
+   * Sprites), py (background-position y) }] */
   function ambPieces(m) {
-    var A = AMB, To = tl(A.so), Tc = tl(A.sc), f = A.sc / A.so, out = [], side = m.r ? 'r' : 'l', ck = m.ck, tx = m.ti || m.sb, e2, yz, gt, yb, s;
-    function add(k, e, off, y, h, sz, edge) {   // im Behaelter beschnitten (ausserhalb liegt nur der unsichtbare Rest eines Auslaufs)
-      var yr = Math.round(y), y0 = Math.max(0, yr), y1 = Math.min(m.h, yr + Math.round(h)), dy = y0 - yr;
-      out.push({ k: k, img: ambImg(k, m.r), y: y0, h: y1 - y0, w: Math.min(A.iw, Math.round(e + off + A.hx.tail)),
-        pos: (m.r ? 'left ' : 'right ') + (k === 'd' ? 'bottom' : dy ? -dy + 'px' : 'top'), size: A.iw + 'px ' + Math.round(sz) + 'px', edge: edge });
+    var A = AMB, out = [], H = m.h, L = (m.rows || []).slice().sort(function (a, b) { return a.top - b.top; }), ps = [];
+    var gl = L.map(function (q) { return [q.top + A.g[q.k][0], q.top + A.g[q.k][1]]; }), yc = [];
+    for (var j = 1; j < L.length; j++) yc.push(Math.round((gl[j - 1][1] + gl[j][0]) / 2));   // Mitte der Luecke zwischen zwei Zeilen
+    if (yc.length) {                                      // Uebergang nie im Randauslauf (kurzer Block nahe am Rand)
+      if (m.t) yc[0] = Math.max(yc[0], A.ev + A.xw); else yc[yc.length - 1] = Math.min(yc[yc.length - 1], H - A.ev - A.xw);
     }
-    if (tx) { e2 = Math.max(m.ti ? m.ti.e : 0, m.sb ? m.sb.e + A.offs : 0); gt = m.ti ? m.ti.top + A.gti : m.sb.top + 6; yb = m.tb + A.gb; }
-    if (ck && tx) {
-      yz = ck.top + A.xc;                                 // Mitte des Uebergangs Uhr -> Titel
-      if (m.t) {
-        add('d', ck.e, A.offc, 0, yz + Tc, A.ihd * f, [side, 't']);
-        var zk = yb - yz > (A.zref + A.zref2) / 2 ? 'z2' : 'z', zr = zk === 'z2' ? A.zref2 : A.zref;   // 2 Titelzeilen: eigenes Bild
-        s = Math.max(0.9, (yb - yz) / zr);
-        add(zk, e2, A.offt, yz - Tc * s, ambSize(zk)[1] * s, ambSize(zk)[1] * s, [side]);
-      } else {
-        add('c', ck.e, A.offc, ck.top + A.gck - 0.6 * A.so - To, ambSize('c')[1], ambSize('c')[1], [side]);
-        add('u', e2, A.offt, yz - Tc, m.h - (yz - Tc), A.ihu * f, [side, 'b']);
+    var x0s = L.map(function (q) { return Math.max(A.es, Math.round(q.e + A.hb)); }), gap = A.kh - 2 * A.xw;
+    L.forEach(function (q, i) { ps.push({ x0: x0s[i], n: A.mult[q.k] || 1 }); });
+    L.forEach(function (q, i) {
+      var p = ps[i], d;
+      if (i) {                                            // Uebergang zur Zeile darueber
+        d = L[i - 1].e - q.e;
+        if (-d > A.rt + 8) p.t = ['xtk', yc[i - 1] - A.xw - gap, x0s[i - 1]];   // diese Zeile viel laenger: weicher, runder Saum nach oben
+        else p.t = ['xt', yc[i - 1] - A.xw];
+      } else p.t = m.t ? ['et', 0] : ['st', gl[0][0] - A.vh];
+      if (i < L.length - 1) {
+        d = L[i + 1].e - q.e;
+        if (-d > A.rt + 8) p.b = ['xbk', yc[i] - A.xw, x0s[i + 1]];
+        else p.b = ['xb', yc[i] - A.xw];
+      } else p.b = m.t ? ['sb', gl[i][1]] : ['eb', H - A.ev];
+    });
+    ps.forEach(function (p) {
+      for (var rep = 0; rep < p.n; rep++) piece(p);   // kleine Zeile: dasselbe Stueck doppelt uebereinander = doppeltes Feld (4,5:1 statt 3:1)
+    });
+    function piece(p) {
+      var x0 = p.x0;
+      function cols(k, xs) {                              // Spalten einer Zeile: Seitenrand, Mitte, (Saum), Auslauf
+        if (k !== 'xbk' && k !== 'xtk') return [['s', 0, A.es, k], ['f', A.es, x0 - A.es, k], ['e', x0, A.rw, k]];
+        var sk = k === 'xbk' ? 'sbk' : 'stk';
+        return [['s', 0, A.es, k], ['f', A.es, xs - A.es, k], ['t', xs, A.rt, k], ['f', xs + A.rt, x0 - xs - A.rt, sk], ['e', x0, A.rw, sk]];
       }
-    } else if (ck) {
-      if (m.t) add('d', ck.e, A.offc, 0, ck.top + A.gcb + 0.6 * A.so + To, A.ihd, [side, 't']);
-      else { yz = ck.top + A.gck - 0.6 * A.so - To; add('u', ck.e, A.offc, yz, m.h - yz, A.ihu, [side, 'b']); }
-    } else if (tx) {
-      if (m.t) add('d', e2, A.offt, 0, yb + To, A.ihd, [side, 't']);
-      else { yz = gt - 0.6 * A.so - To; add('u', e2, A.offt, yz, m.h - yz, A.ihu, [side, 'b']); }
+      var yT = Math.round(p.t[1]), yM = yT + AROW[p.t[0]].h, yB = Math.max(yM, Math.round(p.b[1]));
+      var rows = [[p.t[0], yT, AROW[p.t[0]].h, p.t[2]], ['m', yM, yB - yM], [p.b[0], yB, AROW[p.b[0]].h, p.b[2]]];
+      rows.forEach(function (rw) {
+        var y0 = Math.max(0, rw[1]), y1 = Math.min(H, rw[1] + rw[2]);
+        if (y1 <= y0) return;
+        cols(rw[0], rw[3]).forEach(function (c) {
+          if (c[2] <= 0) return;
+          var sw = c[0] === 'f' ? c[2] : c[0] === 'e' ? A.rw : c[0] === 't' ? A.rt : A.es, sh = ASPR_H, py, sy;
+          if (rw[0] === 'm') { sy = rw[2] / (A.band / 2); sh = ASPR_H * sy; py = -(AROW.m.y + A.band / 4) * sy - (y0 - rw[1]); }   // Band-Mitte gestreckt
+          else py = -(AROW[c[3]].y + (y0 - rw[1]));
+          out.push({ img: ambImg(c[0], m.r), x: c[1], y: y0, w: c[2], h: y1 - y0, sw: sw, sh: Math.round(sh * 100) / 100, py: Math.round(py * 100) / 100 });
+        });
+      });
     }
     return out;
   }
@@ -144,7 +176,7 @@
   function tf(s, x, y) { return 'translate3d(' + x + 'px,' + y + 'px,0)' + (s !== 1 ? ' scale(' + s + ')' : ''); }
 
   var L = {
-    PAGE: PAGE, MIX: MIX, OV_W: OV_W, OV_H: OV_H, FX: FX, FX_MS: FX_MS, CALM: CALM, CORNERS: CORNERS, KB: KB, AMB: AMB, ambPieces: ambPieces, ambImg: ambImg, ambField: ambField, ambSize: ambSize,
+    PAGE: PAGE, MIX: MIX, OV_W: OV_W, OV_H: OV_H, FX: FX, FX_MS: FX_MS, CALM: CALM, CORNERS: CORNERS, KB: KB, AMB: AMB, ambPieces: ambPieces, ambImg: ambImg, ambField: ambField, ambSize: ambSize, ambH: ambH, ambV: ambV, AMB_MAX: 64, AROW: AROW, ASPR_H: ASPR_H,
     SEC: [10, 20, 30, 60],
     TYPE: { movie: 1, show: 2, artist: 8 },
     /* Einstellung -> tatsaechlicher Uebergang. reduced: "Reduzierte Bewegung"; rnd: Zahl 0..1 oder Funktion; last: letzter (Zufall
