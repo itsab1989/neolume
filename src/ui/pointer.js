@@ -7,7 +7,9 @@
  * - Langes Druecken auf das Touchpad (>= 800 ms) = TOOLS (Optionen) fuer das Element unter dem Punkt; der Klick danach entfaellt.
  * - Maus/Trackpad (caps.pointer 'mouse'): Rechtsklick/Ctrl-Klick = sofort TOOLS fuer das Element unter dem Zeiger (P.context, NAV-25).
  * - Letzte Eingabe gewinnt: nach einer Taste werden Zeiger-Bewegungen ignoriert, bis sich der Punkt deutlich bewegt (> 16 px).
- * - Klick = OK auf dem Element unter dem Punkt. Blaetter-Pfeile an der fokussierten Reihe nur bei aktivem Zeiger.
+ * - Klick = OK auf dem Element unter dem Punkt. Blaetter-Pfeile nur bei aktivem Zeiger: ‹ › an der fokussierten Reihe, dazu
+ *   (Nutzerbefund 06.11.) Pfeile hoch/runter am oberen/unteren Rand der rollenden Flaeche (pointerVert); Klick = ein Schritt.
+ *   Blenden weich ein/aus (Klasse .on, nur Deckkraft/visibility an dauerhaften kleinen Ebenen, nie display).
  * - Mausrad (falls geliefert) -> Tasten der Zone (Reihe: LINKS/RECHTS, Liste: HOCH/RUNTER), hoechstens alle 150 ms.
  * - TV-Befund 27.10. nachmittags ("Liste scrollt wild"): Hover darf nie eine Rueckkopplung ausloesen (Fokus -> Liste rollt ->
  *   anderes Element unter dem stehenden Punkt -> Fokus …). Darum:
@@ -15,8 +17,8 @@
  *      Ereignisse mit unveraenderter Position (WebKit feuert mousemove, wenn Inhalt unter dem Punkt wandert) ohnehin nicht.
  *   b) Scroll-Sperre: hat eine Zeiger-Bewegung den Inhalt verschoben (pointerSig() vorher != nachher), wertet der Zeiger erst
  *      wieder aus, wenn SCROLL_COOL ms vergangen sind UND der Punkt sich um >= SCROLL_MOVE px von der Stelle entfernt hat.
- *   c) Listen/Raster fokussieren per Zeiger "still" (ohne zu rollen); geblaettert wird ueber Randzonen (pointerEdge: erst nach
- *      EDGE_DWELL ms Verweilen, dann ein Schritt je P.edgeDelay: beschleunigt 400 ms -> 120 ms bzw. gleichmaessig EDGE_RATE ms,
+ *   c) Listen/Raster fokussieren per Zeiger "still" (ohne zu rollen); geblaettert wird ueber die Pfeile (Klick), Randzonen (pointerEdge: Klick;
+ *      mit Einstellung "Zeiger blaettert am Rand weiter" auch nach EDGE_DWELL ms Verweilen, dann ein Schritt je P.edgeDelay: beschleunigt 400 ms -> 120 ms bzw. gleichmaessig EDGE_RATE ms,
  *      Einstellung "Zeiger-Scrollen beschleunigen") oder Mausrad. Nur ganz sichtbare Zeilen bekommen sofort Zeiger-Fokus;
  *      eine angeschnittene, aber zu >= 40 % sichtbare Zeile nach HOLD ms Verweilen (EIN Schritt Rollen, dann Sperre).
  *   d) Lebenszeichen: Liegt der Finger auf dem Touchpad, kommen laufend kleinste Bewegungen (auch unter JITTER). Bleibt LIVE ms
@@ -27,8 +29,9 @@
  *      im Protokoll zeigt die Abstaende je Randzonen-Lauf.
  * Ziel-Schnittstelle (Bildschirm/Overlay/Rail): pointer(x, y, kind:'move'|'click', target) -> bool,
  *   optional pointerArrows() -> {y, h, left, right} | null, pointerPage(dir), wheelKeys ['LEFT','RIGHT'],
- *   pointerSig() -> Zahl/Text der aktuellen Scroll-Lage, pointerEdge(x, y) -> {d: -1|1, x, y} | null (Randzone, Anzeige-Mitte),
- *   pointerScroll(d) (einen Schritt rollen, Fokus bleibt sichtbar),
+ *   pointerSig() -> Zahl/Text der aktuellen Scroll-Lage, pointerEdge(x, y) -> {d: -1|1, x, y} | null (Randzone, Pfeil-Mitte),
+ *   pointerVert() -> {up: {x, y} | null, dn: {x, y} | null} | null (Pfeile hoch/runter, Mitte; meist pointerEdge mitten in der Zone),
+ *   pointerScroll(d) (einen Schritt rollen, Fokus bleibt sichtbar; auch Klick auf Pfeil hoch/runter),
  *   pointerGrab(x, y) -> 'drag' | 'tap' | '' (Finger/Maus-Druck an dieser Stelle: Ziehen an pointerDrag, nur Tippen, Standard),
  *   pointerDrag(phase 'start'|'move'|'end'|'cancel', x, y) -> bool (start: true = uebernommen), touchLong (false = langer
  *   Finger-Druck tut nichts statt TOOLS), pointerDown(x, y) (Finger/Maus gedrueckt: z. B. Schwung anhalten),
@@ -44,14 +47,16 @@
   // max ~710 ms; Loslassen liefert KEIN Ereignis (kein mouseout/blur), nur Stille -> 1 s Frist = kurzer Nachlauf, kein Abbruch
   // beim Stillhalten. Wiederauflegen: Punkt erscheint in der Bildmitte (~639,360) = Sprung, siehe P.retouch.
   var P = { on: true, root: null, x: -1, y: -1, pend: false, timer: 0, lastMove: 0, keyT: 0, ax: -1, ay: -1, idleT: 0, arrows: null, arrowsOn: false,
-    rx: -1e4, ry: -1e4, rawT: 0, holdT: 0, gaps: [], lockT: 0, lx: 0, ly: 0, edge: null, edgeT: 0, edgeEl: null, wheelT: 0,
+    rx: -1e4, ry: -1e4, rawT: 0, holdT: 0, gaps: [], lockT: 0, lx: 0, ly: 0, edge: null, edgeT: 0, wheelT: 0,
     dragOn: false, dragScr: null, mdrag: false, dragDone: false };
   P.accel = true;
-  /* Einstellung "Mit dem Zeiger am Rand weiterblaettern" (state.ptrEdge, Standard an; TV-Befund 1.0.5): an = Verweilen in einer
-   * Randzone rollt (edgeCheck), Verweilen auf einer angeschnittenen Zeile/naechsten Reihe holt sie herein (P.hold). Aus = Inhalt
-   * bewegt sich nur per Klick (Klick in die Randzone = ein Schritt, Klick auf die angeschnittene Zeile), Taste oder Mausrad. */
-  P.edgeAuto = true;
-  P.setEdge = function (on) { P.edgeAuto = on !== false; if (!P.edgeAuto) { edgeStop(); P.holdCancel(); } };
+  /* Einstellung "Zeiger blaettert am Rand weiter" (state.ptrEdge; TV-Befund 1.0.5): an = Verweilen in einer Randzone rollt
+   * (edgeCheck), Verweilen auf einer angeschnittenen Zeile/naechsten Reihe holt sie herein (P.hold). Aus = Inhalt bewegt sich
+   * nur per Klick (Pfeil hoch/runter bzw. Randzone = ein Schritt, Klick auf die angeschnittene Zeile), Taste oder Mausrad.
+   * Standard seit Nutzerbefund 06.11. AUS (Rollen von selbst wirkte unruhig, die Pfeile sind jetzt der sichtbare Weg). Gespeichert
+   * wird nur ein bewusst umgeschalteter Wert -> wer es eingeschaltet hat, behaelt es. */
+  P.edgeAuto = false;
+  P.setEdge = function (on) { P.edgeAuto = on === true; if (!P.edgeAuto) { edgeStop(); P.holdCancel(); } };
   /* Takt der Randzone (rein, getestet): Wartezeit vor Schritt k+1, nachdem k Schritte gelaufen sind (k >= 1).
    * Beschleunigt: 3 Schritte im Abstand von 400 ms, dann je Schritt x0,8 bis 120 ms; aus: gleichmaessig 300 ms */
   P.edgeDelay = function (k, accel) {
@@ -123,8 +128,10 @@
     }
     if (kind === 'move' && rail && rail.deferHover && rail.deferHover(refollow)) return true;   // flexibel: Leiste gleitet noch zu
     if (N.ui.mini && N.ui.mini.pointer(x, y, kind)) return true;   // M4: Mini-Player (Klick = Jetzt laeuft)
-    if (P.arrowsOn && kind === 'click') {
-      var d = arrowHit(x, y);
+    if (P.arrowsOn) {
+      var vd = vArrowHit(x, y);                     // Pfeil hoch/runter: Zeigen fokussiert nichts darunter, Klick = ein Schritt
+      if (vd) { if (kind === 'click' && scr && scr.pointerScroll) scr.pointerScroll(vd); return true; }
+      var d = kind === 'click' ? arrowHit(x, y) : 0;
       if (d && scr && scr.pointerPage) { scr.pointerPage(d); return true; }
     }
     o = stageOff(scr, false);
@@ -132,12 +139,17 @@
   }
   /* nach dem verzoegerten Einklappen der Seitenleiste: Treffer an der letzten Zeigerstelle neu (wie eine Bewegung) */
   function refollow() { if (P.on && P.x >= 0 && !owner()) { N.fx.step(true); route(P.x, P.y, 'move', null); } }
-  function arrowHit(x, y) {
-    var a = P.curArrows;
-    if (!a || y < a.y || y >= a.y + a.h) return 0;
-    if (a.left && x >= a.lx && x < a.lx + 40) return -1;
-    if (a.right && x >= a.rx && x < a.rx + 40) return 1;
+  function arrowHit(x, y) {                          // ‹ ›: Treffer ueber die ganze Reihenhoehe
+    var a = P.curArrows, h = a && a.h;
+    if (!h || y < h.y || y >= h.y + h.h) return 0;
+    if (h.left && x >= h.lx && x < h.lx + AW) return -1;
+    if (h.right && x >= h.rx && x < h.rx + AW) return 1;
     return 0;
+  }
+  function inBox(b, x, y) { return !!b && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h; }
+  function vArrowHit(x, y) {
+    var a = P.curArrows;
+    return !a ? 0 : inBox(a.b[2], x, y) ? -1 : inBox(a.b[3], x, y) ? 1 : 0;
   }
   /* Drossel mit Vorderflanke (rein, getestet): fire() sofort, wenn seit dem letzten Lauf >= ms vergangen sind, sonst einmal
    * am Ende des Fensters; der Aufrufer liest dann die neueste Position. */
@@ -212,7 +224,6 @@
     }
     P.gaps = [];
     P.edge = null;
-    if (P.edgeEl && P.edgeEl.style.display !== 'none') P.edgeEl.style.display = 'none';
   }
   P.edgeStop = edgeStop;
   /* Verweilen auf einem Element (z. B. angeschnittene Zeile): fn nach ms, wenn bis dahin keine Taste/kein Klick/kein neues
@@ -221,20 +232,16 @@
   P.hold = function (fn, ms) {
     P.holdCancel();
     if (!P.edgeAuto) return false;
-    P.holdT = setTimeout(function () { P.holdT = 0; if (P.on && !P.keyT && P.edgeAuto) fn(); }, ms || HOLD);
+    P.holdT = setTimeout(function () { P.holdT = 0; if (P.on && !P.keyT && P.edgeAuto) { fn(); P.syncArrows(); } }, ms || HOLD);
     return true;
   };
   P.holdCancel = function () { if (P.holdT) { clearTimeout(P.holdT); P.holdT = 0; } };
   function edgeCheck(t) {
-    var e = P.edgeAuto ? edgeAt(t, P.x, P.y) : null;   // Aus: kein Verweil-Rollen, keine Pille (Klick in die Zone rollt weiter)
+    var e = P.edgeAuto ? edgeAt(t, P.x, P.y) : null;   // Aus: kein Verweil-Rollen (Klick in die Zone bzw. auf den Pfeil rollt weiter)
     if (!e) { if (P.edge) edgeStop(); return; }
     if (P.edge && P.edge.d === e.d && P.edgeT) return;
     edgeStop();
-    P.edge = e;
-    if (P.edgeEl) {
-      P.edgeEl.className = e.d < 0 ? 'pedge up' : 'pedge dn';   // '‹' per CSS gedreht (gleiche Glyphe wie die Blaetter-Pfeile)
-      P.edgeEl.style.cssText = 'left:' + (e.x - 20) + 'px;top:' + (e.y - 20) + 'px;display:block';
-    }
+    P.edge = e;                                      // Anzeige: der Pfeil hoch/runter dieser Zone steht schon dort (syncArrows)
     var k = 0;                                       // Schritte seit Betreten der Zone (Verlassen = neu ab 0)
     P.edgeT = setTimeout(function step() {
       P.edgeT = 0;
@@ -498,11 +505,13 @@
     }
     curEl = U.el('div', 'pcur', chrome);
     root.addEventListener('DOMMouseScroll', onWheel, false);
-    P.arrows = [U.el('div', 'parr', chrome, 'display:none'), U.el('div', 'parr', chrome, 'display:none')];
-    P.arrows[0].appendChild(document.createTextNode('‹'));
-    P.arrows[1].appendChild(document.createTextNode('›'));
-    P.edgeEl = U.el('div', 'pedge', chrome, 'display:none');
-    P.edgeEl.appendChild(document.createTextNode('‹'));
+    // ‹ › und ‹ gedreht (hoch, runter): dauerhaft im DOM, unsichtbar bis .on, Lage per translate3d (showArrow)
+    P.arrows = [];
+    for (var i = 0; i < 4; i++) {
+      P.arrows.push(U.el('div', 'parr', chrome));
+      P.arrows[i].appendChild(document.createTextNode(i === 1 ? '›' : '‹'));
+      arrSt[i] = { on: false, x: -1, y: -1 };
+    }
   };
   /* Einstellung "Zeiger-Steuerung" (Standard An). Aus: Zeiger-Ereignisse werden ignoriert; Punkt ausblenden ist
    * nur per CSS cursor:none versucht (am TV unbestaetigt, siehe docs/ARCHITEKTUR.md). */
@@ -538,21 +547,55 @@
     if (P.arrowsOn) P.hideArrows();
     hideCursor();
   };
+  /* ---- Blaetter-Pfeile: ‹ › an der fokussierten Reihe, hoch/runter am Rand der rollenden Flaeche (Nutzerbefund 06.11.) ----
+   * Vier dauerhafte Elemente mit eigener kleiner Ebene (translate3d); Zeigen/Verbergen nur per Klasse .on (CSS: Deckkraft in
+   * mo.base 150 ms, aus in mo.fast 120 ms, danach visibility) – nie display (Regel Runde 6: keine Ebenen an-/abbauen im
+   * Zeigerpfad). Lage per translate3d, nur wenn sie sich aendert: ein sichtbarer Pfeil springt an die neue Stelle (kein Aus/Ein =
+   * kein Flackern), ein verschwindender bleibt beim Ausblenden stehen. */
+  var AW = 40, AH = 64, VMAX = 634, arrSt = [];       // Kasten 40 x 64 (hoch/runter gedreht 64 x 40, Unterkante <= 654 ueber der Hinweisleiste ab 656)
+  /* Lage der Pfeile (rein, getestet): h = pointerArrows(), v = pointerVert() (Ansichts-Koordinaten), o = Kasten-Versatz {x, y, k}
+   * (null = TV), aw = Breite der Ansicht. -> {h: {y, h, left, right, lx, rx} | null, b: [links, rechts, hoch, runter]}; b[i] =
+   * Trefferkasten {x, y, w, h} in Wurzel-Koordinaten samt Lage ex/ey des (ungedrehten) Elements, null = Pfeil aus */
+  P.arrowBoxes = function (h, v, o, aw) {
+    o = o || { x: 0, y: 0, k: 1 };
+    var b = [null, null, null, null], hh = null, i;
+    if (h && (h.left || h.right)) {                  // am TV links 124, rechts 1176 (endet am Sicherheitsrand 1216); flexibel an der Ansichtsbreite
+      hh = { y: h.y * o.k + o.y, h: h.h * o.k, left: !!h.left, right: !!h.right, lx: 124 * o.k + o.x, rx: (aw - 104) * o.k + o.x };
+      var top = hh.y + Math.round(hh.h / 2) - AH / 2;
+      if (hh.left) b[0] = { x: hh.lx, y: top, w: AW, h: AH, ex: hh.lx, ey: top };
+      if (hh.right) b[1] = { x: hh.rx, y: top, w: AW, h: AH, ex: hh.rx, ey: top };
+    }
+    for (i = 0; v && i < 2; i++) {
+      var c = i ? v.dn : v.up;
+      if (!c || (c.d && c.d !== (i ? 1 : -1))) continue;   // Ergebnis der anderen Richtung (pointerEdge): kein Pfeil
+      var cx = Math.round(c.x * o.k + o.x), cy = Math.round(Math.min(c.y, VMAX) * o.k + o.y);
+      b[2 + i] = { x: cx - AH / 2, y: cy - AW / 2, w: AH, h: AW, ex: cx - AW / 2, ey: cy - AH / 2 };
+    }
+    return { h: hh, b: b };
+  };
+  /* fester Platz eines Pfeils (Nutzerentscheidung 06.11.: "immer an der gleichen Stelle"): e = pointerEdge-Ergebnis der Zone
+   * (gilt sie gerade?), x/y = fester Platz je Bildschirm und Richtung – nie an der Lage der fokussierten Zeile/Reihe */
+  P.slot = function (e, x, y) { return e ? { d: e.d, x: x, y: y } : null; };
+  function showArrow(i, bx) {
+    var el = P.arrows[i], st = arrSt[i];
+    if (bx) {
+      if (bx.ex !== st.x || bx.ey !== st.y) { st.x = bx.ex; st.y = bx.ey; U.tf(el, bx.ex, bx.ey, i === 2 ? ' rotate(90deg)' : i === 3 ? ' rotate(-90deg)' : ''); }
+      if (!st.on) { st.on = true; U.cls(el, 'on', true); }
+    } else if (st.on) { st.on = false; U.cls(el, 'on', false); }
+  }
   P.hideArrows = function () {
     if (!P.arrows || !P.arrowsOn) return;
-    P.arrows[0].style.display = 'none'; P.arrows[1].style.display = 'none'; P.arrowsOn = false; P.curArrows = null;
+    for (var i = 0; i < 4; i++) showArrow(i, null);   // weich aus (CSS), Lage bleibt
+    P.arrowsOn = false; P.curArrows = null;
   };
   P.syncArrows = function () {
     if (!P.arrows) return;
-    var scr = N.router.top(), a = P.active() && !N.router.hasOverlay() && !(N.ui.rail && N.ui.rail.isOpen()) && scr && scr.pointerArrows ? scr.pointerArrows() : null;
-    if (!a) { P.hideArrows(); return; }
-    // Lage in Wurzel-Koordinaten: am TV links 124, rechts 1236; flexible Flaeche: rechts an der Breite der Ansicht, Kasten verschoben
-    var o = stageOff(scr, false) || { x: 0, y: 0, k: 1 }, aw = N.screen ? N.screen.area(scr.flex).w : 1280;
-    a = { y: a.y * o.k + o.y, h: a.h * o.k, left: a.left, right: a.right, lx: 124 * o.k + o.x, rx: (aw - 44) * o.k + o.x };
+    var scr = N.router.top(), ok = P.active() && !N.router.hasOverlay() && !(N.ui.rail && N.ui.rail.isOpen()) && scr;
+    var h = ok && scr.pointerArrows ? scr.pointerArrows() : null, v = ok && scr.pointerVert ? scr.pointerVert() : null;
+    var a = h || v ? P.arrowBoxes(h, v, stageOff(scr, false), N.screen ? N.screen.area(scr.flex).w : 1280) : null;
+    if (!a || !(a.b[0] || a.b[1] || a.b[2] || a.b[3])) { P.hideArrows(); return; }
     P.curArrows = a;
-    var css = 'top:' + (a.y + Math.round(a.h / 2) - 32) + 'px;';
-    P.arrows[0].style.cssText = css + 'left:' + a.lx + 'px;display:' + (a.left ? 'block' : 'none');
-    P.arrows[1].style.cssText = css + 'left:' + a.rx + 'px;display:' + (a.right ? 'block' : 'none');
+    for (var i = 0; i < 4; i++) showArrow(i, a.b[i]);
     P.arrowsOn = true;
   };
   N.pointer = P;

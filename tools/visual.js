@@ -670,9 +670,10 @@ function makeSeeds(port) {
   seeds.playTrickEn = seed({ lang: 'en', accent: 'violet' }, { 'settings-aaaa1111.json': { ffrw: 'trick', accent: 'violet' } }, cfgPlay);
   seeds.trickHls = seed({}, { 'settings-aaaa1111.json': { ffrw: 'trick' } }, cfgPlay);
   seeds.trickHlsEn = seed({ lang: 'en' }, { 'settings-aaaa1111.json': { ffrw: 'trick' } }, cfgPlay);
-  // Zeiger-Randzone: Verweilen loest nie aus (ptrEdgeDwell) -> stehende Anzeige-Pille; Zeiger aus -> abhaengige Einstellung grau
-  seeds.ptrHold = seed({}, null, JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, ptrEdgeDwell: 600000 }));
-  seeds.ptrHoldPlay = seed({}, null, JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', sefFake: 'still', seekDelay: 600000, fixedClock: '21:34', welcome: false, ptrEdgeDwell: 600000 }));
+  // Zeiger-Randzone: Verweilen loest nie aus (ptrEdgeDwell, Pfeil hoch/runter steht still); "am Rand weiterblaettern" ausdruecklich an
+  // (angeschnittene/naechste Reihe nach 250 ms; Standard ist seit 06.11. aus); Zeiger aus -> abhaengige Einstellung grau
+  seeds.ptrHold = seed({ ptrEdge: true }, null, JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, ptrEdgeDwell: 600000 }));
+  seeds.ptrHoldPlay = seed({ ptrEdge: true }, null, JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', sefFake: 'still', seekDelay: 600000, fixedClock: '21:34', welcome: false, ptrEdgeDwell: 600000 }));
   seeds.ptrOff = seed({ pointer: false });
   /* Fernsehen (SPEC A20): Einstellung an, erfundene Sender und Sendungen (config liveDemo, kein Netz), Ersatz-Logos vom Mock.
    * Seitenleiste: "Fernsehen" vorn (LEFT,UP,ENTER oeffnet den Bereich); liveHome: Reihe "Fernsehen" oben auf der Startseite */
@@ -699,6 +700,7 @@ function makeSeeds(port) {
   seeds.recent4 = seed({}, { 'search-aaaa1111.json': { q: REC8 }, 'settings-aaaa1111.json': { recentSearches: 3 } });   // fruehere Stufe 3 -> 4 (Migration)
   seeds.recentLongEn = seed({ lang: 'en' }, { 'search-aaaa1111.json': { q: RECL } });
   seeds.recentPtr = seed({}, { 'search-aaaa1111.json': { q: REC8 } }, cfgHold);
+  seeds.ptrArr = seed({}, null, cfgHold);   // Zeiger mit Standard-Einstellungen (am Rand weiterblaettern aus): Pfeile hoch/runter (06.11.)
   seeds.ptrEdgeOff = seed({ ptrEdge: false }, null, JSON.stringify({ readOnly: true, proxyHost: '127.0.0.1:' + port + '/tv', cursor: 'system', fixedClock: '21:34', welcome: false, ptrEdgeDwell: 600000 }));   // "Zeiger blaettert am Rand weiter" aus
   // Feinauswahl am Balken (SPEC PLAY-30): Einstellung an, Zeiger-Verweilen echt (700 ms), heller "Film" (fakeBg) und Vorschaubilder aus
   // sub: feste Untertitel-Zeile (config.fakeSub, nur Bildtest) – Kollision Lasche/Untertitel sichtbar machen
@@ -754,7 +756,7 @@ function makeSeeds(port) {
     helperUrl: 'http://127.0.0.1:' + port, helperKey: 'visual-helper-key-0001' });
   seeds.inspNew = seed({}, null, cfgHelper);
   seeds.inspNewEn = seed({ lang: 'en' }, null, cfgHelper);
-  seeds.inspNewPtr = seed({}, null, cfgHelper.replace('}', ', "ptrEdgeDwell": 600000}'));   // Zeiger-Szenen mit Helfer: Randzone zeigt nur die Pille
+  seeds.inspNewPtr = seed({ ptrEdge: true }, null, cfgHelper.replace('}', ', "ptrEdgeDwell": 600000}'));   // Zeiger-Szenen mit Helfer: Randzone rollt nie von selbst
   seeds.inspNewOff = seed({}, { 'settings-aaaa1111.json': { inspHideOwn: false } }, cfgHelper);
   seeds.pkgSrvHelper = seed(pkgState, null, cfgHelper) + pkgWith(['http://127.0.0.1:' + friendPort]);
   seeds.noart = seed();                                                                               // Hero ohne Art: Poster unscharf
@@ -899,9 +901,14 @@ var SCENES = [
   { name: 'home-poster', seed: 'home', keys: 'DOWN,DOWN,RIGHT,RIGHT', mask: [[320, 270, 600, 34]] },   // "Ende um HH:MM" haengt von der Uhr ab
   { name: 'home-poster-en', seed: 'en', keys: 'DOWN,DOWN,RIGHT,RIGHT', mask: [[320, 270, 600, 34]] },   // HOME-11: fester Hinweis unten links (Kopf der naechsten Reihe nicht im Bild)
   { name: 'home-ptr-next', seed: 'ptrHold', keys: 'DOWN,DOWN', mwait: 4200, moves: '600:300,600:320,600:664,601:665' },   // Zeiger ruht unter den Postern -> naechste Reihe
-  { name: 'home-ptr-next-land', seed: 'ptrHold', keys: 'DOWN', mwait: 3800, moves: '600:300,600:320,700:620,701:621' },   // Querformat: auf dem Kopf der naechsten Reihe
+  { name: 'home-ptr-next-land', seed: 'ptrHold', keys: 'DOWN', mwait: 3800, moves: '600:300,600:320,450:620,451:621' },   // Querformat: auf dem Kopf der naechsten Reihe (neben dem Pfeil runter)
   { name: 'home-ptr-next-off', seed: 'ptrEdgeOff', keys: 'DOWN,DOWN', mwait: 4200, moves: '600:300,600:320,600:664,601:665' },   // Einstellung aus: Verweilen bewegt nichts
   { name: 'home-ptr-next-click', seed: 'ptrEdgeOff', keys: 'DOWN,DOWN', mwait: 4200, moves: '600:300,600:320,600:664,click@600:664' },   // aus: Klick geht eine Reihe tiefer
+  // Nutzerbefund 06.11.: Pfeile hoch/runter als festes Paar (hoch x 644, runter x 716, y 298 zwischen Hero und Kopf) mit Standard-Einstellung
+  { name: 'home-ptr-arrows', seed: 'ptrArr', keys: 'DOWN', mwait: 3800, moves: '600:300,600:320,420:480,421:482' },   // zweite Reihe: hoch und runter
+  { name: 'home-ptr-arrows-poster', seed: 'ptrArr', keys: 'DOWN,DOWN', mwait: 4200, moves: '600:300,600:320,420:480,421:482' },   // hohe Poster: Paar an derselben Stelle (nie auf den Postern)
+  { name: 'home-ptr-arrow-up', seed: 'ptrArr', keys: 'DOWN', mwait: 3800, moves: '600:300,600:320,644:298,click@644:298' },   // Klick auf hoch: zurueck nach ganz oben, nur noch runter
+  { name: 'home-ptr-arrow-dn', seed: 'ptrArr', keys: 'DOWN', mwait: 3800, moves: '600:300,600:320,716:298,click@716:298' },   // Klick auf runter: eine Reihe tiefer, Pfeil bleibt an seinem Platz
   { name: 'home-rail', seed: 'home', keys: 'LEFT,DOWN' },
   { name: 'home-tools', seed: 'home', keys: 'TOOLS' },
   { name: 'home-markshow', seed: 'home', keys: 'DOWN,DOWN,DOWN,RIGHT,YELLOW' },
@@ -961,7 +968,7 @@ var SCENES = [
   { name: 'search-recent-sugg-up', seed: 'recent8', keys: 'BLUE,wait600,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN,DOWN,UP' },
   { name: 'search-recent-ptr', seed: 'recentPtr', keys: 'BLUE,wait600', mwait: 3600, moves: '700:300,700:320,600:160,601:161' },   // Zeiger auf Zeile 2: Fokus ohne Rollen
   { name: 'search-recent-ptr-click', seed: 'recentPtr', keys: 'BLUE,wait600', mwait: 4600, moves: '700:300,700:320,818:116,819:117,click@819:117' },   // Klick auf einen Begriff = OK
-  { name: 'settings-recent', seed: 'recent8', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'settings-recent', seed: 'recent8', keys: 'until400:.card,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,until400:.set-row,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'settings-recent-panel-en', seed: 'recent8En', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
   { name: 'settings-recent-info', seed: 'recent8', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
   { name: 'p4-discover-recent', seed: 'recent8', keys: 'LEFT,UP,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT' },
@@ -1044,11 +1051,11 @@ var SCENES = [
   { name: 'player-versions', seed: 'play', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800,TOOLS,ENTER' },
   { name: 'home-version', seed: 'home', keys: 'RIGHT,RIGHT,TOOLS' },
   { name: 'player-last', seed: 'play', keys: 'DOWN,ENTER', mask: CLOCK },
-  { name: 'settings-still', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-still', seed: 'home', keys: 'until400:.card,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,until400:.set-row,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
   // P5 Einstellungen & Komfort
-  { name: 'p5-settings-subs', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
-  { name: 'p5-settings-anime', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,RIGHT,DOWN' },
-  { name: 'p5-settings-display', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-settings-subs', seed: 'home', keys: 'until400:.card,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,until400:.set-row,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'p5-settings-anime', seed: 'home', keys: 'until400:.card,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,until400:.set-row,DOWN,DOWN,RIGHT,DOWN' },
+  { name: 'p5-settings-display', seed: 'home', keys: 'until400:.card,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,until400:.set-row,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   // Zeiger-Scrollen beschleunigen (abhaengig von Zeiger-Steuerung): an, Zeiger-Steuerung selbst (Erklaerung mit "Aus: …"), Zeiger aus = grau, englisch
   { name: 'settings-ptraccel', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'settings-ptredge', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // Zeiger blaettert am Rand weiter (TV-Befund 1.0.5)
@@ -1169,6 +1176,8 @@ var SCENES = [
   // Gross: angeschnittene 2. Reihe (44 % sichtbar) ist zeigbar -> nach 250 ms EINE Reihe hoch und fokussiert; Band y 604–656 = Randzone
   { name: 'library-ptr-poster', seed: 'ptrHold', keys: 'LEFT,DOWN,ENTER,wait800,DOWN', mwait: 5000, moves: '600:300,600:320,600:560,600:566' },
   { name: 'library-ptr-band', seed: 'ptrHold', keys: 'LEFT,DOWN,ENTER,wait800,DOWN', mwait: 5000, moves: '600:300,600:320,600:630,600:634' },
+  // Pfeile hoch/runter (06.11., Standard-Einstellung): gerolltes Raster -> beide Pfeile; Klick auf runter = eine Zeile weiter
+  { name: 'library-ptr-arrows', seed: 'ptrArr', keys: 'LEFT,DOWN,ENTER,wait800,DOWN,DOWN,DOWN', mwait: 5400, moves: '600:300,600:320,400:400,401:402' },
   { name: 'details-movie', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER' },
   { name: 'details-movie-cast', seed: 'home', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN' },
   // NAV-12 (Befund 03.11.): INFO zeigt die ganze Beschreibung; laengerer Text blaettert mit DOWN in Stufen (Anfang, Mitte, Endlage)
@@ -1283,7 +1292,7 @@ var SCENES = [
   { name: 'player-lpD-nothumbs', seed: 'lpDNo', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6200, moves: '600:300,700:486,701:486,700:486,701:486,700:486,760:486', mask: CLOCK },   // -> Panel
   { name: 'player-lpD-up', seed: 'lpD', keys: 'RIGHT,RIGHT,ENTER,ENTER,wait800', mwait: 6800, moves: '600:300,700:486,701:486,700:486,701:486,700:486,760:486,760:280', mask: CLOCK },   // ueber die Lasche hinaus: zu
   { name: 'settings-loupe-style', seed: 'lpStyleOn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,' + rep('DOWN', 12) + ',ENTER' },   // Sprache & Bedienung, letzte Zeile (seit 05.11.2026)
-  { name: 'settings-loupe-style-off-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,' + rep('DOWN', 12) },
+  { name: 'settings-loupe-style-off-en', seed: 'en', keys: 'until400:.card,LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,until400:.set-row,DOWN,DOWN,DOWN,DOWN,RIGHT,' + rep('DOWN', 12) },
   { name: 'book-np-loupe', seed: 'bookLoupe', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,860:404,861:404,860:404,861:404,860:404,900:404' },
   { name: 'book-np-loupe-en', seed: 'bookLoupeEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,640:404,641:404,640:404,641:404,640:404,620:420' },
   { name: 'book-np-loupe-guard', seed: 'bookLoupe', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,UP,RIGHT,ENTER,wait800,DOWN,ENTER,wait800,ENTER,wait800', mwait: 12500, moves: '700:300,860:404,861:404,860:404,861:404,860:404,870:440,880:480,890:510' },   // Jetzt laeuft (B): Zeiger auf der Knopfreihe, Knoepfe reagieren nicht

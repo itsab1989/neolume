@@ -5,6 +5,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.20] - 2026-11-06
+
+### Added
+- **Arrows up and down for the Smart Control pointer.** Until now, with the pointer near the bottom of Home the page
+  moved down by itself after a moment – and there was no way back up with the pointer. Now small arrows pointing up and
+  down appear whenever there is more to see in that direction: on Home (all the way back up to the first row under the
+  big picture), in libraries, albums, artists, detail pages, Search and Discover. Each arrow always sits at the same spot
+  on a screen and never covers the highlighted card – on Home, for example, both sit side by side between the big picture
+  and the row title. They look like the ‹ › arrows next to a row, and one click is one step – just like pressing ▲ or ▼
+  on the remote.
+
+### Changed
+- **Pointer arrows fade in and out softly.** The ‹ › arrows next to the highlighted row (and the new up and down arrows)
+  now fade in and out in a short, quick animation instead of popping up and vanishing in one go – also when you press a
+  key on the remote and the pointer steps aside. The › arrow also moved a little to the left, so it is never cut off on
+  TVs that crop the picture edges.
+- **The page no longer scrolls by itself when the pointer rests at the edge.** "Pointer scrolls at the edges" (Settings ›
+  Language & controls) is now off by default, because the new arrows are the visible way to scroll. If you like the old
+  behaviour, just turn it back on – its description explains what it does. If you had switched it on yourself before,
+  it stays on.
+
+If scrolling with the pointer now feels a bit calmer, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.19] - 2026-11-06
 
 ### Added

@@ -401,14 +401,15 @@
         // dort die Maus abgeschaltet, Randzonen braucht freies Rollen nicht (Nutzer 03.11., SPEC NAV-26)
         N.platform.caps.pointer === 'mouse' ? [] : [{ id: 'ptr', type: 'toggle', label: 'set.pointer', desc: 'set.pointer.desc',
           get: function () { return S.state.pointer !== false; }, set: function (x) { S.state.pointer = x; S.save(); N.pointer.setEnabled(x); } },
-        // TV-Befund 1.0.5: Weiterblaettern durch Verweilen am Rand (Randzonen, naechste Reihe der Startseite) abschaltbar
+        // TV-Befund 1.0.5: Weiterblaettern durch Verweilen am Rand (Randzonen, naechste Reihe der Startseite) abschaltbar; Standard
+        // seit Nutzerbefund 06.11. aus (Pfeile hoch/runter sind der sichtbare Weg), gespeichert wird nur ein umgeschalteter Wert
         { id: 'ptredge', type: 'toggle', label: 'set.ptrEdge', desc: 'set.ptrEdge.desc', ddesc: 'set.ptrEdge.off.desc', help: 'help.ptrEdge',
           disabled: function () { return S.state.pointer === false; },
-          get: function () { return S.state.ptrEdge !== false; }, set: function (x) { S.state.ptrEdge = x; S.save(); N.pointer.setEdge(x); } },
+          get: function () { return S.state.ptrEdge === true; }, set: function (x) { S.state.ptrEdge = x; S.save(); N.pointer.setEdge(x); } },
         // TV-Befund 27.10. nachmittags: Randzonen-Rollen erst langsam, dann schneller; nur mit Zeiger-Steuerung (sonst ausgegraut)
         { id: 'ptracc', type: 'toggle', label: 'set.ptrAccel', desc: 'set.ptrAccel.desc',
           ddesc: function () { return S.state.pointer === false ? 'set.ptrAccel.off.desc' : 'set.ptrAccel.edge.desc'; },
-          disabled: function () { return S.state.pointer === false || S.state.ptrEdge === false; },
+          disabled: function () { return S.state.pointer === false || S.state.ptrEdge !== true; },
           get: function () { return S.state.ptrAccel !== false; }, set: function (x) { S.state.ptrAccel = x; S.save(); N.pointer.setAccel(x); } }],
         [loupeRow(), loupeStyleRow()]));              // Feinauswahl (PLAY-30/31): bis 05.11.2026 unter Wiedergabe, gedimmt ohne Zeiger
     }

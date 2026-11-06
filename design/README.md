@@ -32,7 +32,7 @@ Dark theme. Contrast numbers are measured against `bg`. Rules: body text never b
 |---|---|---|
 | `@c.bg@` | `#0E0F11` | Page background, opaque bottom band, outline of the pointer, dark modules of the QR code |
 | `@c.panel@` | `#121316` | Opaque side panels: expanded navigation, selection/help panel. Every accent colour is checked to reach 4.5:1 on it |
-| `@c.surface-1@` | `#17191C` | Dialogs, Up Next card, settings description, pointer arrow pills, list cards |
+| `@c.surface-1@` | `#17191C` | Dialogs, Up Next card, settings description, pointer arrows, list cards |
 | `@c.surface-2@` | `#1F2226` | Image placeholders, on-screen keys, chips, cover backgrounds |
 | `@c.surface-3@` | `#2A2E33` | Buttons at rest, toasts and the new content notice, focused settings row, current A-Z letter |
 | `@c.line@` | `#3A3F45` | Lines, progress tracks, unwatched cell of the season strip, toggle track (off) |
@@ -179,8 +179,8 @@ Only -webkit-transform and opacity on small elements; 150 ms or less; ease-out. 
 
 | Token | Value | Use |
 |---|---|---|
-| `@mo.fast@` | `120ms` | Buttons, text swap (opacity) |
-| `@mo.base@` | `150ms` | Cards, focus ring, rows/pages scrolling, navigation panel, toast |
+| `@mo.fast@` | `120ms` | Buttons, text swap (opacity), pointer arrows fading out |
+| `@mo.base@` | `150ms` | Cards, focus ring, rows/pages scrolling, navigation panel, toast, pointer arrows fading in |
 | `@mo.out@` | `250ms` | Player controls fading out (the empty wrapper layer); they fade in with fast |
 | `@mo.slow@` | `400ms` | Soft fades: ambient background cross-fade (opacity of a full-screen layer, the one exception) and the new content notice |
 | `@mo.spin@` | `900ms` | One turn of the spinner (linear, endless) |

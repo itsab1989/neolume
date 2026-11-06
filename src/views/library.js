@@ -1082,6 +1082,13 @@
       if (y >= G.edgeB() && y < G.VIS + 24 && grid.canScroll(1)) return { d: 1, x: cx, y: G.VIS - 4 };   // TV: bis 656, Mitte 628
       return null;
     };
+    /* Pfeile hoch/runter (NAV-2): fest als Paar mittig unter dem Raster ueber der Hinweisleiste (y 630; die fokussierte Zeile ist
+     * immer ganz sichtbar und endet darueber), je Richtung ein fester Platz; nur wenn ihre Randzone gilt. Oben lag der Pfeil auf
+     * dem Fokus-Rahmen der ersten Zeile (Nutzerentscheidung 06.11.). */
+    s.pointerVert = function () {
+      var cx = G.X0 + Math.round(G.width() / 2), P = N.pointer;
+      return { up: P.slot(s.pointerEdge(cx, 176), cx - 36, 630), dn: P.slot(s.pointerEdge(cx, G.VIS - 4), cx + 36, 630) };
+    };
     s.pointerScroll = function (d) {
       if (zone !== 'grid') toGrid();
       placeRing(grid.scrollBy(d)); afterMove();

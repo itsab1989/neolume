@@ -390,6 +390,12 @@
       var top = LIST_Y - off, e = N.ui.TrackList.edge(list, top, x, y);
       return e || (y >= top - 32 && y < top ? { d: -1, x: 640, y: top - 16 } : null);
     };
+    /* Pfeile hoch/runter (NAV-2): feste Plaetze – hoch auf der Kopfzeile der Titelliste (y 250, die erste Zeile beginnt bei 280),
+     * runter knapp ueber der Hinweisleiste (y 634, unter der sechsten Zeile); nie auf einer fokussierten Zeile */
+    s.pointerVert = function () {
+      var P = N.pointer;
+      return { up: zone === 'list' ? P.slot(s.pointerEdge(640, LIST_Y - off - 16), 640, 250) : null, dn: P.slot(s.pointerEdge(640, 640), 640, 634) };
+    };
     s.pointerScroll = function (d) {
       if (zone !== 'list') { if (d > 0) toList(); return; }
       if (d < 0 && !list.canScroll(-1)) toBtn(); else list.scrollBy(d);

@@ -225,6 +225,7 @@
       if (off === BO && row && row.count() && y >= N.RowMath.EDGE_B && y < 656) return { d: 1, x: 600, y: 636 };
       return null;
     };
+    s.pointerVert = function () { var P = N.pointer; return { up: P.slot(s.pointerEdge(600, 304), 600, 304), dn: P.slot(s.pointerEdge(600, 640), 600, 634) }; };   // Pfeile hoch/runter (NAV-2)
     s.pointerScroll = function (d) { if (d > 0) toRow(); else toBtn(); };
     s.relabel = function () { paint(); buildButtons(); if (row) row.relabel(); };
     return s;

@@ -97,6 +97,7 @@ function anchored() {
   });
   N.router.reset('list');
   var P = N.pointer, flip = false;
+  P.setEdge(true);                                           // diese Faelle pruefen das Verweil-Rollen (Einstellung an; Standard aus)
   // Finger auf dem Touchpad: alle 50 ms ein Zitter-Ereignis (1 px, unter der Zitterschwelle) = Lebenszeichen
   function live(ms) {
     for (var t = 0; t < ms;) { var st = Math.min(50, ms - t); T.tick(st); t += st; P.move(P.x + (flip ? 1 : -1), P.y); flip = !flip; }
@@ -305,6 +306,7 @@ function rowsList() {
       pointerSig: function () { return s.off; } };
   });
   N.router.reset('rows');
+  N.pointer.setEdge(true);                                   // Verweilen auf angeschnittener Reihe (Einstellung an)
   return { N: N, T: T, P: N.pointer, s: s };
 }
 test('Suche/Entdecken: Zeiger auf ganz sichtbarer Reihe rollt nie; angeschnittene erst nach Verweilen, genau einmal', function () {
@@ -336,6 +338,92 @@ test('Einstellung "Zeiger blaettert am Rand weiter" aus: kein Verweil-Rollen, ke
   assert.strictEqual(s.scrolls, 1, 'wieder an: Randzone wirkt');
   P.move(400, 645); c.live(100); P.setEdge(false); c.live(P.EDGE_DWELL * 3);
   assert.strictEqual(s.scrolls, 1, 'Ausschalten beendet ein laufendes Rollen');
+});
+
+/* Nutzerbefund 06.11. (Smart Control, Startseite): Verweilen rollte von selbst und es gab keinen Weg zurueck nach oben -> Standard
+ * "Zeiger blaettert am Rand weiter" aus; Pfeile hoch/runter (Klick = ein Schritt), alle Pfeile blenden weich ein/aus */
+test('Standard: Zeiger blaettert am Rand NICHT von selbst weiter (nur ausdruecklich true schaltet es ein)', function () {
+  var N = H.load({ fakeTimers: true }).N, P = N.pointer;
+  assert.strictEqual(P.edgeAuto, false);
+  assert.strictEqual(P.hold(function () {}), false, 'angeschnittene Reihe/naechste Reihe: kein Verweilen');
+  P.setEdge(undefined); assert.strictEqual(P.edgeAuto, false, 'nie gespeichert = aus');
+  P.setEdge(true); assert.strictEqual(P.edgeAuto, true, 'gespeichertes "an" bleibt an');
+  P.setEdge(false); assert.strictEqual(P.edgeAuto, false);
+});
+
+test('Pfeil-Lage (P.arrowBoxes): welche Pfeile wann, Lage und Trefferkasten', function () {
+  var P = H.load().N.pointer, A = P.arrowBoxes;
+  var a = A({ y: 372, h: 264, left: false, right: true }, null, null, 1280);
+  H.eq(a.b.map(Boolean), [false, true, false, false], 'nur ›, wenn nur nach rechts geblaettert werden kann');
+  H.eq([a.b[1].x, a.b[1].y, a.b[1].w, a.b[1].h], [1176, 372 + 132 - 32, 40, 64], 'rechts an 1176 (bis zum Sicherheitsrand 1216), mittig an der Reihe');
+  assert.strictEqual(A({ y: 372, h: 264, left: false, right: false }, null, null, 1280).h, null, 'Reihe ohne Blaettern: keine ‹ ›');
+  a = A(null, { up: { x: 680, y: 298 }, dn: { x: 680, y: 628 } }, null, 1280);
+  H.eq(a.b.map(Boolean), [false, false, true, true]);
+  H.eq([a.b[2].x, a.b[2].y, a.b[2].w, a.b[2].h], [648, 278, 64, 40], 'hoch: 64 x 40 um die Mitte');
+  H.eq([a.b[3].ex, a.b[3].ey], [660, 596], 'Element (40 x 64) vor dem Drehen um dieselbe Mitte');
+  a = A(null, { up: null, dn: { d: 1, x: 600, y: 644 } }, null, 1280);
+  assert.strictEqual(a.b[3].y + a.b[3].h, 654, 'runter: nie auf der Hinweisleiste (ab 656; Unterkante <= 654)');
+  a = A(null, { up: { d: 1, x: 640, y: 628 }, dn: { d: -1, x: 640, y: 300 } }, null, 1280);
+  H.eq(a.b.map(Boolean), [false, false, false, false], 'Randzone der anderen Richtung ergibt keinen Pfeil');
+  // feste Plaetze (Nutzerentscheidung 06.11.): Zone gilt -> Pfeil am festen Platz, egal wo die Zone gerade liegt
+  assert.strictEqual(P.slot(null, 640, 254), null, 'Zone gilt nicht: kein Pfeil');
+  H.eq(P.slot({ d: -1, x: 640, y: 412 }, 604, 630), { d: -1, x: 604, y: 630 });
+  a = A(null, { up: P.slot({ d: -1, x: 1, y: 2 }, 644, 298), dn: null }, null, 1280);
+  H.eq([a.b[2].x, a.b[2].y, a.b[3]], [612, 278, null], 'nur hoch: steht an seinem Platz, rueckt nicht in die Mitte');
+  a = A({ y: 100, h: 200, left: true, right: true }, { up: { x: 100, y: 50 }, dn: null }, { x: 10, y: 20, k: 0.5 }, 1000);
+  H.eq([a.b[0].x, a.b[1].x, a.b[0].y, a.b[2].x, a.b[2].y], [72, 458, 70 + 50 - 32, 60 - 32, 45 - 20], 'verkleinerter, verschobener Kasten (flexibel)');
+});
+
+function arrowRig() {
+  var ctx = H.load({ fakeTimers: true }), N = ctx.N, T = ctx.timers, P = N.pointer;
+  N.router._reset(T.now);
+  N.ui.hints = { el: null, set: function () {}, refresh: function () {}, hit: function () { return null; } };
+  N.ui.rail = { el: null, isOpen: function () { return false; }, attached: function () { return false; } };
+  var s = { R: 1, n: 3, ptr: [], scroll: [] };
+  N.router.define('rows', function () {
+    return { create: function () {}, onKey: function () { return true; },
+      pointer: function (x, y, kind) { s.ptr.push(kind + '@' + x + ',' + y); return true; },
+      pointerArrows: function () { return { y: 372, h: 264, left: false, right: true }; },
+      pointerVert: function () { return { up: s.R > 0 ? { x: 680, y: 298 } : null, dn: s.R + 1 < s.n ? { x: 680, y: 628 } : null }; },
+      pointerScroll: function (d) { s.scroll.push(d); s.R += d; } };
+  });
+  N.router.reset('rows');
+  function node() { return { style: {}, className: '', childNodes: [], appendChild: function (c) { this.childNodes.push(c); }, setAttribute: function () {}, addEventListener: function () {} }; }
+  ctx.document = { getElementById: function () { return null; }, createElement: node, createTextNode: function (t) { return { nodeValue: t }; }, body: null };
+  P.init(node(), node()); P.setEnabled(true);
+  function on() { return P.arrows.map(function (e) { return / on$|^on$| on /.test(' ' + e.className + ' ') ? 1 : 0; }); }
+  return { N: N, T: T, P: P, s: s, on: on };
+}
+test('Pfeile hoch/runter: nur in moegliche Richtungen, Klick = ein Schritt, Zeigen fokussiert nichts darunter', function () {
+  var c = arrowRig(), P = c.P, s = c.s, T = c.T;
+  H.eq(c.on(), [0, 0, 0, 0], 'vor der ersten Zeiger-Bewegung: keine Pfeile');
+  P.move(400, 450); T.tick(50);
+  H.eq(c.on(), [0, 1, 1, 1], '› sowie hoch und runter');
+  assert.strictEqual(P.arrows[2].style.webkitTransform, 'translate3d(660px,266px,0) rotate(90deg)', 'hoch = ‹ um 90° gedreht');
+  assert.strictEqual(P.arrows[2].style.display, undefined, 'nie display (Ebene bleibt)');
+  var n = s.ptr.length;
+  P.move(690, 300); T.tick(50);
+  assert.strictEqual(s.ptr.length, n, 'Zeigen auf den Pfeil erreicht die Karte darunter nicht');
+  P.click(690, 300, null);
+  H.eq(s.scroll, [-1], 'Klick auf hoch = ein Schritt nach oben');
+  H.eq(c.on(), [0, 1, 0, 1], 'oben angekommen: Pfeil hoch blendet aus');
+  P.click(690, 300, null);
+  H.eq(s.scroll, [-1], 'unsichtbarer Pfeil hoch nimmt keinen Klick an');
+  P.click(690, 630, null); P.click(690, 630, null);
+  H.eq(s.scroll, [-1, 1, 1]);
+  H.eq(c.on(), [0, 1, 1, 0], 'letzte Reihe: kein Pfeil runter');
+});
+test('Pfeile blenden weich aus: Taste und 3 s Ruhe nehmen nur .on weg, Lage bleibt; erneutes Zeigen ohne neue Lage', function () {
+  var c = arrowRig(), P = c.P, T = c.T;
+  P.move(400, 450); T.tick(50);
+  var tf = P.arrows[3].style.webkitTransform;
+  P.keyUsed();
+  H.eq(c.on(), [0, 0, 0, 0], 'Taste: alle aus (CSS blendet aus)');
+  assert.strictEqual(P.arrows[3].style.webkitTransform, tf, 'Lage bleibt beim Ausblenden');
+  P.move(500, 460); T.tick(50);
+  H.eq(c.on(), [0, 1, 1, 1], 'Zeiger wieder da: Pfeile blenden ein');
+  T.tick(3100);
+  H.eq(c.on(), [0, 0, 0, 0], '3 s ohne Bewegung: aus');
 });
 
 /* TV-Befund 1.0.5 (Bibliothek: Reiter "Ansicht" in Sortieren & Filter nicht zuverlaessig waehlbar) */

@@ -1098,6 +1098,21 @@
       placeRing(sl.page(dir)); afterMove();
       if (N.pointer) N.pointer.syncArrows();
     };
+    /* Pfeile hoch/runter (NAV-2, Nutzerentscheidung 06.11. "immer an der gleichen Stelle"): als Paar nebeneinander an EINER festen
+     * Stelle mittig ueber der Reihenbreite zwischen Hero und Kopf der Fokusreihe (y 298), fuer jeden Reihentyp; jede Richtung hat
+     * ihren festen Platz (hoch links, runter rechts), ein unmoeglicher Pfeil blendet aus, der andere rueckt nicht nach. Hoch fuehrt
+     * bis zur ersten Reihe (Hero zeigt sie). Klick = eine Reihe wie ▲/▼. */
+    s.pointerVert = function () {
+      if (TILES || FREE || !rows.length || sb.on || railOpen) return null;
+      var cx = Math.round((144 + Math.min(A.w, 1280) - 64) / 2), y = HEAD_Y - 22;
+      return { up: R > 0 ? { x: cx - 36, y: y } : null, dn: R + 1 < rows.length ? { x: cx + 36, y: y } : null };
+    };
+    s.pointerScroll = function (d) {
+      var r = R + d;
+      if (TILES || r < 0 || r >= rows.length) return;
+      N.fx.step(true);
+      moveRow(r);
+    };
     /* ---------- Tippen, freies Scrollen (Apple: caps.cardTap, caps.home 'tiles', caps.scroll 'free'; 08-touch S4–S6) ---------- */
     /* Tipper/Klick auf eine Kachel: bei cardTap 'details' oeffnen Film/Serie/Folge die Details (Detailkarte, Nr. 9/12) statt
      * abzuspielen, eine Weiterhoeren-Karte die Karte ihres Buchs; "Alle anzeigen", Erweiterungs-Karten, Musik und Playlists wie OK.

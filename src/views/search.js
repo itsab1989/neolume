@@ -787,6 +787,12 @@
       if (y >= RM.edgeB(visRows(), CLIP_Y) && y < VB + 24 && canScroll(1)) return { d: 1, x: mx, y: VB - 4 };
       return null;
     };
+    /* Pfeile hoch/runter (NAV-2): fest als Paar mittig unter den Ergebnissen ueber der Hinweisleiste (y 630, unter dem Rahmen der
+     * zweiten Reihe), je Richtung ein fester Platz; nur wenn ihre Randzone gilt. Oben laege er auf dem Rahmen der Fokusreihe. */
+    s.pointerVert = function () {
+      var mx = Math.round((RX0 + RX1) / 2), P = N.pointer;
+      return { up: P.slot(s.pointerEdge(mx, CLIP_Y + 24), mx - 36, 630), dn: P.slot(s.pointerEdge(mx, VB - 4), mx + 36, 630) };
+    };
     /* ein Schritt = eine Gruppe (wie ▲/▼ ab der obersten Gruppe im Bild); der Fokus kommt mit (bleibt sichtbar) */
     s.pointerScroll = function (d) {
       var t = topIdx(), k = nextG(t, d);

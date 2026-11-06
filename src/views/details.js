@@ -1178,6 +1178,9 @@
       if (y >= RM.secEdgeB(targets(), off ? TOP_CLIP : 0) && y < 656 && RM.secNext(st, off, 1) >= 0) return { d: 1, x: 600, y: 636 };
       return null;
     };
+    /* Pfeile hoch/runter (NAV-2): feste Plaetze bei x 600 – hoch zwischen Info-Block und Abschnitt (y 304), runter ueber der
+     * Hinweisleiste (y 634); nie auf dem fokussierten Abschnitt */
+    s.pointerVert = function () { var P = N.pointer; return { up: P.slot(s.pointerEdge(600, 304), 600, 304), dn: P.slot(s.pointerEdge(600, 640), 600, 634) }; };
     /* ein Schritt = ein Abschnitt (wie ▼/▲): nach unten in Staffeln/Folgen zuerst die Reiter, nach oben zuerst die Folgen */
     s.pointerScroll = function (d) {
       var st = secStops(), k = RM.secNext(stopOffs(st), off, d), t = k >= 0 ? st[k] : null;

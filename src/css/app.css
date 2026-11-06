@@ -383,12 +383,13 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .splash-st { position: absolute; left: 0; top: 384px; width: @l.screen-w@; text-align: center; }
 
 /* ---------- Zeiger (Smart Control): Blaetter-Pfeile nur bei aktivem Zeiger ---------- */
-.parr { position: absolute; width: 40px; height: 64px; border-radius: @r.md@; background: @c.surface-1@; color: @c.text-1@; text-align: center;
-  font-size: 40px; line-height: 60px; font-weight: 600; z-index: @z.float@; }
-/* Randzone (Zeiger verweilt am oberen/unteren Rand einer Liste -> rollt gedrosselt): Pfeil-Pille, '‹' gedreht */
-.pedge { position: absolute; width: 40px; height: 40px; border-radius: @r.md@; background: @c.surface-1@; color: @c.text-1@; text-align: center;
-  font-size: 34px; line-height: 36px; font-weight: 600; z-index: @z.float@; }
-.pedge.up { -webkit-transform: rotate(90deg); } .pedge.dn { -webkit-transform: rotate(-90deg); }
+/* ‹ › an der fokussierten Reihe, hoch/runter ('‹' per translate3d + rotate gedreht) am Rand der rollenden Flaeche (N.pointer).
+ * Dauerhafte kleine Ebenen; weich ein (mo.base) und aus (mo.fast, danach visibility) – nur Deckkraft, nie display (Runde 6). */
+.parr { position: absolute; left: 0; top: 0; width: 40px; height: 64px; border-radius: @r.md@; background: @c.surface-1@; color: @c.text-1@; text-align: center;
+  font-size: 40px; line-height: 60px; font-weight: 600; z-index: @z.float@; opacity: 0; visibility: hidden; -webkit-transform: translate3d(0,0,0);
+  -webkit-transition: opacity @mo.fast@ @mo.ease-std@, visibility 0s linear @mo.fast@; }
+.parr.on { opacity: 1; visibility: visible; -webkit-transition: opacity @mo.base@ @mo.ease@; }
+.rm .parr, .rm .parr.on { -webkit-transition: none; }
 .nocursor, .nocursor div, .nocursor img { cursor: none; }
 /* Variante A: Amber-Pfeil als CSS-Cursor (Spitze 4,4); Variante B: cursor:none + eigenes Element .pcur */
 .cur-a, .cur-a div, .cur-a img { cursor: url(@A/@pointer@.png) 4 4, default; }

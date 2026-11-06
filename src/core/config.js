@@ -2,7 +2,7 @@
  * Netz-Standards sind im Repo leer: tools/build.js setzt die lokalen Werte aus local.json (git-ignoriert) ins gebaute app.js. */
 (function (N) {
   var C = {
-    version: '1.0.19',
+    version: '1.0.20',
     product: N.brand.name,
     platform: N.platform.info.platform,               // X-Plex-Kopfzeilen je Plattform (N.platform.info, Adapter)
     platformVersion: N.platform.info.platformVersion,
@@ -36,7 +36,7 @@
       if (o.sefFake === 'still') C.sefFake = 'still';                 // Vorschau/visuelle Tests: stehendes Bild
       if (Number(o.seekDelay) > 0) C.seekDelay = Number(o.seekDelay);  // nur Tests: Sammel-Sprung haelt an
       if (Number(o.fakeEndMs) > 0) C.fakeEndMs = Number(o.fakeEndMs);   // nur Bildtests (ohne SEF): Video endet ms nach dem Start (Karte am Ende mit Rueckzaehler)
-      if (Number(o.ptrEdgeDwell) > 0) C.ptrEdgeDwell = Number(o.ptrEdgeDwell);   // nur Tests: Zeiger-Randzone zeigt nur die Pille
+      if (Number(o.ptrEdgeDwell) > 0) C.ptrEdgeDwell = Number(o.ptrEdgeDwell);   // nur Tests: Zeiger-Randzone rollt nie von selbst (Pfeil steht still)
       if (/^#[0-9A-Fa-f]{6}$/.test(o.fakeBg || '')) C.fakeBg = o.fakeBg;   // nur Bildtests: Farbe des Video-Platzhalters (helles Bild, Feinauswahl)
       if (o.liveDemo === true) C.liveDemo = true;      // nur Bildtests: Fernsehen mit erfundenen Sendern (N.liveDemo), ohne Netz
       if (typeof o.fakeSub === 'string' && o.fakeSub.length < 120) C.fakeSub = o.fakeSub;   // nur Bildtests (stehendes Bild): feste Untertitel-Zeile

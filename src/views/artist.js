@@ -332,6 +332,12 @@
       if (RM.secNext(o, off, 1) >= 0 && y >= RM.secEdgeB(b, clipTop()) && y < 656) return { d: 1, x: 640, y: 628 };
       return null;
     };
+    /* Pfeile hoch/runter (NAV-2): feste Plaetze wie auf der Albumseite – hoch auf der Kopfzeile des Abschnitts (y 250; Fokus-Rahmen der Karten ab 272), runter
+     * knapp ueber der Hinweisleiste (y 634); nie auf einer fokussierten Zeile/Karte */
+    s.pointerVert = function () {
+      var P = N.pointer;
+      return { up: P.slot(s.pointerEdge(640, zone === 'pop' ? popY + 44 - off - 16 : SEC_TOP + 28), 640, 250), dn: P.slot(s.pointerEdge(640, 640), 640, 634) };
+    };
     /* ein Schritt: in "Beliebte Titel" die Liste, sonst ein Abschnitt (wie ▼/▲) */
     s.pointerScroll = function (d) {
       if (zone === 'pop' && pop.canScroll(d)) { pop.scrollBy(d); return; }
