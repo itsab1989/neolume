@@ -5,6 +5,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.21] - 2026-11-07
+
+### Changed
+- **"Show all" card see-through like the clock.** The "Show all" card at the end of a row now has the same soft,
+  semi-transparent background as the clock in the top right corner, so the picture behind it shines through a little
+  instead of a solid grey block – in every row on Home, in Discover and in the other rows that end with this card.
+
+### Fixed
+- **Player controls disappear completely.** Sometimes, after the controls had faded out, the three boxes (title, clock and
+  the control bar) were still very faintly visible on the TV until you opened and closed the controls again. Once the fade
+  has finished, the controls are now also hidden outright, in the video player and in live TV.
+- **"Skip intro" after jumping back.** When you resumed an episode in the middle and then jumped back to the start, the
+  "Skip intro" button (and automatic skipping) did not come back, and near the end the credits button or the countdown to
+  the next episode could stay away too. Now they work again as soon as you jump.
+- **No early "This is taking longer than usual" note on the next episode.** If the previous episode had been loading for a while, the
+  note could show up far too early while the next episode was loading. Each episode now starts with a fresh wait.
+- **Undoing "watched" on Home no longer shows the card twice.** If you marked a title in "Continue watching" as watched,
+  undid it right away and the server then reported a problem with the first step, the card appeared twice in the row.
+- **Android TV: resuming starts cleanly.** When you continued a film, the time briefly showed 0:00 before jumping to the
+  right spot; now it shows the right time straight away. The app also keeps running normally if you go to the TV's home
+  screen and come straight back, and it notices a network change that happens while it is still starting up.
+
+If the player now feels a little more polished, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.20] - 2026-11-06
 
 ### Added

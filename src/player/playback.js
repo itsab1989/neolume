@@ -308,6 +308,9 @@
   P.toggle = function () { if (this.state === 'paused') this.play(); else this.pause(); };
   /* Sprung auf ms: primaer Jump (auch HLS, K3); Rueckgabe != 1 bei HLS -> Sitzung an der Stelle neu starten */
   P.seek = function (ms) {
+    // Sprung nach dem Start: der Fortsetzen-Punkt gilt nicht mehr (sonst kein "Intro ueberspringen" nach dem Zurueckspringen
+    // vor die Stelle, an der fortgesetzt wurde; Review 07.11.). Der Start-Sprung selbst laeuft nicht hierueber.
+    if (this.firstTick) this.resume = 0;
     var dur = this.dur(); if (dur > 0) ms = Math.min(ms, dur - 3000);
     ms = Math.max(0, ms);
     this.normal(true);                               // ein Sprung beendet das Schnellspulen

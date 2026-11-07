@@ -340,11 +340,18 @@ class Wizard(object):
         if old: store.extra = dict(old.extra)
         ext.helper_store(self, store)
         self.helper_store, self.helper_skipped = store, skipped
-        if self.helper_remember: store.save(self.helper_file)
+        if self.helper_remember: self.save_helper(store)
         else: helpermod.Store.forget(self.helper_file)
         if self.helper: self.helper.store = store
         host = self.helper_address or ip
         return {'url': 'http://%s:%d' % (host, self.update.port or helpermod.HELPER_PORT), 'key': store.key, 'sign': store.sign}
+
+    def save_helper(self, store, change=None):
+        """Save the helper file without losing what an installed helper wrote into it meanwhile (fields of ext.live_keys, e.g.
+        the TVs it bound - an old copy would remove them and the TV would be refused): see helper.save_fresh. Returns the path."""
+        path = self.helper_file or helpermod.store_path()
+        helpermod.save_fresh(store, path, ext.live_keys(), change)
+        return path
 
     # ---------- installed helper (background service, service.py) ----------
     def service_ctx(self):
@@ -367,7 +374,7 @@ class Wizard(object):
         if lang in ('de', 'en') or self.lang: ctx.lang = lang if lang in ('de', 'en') else self.lang
         if not self.helper_remember:
             self.helper_remember = True
-        hfile = self.helper_store.save(self.helper_file)
+        hfile = self.save_helper(self.helper_store)
         if self.helper: self.helper_stop()                    # free the port for the background helper
         r = service.install(ctx, hfile, self.update.port if self.update.port else helpermod.HELPER_PORT, bool(tray))
         self.service_report = r.to_json()
@@ -389,8 +396,8 @@ class Wizard(object):
         Profiles, the TV binding of an edition (extra) and the shared key stay. Every TV needs a new app package afterwards."""
         st = self.helper_store
         if not st: raise StepError('no_helper')
-        st.rotate_sign()
-        if self.helper_remember: st.save(self.helper_file)        # an installed helper reads the changed file within seconds
+        if self.helper_remember: self.save_helper(st, lambda s: s.rotate_sign())   # an installed helper reads it within seconds
+        else: st.rotate_sign()
         if self.helper: self.helper.store = st
         self.package = None
         if self.sync.running: self.sync_stop()                   # the package loaded there still has the old key

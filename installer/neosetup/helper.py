@@ -380,6 +380,26 @@ class Store(object):
 _SAVE_LOCK = threading.RLock()            # Store.save: one writer at a time (all stores of this process)
 
 
+def save_fresh(store, path=None, live=(), change=None):
+    """Save a store that may be older than the file (the setup program keeps its copy for a long time while an installed
+    helper - another process - keeps writing the same helper.json, e.g. the TVs an edition bound): under the save lock read
+    the file again, take over the fields `live` from it (the file wins; missing there = removed), then apply `change(store)`
+    (may be None) and write. Only for a file of the same helper (same shared key). Returns what `change` returned."""
+    path = path or store_path()
+    with _SAVE_LOCK:
+        live = tuple(live or ())
+        if live:
+            try: disk = Store.load(path)
+            except (OSError, ValueError): disk = None
+            if disk is not None and disk.key == store.key:
+                for k in live:
+                    if k in disk.extra: store.extra[k] = disk.extra[k]
+                    else: store.extra.pop(k, None)
+        res = change(store) if change else None
+        store.save(path)
+    return res
+
+
 # ---------------------------------------------------------------- rate limit
 class RateLimit(object):
     """Token bucket per client address: `rate` requests per `per` seconds (burst = rate)."""

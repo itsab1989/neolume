@@ -47,7 +47,7 @@
     for (var i = 0; i < this.m.length; i++) {
       var m = this.m[i];
       if (m.done) continue;
-      if (t >= m.end) { m.done = true; continue; }
+      if (t >= m.end) continue;      // nur vorbei (Fortsetzen, Sprung darueber): nicht erledigt, nach Zuruecksprung wieder da
       if (t < m.start || t >= m.end - 3000) continue;
       var mode = m.type === 'intro' ? c.intro : c.credits;
       if (mode === 'auto' && !(m === lastC && nextOnCredits)) {

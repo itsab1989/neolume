@@ -33,8 +33,9 @@ class Raw(object):
     def __init__(self, data, ctype, headers=None, stream=None, size=0, done=None):
         self.data, self.ctype, self.headers = data, ctype, list(headers or [])
         # large files (app update): stream = open binary file, size = its length; sent in chunks, never read into memory;
-        # done() runs after sending (e.g. frees a transfer slot) – also when the client went away
+        # done() runs after sending (e.g. frees a transfer slot) – also when the client went away; sent = bytes sent by then
         self.stream, self.size, self.done = stream, size, done
+        self.sent = 0
 
 
 def host_ok(host):
@@ -101,6 +102,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 if not chunk: break
                 self.wfile.write(chunk)
                 left -= len(chunk)
+                raw.sent += len(chunk)
             self.server.owner.event(self.client_address[0], self.path.split('?', 1)[0][:80], status)
             return True
         finally:

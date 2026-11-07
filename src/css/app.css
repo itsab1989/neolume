@@ -87,7 +87,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
 /* HOME-14 Karte "Alle anzeigen" am Reihenende: ruhige Flaeche, Raster-Symbol 48 px (Abzeichen-Element, eigenes Bild all-grid.png) + Text
  * in der Groesse der Kartentitel; Symbol + 12 px + eine Textzeile (24) als Block mittig. TV-Test 30.10.: das 32er Sprite-Symbol
  * (sichtbar 18 px) wirkte aus 3 m klein/leer. */
-.card.is-all { background: @c.surface-3@; }
+.card.is-all { background: @c.bg-60@; }   /* halbdurchsichtig wie die Uhr (Nutzerwunsch 07.11.), Hintergrund scheint durch */
 .bdg.all { display: block; left: 50%; margin-left: -24px; width: 48px; height: 48px; background-image: url(@A/all-grid.png); background-repeat: no-repeat; }
 .card .ph.all { left: 8px; right: 8px; top: 0; bottom: auto; max-height: 48px; text-align: center; color: @c.text-1@;
   font-size: @ty.body.size@; line-height: 24px; font-weight: 600; }

@@ -124,6 +124,20 @@ test('Marker: Auto springt, danach 5 s "Intro ansehen"; nicht waehrend des Forts
   assert.strictEqual(mk.watchStart(), 1361);
   assert.strictEqual(run(mk, 2000, 6000, c).skipTo, -1, 'kein erneuter Auto-Sprung');
 });
+test('Marker nach Fortsetzen und Zuruecksprung (Review 07.11.): Intro-Button wieder da, Sprung setzt den Fortsetzen-Punkt zurueck', function () {
+  // fortgesetzt bei 25:00, dann zurueck auf 0:05: das Intro (0:01-1:27) war nur "vorbei", nie gezeigt -> Button wieder da
+  var mk = new N.Markers(MK, { intro: 'button', credits: 'off', autoNext: false, cd: 10 }), c = { dur: 1437083, playing: true, hasNext: false, resume: 1500000 };
+  run(mk, 1500000, 1505000, c);
+  mk.seeked(); c.resume = 0;
+  assert.strictEqual(run(mk, 5000, 8000, c).btn, 'intro');
+  // Playback: ein Sprung nach dem ersten Tick setzt resume auf 0 (Start-Sprung/Sicherheitsnetz unberuehrt)
+  var r = rig({ off: 1500000 }), p = r.p;
+  p.start(); T.tick(1000);
+  assert.strictEqual(p.resume, 1500000, 'vor dem ersten Tick bleibt der Fortsetzen-Punkt');
+  p.onEvent(14, 1500000);
+  p.seek(60000);
+  assert.strictEqual(p.resume, 0);
+});
 test('Countdown: ab finalem Abspann, N Sekunden nach Wiedergabezeit, Abbruch, Fallback Dauer - N - 2 s', function () {
   var list = [{ type: 'credits', startTimeOffset: 3142551, endTimeOffset: 3185057, 'final': true }];
   var mk = new N.Markers(list, { intro: 'button', credits: 'button', autoNext: true, cd: 10 }), c = { dur: 3185057, playing: true, hasNext: true, resume: 0 };

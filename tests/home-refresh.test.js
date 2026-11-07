@@ -157,3 +157,31 @@ test('HOME-12/NAV-7.3: fokussierte Karte auf dem Server entfernt -> neue Fassung
   assert.strictEqual(t2.slot().model.items[0].rk, 'NEU', '30 s ohne Taste: eingesetzt');
   assert.strictEqual(t2.slot().f, 1, 'dieselbe Karte (s1) bleibt fokussiert');
 });
+
+/* Review 07.11.: Gelb (gesehen) in "Weiterschauen", sofort Rueckgaengig, danach meldet der Server einen Fehler fuer das erste
+ * Markieren -> die Karte kam ein zweites Mal in die Reihe. Nach Rueckgaengig stellt ein spaeter Fehler nichts mehr her. */
+test('Gesehen + Rueckgaengig, danach Fehler des Servers: Karte nur einmal da', function () {
+  var base = [{ id: 'cw', kind: 'land', tk: 'home.row.newIn', tp: { library: 'Filme' }, items: [{ rk: 'm1', type: 'movie', title: 'Demo m1', thumb: '/t/m1', vc: 0, off: 60000, dur: 600000 }] }, row('new-2', ['s1', 's2'])];
+  var e = setup({ cacheRows: base, homeRows: [{ id: 'cw', on: true }, { id: 'new-2', on: true }] }), N = e.N, writes = [];
+  N.plex.write = function (m, p, q, cb) { writes.push({ p: p, cb: cb }); };
+  N.ui.toast = { show: function () {}, hide: function () {}, tapSuffix: function () { return ''; }, on: function () { return false; } };
+  e.slots.forEach(function (sl) {
+    sl.removeAt = function (i) { this.model.items.splice(i, 1); };
+    sl.insertAt = function (i, it) { this.model.items.splice(i, 0, it); };
+  });
+  e.s.enter({}, null);
+  answer(e.calls[0], JSON.parse(JSON.stringify(base)), e.libs);
+  e.T.tick(1000);
+  function cw() {
+    var n = 0;
+    e.slots.forEach(function (x) { if (x.model && x.model.id === 'cw') x.model.items.forEach(function (it) { if (it.rk === 'm1') n++; }); });
+    return n;
+  }
+  assert.strictEqual(cw(), 1);
+  e.s.onKey('YELLOW');                               // gesehen: Karte verlaesst "Weiterschauen"
+  assert.strictEqual(cw(), 0);
+  e.s.onKey('YELLOW');                               // Rueckgaengig (binnen 6 s): Karte wieder da
+  assert.strictEqual(cw(), 1);
+  writes[0].cb({ status: 500 });                     // erst jetzt: Fehler des ersten Markierens
+  assert.strictEqual(cw(), 1, 'nicht doppelt');
+});

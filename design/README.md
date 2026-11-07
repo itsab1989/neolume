@@ -71,7 +71,7 @@ Dark theme. Contrast numbers are measured against `bg`. Rules: body text never b
 | `@c.track-on-image@` | `rgba(255,255,255,0.28)` | Progress track drawn on top of card artwork |
 | `@c.dim@` | `rgba(8,9,10,0.6)` | Dimming behind side panels and the expanded navigation (0.45 was too weak on bright images) |
 | `@c.backdrop@` | `rgba(8,9,10,0.78)` | Dimming behind dialogs |
-| `@c.bg-60@` | `rgba(14,15,17,0.6)` | bg at 60 %: home clock pill, A-Z column over the ambient background |
+| `@c.bg-60@` | `rgba(14,15,17,0.6)` | bg at 60 %: home clock pill, "Show all" card at the end of a row, A-Z column over the ambient background |
 | `@c.bg-72@` | `rgba(14,15,17,0.72)` | bg at 72 %: "classic" screensaver info box |
 | `@c.osd@` | `rgba(14,15,17,0.92)` | Player OSD islands and the buffering box over video |
 | `@c.mini@` | `rgba(23,25,28,0.96)` | Mini player (surface-1 at 96 %) |

@@ -639,11 +639,13 @@
       var leaves = row.kind === 'land' && w;        // aus Weiterschauen/Naechste Folgen verschwindet die Karte (6.3.1)
       applyWatched(it, w);
       if (leaves) removeCard(idx); else refreshAll(it);
+      var undone = false;                            // schon rueckgaengig gemacht: ein spaeter Fehler stellt nichts mehr her (sonst Karte doppelt)
       scrobble(it, w, function (err) {
-        if (err) { restoreSnap(it, sn); if (leaves) reinsert(row, idx, it); else refreshAll(it); N.ui.toast.show(N.t('toast.actionFailed')); undo = null; }
+        if (err && !undone) { restoreSnap(it, sn); if (leaves) reinsert(row, idx, it); else refreshAll(it); N.ui.toast.show(N.t('toast.actionFailed')); undo = null; }
       });
       N.ui.toast.show(N.t((w ? 'toast.markedWatched' : 'toast.markedUnwatched') + N.ui.toast.tapSuffix()), { undo: true, icon: 'confirm' });
       undo = { kind: 'watched', until: U.now() + 6000, revert: function () {
+        undone = true;
         restoreSnap(it, sn);
         if (leaves) reinsert(row, idx, it); else refreshAll(it);
         scrobble(it, !w, function () {});

@@ -48,6 +48,7 @@
 
   N.router.define('liveplayer', function (params) {
     var s = { rail: null, wheelKeys: ['LEFT', 'RIGHT'], toastHigh: true, touchLong: false, panelFull: true };
+    var hideT = 0, FADE_MS = 300;   // Blende aus: mo.out 250 ms + Reserve
     var root, vbg, osdW, top, t1, t2, clk, bot, tr, played, tm0, tm1, chn, pill, lbl, lblT, spin, spinT, sbBg, sb, bk = null;
     var btnEl = {}, ppIc = null, osd = false, osdT = 0, fb = 'pp', closed = false, errOn = false, ti = null, G = tvGeo(), NG = null, onRsz = null, dir = false;
     var sleep = { mode: 'off', at: 0, t: 0, w: 0 }, zapT = 0, lastTune = 0;
@@ -171,6 +172,7 @@
     }
     function clearAll() {
       if (osdT) { clearTimeout(osdT); osdT = 0; }
+      if (hideT) { clearTimeout(hideT); hideT = 0; }
       if (stallT) { clearTimeout(stallT); stallT = 0; }
       if (clkT) { clearTimeout(clkT); clkT = 0; }
       if (digitT) { clearTimeout(digitT); digitT = 0; }
@@ -314,6 +316,8 @@
       if (errOn) return;
       if (!osd) {
         osd = true;
+        if (hideT) { clearTimeout(hideT); hideT = 0; }
+        osdW.style.visibility = '';                                 // nach der Blende verborgen (s. hideOsd), jetzt wieder zeichnen
         if (top.style.display === 'none') { U.show(top, true); U.show(bot, true); U.raf(function () { if (osd) U.cls(osdW, 'on', true); }); }
         else U.cls(osdW, 'on', true);
         paintClk(); paintNow(); setFocus(fb, true); subLook();
@@ -327,6 +331,9 @@
       if (!osd) return;
       if (force !== true && N.router.hasOverlay()) { osdT = setTimeout(hideOsd, OSD_MS); return; }
       osd = false; U.cls(osdW, 'on', false); U.show(lbl, false); subLook();
+      // wie im Video-Player (Nutzerbefund 07.11.): Blende endete am TV teils nicht genau bei 0 -> danach Huelle verbergen
+      if (hideT) clearTimeout(hideT);
+      hideT = setTimeout(function () { hideT = 0; if (!osd) osdW.style.visibility = 'hidden'; }, FADE_MS);
       if (btnEl[fb]) U.cls(btnEl[fb], 'is-focus', false);
       fb = 'pp';
       N.router.refreshHints();

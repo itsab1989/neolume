@@ -337,7 +337,7 @@
     function play(it, off, q) {
       lpEnd();
       item = it; cues = null; cueI = -1; showSub(''); hideSkip(); hideUp(); hideLast();
-      if (xt && xt.item) xt.item(it); bif = null; thFail = 0; slow = 0; chs = []; chI = -2; trickHinted = false; U.vis(trk, false);
+      if (xt && xt.item) xt.item(it); bif = null; thFail = 0; if (slow) { clearTimeout(slow); slow = 0; } chs = []; chI = -2; trickHinted = false; U.vis(trk, false);
       errOn = false;
       clearLow(); bw = new N.comfort.BufWatch(U.now()); pausedAt = 0; prevSt = ''; hideLost();
       sb.hide(); U.show(sbBg, false);
@@ -566,6 +566,7 @@
       if (errOn) return;
       if (!osd) {
         fadeEnd();                                                  // Fokus der letzten Blende abraeumen, bevor er neu gesetzt wird
+        osdW.style.visibility = '';                                 // nach der Blende verborgen (fadeEnd), jetzt wieder zeichnen
         dirSync();
         osd = true; U.cls(sub, 'up', true); U.cls(root, 'pl-osd', true);
         if (top.style.display === 'none') { U.show(top, true); U.show(bot, true); U.raf(function () { if (osd) U.cls(osdW, 'on', true); }); }   // erstes Mal: Ebenen anlegen, Blende ab dem naechsten Frame
@@ -604,6 +605,9 @@
       if (fadeB) { U.cls(fadeB, 'is-focus', false); fadeB = null; }
       if (fadeBar) { U.cls(bot, 'foc', false); fadeBar = false; }
       if (lblIn && !osd) U.show(lbl, false);
+      // Nutzerbefund 07.11.: nach dem Ausblenden blieben die drei Inseln am TV ganz schwach sichtbar (Deckkraft-Uebergang endete
+      // nicht genau bei 0, erneutes Ein-/Ausblenden behob es). Nach der Blende die Huelle zusaetzlich verbergen; showOsd hebt es auf.
+      if (!osd) osdW.style.visibility = 'hidden';
     }
     /* Finger/Maus (caps.pointer 'mouse', letzte Eingabe nicht Taste): kein Fokus im Player, Zurueck-Knopf sichtbar. Klasse nur
      * beim Wechsel; -> true = gewechselt (Fokus neu zeichnen). Am TV immer false. */
