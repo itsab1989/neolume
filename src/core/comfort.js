@@ -113,6 +113,7 @@
     var rs = Number(st.recentSearches);               // Zuletzt gesucht: fruehere Stufen 6/3 (bis 28.10.) -> 8/4, Aus bleibt Aus
     if (rs === 6) st.recentSearches = 8; else if (rs === 3) st.recentSearches = 4;
     if (st.recentSearches === null || st.recentSearches === '') st.recentSearches = C.DEFAULTS.recentSearches;   // leer ist nicht "Aus"
+    if (st.glass === true) st.glass = 'strong'; else if (st.glass === false) st.glass = 'off';   // BG-2: frueher Schalter, seit 08.11. drei Stufen
     return st;
   };
   /* Uhr auf der Startseite: box = Kasten (bisher, Standard), free = grosse duenne Ziffern frei auf weichem Eckschatten,

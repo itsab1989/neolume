@@ -75,7 +75,7 @@
       if (FREE) grid.onScroll = function () { ensurePages(); if (zone === 'grid' && regOn()) paintReg(false); };
       skel = U.el('div', 'skel', root);
       for (var i = 0; i < 5; i++) U.el('i', '', skel, 'left:' + (G.X0 + i * G.SX) + 'px;top:' + G.Y0 + 'px;width:176px;height:264px');
-      fade = U.el('img', 'fade fade-frame', root); fade.src = N.assetBase + 'fade-frame.png';   // unter A–Z-Leiste/Sprungbuchstabe: Band ab y 612, Leiste bis 628
+      fade = U.el('img', 'fade fade-frame', root); N.glass.img(fade, 'fade-frame.png');   // unter A–Z-Leiste/Sprungbuchstabe: Band ab y 612, Leiste bis 628
       /* A–Z-Leiste: vollstaendiges Alphabet sofort sichtbar (NUTZER-FEEDBACK-REGELN 1), 27 feste Elemente. Flache flexible Flaeche
        * (LIB-12): reicht die Hoehe bis 16 px ueber der Unterkante nicht, verdichtet (jeder zweite Platz "•", L.azSlots) statt
        * abgeschnitten; regDivs = Plaetze, regAi = Buchstaben-Index je Platz (-1 = "•"), regMap = Platz je Buchstabe */

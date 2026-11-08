@@ -26,7 +26,7 @@
       ring = new N.ui.Ring(root);
       ring.prep(['tv-l', 'tv-m', 'tv-s', 'list-tv']);
       sb = new N.ui.StateBlock(root);
-      var fade = U.el('img', 'fade fade-frame', root); fade.src = N.assetBase + 'fade-frame.png';   // unteres Band wie in der Mediathek
+      var fade = U.el('img', 'fade fade-frame', root); N.glass.img(fade, 'fade-frame.png');   // unteres Band wie in der Mediathek
       onEpg = function () { if (!dead) N.idle.add(relabel, 'live-epg'); };
       N.evt.on('live:epg', onEpg);
       onSet = function (e) { if (!dead && e && (e.key === 'liveRegions' || e.key === 'liveView')) N.idle.add(function () { if (!dead) load(true); }, 'live-load'); };

@@ -93,6 +93,7 @@
         slots.push(sl); slotGroup.push(-1);
       }
       // Naechste Reihe nur angeschnitten (Bilder, ohne Untertitel): Tastenleiste unten rechts ueberdeckt nichts (TV-Test 27.10., F8)
+      // bewusst immer deckend, bei jeder Stufe von "Transparenz der Leisten" (BG-2): einfarbiger Grund, darunter nur angeschnittene Karten
       var fade = U.el('img', 'fade s-fade', root); fade.src = N.assetBase + 'fade-bottom.png';
       U.el('div', 's-fadebg', root);
       ring = new N.ui.Ring(root);

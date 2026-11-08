@@ -367,6 +367,18 @@
             onSelect: function (l) { if (l !== N.i18n.lang()) N.app.setLang(l); } });
         } };
     }
+    /* Transparenz der Leisten (SPEC BG-2, Nutzerwunsch 08.11.): direkt hinter den Hintergrund-Zeilen, weil sie bestimmt, wie viel vom
+     * Hintergrund an den Raendern zu sehen ist; wirkt sofort (N.glass tauscht die Bilder), INFO nennt die Kosten auf aelteren TVs */
+    function glassRow() {
+      if (!N.glass.avail()) return null;   // nur mit caps.glassBars 'all' (TV-Layout) oder 'rail' (nur Seitenleiste); Apple vorerst nicht
+      // drei Stufen (Nutzer 08.11. am TV): Deckend (Standard) · Leicht durchscheinend · Durchscheinend; frueheres true = Durchscheinend
+      var S = st(), G = N.glass;
+      function opt(val, k) { return [val, v(k), null, v(k + '.s')]; }
+      var r = choice('glass', [opt('off', 'glassOff'), opt('mid', 'glassMid'), opt('strong', 'glassStrong')]);
+      r.val = function () { return v({ off: 'glassOff', mid: 'glassMid', strong: 'glassStrong' }[G.level(S.settings && S.settings.glass)]); };
+      r.help = 'help.glass';
+      return r;
+    }
     /* Startseite & Aussehen (docs/research/settings-order-2026-10-29.md 9.5): Startseite (anpassen, Infobereich bzw. Kachelgroesse),
      * Bibliotheksansicht, Farben (Auswahl, Markierungen), Kacheln (Spoiler, Fortschritt), Hintergruende, Uhr, zuletzt Weniger Animationen */
     function lookRows(S) {
@@ -383,7 +395,7 @@
         // TV-Befund 28.10.: Serien-Balken einzeln abschaltbar (vorher an "Folgen-Fortschritt" gekoppelt)
         { id: 'sp', type: 'toggle', label: 'set.seriesProgress', desc: 'set.seriesProgress.desc',
           get: function () { return !!(S.settings && S.settings.seriesProgress); }, set: function (x) { S.setSetting('seriesProgress', x); } },
-        toggle('backgrounds')].concat(libBgRows(), [toggle('clock'), clockStyleRow(),
+        toggle('backgrounds')].concat(libBgRows(), [glassRow(), toggle('clock'), clockStyleRow(),
         { id: 'rm', type: 'toggle', label: 'set.reduceMotion', desc: 'set.reduceMotion.desc',
           get: function () { return !!(S.settings && S.settings.reduceMotion); }, set: function (x) { S.setSetting('reduceMotion', x); N.fx.setReduced(x); } }]));
     }

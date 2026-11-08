@@ -161,6 +161,60 @@ test('Profilwechsel leert Warteschlange und LRU', function () {
   assert.strictEqual(N.img._stats().queued, 0);
 });
 
+test('Profilwechsel bricht laufende Downloads ab und gibt ihre Plaetze sofort frei (Nutzerbefund 08.11.)', function () {
+  var s = setup(), N = s.N, T = s.T, old = [], i;
+  T.tick(1100);                                                        // Ruhe: bis zu 6 gleichzeitig
+  for (i = 0; i < 6; i++) { old.push(new Img()); N.img.want(old[i], 'http://pms/alt' + i, 0); }
+  T.tick(200);
+  assert.strictEqual(N.img._stats().active, 6, 'alle Plaetze belegt');
+  N.img.reset();
+  assert.strictEqual(N.img._stats().active, 0, 'nach dem Wechsel sofort frei');
+  for (i = 0; i < 6; i++) { assert.strictEqual(old[i].src, N.img.BLANK, 'Download abgebrochen'); assert.strictEqual(old[i].onload, null); }
+  var neu = [];
+  for (i = 0; i < 6; i++) { neu.push(new Img()); N.img.want(neu[i], 'http://pms/neu' + i, 0); }
+  T.tick(200);
+  assert.strictEqual(N.img._stats().active, 6, 'neues Profil laedt ohne Warten');
+  neu[0].onload(); T.tick(20);
+  assert.strictEqual(N.img._stats().active, 5);
+  N.img.want(old[0], 'http://pms/alt0', 0); T.tick(200);           // dasselbe Bild will dieselbe Adresse wieder: laedt neu
+  assert.strictEqual(old[0].src, 'http://pms/alt0');
+  old[0].onload(); T.tick(20);
+  assert.strictEqual(old[0]._pnJob, null);
+});
+
+test('Profilwechsel mit Vorladebild (TV-Weg): abgebrochen, gleiche Adresse danach wieder sichtbar, Zaehler stimmt', function () {
+  var s = setup(), N = s.N, T = s.T, pres = [];
+  N.img._mkPre(function () { var p = new Img(); pres.push(p); return p; });
+  T.tick(1100);
+  var a = new Img(); N.img.want(a, 'http://pms/x', 0); T.tick(200);
+  assert.strictEqual(pres.length, 1);
+  N.img.reset();
+  assert.strictEqual(pres[0].src, N.img.BLANK, 'Vorladebild abgebrochen'); assert.strictEqual(pres[0].onload, null);
+  assert.strictEqual(a._pnJob, null);
+  N.img.want(a, 'http://pms/x', 0); T.tick(200);
+  assert.strictEqual(pres.length, 2, 'neuer Download'); assert.strictEqual(N.img._stats().active, 1);
+  pres[1].onload(); T.tick(400);
+  assert.strictEqual(a.src, 'http://pms/x', 'Bild erscheint');
+  assert.strictEqual(N.img._stats().active, 0);
+  N.img._mkPre(null);
+});
+
+test('Profilwechsel: Bild, das auf seinen zweiten Versuch wartet, kommt nicht wieder und blockiert nichts', function () {
+  var s = setup(), N = s.N, T = s.T, a = new Img();
+  N.img.want(a, 'http://pms/y', 0); T.tick(200);
+  a.onerror(); T.tick(10);                                             // wartet 2 s auf die Wiederholung
+  N.img.reset();
+  T.tick(2500);
+  assert.strictEqual(N.img._stats().queued, 0, 'alter Auftrag nicht wieder eingereiht');
+  assert.strictEqual(N.img._stats().active, 0);
+  N.img.want(a, 'http://pms/y', 0); T.tick(200);                     // gleiche Adresse neu gewollt: laedt
+  assert.strictEqual(N.img._stats().active, 1);
+  a.onload(); T.tick(20);
+  assert.strictEqual(N.img._stats().active, 0);
+  N.img.drop(a);
+  assert.strictEqual(N.img._stats().active, 0, 'drop zaehlt nicht doppelt');
+});
+
 test('Vorab-Dekodieren (Runde 5): nur geladene Bilder, eines je Frame, nur in Ruhe, nicht doppelt', function () {
   var s = setup(), N = s.N, T = s.T, dec = new Img(), seen = [];
   N.img._dec(dec);

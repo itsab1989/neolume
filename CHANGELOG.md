@@ -5,6 +5,32 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.22] - 2026-11-08
+
+### Added
+- **Bar transparency (optional).** New setting under Settings › Home & appearance, right after "Background strength":
+  the sidebar on the left and the band at the bottom with the button hints can stay solid (the default), let the
+  picture behind them shimmer through a little ("Slightly see-through") or as clearly as the clock box ("See-through") – on
+  Home, detail pages, albums, artists and in the libraries. Behind text, icons and hints it stays dark enough to read on
+  bright pictures. It applies at once and per profile. Not offered on Mac, iPad and iPhone, whose layout hides these bars
+  in places.
+
+### Changed
+- **Button hints sit a little lower.** The line at the bottom that shows what the colour keys, INFO and TOOLS do now sits
+  12 px lower on every screen, with more room to the soft shading above it. The small "more below" note at the bottom
+  left moved with it.
+- **Sidebar background covers the icons fully.** The dark background of the sidebar now reaches just past its icons and
+  then fades out more gently, instead of starting to fade while the icons were still on it.
+- **Softer shading on detail pages.** The darkening behind the title and description now rises gently from the top of the
+  screen instead of starting with a visible edge above the text; behind the text it is as dark as before.
+
+### Fixed
+- **Pictures after switching profiles.** When you switch to another profile, pictures still loading for the previous
+  profile are cancelled at once, so the new profile's Home no longer waits behind them.
+
+If the new see-through look makes your TV feel a bit more modern, you're welcome to buy me a coffee on
+[Ko-fi](https://ko-fi.com/itsab1989) – entirely optional. ☕
+
 ## [1.0.21] - 2026-11-07
 
 ### Changed

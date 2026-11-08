@@ -4,7 +4,7 @@
  * - icons.png      PNG-Sprite (SPEC 5.21): 32-px-Raster, Spalte = Icon, Zeile = Farbzustand (Quelle design/icons/*.svg, + icons.svg/.json)
  * - fade-bottom.png 1280x88 (SPEC 2: transparent bei y 632 -> deckend ab y 652; Start, Details, Suche, Album, Kuenstler, DetHero-Kopfband)
  * - fade-frame.png 1280x108 Band unten der Mediathek (transparent bei y 612 -> deckend ab y 652, smoothstep ueber 40 px = rail.png)
- * - rail.png       120x720 Seitenleiste (deckend c.bg bis x 80 -> transparent bei x 120, dieselbe Kurve wie fade-frame:
+ * - rail.png       132x720 Seitenleiste (deckend c.bg bis x 96 -> smootherstep auf 0 bei x 132; Nutzer am TV 08.11.: Symbole x 56..88
  *                  zusammen ein Rahmen mit weicher Ecke unten links, siehe "Rahmen links + unten")
  * - scrim-hdr.png  1280x88 Kopfband Film/Serie in den Abschnitten: wie fade-bottom, nach rechts auf 30 % auslaufend
  * - all-grid.png   48x48 Raster-Symbol der Karte "Alle anzeigen" (HOME-14), Form aus design/icons/grid.svg, Farbe c.text-1
@@ -20,6 +20,8 @@
  * - scrim-saver*.png Bildschirmschoner-Einblendungen (siehe saverScrims; Eck-Schatten je Ecke fertig gespiegelt); nur diese: node tools/make_assets.js --saver
  * - saver-shadow[-sq].png Schatten unter dem Plakat im Schoner-Modus "Poster und Cover" (entsteht mit den Schoner-Scrims)
  * - scrim-clock.png weicher Eckschatten hinter der Startseiten-Uhr ohne Kasten (entsteht mit den Schoner-Scrims)
+ * - *-glass[-mid][-rail].png Fassungen der Stufen von rail, fade-bottom, fade-frame, scrim, scrim-det, scrim-np (SPEC BG-2, gleiche
+ *                  Groesse); nur diese: node tools/make_assets.js --glass
  * Braucht: rsvg-convert (Homebrew librsvg) fuer den Sprite, npm-Paket qrcode.
  */
 'use strict';
@@ -56,8 +58,9 @@ function allGrid() {
   try { cp.execFileSync('rsvg-convert', ['-o', path.join(OUT, 'all-grid.png'), t]); } catch (e) { console.error('rsvg-convert fehlt – all-grid.png'); }
 }
 if (process.argv.indexOf('--allgrid') >= 0) { allGrid(); process.exit(0); }
-if (process.argv.indexOf('--saver') < 0) allGrid();
-if (process.argv.indexOf('--saver') < 0) ptrs.forEach(function (b) {
+var ONLY_GLASS = process.argv.indexOf('--glass') >= 0;   // --glass schreibt nur die sechs *-glass.png (keine Zeiger, kein Raster-Symbol)
+if (process.argv.indexOf('--saver') < 0 && !ONLY_GLASS) allGrid();
+if (process.argv.indexOf('--saver') < 0 && !ONLY_GLASS) ptrs.forEach(function (b) {
   [[b[0] + '.png', b[1]], [b[0] + '-press.png', b[2]]].forEach(function (p) {
     var t = path.join(require('os').tmpdir(), 'neo-' + p[0] + '.svg');
     fs.writeFileSync(t, arrowSvg(p[1]));
@@ -225,15 +228,234 @@ function frameA(d, x, y) {   // d = Abstand von der Innenkante (0 = transparent)
   return Math.max(0, Math.min(255, Math.floor(255 * a + (t > 0 && t < 1 ? ign(x, y) : 0.5))));
 }
 function ign(x, y) { var v = 52.9829189 * ((0.06711056 * x + 0.00583715 * y) % 1); return v - Math.floor(v); }   // [0,1)
+
+/* ---------- Transparenz der Leisten (SPEC BG-2, Einstellung "glass", Standard deckend; Nutzerwunsch 08.11.) ----------
+ * Je Bild Fassungen in GLEICHER Groesse (N.glass tauscht nur die Quelle, keine zusaetzliche Ebene): *-glass (Durchscheinend),
+ * *-glass-mid (Leicht durchscheinend), fuer die Abdunklungen zusaetzlich *-rail (caps.glassBars 'rail', ohne Band).
+ * Hauptregel (TV-Befunde 08.11.): die Gesamtwirkung aus Seitenleiste + Band + Abdunklung wird nach rechts nie dunkler (je Zeile,
+ * Toleranz 0,01) – eine hellere Leiste neben dunklerem Text las sich als Fleck; unten (ab y 560) ist jede Zeile ueber x 0..400
+ * gleich (Ecke ohne Kerbe/Dopplung). tests/glass.test.js prueft das samt Kontrasten.
+ * - Seitenleiste: flach (Durchscheinend 0,72 = Boden hinter dem Hero-Text; Leicht = GLASS.railMid), Kante wie rail.png.
+ * - Band: EINE weiche Rampe ab der Oberkante bis zur Hinweis-Zeile (0,76), darunter flach (eine zweite Stufe im Sicherheitsrand
+ *   las sich als dunkler Streifen).
+ * - Abdunklungen: aus scrim.png / scrim-det.png / scrim-np.png abgeleitet, an keinem Pixel dunkler; Ziel je Zeile flach vom
+ *   Bildschirmrand (Boden F(y)), rechts dem Original folgend; G = 1 - (1 - Ziel) / (1 - Leisten).
+ * Nur diese Bilder neu erzeugen: node tools/make_assets.js --glass */
+var GLASS = {
+  bar: Number(/,\s*([\d.]+)\)$/.exec(T.color('bg-60'))[1]),   // 0.6 aus dem Token c.bg-60
+  rail: 0.72,                                                   // Seitenleiste (Symbole x 58..86): = Boden der Startseite hinter dem Hero-Text (nach rechts nie dunkler)
+  hint: 0.88, hintEnd: 672                                       // Band (TV 08.11.: weisse Senderkacheln unter "OK Ansehen" kaum lesbar, 0,76 zu wenig): EINE weiche Rampe von der Oberkante bis zur Hinweis-Zeile (top 668, Text
+                                                                // y ~674..692) auf 0,88, darunter flach (keine zweite Stufe, kein Streifen ganz unten)
+};
+function ramp(v, a, b) { var t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); }
+function dither(a, x, y) { return Math.max(0, Math.min(255, Math.floor(255 * a + (a > 0 && a < 1 ? ign(x, y) : 0.5)))); }
+function frameS(d) { var t = Math.max(0, Math.min(1, (d + 0.5) / FRAME_L)); return t * t * (3 - 2 * t); }   // Kurve von frameA ohne Rauschen
+/* Deckkraft der Glas-Leisten in Bildschirm-Koordinaten (sx, sy) */
+/* Seitenleiste (Nutzer am TV 08.11.: Fade zu kurz, Hintergrund deckte die Symbole x 56..88 nicht ganz): flach bis x 96 (8 px hinter
+ * den Symbolen), dann smootherstep ueber 36 px auf 0 bei x 132. Nicht weiter: der Fokusrahmen der ersten Karte liegt bei x 123..128
+ * (Rahmen unter der Leiste: Querformat-Karten am aeussersten Pixel bis ~9 % dunkler, Plakate < 1 %), fokussierte Karten beginnen bei x 132, Karten bei x 144. */
+var RAIL_W = 132, RAIL_FLAT = 96;
+function railS(sx) { if (sx >= RAIL_W) return 0; var t = Math.max(0, Math.min(1, (RAIL_W - sx - 0.5) / (RAIL_W - RAIL_FLAT))); return t * t * t * (t * (t * 6 - 15) + 10); }
+function glassRail(sx) { return railS(sx) * GLASS.rail; }
+function glassBand(sy, top) {   // Band ab y top: eine smoothstep-Rampe bis y 672 auf GLASS.hint (0,88), darunter flach (TV-Befund 08.11.: zweite Stufe
+  // unten im Sicherheitsrand las sich als dunkler Streifen; Knick zwischen zwei Rampen ebenso)
+  return sy < top ? 0 : GLASS.hint * ramp(sy, top, GLASS.hintEnd);
+}
+function glassBottom(sx, sy) { return glassBand(sy, 632); }
+/* Lesbarkeit ueber dem Bild (Koordinator 08.11.: Kartenbeschriftungen text-3 auf aufgehelltem Hero ~2:1): wo Text steht, mindestens
+ * GLASS.text (auf rein weissem Bild text-2 >= 4,5:1, text-3 >= 3:1; tests/glass.test.js).
+ * EIN zusammenhaengendes Feld wie die Form des Originals (TV-Befund 08.11. auf satt rotem Hero: "dunkle Flecken zwischendrin" –
+ * getrennte weiche Inseln je Textflaeche und je Zeile verschiedene Werte neben der Seitenleiste): jede Textflaeche reicht von der
+ * Inhaltskante nach links bis zur Seitenleiste und nach unten bis ins Band; nach rechts und nach oben laeuft sie weich aus
+ * (smoothstep ueber GLASS.soft px). Vereinigt per max -> nach rechts und nach oben nie dunkler werdend, keine Inseln, und neben der
+ * Seitenleiste in jeder Hoehe dasselbe. Links laeuft der Boden gleichmaessig von der Seitenleiste (0,65 am Bildschirmrand) zum Text
+ * (0,82 ab x 144), ohne helle Spalte. Ausserhalb bleiben Seitenleiste, Band und die Bildecke oben rechts so hell wie vorher. */
+GLASS.text = 0.82; GLASS.soft = 260;
+var TEXT_HOME = [[784, 60],               // Hero-Text (.hero-txt: Overline, Titel, Meta 640 px bis x 784) und darunter Ueberschriften
+  [1280, 556]];                           // Beschriftungen der Karten + Ueberschrift der naechsten Reihe (ganze Breite)
+var TEXT_DET = [[800, 40], [1000, 200], [1280, 300]];   // Kopf in den Abschnitten · erster Bildschirm · Abschnitte
+function textP(areas, x, y) {             // areas: je [rechte Kante, obere Kante]; links bis x 0, unten bis ins Band
+  var m = 0;
+  for (var i = 0; i < areas.length; i++) {
+    var a = areas[i], v = (1 - ramp(x, a[0], a[0] + GLASS.soft)) * ramp(y, a[1] - GLASS.soft, a[1]);
+    if (v > m) m = v;
+  }
+  var lo = GLASS.rail + (GLASS.text - GLASS.rail) * ramp(x, 16, 144);
+  return lo * m;
+}
+/* Zusatz von scrim-det: nach oben lang und gleichmaessig auslaufend (Nutzer am TV 08.11., ruhiges helles Bild: der steile Anstieg y 40..210
+ * las sich als Oberkante eines dunklen Kastens hinter dem Info-Block) – von y 0 bis y 230 (Oberkante des Info-Blocks auf dem ersten
+ * Bildschirm, Ueberzeile ab y ~240) fast linear mit weichen Enden (Steigung hoechstens 1,25 x Mittel); darunter unveraendert. */
+function easeLin(t, e) { t = Math.max(0, Math.min(1, t)); var k = 1 / (1 - e); return t < e ? k * t * t / (2 * e) : t > 1 - e ? 1 - k * (1 - t) * (1 - t) / (2 * e) : k * (t - e / 2); }
+function detE(x, y) { return 0.65 * (1 - ramp(x, 860, 1240)) * easeLin(y / 230, 0.2) * (1 - ramp(y, 560, 700)); }
+/* Zwei Stufen (Nutzer 08.11. am TV: "so wie jetzt, so wie vorher und irgendwas dazwischen"): strong = *-glass.png (Durchscheinend),
+ * mid = *-glass-mid.png (Leicht durchscheinend). mid liegt bei Seitenleiste und Band genau auf halbem Weg zwischen deckend und strong;
+ * die Abdunklung wird so gewaehlt, dass die Gesamtwirkung (Abdunklung + Leisten) die Mitte zwischen aus und strong trifft. Je Bild gilt
+ * strong <= mid <= Original (tests/glass.test.js).
+ * Ecke unten links (TV-Befund 08.11.: wirkte fast deckend): Seitenleiste und Band liegen dort uebereinander und dunkelten doppelt ab.
+ * Das Band wird unter der Seitenleiste (x < RAIL_W = 132) so viel schwaecher, dass beide zusammen genau max(Seitenleiste, Band) ergeben –
+ * dieselbe Staerke wie das Band daneben und die Leiste darueber, ohne dunkles Quadrat (Start, Details, Mediathek, Live-TV, Album,
+ * Kuenstler: ueberall liegt das Band unter der Seitenleiste). */
+var GLASS_LV = { strong: { sfx: '-glass', k: 1 }, mid: { sfx: '-glass-mid', k: 0.5 } };
+function offRail(sx) { return railS(sx); }                         // rail.png ohne Rauschen
+function offBottom(sy) { var y = sy - 632; return y < 0 ? 0 : y >= 20 ? 1 : (y / 20) * (y / 20) * 0.6 + (y / 20) * 0.4; }   // fade-bottom.png
+function offFrame(sy) { return sy < 612 ? 0 : frameS(sy - 612); }                          // fade-frame.png
+/* Seitenleiste je Stufe: dieselbe Form wie rail.png, flach bis x 96 (railS); strong = GLASS.rail (0,72 = Boden hinter dem Hero-Text), mid =
+ * GLASS.railMid (Mitte aus diesem Boden und dem Hellsten des Originals an der Leistenkante) – so ist die Leiste nie dunkler als die
+ * Abdunklung daneben (sonst Stufe an der Leistenkante bzw. Strich hinter den Symbolen, TV-Befund 08.11.) */
+function lvRail(lv, sx) { return railS(sx) * (lv.k < 1 ? GLASS.railMid : GLASS.rail); }
+/* Bezug "deckend" fuer die Zwischenstufe: fade-bottom.png steigt in 20 px auf und knickt bei y 652 (Steigung 0,08 -> 0) – halb
+ * uebernommen war das in der Stufe mid ein sichtbarer Knick (Pruefbefund 08.11.). Deshalb weich ueber 40 px (smoothstep, nie dunkler
+ * als fade-bottom.png, nie heller als die Glas-Fassung). */
+function offBottomS(sy) { return Math.max(glassBand(sy, 632), ramp(sy, 632, 672)); }
+function lvBandU(lv, sy, frame) {                                                            // Band ohne Eck-Ausgleich
+  var o = frame ? offFrame(sy) : lv.k < 1 ? offBottomS(sy) : offBottom(sy), g = frame ? glassBand(sy, 612) : glassBand(sy, 632);
+  return o + (g - o) * lv.k;
+}
+function lvBand(lv, sx, sy, frame) {                                                         // mit Eck-Ausgleich unter der Seitenleiste
+  var u = lvBandU(lv, sy, frame), r = lvRail(lv, sx);
+  if (sx >= RAIL_W || r <= 0) return u;
+  if (r >= 1) return 0;
+  // weiches Maximum statt max (Nutzer 08.11.: "Uebergaenge wirklich fliessend"): max gab entlang der Diagonale r = u einen Knick
+  // (Mediathek, Live-TV); smax ist ueberall glatt und liegt hoechstens SMAX_K / 2 (0,08) ueber max – in der Ecke eine weiche, leicht
+  // dunklere Rundung statt einer Knicklinie
+  // nur das Band der Mediathek/Live-TV (ohne Abdunklung darueber); auf Start/Details gleicht die Abdunklung die Ecke ohnehin aus
+  return Math.max(0, 1 - (1 - (frame ? smax(r, u) : Math.max(r, u))) / (1 - r));
+}
+var SMAX_K = 0.16;
+// Rundung nur dort, wo beide da sind (k^2 ~ a*b): ist eine Ebene 0, ist smax genau die andere – kein Anheben an Band-Oberkante/Leistenrand
+function smax(a, b) { var k2 = SMAX_K * SMAX_K * Math.min(1, 16 * a * b); return Math.min(1, (a + b + Math.sqrt((a - b) * (a - b) + k2)) / 2); }
+function lvFrameF(lv, sx, sy) { return 1 - (1 - lvRail(lv, sx)) * (1 - lvBand(lv, sx, sy, false)); }   // Leisten ueber Hero/Details
+function glassAssets() {
+  var V = require('./visual.js');
+  (function () {   // GLASS.railMid aus scrim.png: (Hellstes bei x 200, y 0..480, + Boden 0,72) / 2
+    var p = path.join(OUT, 'scrim.png'); if (!fs.existsSync(p)) { GLASS.railMid = 0.8; return; }
+    var S = V.readPng(p), mn = 1; for (var y = 0; y <= 480; y += 2) mn = Math.min(mn, S.px[(y * S.w + 200) * 4 + 3] / 255);
+    GLASS.railMid = (mn + S.px[(240 * S.w + 300) * 4 + 3] / 255) / 2;
+  })();
+  Object.keys(GLASS_LV).forEach(function (k) {
+    var lv = GLASS_LV[k];
+    fs.writeFileSync(path.join(OUT, 'rail' + lv.sfx + '.png'), png(RAIL_W, 720, function (x, y) { return [BG[0], BG[1], BG[2], dither(lvRail(lv, x), x, y)]; }));
+    fs.writeFileSync(path.join(OUT, 'fade-bottom' + lv.sfx + '.png'), png(1280, 88, function (x, y) {
+      // nie dunkler als fade-bottom.png; unter der Seitenleiste gilt die Stufen-Reihenfolge fuer Leiste + Band zusammen (Eck-Ausgleich)
+      var b = dither(lvBand(lv, x, y + 632, false), x, y);
+      if (lv.k < 1) b = Math.min(Math.round(255 * offBottom(y + 632)), b);
+      return [BG[0], BG[1], BG[2], b];
+    }));
+    fs.writeFileSync(path.join(OUT, 'fade-frame' + lv.sfx + '.png'), png(1280, 108, function (x, y) {
+      return [BG[0], BG[1], BG[2], dither(lvBand(lv, x, y + 612, true), x, y)];
+    }));
+  });
+  /* Regel (Koordinator 08.11.): nie dunkler als das Original, an keinem Pixel. Gesamtwirkung C = 1 - (1 - Leisten) * (1 - Abdunklung);
+   * zuerst das Ziel T fuer die Gesamtwirkung je Stufe, daraus Abdunklung G = 1 - (1 - T) / (1 - Leisten) (Leisten schon dunkler -> 0).
+   * Nach rechts nie dunkler werdend (TV-Befund 08.11., "KPop": hinter dem Hero-Titel erst hell am Rand, dann dunkler, dann wieder heller
+   * = Fleck): T haengt links nur von y ab und folgt rechts dem Original –
+   *   strong: T = min(Original, F(y)) mit einem Boden F je Bildschirm, der nur von y abhaengt (in x konstant, also ab dem Bildschirmrand
+   *     flach, auch unter der Seitenleiste); da das Original nach rechts nie dunkler wird, wird es auch T nicht.
+   *   mid:    T = Mitte aus deckend (Original unter den deckenden Leisten; Band weich, offBottomS) und strong – beide nach rechts nie
+   *     dunkler, also auch die Mitte.
+   * Ecke unten links (Nutzer 08.11.: "ein durchgehender Balken"): ab y 640 ist T in x 0..200 dasselbe wie bei x 200 (Uebergang
+   * y 615..640), so ergibt Seitenleiste + Band + Abdunklung dort genau das Band daneben – keine hellere Ecke, kein Bogen. */
+  function cornerFlat(T, W, H) {
+    for (var y = 600; y < H; y++) {
+      var w = ramp(y, 615, 640);
+      if (w <= 0) continue;
+      var ref = T[y * W + 200];
+      for (var x = 0; x < 200; x++) T[y * W + x] = w * ref + (1 - w) * T[y * W + x];
+    }
+  }
+  function scrimG(base, floor) {
+    var src = path.join(OUT, base + '.png');
+    if (!fs.existsSync(src)) return;
+    var S = V.readPng(src), W = S.w, H = S.h, x, y;
+    function at(x, y) { return S.px[(y * W + x) * 4 + 3]; }
+    var Ts = new Float64Array(W * H), Tm = new Float64Array(W * H), strong = Buffer.alloc(W * H);
+    for (y = 0; y < H; y++) { var F = floor(y); for (x = 0; x < W; x++) Ts[y * W + x] = Math.min(at(x, y) / 255, F); }
+    var Ts0 = Float64Array.from(Ts);                               // ohne Eck-Ausgleich (fuer die Fassung ohne Band, *-rail)
+    /* zum Band hin weich auf dessen Wert (GLASS.hint) statt per max: Gesamtwirkung T + (max(T, Band) - T) * Rampe des Bands – kein
+     * Knick dort, wo das Band den Boden kreuzt (bei 0,88 sonst sichtbar), und nie heller als das Band */
+    // lang und weich (smootherstep y 560..672): auf Start/Details wirkte der kurze Anstieg ab y 632 wie eine harte Schnittkante an den
+    // Karten der naechsten Reihe (TV-Befund 08.11., "Extras"); die Abdunklung liegt ohnehin ueber dem ganzen Bild, kostet nichts extra
+    for (y = 560; y < H; y++) { var tb = Math.min(1, (y - 560) / (GLASS.hintEnd - 560)), bs = tb * tb * tb * (tb * (tb * 6 - 15) + 10); for (x = 0; x < W; x++) { var t0 = Ts[y * W + x]; Ts[y * W + x] = t0 + (Math.max(t0, GLASS.hint) - t0) * bs; } }
+    cornerFlat(Ts, W, H);
+    function cOffAt(x, y) { return 1 - (1 - offRail(x)) * (1 - offBottomS(y)) * (1 - at(x, y) / 255); }
+    /* mid nie heller als strong (max mit Ts; oben links auf Details lag das Original bei x 200 knapp unter dem Boden 0,82).
+     * mid je Zeile von x 0 bis 200 flach: hoechstens die Mitte aus Boden und Original bei x 200 in dieser Zeile – unter und neben der
+     * Leiste also genau wie der Inhalt daneben (sonst Flecken/Strich entlang der Leiste); min mit einem nur von y abhaengigen Wert bleibt
+     * nach rechts nie dunkler werdend. Die Seitenleiste selbst (GLASS.railMid) ist nie dunkler als das Hellste davon. */
+    /* unten mindestens so dunkel wie das Band der Stufe mid ganz unten ((1 + GLASS.hint) / 2 = 0,94), weich ueber y 480..620 (smootherstep):
+     * dann liegt das Band ganz unter der Abdunklung, Zeilen ab y 560 sind ueber die ganze Breite gleich (Ecke ohne Kerbe/Dopplung) und
+     * es gibt keinen Knick, wo das Band die Abdunklung kreuzen wuerde */
+    var bandMid = (1 + GLASS.hint) / 2;
+    function smoother(t) { t = Math.max(0, Math.min(1, t)); return t * t * t * (t * (t * 6 - 15) + 10); }
+    for (y = 0; y < H; y++) { var Fm = (cOffAt(200, y) + floor(y)) / 2, bm = bandMid * smoother((y - 480) / 140); for (x = 0; x < W; x++) Tm[y * W + x] = Math.max(bm, Ts[y * W + x], Math.min(Fm, (cOffAt(x, y) + Ts[y * W + x]) / 2)); }
+    var Tm0 = new Float64Array(W * H);                              // fuer *-rail: Mitte ohne Band (das gibt es dort nicht)
+    for (y = 0; y < H; y++) { var Fm0 = (at(200, y) / 255 + floor(y)) / 2; for (x = 0; x < W; x++) Tm0[y * W + x] = Math.max(Ts0[y * W + x], Math.min(Fm0, (1 - (1 - offRail(x)) * (1 - at(x, y) / 255) + Ts0[y * W + x]) / 2)); }
+    cornerFlat(Tm, W, H);
+    fs.writeFileSync(path.join(OUT, base + '-glass.png'), png(W, H, function (x, y) {
+      var f = lvFrameF(GLASS_LV.strong, x, y), b = Math.min(at(x, y), dither(Math.max(0, 1 - (1 - Ts[y * W + x]) / (1 - f)), x, y));
+      strong[y * W + x] = b;
+      return [BG[0], BG[1], BG[2], b];
+    }));
+    fs.writeFileSync(path.join(OUT, base + '-glass-mid.png'), png(W, H, function (x, y) {
+      var f = lvFrameF(GLASS_LV.mid, x, y), sb = strong[y * W + x];
+      var b = f >= 1 ? sb : dither(Math.max(0, 1 - (1 - Tm[y * W + x]) / (1 - f)), x, y);
+      // Reihenfolge strong <= mid <= deckend gilt fuer die Gesamtwirkung (Leisten + Abdunklung), nicht je Bild: die Leisten sind in mid
+      // dunkler, die Abdunklung darunter darf dann heller sein (eine Klammer je Bild gab eine Stufe an der Ecke, Pruefbefund 08.11.)
+      return [BG[0], BG[1], BG[2], Math.min(at(x, y), b)];
+    }));
+    /* caps.glassBars 'rail' (Geraete ohne Band unten): Seitenleiste und Abdunklung wie oben, nach unten (y 560..660) weich zurueck zum
+     * Original, unten genau wie Deckend. Gewicht nur von y abhaengig, damit es nach rechts nie dunkler wird: T_r = o - w(y) (o - T_Stufe);
+     * Abdunklung unter der Glas-Seitenleiste allein: G = 1 - (1 - T_r) / (1 - Leiste); nie dunkler als das Original, strong <= mid. */
+    var strongR = Buffer.alloc(W * H);
+    [['strong', Ts0, '-glass-rail'], ['mid', Tm0, '-glass-mid-rail']].forEach(function (lvp) {
+      var lv = GLASS_LV[lvp[0]], T0 = lvp[1];
+      fs.writeFileSync(path.join(OUT, base + lvp[2] + '.png'), png(W, H, function (x, y) {
+        var ob = at(x, y), o = ob / 255, w = 1 - ramp(y, 560, 660);
+        var t = o - w * (o - Math.min(o, T0[y * W + x])), r = lvRail(lv, x);
+        var b = r >= 1 ? ob : Math.min(ob, dither(Math.max(0, 1 - (1 - t) / (1 - r)), x, y));
+        if (w <= 0) b = ob;
+        // Reihenfolge strong <= mid gilt fuer die Gesamtwirkung (Leiste + Abdunklung), nicht je Bild
+        return [BG[0], BG[1], BG[2], b];
+      }));
+    });
+  }
+  /* Boeden je Bildschirm (nur von y abhaengig): Startseite hinter Hero-Text, Ueberschrift und darunter so dunkel wie das Original selbst
+   * hinter der Beschreibung (bei x 300, y 240: 0,72 – dieselbe Lesbarkeit wie bisher dort), zu den Kartenbeschriftungen hin weich
+   * (smootherstep y 376..556) auf GLASS.text (0,82: text-2 >= 4,5:1, text-3 >= 3:1 auf Weiss); Details/Album/Kuenstler ueberall
+   * GLASS.text (das Original ist hinter Titel/Infos/Beschreibung selbst 0,8..0,9). */
+  var heroF = (function () { var p = path.join(OUT, 'scrim.png'); if (!fs.existsSync(p)) return 0.72; var S = V.readPng(p); return S.px[(240 * S.w + 300) * 4 + 3] / 255; })();
+  GLASS.hero = heroF;
+  function smoother(t) { t = Math.max(0, Math.min(1, t)); return t * t * t * (t * (t * 6 - 15) + 10); }
+  scrimG('scrim', function (y) { return heroF + (GLASS.text - heroF) * smoother((y - 376) / 180); });
+  scrimG('scrim-det', function () { return GLASS.text; });
+  scrimG('scrim-np', function () { return GLASS.text; });
+  /* Kopfband der Detailseiten in den Abschnitten (scrim-hdr.png, um 180 Grad gedreht und auf 288 px gestreckt, Deckkraft 0,92). In Ruhe
+   * liegt unter dem Kopf nichts (details.js hideAbove), beim Blaettern laufen Reihen aber ~180 ms (bei Tastenwiederholung laenger) unter
+   * ihm durch (Pruefbefund 08.11.): hinter dem Kopftext (x bis 800, Bildschirm-y bis 190) deshalb so deckend wie das Original (Durchschein
+   * <= 8 %, kein Flackern), aussen weicher: unten smootherstep auf 0 bei y 288 (Bild-y 0..30 statt 0..20), rechts ab x 800 zusaetzlich
+   * bis x 1100 auf die Stufe (Durchscheinend 0,70, Leicht 0,85) – dort steht kein Text. Nie dunkler als scrim-hdr.png. */
+  [['-glass', 0.70], ['-glass-mid', 0.85]].forEach(function (lv) {
+    fs.writeFileSync(path.join(OUT, 'scrim-hdr' + lv[0] + '.png'), png(1280, 88, function (x, y) {
+      var tv = Math.min(1, y / 30), v = tv * tv * tv * (tv * (tv * 6 - 15) + 10);
+      var t = Math.max(0, Math.min(1, (1279 - x - 780) / 460)), h = 1 - 0.7 * t * t * (3 - 2 * t);
+      var tr = Math.max(0, Math.min(1, (1279 - x - 800) / 300)), sr = tr * tr * tr * (tr * (tr * 6 - 15) + 10), g = 1 - (1 - lv[1]) * sr;
+      var o = (y >= 20 ? 1 : (y / 20) * (y / 20) * 0.6 + (y / 20) * 0.4) * h;
+      return [BG[0], BG[1], BG[2], Math.min(Math.round(255 * o), dither(v * h * g, x, y))];
+    }));
+  });
+}
+if (process.argv.indexOf('--glass') >= 0) { glassAssets(); process.exit(0); }
+
 /* fade-frame: 1280x108, Bild beginnt bei y=612; transparent oben -> deckend ab y 652 (Hinweisleiste, Reihen laufen darunter aus).
  * Nur in der Mediathek: dort reicht der (bunte) Hintergrund bis unten. Start/Details/Suche behalten fade-bottom (kurz, ab y 632):
  * deren unterste Reihe/Fortschrittsbalken reichen bis y ~650, und unten links dunkelt dort scrim.png ohnehin ab. */
 fs.writeFileSync(path.join(OUT, 'fade-frame.png'), png(1280, 108, function (x, y) {
   return [BG[0], BG[1], BG[2], frameA(y, x, y)];
 }));
-/* rail: 120x720, deckend bis x 80 (Symbole x 58..86 auf vollem c.bg), dann auf 40 px wie fade-frame auf 0 bei x 120 */
-fs.writeFileSync(path.join(OUT, 'rail.png'), png(120, 720, function (x, y) {
-  return [BG[0], BG[1], BG[2], frameA(119 - x, x, y)];
+/* rail: 132x720, deckend bis x 96 (Symbole x 56..88 ganz auf c.bg), dann smootherstep auf 0 bei x 132 (railS) */
+fs.writeFileSync(path.join(OUT, 'rail.png'), png(RAIL_W, 720, function (x, y) {
+  return [BG[0], BG[1], BG[2], dither(railS(x), x, y)];
 }));
 /* fade-bottom: Bild beginnt bei y=632; transparent bei 0, deckend ab 20 (y=652) */
 fs.writeFileSync(path.join(OUT, 'fade-bottom.png'), png(1280, 88, function (x, y) {
@@ -272,10 +494,8 @@ function scrimDet() {
   var src = path.join(OUT, 'scrim.png');
   if (!fs.existsSync(src)) return;
   var S = require('./visual.js').readPng(src);
-  function ramp(v, a, b) { var t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); }
   fs.writeFileSync(path.join(OUT, 'scrim-det.png'), png(S.w, S.h, function (x, y) {
-    var o = (y * S.w + x) * 4, a = S.px[o + 3] / 255;
-    var e = 0.65 * (1 - ramp(x, 860, 1240)) * ramp(y, 40, 210) * (1 - ramp(y, 560, 700));
+    var o = (y * S.w + x) * 4, a = S.px[o + 3] / 255, e = detE(x, y);
     return [S.px[o], S.px[o + 1], S.px[o + 2], Math.round(255 * (1 - (1 - a) * (1 - e)))];
   }));
 }
@@ -298,6 +518,6 @@ QR.toFile(path.join(OUT, 'qr.png'), 'https://plex.tv/link', { errorCorrectionLev
   if (err) console.error('QR-Fehler', err);
   var scrimSrc = path.join(ROOT, 'app', 'scrim.png');
   if (!fs.existsSync(path.join(OUT, 'scrim.png')) && fs.existsSync(scrimSrc)) fs.copyFileSync(scrimSrc, path.join(OUT, 'scrim.png'));
-  scrimDet(); scrimNp(); saverScrims();
+  scrimDet(); scrimNp(); saverScrims(); glassAssets();
   fs.readdirSync(OUT).forEach(function (f) { console.log(f, fs.statSync(path.join(OUT, f)).size + ' B'); });
 });

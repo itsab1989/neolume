@@ -13,7 +13,7 @@
     this.hx = o.narrow ? 0 : HERO_X;                 // schmale Karte (Apple, Klasse K): kein Plakat, Info ab der Inhaltskante
     this.bgc = U.el('div', 'full', root, 'display:none');
     this.bg = U.el('img', 'full', root); this.bg.src = N.img.BLANK; this.bg.style.visibility = 'hidden';
-    var scrim = U.el('img', 'full', root); scrim.src = N.assetBase + (o.scrim || 'scrim-det.png');   // kraeftiger hinter dem Text (F5/F17; Kuenstler F24)
+    var scrim = U.el('img', 'full', root); N.glass.img(scrim, o.scrim || 'scrim-det.png');   // kraeftiger hinter dem Text (F5/F17; Kuenstler F24)
     this.pc = U.el('div', this.sq ? 'd-poster sq' : 'd-poster', root);
     this.poster = U.el('img', '', this.pc); this.poster.src = N.img.BLANK; this.poster.pnCover = true;
     this.pfb = U.el('div', 'd-pfb', this.pc, 'display:none'); this.pfbT = document.createTextNode(''); this.pfb.appendChild(this.pfbT);
@@ -24,7 +24,8 @@
    * Chips (fremder Titel: "Regie: …" bzw. "Sender · Idee: …") */
   P.makeInfo = function (root, o) {
     // kompakter Kopf in den Abschnitten: dunkles Band unter dem Text (Feedback-Regel 11, wie details.js)
-    this.hdr = U.el('img', 'dtop', root); this.hdr.src = N.assetBase + (o && o.hdr || 'fade-bottom.png');   // o.hdr: Band laeuft nach rechts aus (Filme/Serien)
+    this.hdr = U.el('img', 'dtop', root);
+    if (o && o.hdr) N.glass.img(this.hdr, o.hdr); else this.hdr.src = N.assetBase + 'fade-bottom.png';   // Film/Serie: Kopfband folgt der Stufe (BG-2)   // o.hdr: Band laeuft nach rechts aus (Filme/Serien)
     var info = this.info = U.el('div', 'dinfo', root);
     U.tf(info, this.hx, HERO_Y);
     this.ovT = U.txt('div', 'd-ov t-label cacc ell', info, '');

@@ -106,6 +106,24 @@
         headers: { 'Content-Type': 'text/plain' } }, function (err) { cb(!err, err); });
     }
   };
+  /* Haenger-Messung waehrend der Wiedergabe (nur Entwicklungs-Build; Nutzerbefund 08.11.: Ton stockte kurz, gegen Filmende haeufiger):
+   * ein 500-ms-Takt; kommt er > 150 ms zu spaet, stand der Hauptfaden (Speicherbereinigung, Schreiben, Malen) -> Zeile mit Filmstelle.
+   * Alle 10 min eine Zusammenfassung (Anzahl, laengster), damit ein Anstieg ueber die Laufzeit sichtbar wird. Solange gemessen wird,
+   * schreibt der Entwicklungs-Build nicht in die Protokolldatei (D.hold wie im Messlauf; das synchrone Schreiben waere selbst ein
+   * Haenger und loeste die naechste Zeile aus) – die Zeilen gehen weiter sofort an den Mac (sink), die Datei folgt nach dem Ende. */
+  var stT = 0, stHold = false;
+  D.stalls = function (on, pos) {
+    if (stT) { clearInterval(stT); stT = 0; if (D.hold) D.hold = stHold; }   // hat der Messlauf hold inzwischen beendet: so lassen
+    if (!on || !D.dev) return;
+    stHold = D.hold; D.hold = true;
+    var last = Date.now(), n = 0, worst = 0, since = last;
+    stT = setInterval(function () {
+      var now = Date.now(), late = now - last - 500;
+      last = now;
+      if (late > 150) { n++; if (late > worst) worst = late; D.log('info', 'haenger ' + late + ' ms bei ' + Math.round((pos && pos() || 0) / 1000) + ' s'); }
+      if (now - since >= 600000) { D.log('info', 'haenger 10 min: ' + n + ', laengster ' + worst + ' ms, Stelle ' + Math.round((pos && pos() || 0) / 1000) + ' s'); n = 0; worst = 0; since = now; }
+    }, 500);
+  };
   N.diag = D;
   N.log = function (m) { D.log('info', m); };
 })(N);

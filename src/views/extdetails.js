@@ -48,7 +48,7 @@
       BO = cg && N.ui.card.g ? Math.max(0, 512 - N.ui.card.g.ch) : 0;
       if (BO) { hero.setLift(BO); setOff(BO); }
       hero.setPoster(it.thumb, it.title);
-      var fade = U.el('img', 'fade', root); fade.src = N.assetBase + 'fade-bottom.png';
+      var fade = U.el('img', 'fade', root); N.glass.img(fade, 'fade-bottom.png');
       ring = new N.ui.Ring(root);
       if (N.ext.has('extdetails:open')) xt = N.ext.call('extdetails:open', X) || null;
       holdBtn = !!(xt && xt.pending && xt.pending()); holdCr = !!(xt && xt.infoPending && xt.infoPending());

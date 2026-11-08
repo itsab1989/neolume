@@ -52,13 +52,14 @@ body { color: @c.text-1@; font-family: @ty.family@;
   -webkit-transform: translate3d(0,0,0); -webkit-transition: -webkit-transform @mo.base@ @mo.ease@; }
 .hrow { position: absolute; left: 0; width: @l.screen-w@; height: 340px; }
 .row-head { position: absolute; left: @l.content-x@; top: 0; height: 32px; width: 1000px; font-size: @ty.row.size@; line-height: @ty.row.lh@; font-weight: @ty.row.weight@; color: @c.text-1@; white-space: nowrap; }
+.row-head.hd-off { visibility: hidden !important; }   /* Startseite: Kopf der naechsten Reihe, solange unten der Hinweis "darunter" steht (BG-2); !important, weil Row.setVisible visibility inline setzt */
 .row-head .cnt { font-size: 16px; font-weight: 400; color: @c.text-3@; padding-left: 10px; }
 /* HOME-11: "darunter geht es weiter" – derselbe › wie .d-tmore (Staffel-Reiter), um 90 Grad gedreht, hinter dem Kopf der naechsten Reihe */
 .row-head .more-dn { display: inline-block; width: 28px; height: 32px; margin-left: @sp.2@; vertical-align: top; text-align: center; font-size: 28px; line-height: 30px; font-weight: 600; color: @c.text-2@;
   -webkit-transform: rotate(90deg); }
 /* HOME-11, fester Hinweis: hohe Posterreihe schiebt den Kopf der naechsten Reihe aus dem Bild -> derselbe gedrehte › mit ihrem
  * Titel unten links auf Hoehe der Hinweisleiste (die steht rechtsbuendig), ueber dem Verlauf */
-.hmore { position: absolute; left: @l.content-x@; top: 656px; height: 28px; max-width: 400px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.hmore { position: absolute; left: @l.content-x@; top: 668px; height: 28px; max-width: 400px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   font-size: @ty.small.size@; line-height: 28px; color: @c.text-2@; -webkit-transform: translate3d(0,0,0); }   /* Runde 6: dauerhafte Ebene, Wechsel per visibility (home.js markMore) */
 .hcue0 .hmore { -webkit-transform: none; }   /* Gegenprobe nur im Messlauf (hvar-cue0) */
 .hmore .more-dn { display: inline-block; width: 28px; height: 28px; margin-right: @sp.2@; vertical-align: top; text-align: center; font-size: 28px; line-height: 26px; font-weight: 600;
@@ -116,7 +117,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .hero-img { position: absolute; left: 0; top: 0; width: @l.screen-w@; height: @l.screen-h@; visibility: hidden; }
 .full { position: absolute; left: 0; top: 0; width: @l.screen-w@; height: @l.screen-h@; }
 .fade { position: absolute; left: 0; top: 632px; width: @l.screen-w@; height: 88px; }
-.fade-frame { top: 612px; height: 108px; }   /* Mediathek: fade-frame.png, gleiche Kurve wie rail.png (ein Rahmen, weiche Ecke) */
+.fade-frame { top: 612px; height: 108px; }   /* Mediathek: fade-frame.png, 40 px smoothstep (rail.png: 36 px smootherstep) – zusammen ein Rahmen mit weicher Ecke */
 .s-fade { top: 584px; }
 .s-fadebg { position: absolute; left: 0; top: 672px; width: @l.screen-w@; height: 48px; background: @c.bg@; }
 .hero-txt { position: absolute; left: @l.content-x@; top: 0; width: 640px; height: 316px; opacity: 1;
@@ -146,7 +147,7 @@ body { color: @c.text-1@; font-family: @ty.family@;
 
 /* ---------- Seitenleiste (SPEC 5.5, 7.4) ---------- */
 #pn-rail { position: absolute; left: 0; top: 0; width: @l.rail-w@; height: @l.screen-h@; z-index: @z.rail@; }
-.rail-bg { position: absolute; left: 0; top: 0; width: @l.rail-w@; height: @l.screen-h@; }
+.rail-bg { position: absolute; left: 0; top: 0; width: 132px; height: @l.screen-h@; }   /* rail.png 132 px: flach bis x 96, Auslauf bis x 132 (breiter als die Leiste @l.rail-w@, Nutzer am TV 08.11.) */
 .ri { position: absolute; left: 44px; width: 56px; height: 48px; border-radius: @r.md@; }
 .ri .ic { left: 12px; top: 8px; }
 .ri .bar { position: absolute; left: -16px; top: 12px; width: 4px; height: 24px; border-radius: 2px; background: @c.text-1@; display: none; }
@@ -172,7 +173,9 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .nav-sep { position: absolute; left: 56px; top: 620px; width: 208px; height: 1px; background: @c.surface-3@; }
 
 /* ---------- Hinweisleiste (SPEC 5.11) ---------- */
-#pn-hints { position: absolute; left: @l.content-x@; top: 656px; width: 1072px; height: 28px; text-align: right; white-space: nowrap; z-index: @z.bar@; }
+/* top 668 (Nutzerwunsch 08.11., zweimal je 6 px: Beschriftung stand zu hoch, nah am weichen Uebergang): 12 px unter den Zeiger-Randzonen
+ * (bis 656); Text endet bei ~692, also ~8 px im unteren Titel-Sicherheitsrand (36 px) – gewollt, layout_allow.json */
+#pn-hints { position: absolute; left: @l.content-x@; top: 668px; width: 1072px; height: 28px; text-align: right; white-space: nowrap; z-index: @z.bar@; }
 /* Tastenhinweise "Nur kurz"/"Aus" (settings.hints): nur Deckkraft, kleine Flaeche; einblenden sofort, ausblenden weich */
 #pn-hints.hid { opacity: 0; visibility: hidden; -webkit-transition: opacity @mo.slow@ @mo.ease-std@, visibility 0s linear @mo.slow@; }
 .rm #pn-hints.hid { -webkit-transition: none; }

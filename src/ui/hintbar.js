@@ -124,7 +124,7 @@
   /* Zeiger (Smart Control hat kein TOOLS usw.): Klick auf einen Eintrag = diese Taste. Rechtecke EINMAL je Aenderung messen,
    * einen Frame nach dem Setzen (nie im Tastenpfad); Treffer per Rechteck-Mathe. */
   var KEY = { OK: 'ENTER', red: 'RED', green: 'GREEN', yellow: 'YELLOW', blue: 'BLUE', ret: 'RETURN', INFO: 'INFO', TOOLS: 'TOOLS' };
-  var X0 = 144, Y0 = 656, PAD = 8;
+  var X0 = 144, Y0 = 668, PAD = 8;                        // = top von #pn-hints (app.css)
   H.list = []; H.rects = null; H.measureQ = false;
   H.measure = function () {
     H.measureQ = false;

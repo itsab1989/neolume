@@ -15,7 +15,7 @@
     this.imgs[0].src = N.img.BLANK; this.imgs[1].src = N.img.BLANK;
     this.cur = -1; this.url = ''; this.gen = 0; this.retryT = 0; this.xfT = 0;
     var scrim = U.el('img', 'full', bg);
-    scrim.src = N.assetBase + 'scrim.png';
+    N.glass.img(scrim, 'scrim.png');
     /* o.decode: Scrim erst zeigen, wenn er dekodiert ist (sonst dekodiert WebKit die 1280x720-PNG im ersten Frame des Aufbaus);
      * bis dahin steht ohnehin noch kein Bild darunter */
     if (this.o.decode && scrim.decode) { U.vis(scrim, false); scrim.decode().then(function () { U.vis(scrim, true); }, function () { U.vis(scrim, true); }); }

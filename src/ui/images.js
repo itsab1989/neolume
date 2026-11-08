@@ -40,6 +40,13 @@
    * LRU-Treffer gehen denselben Weg (WebKit verwirft dekodierte Daten unsichtbarer Bilder). Zuweisen hoechstens einmal je Frame
    * (rAF-Zeitstempel), sonst konnten mehrere Pumpen im selben Frame je SHOW_PER_FRAME Bilder setzen. dec0: Gegenprobe des Messlaufs. */
   var DECODE = FAST, lastFrame = -1, SHOW_DECODED = 8;
+  /* flying: laufende Downloads. Profilwechsel (reset) bricht sie ab (src = BLANK, Handler ab) und gibt ihre Plaetze sofort frei –
+   * vorher belegten bis zu 6 Bilder des alten Profils (Hero 1280x720 inklusive) Plaetze und Verbindungen bis zum Ende */
+  var flying = [], epoch = 0, resetAt = Date.now(), resetLoads = 0, resetWhy = 'start';
+  function left(job) { var i = flying.indexOf(job); if (i >= 0) flying.splice(i, 1); active--; }
+  /* Messung (Nutzerbefund 08.11.: Tochter wartete beim Start Sekunden auf die Bilder): Zeit vom Laden des Codes bzw. vom Profilwechsel
+   * bis zum 12. geladenen Bild */
+  function sinceReset() { if (resetAt && loads - resetLoads === 12) { if (N.log) N.log('img ' + resetWhy + ': 12 bilder nach ' + (Date.now() - resetAt) + ' ms'); resetAt = 0; } }
   var jobs = [], ready = [], active = 0, lru = new N.LRU(400), frameT = 0, paused = false, sets = 0, loads = 0;   // sets/loads: Zaehler fuer den Messlauf (P7)
   var dec = null, warmQ = [], warmed = new N.LRU(80), warms = 0, WARM_TTL = 30000;   // Vorab-Dekodieren (s. Kopf); warmed: URL -> Zeit
   /* losgeloestes Bild fuer den Download (Tests ohne DOM: null -> direkt ins <img> wie frueher) */
@@ -167,25 +174,25 @@
       if (!DECODE || !(job.pre || (job.pre = mkPre()))) { show(job); return; }
     }
     active++;
-    job.started = true;
+    job.started = true; flying.push(job);
     var pre = job.pre || (job.pre = mkPre());
     if (pre) {
       pre.onload = function () {
-        detach(pre); loads++; job.nw = pre.naturalWidth || 0; job.nh = pre.naturalHeight || 0; lru.set(job.url, job.nw ? [job.nw, job.nh] : 1);
+        detach(pre); loads++; sinceReset(); job.nw = pre.naturalWidth || 0; job.nh = pre.naturalHeight || 0; lru.set(job.url, job.nw ? [job.nw, job.nh] : 1);
         decoded(job, pre, function () {
           if (job.pre !== pre) return;     // inzwischen verworfen (drop hat active schon heruntergezaehlt)
-          active--;
+          left(job);
           if (img._pnJob === job) ready.push(job); else job.pre = null;
           kick();
         });
       };
       pre.onerror = function () {
-        detach(pre); active--;
+        detach(pre); left(job);
         if (img._pnJob !== job) { job.pre = null; kick(); return; }
         job.pre = null;                    // Wiederholung mit frischem Bild (gleiche src loest sonst evtl. nichts aus)
         if (!job.retried) {                // 1 Wiederholung nach 2 s
           job.retried = true; job.started = false;
-          setTimeout(function () { if (img._pnJob === job) { jobs.push(job); kick(); } }, 2000);
+          setTimeout(function () { if (img._pnJob === job && job.ep === epoch) { jobs.push(job); kick(); } }, 2000);
         } else { img._pnJob = null; if (N.diag) N.diag.log('warn', 'img fail ' + job.url.split('?')[0]); if (job.done) job.done(false); }
         kick();
       };
@@ -193,17 +200,17 @@
       return;
     }
     img.onload = function () {
-      detach(img); active--; img._pnJob = null; loads++;
+      detach(img); left(job); img._pnJob = null; loads++; sinceReset();
       job.nw = img.naturalWidth || 0; job.nh = img.naturalHeight || 0; lru.set(job.url, job.nw ? [job.nw, job.nh] : 1); boxFit(img, job.url, job.nw, job.nh);
       if (job.done) job.done(true);
       kick();
     };
     img.onerror = function () {
-      detach(img); active--;
+      detach(img); left(job);
       if (!job.retried) {                  // 1 Wiederholung nach 2 s
         job.retried = true; job.started = false;
         img.src = BLANK;
-        setTimeout(function () { if (img._pnJob === job) { jobs.push(job); kick(); } }, 2000);
+        setTimeout(function () { if (img._pnJob === job && job.ep === epoch) { jobs.push(job); kick(); } }, 2000);
       } else { img._pnJob = null; img.src = BLANK; if (N.diag) N.diag.log('warn', 'img fail ' + job.url.split('?')[0]); if (job.done) job.done(false); }
       kick();
     };
@@ -308,11 +315,12 @@
       if (!u) { N.img.drop(img); if (done) done(false); return; }
       if (img._pnUrl === u && !img._pnJob) { if (done) done(true); return; }   // steht schon da
       var old = img._pnJob;
+      if (old && old.ep !== epoch) { img._pnJob = old = null; }       // Auftrag von vor dem Profilwechsel (wartete auf Wiederholung): vergessen
       if (old) {
         if (old.url === u) { old.prio = Math.min(old.prio, prio); old.done = done; return; }
         N.img.drop(img);
       } else if (img._pnUrl && img._pnUrl !== u) { img.src = BLANK; img._pnUrl = null; unfit(img); }
-      var job = { img: img, url: u, prio: prio || 0, done: done, seq: seq++ };
+      var job = { img: img, url: u, prio: prio || 0, done: done, seq: seq++, ep: epoch };
       img._pnJob = job;
       jobs.push(job);
       kick();
@@ -321,6 +329,7 @@
      * bekommt gleich ein neues want -> BLANK erst dann, im selben Frame wie der neue Inhalt; gleiche URL bleibt einfach stehen) */
     drop: function (img, keep) {
       var job = img._pnJob;
+      if (job && job.ep !== epoch) { img._pnJob = job = null; }       // von vor dem Profilwechsel: zaehlt nicht mehr (reset)
       if (job) {
         var i = jobs.indexOf(job), k = ready.indexOf(job);
         if (i >= 0) jobs.splice(i, 1);
@@ -328,7 +337,7 @@
         else if (job.started) {
           if (job.pre) { detach(job.pre); try { job.pre.src = BLANK; } catch (e) {} job.pre = null; }   // Download abbrechen
           else detach(img);
-          active--; kick();
+          left(job); kick();
         }
         img._pnJob = null;
       }
@@ -349,6 +358,13 @@
     },
     /* Profilwechsel: Warteschlange und LRU leeren (SPEC 7.15.5) */
     reset: function () {
+      for (var f = 0; f < flying.length; f++) {                       // laufende Downloads abbrechen (wie drop), Platz frei
+        var fj = flying[f];
+        if (fj.pre) { detach(fj.pre); try { fj.pre.src = BLANK; } catch (e) {} fj.pre = null; }
+        else { detach(fj.img); fj.img.src = BLANK; fj.img._pnUrl = null; }
+        fj.img._pnJob = null;
+      }
+      flying = []; active = 0; epoch++; if (loads || resetWhy !== 'start') { resetAt = Date.now(); resetWhy = 'profilwechsel'; } resetLoads = loads;   // erstes reset beim Start (Profil aktiv): Startmessung laeuft weiter
       for (var i = 0; i < jobs.length; i++) jobs[i].img._pnJob = null;
       for (i = 0; i < ready.length; i++) ready[i].img._pnJob = null;
       jobs = []; ready = []; lru.clear(); warmQ = []; warmed.clear();

@@ -105,6 +105,16 @@ function yellowPng(w, h) {
   }
   return writePng(w, h, px);
 }
+/* Transparenz der Leisten (BG-2, Seeds glassRed*): satt rot/orangefarbenes, leicht bewegtes Hintergrundbild – darauf fielen am TV
+ * dunkle Flecken der Abdunklung auf (TV-Befund 08.11.) */
+function redPng(w, h) {
+  var px = Buffer.alloc(w * h * 4);
+  for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+    var t = 0.5 + 0.5 * Math.sin(x / 83 + Math.sin(y / 71) * 1.6) * Math.cos(y / 57 - x / 191), o = (y * w + x) * 4;
+    px[o] = Math.round(225 + 30 * t); px[o + 1] = Math.round(40 + 70 * t); px[o + 2] = Math.round(20 + 20 * t); px[o + 3] = 255;
+  }
+  return writePng(w, h, px);
+}
 /* Ecke unten links (Seitenleiste + Band unten, Seed ambCorner): knallbuntes, helles Titelbild (abgedunkelt wie am PMS, f = darken) –
  * weicher Verlauf aus vier Eckfarben, damit Staerke und Form des Rahmens auf ruhigem, buntem Grund sichtbar sind */
 function gradPng(w, h, f) {
@@ -481,8 +491,11 @@ function startServer(cb) {
       var pa0 = /^svPic/.test(curSeed) && /^\/library\/metadata\/(\d+)\/art\//.exec(src);
       if (pa0 && /^svPicPause/.test(curSeed)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(/Still/.test(curSeed) ? busyPng(w, h) : gradPng(w, h, function (c) { return darken(c, u.searchParams); })); }
       if (pa0) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(Number(pa0[1]) % 2 ? busyPng(w, h) : gradPng(w, h, function (c) { return darken(c, u.searchParams); })); }
+      // ruhiges, helles graues Hintergrundbild (TV-Befund 08.11. Details: Kasten-Kante ueber dem Info-Block, Kante am Ausschnitt)
+      if (/^glassCalm/.test(curSeed) && /\/a\/|\/art\//.test(src)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(solidPng(w, h, [196, 198, 200])); }
+      if (/^glassRed/.test(curSeed) && /\/a\/|\/art\//.test(src)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(redPng(w, h)); }
       var sv = /^sv[A-Z]/.test(curSeed) && /^\/a\//.test(src);   // Bildschirmschoner-Szenen: helles, dunkles, unruhiges Bild
-      if (curSeed === 'ambCorner' && /^\/a\//.test(src)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(gradPng(w, h, function (c) { return darken(c, u.searchParams); })); }
+      if ((curSeed === 'ambCorner' || curSeed === 'glassCorner' || curSeed === 'glassMidCorner') && /^\/a\//.test(src)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(gradPng(w, h, function (c) { return darken(c, u.searchParams); })); }
       if (sv && /Color/.test(curSeed)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(gradPng(w, h)); }   // knallbunt, hell
       if (sv && /Yellow/.test(curSeed)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(yellowPng(w, h)); }
       if (sv && /Highkey/.test(curSeed)) { cors(); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(highkeyPng(w, h)); }
@@ -872,6 +885,12 @@ function makeSeeds(port) {
   seeds.qOrig = seed({}, { 'settings-aaaa1111.json': { quality: 'orig', qualityRemote: 'orig' } });
   // Hintergrund in Bibliotheken: Farbstimmung (Standard, ohne Eintrag), kraeftiger, Titelbild, Zufallsbild, aus, ohne Hintergrundbilder
   function amb(o, l) { return seed(l ? { lang: l } : {}, { 'settings-aaaa1111.json': o }); }
+  // Transparenz der Leisten (SPEC BG-2, Einstellung glass): Startseite, Details, Mediathek (Farbstimmung), Suche
+  seeds.glass = seed({}, { 'settings-aaaa1111.json': { glass: true } });
+  seeds.glassMid = seed({}, { 'settings-aaaa1111.json': { glass: 'mid' } }); seeds.glassMidCorner = amb({ glass: 'mid', libBg: 'art', libBgStrength: 'strong' });
+  seeds.glassRed = seed({}, { 'settings-aaaa1111.json': { glass: 'strong' } }); seeds.glassRedMid = seed({}, { 'settings-aaaa1111.json': { glass: 'mid' } }); seeds.glassRedOff = seed();
+  seeds.glassCalmOff = seed(); seeds.glassCalmMid = seed({}, { 'settings-aaaa1111.json': { glass: 'mid' } }); seeds.glassCalm = seed({}, { 'settings-aaaa1111.json': { glass: 'strong' } });
+  seeds.glassAmb = amb({ glass: true, libBgStrength: 'strong' }); seeds.glassCorner = amb({ glass: true, libBg: 'art', libBgStrength: 'strong' });
   seeds.ambMood = amb({}); seeds.ambStrong = amb({ libBgStrength: 'strong' }); seeds.ambArt = amb({ libBg: 'art' });
   seeds.ambArtStrong = amb({ libBg: 'art', libBgStrength: 'strong' }); seeds.ambRandom = amb({ libBg: 'random' }); seeds.ambOff = amb({ libBg: 'off' });
   seeds.ambCorner = amb({ libBg: 'art', libBgStrength: 'strong' });   // Titelbild knallbunt und hell (gradPng): Ecke unten links
@@ -1122,8 +1141,8 @@ var SCENES = [
   { name: 'news-settings', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'news-settings-secs-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
   { name: 'news-settings-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,INFO' },
-  { name: 'settings-clockstyle', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
-  { name: 'settings-clockstyle-off', seed: 'spoiler', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // Uhr aus: Zeile gedimmt, Satz erklaert warum
+  { name: 'settings-clockstyle', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'settings-clockstyle-off', seed: 'spoiler', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },   // Uhr aus: Zeile gedimmt, Satz erklaert warum
   { name: 'settings-hints-en', seed: 'en', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,ENTER' },
   { name: 'settings-hints-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,INFO' },
   // Akzentfarbe: Einstellung (Farbfeld), Auswahl mit Farbfeldern, Wechsel wirkt sofort; Startseite/Seitenleiste in anderen Farben
@@ -1331,6 +1350,37 @@ var SCENES = [
   { name: 'amb-settings-off', seed: 'ambOff', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'amb-settings-en', seed: 'ambEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   { name: 'amb-settings-panel-en', seed: 'ambEn', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  // Transparenz der Leisten (SPEC BG-2): Stufe Durchscheinend; Deckend = die bisherigen Szenen (unveraendert)
+  { name: 'glass-home', seed: 'glass' },
+  { name: 'glass-home-row2', seed: 'glass', keys: 'DOWN,RIGHT' },
+  { name: 'glass-home-poster', seed: 'glass', keys: 'DOWN,DOWN,RIGHT,RIGHT', mask: [[320, 270, 600, 34]] },
+  { name: 'glass-rail', seed: 'glass', keys: 'LEFT,DOWN' },
+  { name: 'glass-details', seed: 'glass', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER' },
+  { name: 'glass-details-cast', seed: 'glass', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN' },
+  { name: 'glass-library', seed: 'glassAmb', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,wait1800' },   // Farbstimmung kraeftiger, bunter Titel
+  { name: 'glass-library-corner', seed: 'glassCorner', keys: 'LEFT,DOWN,ENTER,wait1800' },   // helles Titelbild: Rahmen + Ecke unten links (wie amb-corner)
+  { name: 'glass-library-plain', seed: 'glass', keys: 'LEFT,DOWN,ENTER,wait800,DOWN,RIGHT' },
+  // Stufe "Leicht durchscheinend" (mid) und satt roter Hero (TV-Befund 08.11.: Flecken) in allen drei Stufen
+  { name: 'glass-mid-home', seed: 'glassMid' },
+  { name: 'glass-mid-home-poster', seed: 'glassMid', keys: 'DOWN,DOWN,RIGHT,RIGHT', mask: [[320, 270, 600, 34]] },   // Hinweis unten, Kopf der naechsten Reihe aus (TCL 08.11.)
+  { name: 'glass-mid-details', seed: 'glassMid', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER' },
+  { name: 'glass-mid-library-corner', seed: 'glassMidCorner', keys: 'LEFT,DOWN,ENTER,wait1800' },
+  // ruhiges helles Bild auf Details (erster Bildschirm und einen Schritt gerollt: Kopfband, Kante am Ausschnitt) in allen drei Stufen
+  { name: 'glass-calm-details-off', seed: 'glassCalmOff', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER' },
+  { name: 'glass-calm-details-mid', seed: 'glassCalmMid', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER' },
+  { name: 'glass-calm-details', seed: 'glassCalm', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER' },
+  { name: 'glass-calm-details-cast-off', seed: 'glassCalmOff', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,wait600' },
+  { name: 'glass-calm-details-cast-mid', seed: 'glassCalmMid', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,wait600' },
+  { name: 'glass-calm-details-cast', seed: 'glassCalm', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,wait600' },
+  { name: 'glass-calm-details-extras-mid', seed: 'glassCalmMid', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,wait600,DOWN,wait600' },
+  { name: 'glass-red-off', seed: 'glassRedOff' },
+  { name: 'glass-red-mid', seed: 'glassRedMid' },
+  { name: 'glass-red', seed: 'glassRed' },
+  { name: 'glass-search', seed: 'glass', keys: 'BLUE,wait600,ENTER,RIGHT,ENTER,wait1500,RIGHT,RIGHT,RIGHT,RIGHT,RIGHT,DOWN' },
+  { name: 'glass-settings', seed: 'glass', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
+  { name: 'glass-settings-info', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,INFO' },
+  { name: 'glass-settings-panel', seed: 'glassMid', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER' },
+  { name: 'glass-switch', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,DOWN,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,DOWN,DOWN,ENTER,RETURN,RETURN,wait800' },   // wirkt sofort: Durchscheinend waehlen, zurueck zur Startseite
   { name: 'rail-long', seed: 'longLib', keys: 'LEFT' },
   // Weitere Server: Seitenleiste mit Bibliotheken eines freigegebenen Servers (Herkunft), Bibliothek/Details mit Herkunft,
   // Seitenleiste anpassen, Einstellungszeile, nicht erreichbarer Server (Meldung nur fuer ihn)

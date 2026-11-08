@@ -55,6 +55,11 @@
       exit: true,              // die App kann sich selbst beenden (Beenden-Dialog, Hinweis "Beenden"); iOS/iPadOS/macOS-Apps nicht
       hintBar: true,           // Hinweisleiste mit Tastenkappen; false = nie, auch nicht mit Tasten (Computer: Mac, Nutzer 03.11.):
                                // Tasten unter Hilfe › Tastenbelegung, Optionen per Rechtsklick (caps.pointer 'mouse'), keine Zeile "Tastenhinweise"
+      glassBars: 'all',        // Einstellung "Transparenz der Leisten" (SPEC BG-2): 'all' = Seitenleiste + Band unten (TV-Layout: Leiste
+                               // x 0..120 immer sichtbar, Band ab y 632, Vollbild-Hero) | 'rail' = nur die Seitenleiste und die Abdunklung
+                               // links daneben (*-glass[-mid]-rail.png), unten bleibt alles wie Deckend (Geraete ohne Band) | false = Zeile
+                               // fehlt, gespeicherter Wert wird ignoriert. Mit 'rail' meldet der Adapter Layouts ohne sichtbare Leiste ueber
+                               // N.glass.railShown(false) – dann gelten die Originalbilder. true (frueher) = 'all'
       focusRing: 'always',     // 'always' = Fokus immer sichtbar (TV) | 'keys' = nur nach Tasten; Finger/Maus ohne Rahmen (N.input)
       scroll: 'focus',         // 'focus' = Inhalt folgt dem Fokus (Tasten, Wischen = Schritte) | 'free' = Wischen verschiebt frei (App.pan)
       details: 'page',         // 'page' = Detailansicht als ganze Seite (TV) | 'card' = Karte von unten ueber der abgedunkelten Ansicht,
@@ -142,6 +147,7 @@
     if (['page', 'card'].indexOf(c.details) < 0) e.push('caps.details muss page|card sein');
     if (['hero', 'tiles'].indexOf(c.home) < 0) e.push('caps.home muss hero|tiles sein');
     if (c.homeHero === true && c.home !== 'tiles') e.push('caps.homeHero nur mit caps.home tiles');
+    if ([true, false, 'all', 'rail'].indexOf(c.glassBars) < 0) e.push('caps.glassBars muss all|rail|false sein');
     if (['ok', 'details'].indexOf(c.cardTap) < 0) e.push('caps.cardTap muss ok|details sein');
     if (['tv', 'fast'].indexOf(c.images) < 0) e.push('caps.images muss tv|fast sein');
     if (typeof c.screen.flex !== 'boolean') e.push('caps.screen.flex muss true/false sein');

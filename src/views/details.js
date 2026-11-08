@@ -165,7 +165,7 @@
         TIGHT = RX < 1216;
         if (TIGHT) { TABW = Math.max(160, RX - 128); tclip.style.width = TABW + 'px'; U.cls(sec, 'ss-tight', true); }
       }
-      if (!card) { var fade = U.el('img', 'fade', root); fade.src = N.assetBase + 'fade-bottom.png'; }
+      if (!card) { var fade = U.el('img', 'fade', root); N.glass.img(fade, 'fade-bottom.png'); }
       bubble = U.el('div', 'jump', root, 'display:none'); bubbleT = document.createTextNode(''); bubble.appendChild(bubbleT);
       ring = new N.ui.Ring(card ? cpage : root);
       sb = new N.ui.StateBlock(root);
@@ -373,7 +373,7 @@
       }
       if (zone === 'row') for (i = 0; i < out.length; i++) if (rows[rk] && out[i] === rows[rk]) { rk = i; break; }
       rows = out;
-      hideAbove();
+      hideAbove(true);                                             // Aufbau: sofort (Kopfband kann durchscheinen, BG-2)
       N.idle.add(updateHints, 'det-hints');
     }
     function sameItems(a, b) {
@@ -636,6 +636,7 @@
       for (i = rdrv.length - 1; i >= 0; i--) if (rdrv[i].row !== epRow) { rdrv[i].d.stop(); rdrv.splice(i, 1); }   // Antriebe der alten Reihen
       var defs = rowDefs();
       for (i = 0; i < defs.length; i++) addRow(defs[i]);
+      hideAbove(true);   // neu aufgebaut (Laden, nach der Wiedergabe): Reihen ueber dem Kopf sofort aus – das Kopfband kann durchscheinend sein
     }
     function rowDefs() {
       var defs = [];
@@ -665,7 +666,7 @@
       if (r) { r.row.render(2, 2); r.row.relabel(); return; }
       if (!sim || !sim.length) return;
       addRow({ id: 'similar', kind: 'poster', tk: 'det.row.similar', items: sim });
-      hideAbove();
+      hideAbove(true);                                             // Aufbau: sofort (Kopfband kann durchscheinen, BG-2)
     }
 
     /* ---------- Zonen & Fokus ---------- */
@@ -683,7 +684,7 @@
      * aus (TV-Befund 28.10.: Bild rechts sonst unnoetig dunkel), dort darf nichts Altes durchscheinen. Keine Messung (feste Positionen). */
     /* Abschnitt (Seiten-y seiner Oberkante) liegt beim aktuellen Versatz unter dem Kopf -> ausgeblendet, fuer den Zeiger nicht da */
     function above(top) { return top - off < ANCHOR - LIFT - 24; }
-    function hideAbove() {
+    function hideAbove(now) {   // now: sofort ausblenden (Aufbau, nicht im Tastenpfad), sonst nach der Bewegung (180 ms)
       if (card) return;                                   // Karte: nichts liegt unter einem festen Kopf
       var b = [], i, show = [], hide = [];                // Knoepfe: dimButtons; display, weil Kinder (Pfeile) visibility setzen
       if (isShow) b.push([sec, SEC + 332]);
@@ -691,6 +692,7 @@
       for (i = 0; i < b.length; i++) (above(b[i][1]) ? hide : show).push(b[i][0]);
       if (hideT) clearTimeout(hideT);
       for (i = 0; i < show.length; i++) U.show(show[i], true);
+      if (now) { hideT = 0; for (i = 0; i < hide.length; i++) U.show(hide[i], false); return; }
       hideT = hide.length ? setTimeout(function () { hideT = 0; if (!dead) for (var k = 0; k < hide.length; k++) U.show(hide[k], false); }, 180) : 0;
     }
     function updateHints() { N.router.refreshHints(); }

@@ -59,7 +59,7 @@
       : TILES ? Math.ceil(A.h / Math.min(PITCH.land, PITCH.sq)) + 3 : 4;
     var used = false, onMode = null;                                   // HT-Wechsel ohne Neuaufbau nur, solange die Seite unbedient ist (s.stale)
     var lastIn = 0, catchT = 0;                                        // HOME-18 Nachholen: letzte Eingabe (ms), Zeitgeber
-    var root, pg, ring, hero, sb, fade, cue, cueT, cueOn = false, slots = [], rows = [], tops = [], colMem = {}, R = 0;
+    var root, pg, ring, hero, sb, fade, cue, cueT, cueOn = false, cueHead = null, slots = [], rows = [], tops = [], colMem = {}, R = 0;
     var slotRow = [], heroT = 0, task = null, loadedAt = 0, pending = null, interacted = false;
     /* freies Scrollen (caps.scroll 'free', S5/S6): py = Seitenlage (px); loose = Lage frei verschoben (erste Taste setzt den Fokus auf
      * die Karte am Anker); pan = laufender Zug; drv = Antrieb je Slot bzw. Seite (N.kinetic.Drive); eat = Klick nach Stopp verschlucken */
@@ -109,7 +109,7 @@
       } else pg = U.el('div', 'pg', root);
       size = sizeSetting();
       for (var i = 0; i < SLOTS; i++) slots.push(new N.ui.Row(pg, { geom: geom, captions: function (kind) { return PLAIN || kind === 'land'; }, w: A.w, free: FREE, clipH: PLAIN ? 400 : 0 }));
-      fade = U.el('img', 'fade', root); fade.src = N.assetBase + 'fade-bottom.png';
+      fade = U.el('img', 'fade', root); N.glass.img(fade, 'fade-bottom.png');
       // HOME-11: fester "darunter geht es weiter"-Hinweis unten links (Glyphe wie .more-dn + Titel der naechsten Reihe), nur wenn
       // deren Kopf nicht im Bild ist (hohe Posterreihe); zeigen/klicken = eine Reihe tiefer. Runde 6: dauerhafte GPU-Ebene (.hmore
       // translate3d), Zeigen/Verbergen per visibility – siehe markMore
@@ -271,6 +271,12 @@
       var on = !sb.on && R + 1 < rows.length && nextZone().cue;     // Kopf der naechsten Reihe nicht im Bild: fester Hinweis unten
       if (on) U.setText(cueT, H.rowTitle(rows[R + 1]));
       if (on !== cueOn) { cueOn = on; if (cueDisp) U.show(cue, on); else U.vis(cue, on); }
+      /* steht der feste Hinweis unten, liegt der echte Kopf der naechsten Reihe unter dem Band (y ~690): mit durchscheinendem Band
+       * (BG-2) schimmerte er doppelt unter dem Hinweis durch (TV-Befund 08.11., TCL) -> ausblenden. Nur eine Klasse am Kopf, nur bei
+       * Wechsel (gleicher Takt wie der Hinweis), keine neue Ebene */
+      var nh = null;
+      if (on) for (var j = 0; j < SLOTS; j++) if (slotRow[j] === R + 1) nh = slots[j].head;
+      if (nh !== cueHead) { if (cueHead) U.cls(cueHead, 'hd-off', false); if (nh) U.cls(nh, 'hd-off', true); cueHead = nh; }
     }
     /* Zeiger-Zone "naechste Reihe" (RowMath.nextZone): ab ihrem Kopf, sonst ab der Unterkante der Fokus-Karten */
     function nextZone() { return RM.nextZone(tops[R + 1] - pageY(), CARD_Y + slotFor(R).g.h, VIS); }

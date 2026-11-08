@@ -27,7 +27,7 @@
       popHead = U.el('div', 'tl-head t-h2 ell', pg, 'top:' + popY + 'px;display:none'); popHead.appendChild(document.createTextNode(''));
       pop = new N.ui.TrackList(pg, { x: 144, y: popY + 44, w: 992, vis: 7, full: 6, row: popRow });   // 7. Zeile nur angeschnitten
       hero.makeInfo(root);
-      var fade = U.el('img', 'fade', root); fade.src = N.assetBase + 'fade-bottom.png';
+      var fade = U.el('img', 'fade', root); N.glass.img(fade, 'fade-bottom.png');
       ring = new N.ui.Ring(root);
       sb = new N.ui.StateBlock(root);
       hero.paint(N.t(book ? 'mu.ov.author' : 'mu.ov.artist'), it0.title, '', '');

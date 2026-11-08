@@ -8,7 +8,7 @@
 
   R.init = function (parent) {
     R.el = U.el('div', '', parent, 'display:none'); R.el.id = 'pn-rail';
-    var bg = U.el('img', 'rail-bg', R.el); bg.src = N.assetBase + 'rail.png';
+    var bg = U.el('img', 'rail-bg', R.el); N.glass.img(bg, 'rail.png');
     /* flexibel: Icon-Spalte in einem Ausschnitt (flach: rollt ueber dem festen Eintrag "Einstellungen"); am TV direkt wie bisher */
     R.clipI = N.screen && N.screen.flex ? U.el('div', 'rail-clip', R.el, 'position:absolute;left:0;top:0;width:100%') : null;
     R.icons = U.el('div', 'a', R.clipI || R.el, 'left:0;top:0');

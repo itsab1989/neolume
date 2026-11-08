@@ -67,6 +67,7 @@
  "player/osd.js",
  "player/audio.js",
  "ui/images.js",
+ "ui/glass.js",
  "ui/avatars.js",
  "ui/nav.js",
  "ui/freelist.js",

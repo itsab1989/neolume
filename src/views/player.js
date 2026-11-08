@@ -259,6 +259,7 @@
       if (sef.fake) { U.show(vbg, true); if (N.config.fakeBg) vbg.style.background = N.config.fakeBg; } else transparent(true);   // Bildtest: heller Film
       U.cls(document.body, 'in-player', true);
       N.tv.saver(false);
+      if (N.diag.stalls) N.diag.stalls(true, function () { return pb ? pb.t : 0; });   // nur Entwicklungs-Build (log.js)
       trackMem = N.store.get(memFile()) || {};
       still = new O.Still(cfg().stillWatching, U.now(), cfg().stillTime);
       if (p.queue) queue = p.queue;                  // "Alle abspielen"/"Zufall" aus der Bibliothek (M3b): fertige Play-Queue
@@ -313,6 +314,7 @@
       transparent(false);
       U.cls(document.body, 'in-player', false);
       N.tv.saver(true);
+      if (N.diag.stalls) N.diag.stalls(false);
       N.evt.emit('playback:stopped', { rk: item ? item.rk : '', video: true, done: fin, srv: item && item.srv || '', ep: item && item.type === 'episode' ? { s: item.s, e: item.e, show: item.showRk || '' } : null });
     }
     function close() { if (closed) return; shutdown(); N.router.back(); }

@@ -36,7 +36,7 @@
       fl = N.ui.freeList({ el: pg, dim: 720, set: freeSet, max: function () { return list.count() ? ANCHOR_OFF + list.maxPx() : 0; },
         hit: function () { return zone !== 'state'; } });
       hero.makeInfo(root);
-      var fade = U.el('img', 'fade', root); fade.src = N.assetBase + 'fade-bottom.png';
+      var fade = U.el('img', 'fade', root); N.glass.img(fade, 'fade-bottom.png');
       sb = new N.ui.StateBlock(root);
       hero.paint(N.t(book ? 'mu.ov.book' : 'mu.ov.album'), it0.title, it0.artist || '', '');
       hero.setPoster(it0.thumb, it0.title);
