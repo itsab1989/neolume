@@ -2010,8 +2010,11 @@ Each screen, its purpose and how it connects (details in the referenced sections
   gets darker towards the right; at the bottom exactly the original, never darker than it), the bands stay as Solid; in layouts where the sidebar is hidden
   the adapter calls `N.glass.railShown(false)` and the original pictures apply (no lighter strip without a sidebar);
   **`false`** – the row is missing and a stored value is ignored, every screen looks exactly like Solid. The Apple
-  platforms use `false` for now (their layouts hide the sidebar or band in places: touch/pointer without hints, menu
-  navigation, detail cards, boxed hero).
+  platforms (iPad, iPhone, Mac) use `rail`: they have no bottom band, and the adapter hides the effect wherever the sidebar is
+  hidden – the narrow width class with the tab bar at the bottom, menu navigation, and a detail card over the collapsed
+  sidebar. The home hero there sits in a box W × W·9/16; its darkening is drawn 1:1 horizontally (like the sidebar and the
+  text, which do not grow with the window), stretched in height, and continued to the right of x 1280 by its last columns
+  (from x ~860 every darkening picture depends only on y), so the lighter part always lines up with the sidebar.
   Purpose: on request the dark frame – the collapsed sidebar on the left and the bottom band under the hint bar – lets the
   picture behind it shine through, dimmed, in the style of the Home clock box (`bg-60`).
   **Main rule – never darker towards the right:** on every screen with the sidebar, the total darkening (sidebar + band +
@@ -2373,7 +2376,7 @@ Behaviour notes per row (hand-written; one row per setting in the code – the s
 | `backgrounds` | Off: no hero/detail/screensaver art (plain background); library title/random picture fall back to colour mood. |
 | `libBg` | BG-1. On tiles-only Home platforms also behind Home (HOME-17), named “Page background” on every platform (the TV text names the libraries, the tiles-only text Home and libraries). |
 | `libBgStrength` | Dimmed when `libBg` is off. BG-1. |
-| `glass` | Three levels: `off` Solid (default, opaque) · `mid` Slightly see-through · `strong` See-through; a stored `true` from the earlier switch counts as `strong`. Applies at once; per profile; only with platform capability `glassBars` `all` or `rail` (missing with `false`, as on Apple for now; stored value ignored there). INFO explains it and mentions that scrolling may feel a little less smooth on older TVs. Directly after the background rows. BG-2. |
+| `glass` | Three levels: `off` Solid (default, opaque) · `mid` Slightly see-through · `strong` See-through; a stored `true` from the earlier switch counts as `strong`. Applies at once; per profile; only with platform capability `glassBars` `all` or `rail` (Apple: `rail`, sidebar only; missing with `false`, stored value ignored there). INFO explains it and mentions that scrolling may feel a little less smooth on older TVs. Directly after the background rows. BG-2. |
 | `clock` | Home, player and screensaver clock. HOME-9, SAV-4. |
 | `clockStyle` | Look of the Home clock: `box` (default), `free`, `date`, `small`; unknown values fall back to `box`. Dimmed while `clock` is off; INFO explains each. HOME-10. |
 | `rm` | Turns off zoom/slide transitions everywhere (focus scale stays instant), screensaver moves → crossfade, background swaps instantly. A19. |

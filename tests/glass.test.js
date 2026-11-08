@@ -432,21 +432,25 @@ test('Startseite: Kopf der naechsten Reihe aus, solange der Hinweis unten steht 
 });
 
 /* ---------- Plattform: caps.glassBars 'all' (TV) | 'rail' (nur Seitenleiste) | false ---------- */
-test('caps.glassBars: Fernseher und Android TV all, Apple vorerst aus; aus = Zeile fehlt und ein gespeicherter Wert wirkt nicht', function () {
+test('caps.glassBars: Fernseher und Android TV all, Apple rail; aus = Zeile fehlt und ein gespeicherter Wert wirkt nicht', function () {
   assert.strictEqual(H.load().N.platform.caps.glassBars, 'all');
   /* Plattform-Adapter fehlen im oeffentlichen Export (android-tv, apple) -> dort nur der Kern */
   function has(id) { return fs.existsSync(path.join(ROOT, 'platforms', id, 'adapter')); }
   if (has('android-tv')) assert.strictEqual(H.load({ platform: 'android-tv' }).N.glass.mode(), 'all');
   if (has('apple')) {
     var A = H.load({ platform: 'apple' }).N;
-    assert.strictEqual(A.platform.caps.glassBars, false);
+    assert.strictEqual(A.platform.caps.glassBars, 'rail', 'Apple: nur Seitenleiste (kein Band unten)');
+    assert.strictEqual(A.glass.avail(), true);
     var S = A.session, old = S.settings;
     try {
       S.settings = { glass: 'strong' };
+      A.glass.sync();
+      assert.strictEqual(A.glass.on(), true);
+      A.platform.caps.glassBars = false;
       assert.strictEqual(A.glass.avail(), false);
       A.glass.sync();
-      assert.strictEqual(A.glass.on(), false, 'gespeichertes An wird auf Apple ignoriert');
-    } finally { S.settings = old; }
+      assert.strictEqual(A.glass.on(), false, 'caps.glassBars false: gespeichertes An wird ignoriert');
+    } finally { S.settings = old; A.platform.caps.glassBars = 'rail'; }
   }
   var src = fs.readFileSync(path.join(ROOT, 'src', 'views', 'settings.js'), 'utf8');
   assert.ok(/function glassRow\(\) \{\s*if \(!N\.glass\.avail\(\)\) return null;/.test(src), 'Zeile nur mit caps.glassBars');

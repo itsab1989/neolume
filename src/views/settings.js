@@ -370,7 +370,7 @@
     /* Transparenz der Leisten (SPEC BG-2, Nutzerwunsch 08.11.): direkt hinter den Hintergrund-Zeilen, weil sie bestimmt, wie viel vom
      * Hintergrund an den Raendern zu sehen ist; wirkt sofort (N.glass tauscht die Bilder), INFO nennt die Kosten auf aelteren TVs */
     function glassRow() {
-      if (!N.glass.avail()) return null;   // nur mit caps.glassBars 'all' (TV-Layout) oder 'rail' (nur Seitenleiste); Apple vorerst nicht
+      if (!N.glass.avail()) return null;   // nur mit caps.glassBars 'all' (TV-Layout) oder 'rail' (nur Seitenleiste, Apple)
       // drei Stufen (Nutzer 08.11. am TV): Deckend (Standard) · Leicht durchscheinend · Durchscheinend; frueheres true = Durchscheinend
       var S = st(), G = N.glass;
       function opt(val, k) { return [val, v(k), null, v(k + '.s')]; }
