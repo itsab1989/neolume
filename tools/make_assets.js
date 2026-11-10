@@ -271,6 +271,8 @@ function glassBottom(sx, sy) { return glassBand(sy, 632); }
  * Seitenleiste in jeder Hoehe dasselbe. Links laeuft der Boden gleichmaessig von der Seitenleiste (0,65 am Bildschirmrand) zum Text
  * (0,82 ab x 144), ohne helle Spalte. Ausserhalb bleiben Seitenleiste, Band und die Bildecke oben rechts so hell wie vorher. */
 GLASS.text = 0.82; GLASS.soft = 260;
+var HX0 = 780;   // Kopfband gerollt: waagerechter Auslauf ab hier bis x 1280 (so bleibt es unter dem deckenden Kopfband, das ab x 780 auslaeuft)
+GLASS.hdr = 0.70;   // Kopfband der Details (Durchscheinend), gleichmaessig; Leicht = (1 + 0,70) / 2
 var TEXT_HOME = [[784, 60],               // Hero-Text (.hero-txt: Overline, Titel, Meta 640 px bis x 784) und darunter Ueberschriften
   [1280, 556]];                           // Beschriftungen der Karten + Ueberschrift der naechsten Reihe (ganze Breite)
 var TEXT_DET = [[800, 40], [1000, 200], [1280, 300]];   // Kopf in den Abschnitten · erster Bildschirm · Abschnitte
@@ -317,14 +319,19 @@ function lvBand(lv, sx, sy, frame) {                                            
   if (sx >= RAIL_W || r <= 0) return u;
   if (r >= 1) return 0;
   // weiches Maximum statt max (Nutzer 08.11.: "Uebergaenge wirklich fliessend"): max gab entlang der Diagonale r = u einen Knick
-  // (Mediathek, Live-TV); smax ist ueberall glatt und liegt hoechstens SMAX_K / 2 (0,08) ueber max – in der Ecke eine weiche, leicht
-  // dunklere Rundung statt einer Knicklinie
+  // (Mediathek, Live-TV); smax ist ueberall glatt und liegt hoechstens SMAX_T x ln 2 (0,028) ueber max – in der Ecke eine weiche Rundung
+  // statt einer Knicklinie, kaum dunkler (Nutzer: keine dunkleren Ecken; vorher mit Wurzel-Form bis 0,08)
   // nur das Band der Mediathek/Live-TV (ohne Abdunklung darueber); auf Start/Details gleicht die Abdunklung die Ecke ohnehin aus
   return Math.max(0, 1 - (1 - (frame ? smax(r, u) : Math.max(r, u))) / (1 - r));
 }
-var SMAX_K = 0.16;
-// Rundung nur dort, wo beide da sind (k^2 ~ a*b): ist eine Ebene 0, ist smax genau die andere – kein Anheben an Band-Oberkante/Leistenrand
-function smax(a, b) { var k2 = SMAX_K * SMAX_K * Math.min(1, 16 * a * b); return Math.min(1, (a + b + Math.sqrt((a - b) * (a - b) + k2)) / 2); }
+var SMAX_T = 0.040;
+// LogSumExp (bei gleicher Anhebung etwas glatter als die Wurzel-Form; in der Ecke gemessen 0,060 statt 0,063); Rundung nur dort, wo beide da sind (Temperatur ~ sqrt(a*b)): ist eine
+// Ebene 0, ist smax genau die andere – kein Anheben an Band-Oberkante/Leistenrand
+function smax(a, b) {
+  var t = SMAX_T * Math.sqrt(Math.min(1, 16 * a * b)), m = Math.max(a, b);
+  if (t < 1e-4) return m;
+  return Math.min(1, m + t * Math.log(Math.exp((a - m) / t) + Math.exp((b - m) / t)));
+}
 function lvFrameF(lv, sx, sy) { return 1 - (1 - lvRail(lv, sx)) * (1 - lvBand(lv, sx, sy, false)); }   // Leisten ueber Hero/Details
 function glassAssets() {
   var V = require('./visual.js');
@@ -364,13 +371,55 @@ function glassAssets() {
       for (var x = 0; x < 200; x++) T[y * W + x] = w * ref + (1 - w) * T[y * W + x];
     }
   }
-  function scrimG(base, floor) {
-    var src = path.join(OUT, base + '.png');
+  function scrimG(base, floor, straight) {
+    var src = path.join(OUT, base + '.png'), out = base;
     if (!fs.existsSync(src)) return;
     var S = V.readPng(src), W = S.w, H = S.h, x, y;
     function at(x, y) { return S.px[(y * W + x) * 4 + 3]; }
     var Ts = new Float64Array(W * H), Tm = new Float64Array(W * H), strong = Buffer.alloc(W * H);
     for (y = 0; y < H; y++) { var F = floor(y); for (x = 0; x < W; x++) Ts[y * W + x] = Math.min(at(x, y) / 255, F); }
+    /* straight (Details/Album, scrim-det): Nutzer 09.11., gerollt auf hellem Bild "dunklerer Fleck rechts" – scrim-det hat rechts neben dem
+     * Info-Block eine gebogene Zunge (Zusatz detE, x 860..1240), die gerollt allein steht. Rechts ab RX0 stattdessen getrennt in x und y:
+     * T = B(y) + (T(RX0, y) - B(y)) G(x), B(y) = T am rechten Rand, G ein gemeinsames fallendes Profil (s. u.); bis y 200 voll, ueber
+     * y 200..320 mit einem smootherstep zurueck (ab y 320 Abschnitts-Text ueber die ganze Breite: dort wie bisher).
+     * Nach rechts nie dunkler (T(RX0) >= B). EIN Bild fuer ersten Bildschirm und Abschnitte (eine Ueberblendung zweier Bilder hellte
+     * mitten im Wechsel auf und kostete zwei Ebenen, Pruefbefund 10.11.). Startseite und Kuenstler (scrim, scrim-np) ohne. */
+    var RX0 = 860;
+    function rightStraight(T) {
+      if (!straight) return;
+      var T0 = Float64Array.from(T);   // vorher (fuer den Lese-Boden am Info-Block)
+      /* gemeinsames Profil G(x) fuer alle oberen Zeilen: das kleinste Verhaeltnis (T - Rand) / (T(RX0) - Rand) ueber y 0..236 – so ist die neue
+       * Form getrennt in x und y und nie dunkler als vorher (also auch nie dunkler als das Original); danach nach rechts nie steigend */
+      var G = new Float64Array(W), yy, xx;
+      for (xx = RX0; xx < W; xx++) G[xx] = 1;
+      for (yy = 0; yy <= 236; yy++) {
+        var a0 = T[yy * W + RX0], b0 = T[yy * W + W - 1];
+        if (a0 - b0 < 0.05) continue;
+        for (xx = RX0 + 1; xx < W; xx++) G[xx] = Math.min(G[xx], Math.max(0, (T[yy * W + xx] - b0) / (a0 - b0)));
+      }
+      for (xx = RX0 + 1; xx < W; xx++) G[xx] = Math.min(G[xx], G[xx - 1]);
+      // gleitendes Mittel (33 px; links von RX0 gilt 1): kein Knick bei RX0, bleibt nach rechts fallend
+      var Gs = new Float64Array(W), R2 = 16;
+      for (xx = RX0 + 1; xx < W; xx++) { var sg = 0; for (var k = -R2; k <= R2; k++) { var q = xx + k; sg += q <= RX0 ? 1 : G[Math.min(W - 1, q)]; } Gs[xx] = sg / (2 * R2 + 1); }
+      for (xx = RX0 + 1; xx < W; xx++) G[xx] = Gs[xx];
+      for (yy = 0; yy < H; yy++) {
+        var a = T[yy * W + RX0], bR = Math.min(a, T[yy * W + W - 1]);
+        var wy = 1 - smoother((yy - 200) / 120);   // nur oben (Kopf); ab y 320 die Abschnitte mit Text ueber die ganze Breite wie bisher
+        if (wy <= 0) continue;
+        for (xx = RX0 + 1; xx < W; xx++) { var t0 = T[yy * W + xx]; T[yy * W + xx] = t0 + (Math.min(t0, bR + (a - bR) * G[xx]) - t0) * wy; }
+      }
+      /* Info-Block des ersten Bildschirms (Text bis x ~972, y 224..512): dort hoechstens bis auf den Lese-Boden heller, min(vorher, 0,80).
+       * Mit langen weichen Rampen (y 124..224 und 512..612, x 972..1092): kurze Rampen gaben Querstreifen (Nutzer 09.11.) */
+      for (yy = 124; yy < 612; yy++) {
+        var wt = smoother((yy - 124) / 100) * (1 - smoother((yy - 512) / 100));
+        for (xx = RX0 + 1; xx < 1092; xx++) {
+          // hoechstens so dunkel wie bei RX0 in derselben Zeile: nach rechts nie dunkler
+          var wf = wt * (1 - smoother((xx - 972) / 120)), o0 = T0[yy * W + xx], tc = T[yy * W + xx];
+          T[yy * W + xx] = tc + (Math.max(tc, Math.min(o0, 0.80, T[yy * W + RX0])) - tc) * wf;
+        }
+      }
+    }
+    rightStraight(Ts);
     var Ts0 = Float64Array.from(Ts);                               // ohne Eck-Ausgleich (fuer die Fassung ohne Band, *-rail)
     /* zum Band hin weich auf dessen Wert (GLASS.hint) statt per max: Gesamtwirkung T + (max(T, Band) - T) * Rampe des Bands – kein
      * Knick dort, wo das Band den Boden kreuzt (bei 0,88 sonst sichtbar), und nie heller als das Band */
@@ -388,16 +437,19 @@ function glassAssets() {
      * es gibt keinen Knick, wo das Band die Abdunklung kreuzen wuerde */
     var bandMid = (1 + GLASS.hint) / 2;
     function smoother(t) { t = Math.max(0, Math.min(1, t)); return t * t * t * (t * (t * 6 - 15) + 10); }
-    for (y = 0; y < H; y++) { var Fm = (cOffAt(200, y) + floor(y)) / 2, bm = bandMid * smoother((y - 480) / 140); for (x = 0; x < W; x++) Tm[y * W + x] = Math.max(bm, Ts[y * W + x], Math.min(Fm, (cOffAt(x, y) + Ts[y * W + x]) / 2)); }
+    // unten weich zum Band der Stufe: Mischgewicht smootherstep y 480..672 statt max (TV-Befund 08.11.: unter der Seitenleiste ab y ~580
+    // deutlich dunkler werdend – der Anstieg 0,91 -> 0,94 lag als max auf nur ~40 px)
+    for (y = 0; y < H; y++) { var Fm = (cOffAt(200, y) + floor(y)) / 2, wb = smoother((y - 480) / 192); for (x = 0; x < W; x++) { var t1 = Math.max(Ts[y * W + x], Math.min(Fm, (cOffAt(x, y) + Ts[y * W + x]) / 2)); Tm[y * W + x] = Math.max(Ts[y * W + x], t1 + (Math.max(t1, bandMid) - t1) * wb); } }
     var Tm0 = new Float64Array(W * H);                              // fuer *-rail: Mitte ohne Band (das gibt es dort nicht)
     for (y = 0; y < H; y++) { var Fm0 = (at(200, y) / 255 + floor(y)) / 2; for (x = 0; x < W; x++) Tm0[y * W + x] = Math.max(Ts0[y * W + x], Math.min(Fm0, (1 - (1 - offRail(x)) * (1 - at(x, y) / 255) + Ts0[y * W + x]) / 2)); }
+    rightStraight(Tm); rightStraight(Tm0);
     cornerFlat(Tm, W, H);
-    fs.writeFileSync(path.join(OUT, base + '-glass.png'), png(W, H, function (x, y) {
+    fs.writeFileSync(path.join(OUT, out + '-glass.png'), png(W, H, function (x, y) {
       var f = lvFrameF(GLASS_LV.strong, x, y), b = Math.min(at(x, y), dither(Math.max(0, 1 - (1 - Ts[y * W + x]) / (1 - f)), x, y));
       strong[y * W + x] = b;
       return [BG[0], BG[1], BG[2], b];
     }));
-    fs.writeFileSync(path.join(OUT, base + '-glass-mid.png'), png(W, H, function (x, y) {
+    fs.writeFileSync(path.join(OUT, out + '-glass-mid.png'), png(W, H, function (x, y) {
       var f = lvFrameF(GLASS_LV.mid, x, y), sb = strong[y * W + x];
       var b = f >= 1 ? sb : dither(Math.max(0, 1 - (1 - Tm[y * W + x]) / (1 - f)), x, y);
       // Reihenfolge strong <= mid <= deckend gilt fuer die Gesamtwirkung (Leisten + Abdunklung), nicht je Bild: die Leisten sind in mid
@@ -410,7 +462,7 @@ function glassAssets() {
     var strongR = Buffer.alloc(W * H);
     [['strong', Ts0, '-glass-rail'], ['mid', Tm0, '-glass-mid-rail']].forEach(function (lvp) {
       var lv = GLASS_LV[lvp[0]], T0 = lvp[1];
-      fs.writeFileSync(path.join(OUT, base + lvp[2] + '.png'), png(W, H, function (x, y) {
+      fs.writeFileSync(path.join(OUT, out + lvp[2] + '.png'), png(W, H, function (x, y) {
         var ob = at(x, y), o = ob / 255, w = 1 - ramp(y, 560, 660);
         var t = o - w * (o - Math.min(o, T0[y * W + x])), r = lvRail(lv, x);
         var b = r >= 1 ? ob : Math.min(ob, dither(Math.max(0, 1 - (1 - t) / (1 - r)), x, y));
@@ -428,24 +480,93 @@ function glassAssets() {
   GLASS.hero = heroF;
   function smoother(t) { t = Math.max(0, Math.min(1, t)); return t * t * t * (t * (t * 6 - 15) + 10); }
   scrimG('scrim', function (y) { return heroF + (GLASS.text - heroF) * smoother((y - 376) / 180); });
-  scrimG('scrim-det', function () { return GLASS.text; });
+  scrimG('scrim-det', function () { return GLASS.text; }, true);   // rechts ohne Zunge (s. rightStraight), erster Bildschirm und Abschnitte
   scrimG('scrim-np', function () { return GLASS.text; });
-  /* Kopfband der Detailseiten in den Abschnitten (scrim-hdr.png, um 180 Grad gedreht und auf 288 px gestreckt, Deckkraft 0,92). In Ruhe
-   * liegt unter dem Kopf nichts (details.js hideAbove), beim Blaettern laufen Reihen aber ~180 ms (bei Tastenwiederholung laenger) unter
-   * ihm durch (Pruefbefund 08.11.): hinter dem Kopftext (x bis 800, Bildschirm-y bis 190) deshalb so deckend wie das Original (Durchschein
-   * <= 8 %, kein Flackern), aussen weicher: unten smootherstep auf 0 bei y 288 (Bild-y 0..30 statt 0..20), rechts ab x 800 zusaetzlich
-   * bis x 1100 auf die Stufe (Durchscheinend 0,70, Leicht 0,85) – dort steht kein Text. Nie dunkler als scrim-hdr.png. */
-  [['-glass', 0.70], ['-glass-mid', 0.85]].forEach(function (lv) {
+  /* Kopfband der Detailseiten in den Abschnitten (scrim-hdr.png, um 180 Grad gedreht und auf 288 px gestreckt, Deckkraft 0,92). Ziel
+   * (Nutzer am TV, 1.0.23): gerollt soll der Kopf aussehen wie der erste Bildschirm – das Band legt nur so viel dazu, wie der Kopftext an
+   * seiner hoeheren Stelle braucht. Je Stufe: F = Gesamtwirkung des ersten Bildschirms (Seitenleiste + scrim-det der Stufe); Ziel
+   * T = max(F, NEED x W) mit NEED = kleinste Deckkraft, bei der text-2 auf rein weissem Bild >= 4,5:1 hat (Titel text-1 braucht fuer 3:1
+   * weniger), W = wx(x) wy(y): x bis 980 voll, smootherstep auf 0 bei x 1280; y bis 198 voll, auf 0 bei y 288 – dort ist
+   * F schon fast so hoch), mal Einstieg ab der Inhaltskante (x 132..252). Band = was zu T fehlt: (1 - (1 - T) / (1 - F)) / 0,92, unter der
+   * Seitenleiste (x < 132) 0 – sie bleibt wie auf dem ersten Bildschirm. Wo scrim-det schon reicht, legt das Band nichts dazu.
+   * Rows blenden beim Schritt unter dem Kopf aus (details.js), das Band muss nichts mehr verdecken. Nie dunkler als scrim-hdr.png. */
+  function lin(v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+  function lum(c) { return 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]); }
+  var T2 = [1, 3, 5].map(function (i) { return parseInt(T.color('text-2').substr(i, 2), 16); });
+  var NEED = (function () { for (var a = 0; a < 1; a += 0.0025) { var m = BG.map(function (v) { return (1 - a) * 255 + a * v; }), lm = lum(m), lt = lum(T2); if ((Math.max(lm, lt) + 0.05) / (Math.min(lm, lt) + 0.05) >= 4.5) return a + 0.02; } return 1; })();   // +0,02: Rauschen und die grobe Bildzeile (3,3 px)
+  GLASS.hdrNeed = NEED;
+  var capMid = null;   // Leicht zuerst: Durchscheinend wird gerollt nie dunkler als Leicht (das laufende Minimum greift je Stufe anders)
+  [['-glass-mid', GLASS_LV.mid], ['-glass', GLASS_LV.strong]].forEach(function (lv) {
+    var S = V.readPng(path.join(OUT, 'scrim-det' + lv[0] + '.png'));
+    function F(sx, sy) { return 1 - (1 - lvRail(lv[1], sx)) * (1 - S.px[(sy * S.w + sx) * 4 + 3] / 255); }
+    /* Ziel je Bildschirmpunkt; danach je Spalte von unten nach oben laufendes Minimum bis y 420 (darunter gilt F): gerollt wird die
+     * Gesamtwirkung nach oben nie dunkler – sonst lag rechts neben dem Text ein dunklerer Fleck ueber dem Auslauf des Kopfbands
+     * (Nutzer 09.11., "dunklerer Fleck rechts": dunkel bis y ~200, darunter heller, dann wieder dunkler) */
+    // fuer das laufende Minimum geglaettet (9 x 5 px): sonst greift es je Spalte den dunkelsten Rauschwert (Dither 1/255) und das Band
+    // springt von Spalte zu Spalte (bis 0,02, "nach rechts dunkler")
+    var SA = new Float64Array(1280 * 421);
+    for (var qy = 0; qy <= 420; qy++) for (var qx = 0; qx < 1280; qx++) {
+      var sum = 0, cnt = 0;
+      for (var dy = -2; dy <= 2; dy++) for (var dx = -4; dx <= 4; dx++) { var px = qx + dx, py = qy + dy; if (px < 0 || px > 1279 || py < 0 || py > 719) continue; sum += S.px[(py * S.w + px) * 4 + 3]; cnt++; }
+      SA[qy * 1280 + qx] = sum / cnt / 255;
+    }
+    function Fs(sx, sy) { return 1 - (1 - lvRail(lv[1], sx)) * (1 - SA[sy * 1280 + sx]); }
+    function target(sx, sy, FF) {
+      FF = FF || F;
+      if (sx < RAIL_W || sy >= 288) return FF(sx, sy);
+      var wx = 1 - smoother((sx - HX0) / (1280 - HX0)), wy = 1 - smoother((sy - 198) / 90), w = wx * wy, wi = smoother((sx - 132) / 120);
+      var f = FF(sx, sy), dd = f - NEED;
+      return f + (Math.min(1, (f + NEED + Math.sqrt(dd * dd + 0.0004)) / 2) - f) * w * wi;
+    }
+    var CAP = new Float64Array(1280 * 288);
+    for (var cx = 0; cx < 1280; cx++) { var m = 1; for (var cy = 420; cy >= 0; cy--) { m = Math.min(m, target(cx, cy, Fs)); if (cy < 288) CAP[cy * 1280 + cx] = Math.min(m, target(cx, cy)); } }
+    if (capMid) for (var ci = 0; ci < CAP.length; ci++) CAP[ci] = Math.min(CAP[ci], capMid[ci]); else capMid = CAP;
     fs.writeFileSync(path.join(OUT, 'scrim-hdr' + lv[0] + '.png'), png(1280, 88, function (x, y) {
-      var tv = Math.min(1, y / 30), v = tv * tv * tv * (tv * (tv * 6 - 15) + 10);
+      var sx = 1279 - x, sy = Math.max(0, Math.min(719, Math.round(287 - (y + 0.5) * 288 / 88)));
       var t = Math.max(0, Math.min(1, (1279 - x - 780) / 460)), h = 1 - 0.7 * t * t * (3 - 2 * t);
-      var tr = Math.max(0, Math.min(1, (1279 - x - 800) / 300)), sr = tr * tr * tr * (tr * (tr * 6 - 15) + 10), g = 1 - (1 - lv[1]) * sr;
-      var o = (y >= 20 ? 1 : (y / 20) * (y / 20) * 0.6 + (y / 20) * 0.4) * h;
-      return [BG[0], BG[1], BG[2], Math.min(Math.round(255 * o), dither(v * h * g, x, y))];
+      var o = (y >= 20 ? 1 : (y / 20) * (y / 20) * 0.6 + (y / 20) * 0.4) * h;   // scrim-hdr.png an dieser Stelle
+      if (sx < RAIL_W) return [BG[0], BG[1], BG[2], 0];
+      // Gewicht getrennt in x und y (Nutzer 09.11.: der Auslauf war "hart und seltsam geschwungen" – die Mischung zweier Textbreiten gab
+      // gebogene Hoehenlinien): waagerecht voll bis x 980, smootherstep auf 0 bei x 1280 (ganze Restbreite, 300 px; Kopf endet bei x 1008,
+      // dort fehlen < 1 %); senkrecht voll bis y 198 (Unterkante der Beschreibungsschrift ~y 204), smootherstep auf 0 bei y 288 (90 px)
+      var wx = 1 - smoother((sx - HX0) / (1280 - HX0)), wy = 1 - smoother((sy - 198) / 90);
+      var w = wx * wy, wi = smoother((sx - 132) / 120);
+      // Hub (was zum Boden fehlt) mal Gewicht – nicht max(F, NEED x w): so laeuft der Hub ueber die ganze Rampe aus statt nur ueber ihr
+      // erstes Viertel (dort, wo NEED x w unter F faellt, war der Auslauf nur ~30 px lang)
+      var f = F(sx, sy), tt = Math.max(f, CAP[sy * 1280 + sx]), need = f >= 1 ? 0 : Math.max(0, 1 - (1 - tt) / (1 - f)) / 0.92;
+      return [BG[0], BG[1], BG[2], Math.min(Math.round(255 * o), dither(Math.min(1, need), x, y))];
     }));
   });
 }
-if (process.argv.indexOf('--glass') >= 0) { glassAssets(); process.exit(0); }
+/* Deckendes Kopfband von Album, Kuenstler und fremden Titeln (DetHero ohne o.hdr: top-band.png = fade-bottom.png, um 180 Grad gedreht,
+ * 288 px hoch, Deckkraft 0,92 in den Abschnitten; ihre Listen laufen darunter durch, deshalb bleibt es deckend). Mit durchscheinender
+ * Seitenleiste lagen Leiste und Band oben links uebereinander – die Leiste wurde oben dunkler als ihre Stufe (Pruefung 08.11.). Glas-
+ * Fassungen: unter der Seitenleiste (x < RAIL_W) wie die Ecke unten nur so viel Band, dass beide zusammen max(Leiste, Band) ergeben;
+ * ueberall sonst genau top-band.png. Bild-x 0 = Bildschirm rechts, Bild-y 0 = Bildschirm unten (gedreht). */
+function topBandAssets() {
+  /* Gesamtwirkung zaehlt (Pruefbefund 08.11.): unter der Seitenleiste soll Leiste + Band + Abdunklung genau so dunkel sein wie direkt
+   * rechts daneben (x RAIL_W, ohne Leiste): D = 1 - (1 - 0,92 v)(1 - s(RAIL_W, y)); das Band dort ist, was zu D fehlt. Weil die
+   * Abdunklung je Bildschirm verschieden ist, je eine Fassung fuer scrim-det (Album, fremde Titel: top-band) und scrim-np (Kuenstler:
+   * top-band-np). Deckend: beide = fade-bottom.png. */
+  var V = require('./visual.js');
+  function bandV(y) { return y >= 20 ? 1 : (y / 20) * (y / 20) * 0.6 + (y / 20) * 0.4; }
+  [['top-band', 'scrim-det'], ['top-band-np', 'scrim-np']].forEach(function (tb) {
+    fs.writeFileSync(path.join(OUT, tb[0] + '.png'), png(1280, 88, function (x, y) { var a = y >= 20 ? 255 : Math.round(255 * bandV(y)); return [BG[0], BG[1], BG[2], Math.min(255, a)]; }));
+    [['-glass', GLASS_LV.strong], ['-glass-mid', GLASS_LV.mid]].forEach(function (lv) {
+      var S = V.readPng(path.join(OUT, tb[1] + lv[0] + '.png'));
+      function s(sx, sy) { return S.px[(sy * S.w + sx) * 4 + 3] / 255; }
+      fs.writeFileSync(path.join(OUT, tb[0] + lv[0] + '.png'), png(1280, 88, function (x, y) {
+        var sx = 1279 - x, v = bandV(y), full = y >= 20 ? 255 : Math.round(255 * v);
+        if (sx >= RAIL_W) return [BG[0], BG[1], BG[2], Math.min(255, full)];
+        var sy = Math.max(0, Math.min(719, Math.round(287 - (y + 0.5) * 288 / 88)));
+        var D = 1 - (1 - 0.92 * v) * (1 - s(RAIL_W, sy)), P = 1 - (1 - lvRail(lv[1], sx)) * (1 - s(sx, sy));
+        var need = P >= 1 ? 0 : Math.max(0, 1 - (1 - D) / (1 - P)) / 0.92;
+        return [BG[0], BG[1], BG[2], Math.min(full, dither(Math.min(1, need), x, y))];
+      }));
+    });
+  });
+}
+if (process.argv.indexOf('--glass') >= 0) { glassAssets(); topBandAssets(); process.exit(0); }
 
 /* fade-frame: 1280x108, Bild beginnt bei y=612; transparent oben -> deckend ab y 652 (Hinweisleiste, Reihen laufen darunter aus).
  * Nur in der Mediathek: dort reicht der (bunte) Hintergrund bis unten. Start/Details/Suche behalten fade-bottom (kurz, ab y 632):
@@ -518,6 +639,6 @@ QR.toFile(path.join(OUT, 'qr.png'), 'https://plex.tv/link', { errorCorrectionLev
   if (err) console.error('QR-Fehler', err);
   var scrimSrc = path.join(ROOT, 'app', 'scrim.png');
   if (!fs.existsSync(path.join(OUT, 'scrim.png')) && fs.existsSync(scrimSrc)) fs.copyFileSync(scrimSrc, path.join(OUT, 'scrim.png'));
-  scrimDet(); scrimNp(); saverScrims(); glassAssets();
+  scrimDet(); scrimNp(); saverScrims(); glassAssets(); topBandAssets();
   fs.readdirSync(OUT).forEach(function (f) { console.log(f, fs.statSync(path.join(OUT, f)).size + ' B'); });
 });

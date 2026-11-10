@@ -319,6 +319,20 @@
   Row.prototype.setVisible = function (on) {
     if (this.vis === on) return;
     this.vis = on;
+    this.paintVis();
+  };
+  /* Detailseite (BG-2, Nutzer am TV nach 1.0.22): Reihe faehrt beim Blaettern unter den (durchscheinenden) Kopf -> schon beim Schritt
+   * ausblenden: Karten-Bereich per Deckkraft (feste Ebene .rclip, Uebergang nur mit .fdo: Compositor, kein Neumalen), Kopf per
+   * visibility. under = true/false; nur bei Wechsel. */
+  Row.prototype.setUnder = function (on) {
+    on = !!on;
+    if (this.under === on) return false;
+    this.under = on;
+    this.paintVis();
+    return true;
+  };
+  Row.prototype.paintVis = function () {
+    var on = this.vis !== false && !this.under;
     this.clip.style.opacity = on ? '' : '0';
     U.vis(this.head, on);
     if (this.noteT) U.vis(this.noteT.parentNode, on);

@@ -100,7 +100,7 @@ test('Details/Album/Kuenstler: Info-Block, Kopf in den Abschnitten und Abschnitt
   ['scrim-det-glass.png', 'scrim-np-glass.png'].forEach(function (n) {
     var both = stack(n), o = load(n.replace('-glass', ''));
     legible(both, o, [144, 48, 800, 244], n + ' Kopf');
-    legible(both, o, [144, 224, 1000, 512], n + ' erster Bildschirm');
+    legible(both, o, [144, 224, 972, 512], n + ' erster Bildschirm');
     legible(both, o, [144, 320, 1272, 636], n + ' Abschnitte');
   });
   assert.ok(stack('scrim-det-glass.png')(1240, 80) <= 0.5, 'Details: Bild oben rechts sichtbar');
@@ -171,7 +171,7 @@ test('Stufen: Leicht liegt sichtbar zwischen Deckend und Durchscheinend (Raster 
       // bei der Mitte aus deckend und durchscheinend AN DER KANTE x 200 – ist das Original dort selbst kaum dunkler als strong (oben auf
       // Details), bleibt mid bei strong. Bewusst; rechts der Kante gilt die Pruefung voll.
       if (x <= 200 && off(200, y) - str(200, y) < 0.08) continue;
-      if (y >= 600) continue;   // unten bestimmt das Band (Mindestwerte unter den Hinweisen, eigener Test)
+      if (y >= 480) continue;   // unten (ab y 480 weich) bestimmt das Band (Mindestwerte unter den Hinweisen, eigener Test)
       if (o - s >= 0.08) { cnt++; assert.ok(m < o - 0.02 && m > s + 0.02, n + ' ' + x + ',' + y + ' nicht dazwischen: ' + o.toFixed(2) + ' / ' + m.toFixed(2) + ' / ' + s.toFixed(2)); }
     }
     assert.ok(cnt > 40, n + ': zu wenige Punkte mit Unterschied ' + cnt);
@@ -193,7 +193,7 @@ test('Ecke unten links: alle drei Ebenen zusammen wie das Band daneben (beide St
       var band = alpha(b, 200, y - 612);
       for (var x = 0; x < 132; x += 4) {
         var rl = alpha(r, x, y), both = 1 - (1 - rl) * (1 - alpha(b, x, y - 612));
-        assert.ok(both <= Math.max(rl, band) + 0.085,   // weiches Maximum (SMAX_K 0,16): hoechstens 0,08 darueber, dafuer ohne Knick
+        assert.ok(both <= Math.max(rl, band) + 0.03,   // weiches Maximum (LogSumExp, SMAX_T 0,04): hoechstens 0,03 darueber (Nutzer: keine dunkleren Ecken)
          sfx + ' fade-frame ' + x + ',' + y + ': ' + both.toFixed(2) + ' > max(' + rl.toFixed(2) + ', ' + band.toFixed(2) + ')');
       }
     }
@@ -242,7 +242,7 @@ test('Leicht durchscheinend: Text ueber dem Bild ebenso lesbar (Start, Details, 
   for (x = 0; x < 1280; x += 11) for (y = 1; y < 720; y++) assert.ok(Math.abs(h(x, y) - h(x, y - 1)) < 0.04, 'mid Kante senkrecht bei ' + x + ',' + y);
   ['scrim-det', 'scrim-np'].forEach(function (n) {
     var c = stackLv(n, '-glass-mid'), oo = load(n + '.png');
-    legible(c, oo, [144, 224, 1000, 512], n + ' mid erster Bildschirm');
+    legible(c, oo, [144, 224, 972, 512], n + ' mid erster Bildschirm');
     legible(c, oo, [144, 320, 1272, 636], n + ' mid Abschnitte');
   });
 });
@@ -345,7 +345,7 @@ test('Details: Abdunklung ueber dem Info-Block steigt sanft (je 10 px <= 0,03, a
       var c = sfx ? anyStack(n, sfx, false) : stackLv(n, '');
       for (var x = 200; x <= 1100; x += 20) for (var y = 0; y + 10 <= 200; y += 2) {
         var d = c(x, y + 10) - c(x, y);
-        assert.ok(d <= 0.03, n + sfx + ' Anstieg ' + x + ',' + y + ': ' + d.toFixed(3));
+        assert.ok(d <= 0.03 + 1.5 / 255, n + sfx + ' Anstieg ' + x + ',' + y + ': ' + d.toFixed(3));   // + Rundung/Rauschen (1,5 Stufen)
         assert.ok(d >= -0.01, n + sfx + ' nach unten heller ' + x + ',' + y);
       }
     });
@@ -362,11 +362,12 @@ function hdrStack(sfx) {
 }
 test('Kopfband Details: Kopftext lesbar, nach rechts nie dunkler, Durchscheinend <= Leicht <= Deckend, weicher Auslauf unten', function () {
   var C = ['', '-glass-mid', '-glass'].map(hdrStack);
-  for (var y = 40; y <= 190; y += 6) for (var x = 144; x <= 800; x += 8) {
+  for (var y = 40; y <= 190; y += 6) for (var x = 144; x <= 780; x += 8) {
     [1, 2].forEach(function (k) { assert.ok(onWhiteC(C[k](x, y), TEXT2) >= 4.5, 'Kopftext ' + k + ' ' + x + ',' + y + ': ' + C[k](x, y).toFixed(2)); });
   }
   for (y = 0; y < 300; y += 4) {
-    for (k = 0; k < 3; k++) { var mn = 1; for (x = 0; x < 1280; x += 2) { var v = C[k](x, y); assert.ok(v <= mn + 0.01, 'Kopf ' + k + ' nach rechts dunkler ' + x + ',' + y); mn = Math.min(mn, v); } }
+    // Toleranz 0,01 + 1/255: zwei gerasterte Bilder (Band mit 88 Zeilen, Abdunklung) mit je 1/255 Rauschen; der laufende Minimalwert greift das dunkelste
+    for (k = 0; k < 3; k++) { var mn = 1; for (x = 0; x < 1280; x += 2) { var v = C[k](x, y); assert.ok(v <= mn + 0.01 + 1 / 255, 'Kopf ' + k + ' nach rechts dunkler ' + x + ',' + y + ': ' + v.toFixed(3) + ' > ' + mn.toFixed(3)); mn = Math.min(mn, v); } }
     for (x = 0; x < 1280; x += 16) { var c = [C[0](x, y), C[1](x, y), C[2](x, y)]; assert.ok(c[2] <= c[1] + 0.005 && c[1] <= c[0] + 0.005, 'Kopf Stufen ' + x + ',' + y + ': ' + c.map(function (q) { return q.toFixed(2); }).join('/')); }
   }
   var k;
@@ -392,21 +393,25 @@ test('Fliessend: zweite Differenz der Gesamtwirkung ueberall klein (alle Glas-Bi
       var f = fullStack(p[0], sfx, p[1]), w = (p[0] || 'fade-frame') + sfx;
       for (var y = 4; y < 716; y += 2) for (var x = 4; x < 1276; x += 2) {
         var h = Math.abs(f(x - 3, y) - 2 * f(x, y) + f(x + 3, y)), v = Math.abs(f(x, y - 3) - 2 * f(x, y) + f(x, y + 3));
-        assert.ok(h <= p[2] && v <= p[2], w + ' Knick bei ' + x + ',' + y + ': waagerecht ' + h.toFixed(3) + ', senkrecht ' + v.toFixed(3));
+        var lim = p[1] && x < 200 && y >= 600 ? 0.065 : p[2];   // Ecke Mediathek/Live-TV: Leiste + Band ohne Abdunklung, Rundung hoechstens 0,03 dunkler -> bis 0,065
+        assert.ok(h <= lim && v <= lim, w + ' Knick bei ' + x + ',' + y + ': waagerecht ' + h.toFixed(3) + ', senkrecht ' + v.toFixed(3));
       }
     });
   });
 });
 
-/* Kopfband beim Blaettern (Pruefbefund 08.11.): Reihen laufen kurz unter dem Kopf durch – hinter dem Kopftext (x 144..800, y 40..190)
- * deckt das Band (0,92 x Bild) so wie Deckend: Durchschein hoechstens 10 % (Durchscheinend) bzw. 8,5 % (Leicht) */
-test('Kopfband: hinter dem Kopftext kaum Durchschein von darunter laufenden Reihen (<= 10 % / 8,5 %)', function () {
-  [['-glass', 0.90], ['-glass-mid', 0.915]].forEach(function (lv) {
-    var h = load('scrim-hdr' + lv[0] + '.png');
-    for (var y = 40; y <= 190; y += 5) for (var x = 144; x <= 800; x += 8) {
-      var a = 0.92 * alpha(h, 1279 - x, Math.floor((287 - y) * 88 / 288));
-      assert.ok(a >= lv[1], lv[0] + ' ' + x + ',' + y + ': ' + a.toFixed(3));
-    }
+/* Kopfband ohne Kasten (Nutzer am TV nach 1.0.22): folgt der Stufe gleichmaessig ueber die Breite – entlang y 100 nach rechts nie dunkler,
+ * keine Stufe (je px hoechstens 0,02), insbesondere keine Kante um x 800; Durchschein beim Blaettern verhindert details.js (Ausblenden). */
+test('Kopfband: gleichmaessig, entlang y 100 nach rechts nie dunkler und ohne Stufe (auch nicht bei x 800)', function () {
+  ['-glass', '-glass-mid'].forEach(function (sfx) {
+    var c = hdrStack(sfx);
+    [60, 100, 160].forEach(function (y) {
+      for (var x = 1; x < 1280; x++) {
+        var d = c(x, y) - c(x - 1, y);
+        assert.ok(d <= 0.01 + 1 / 255 && d >= -0.02, sfx + ' Kopfband ' + x + ',' + y + ': ' + d.toFixed(3));
+      }
+      for (x = 700; x <= 900; x++) { var k2 = Math.abs(c(x + 6, y) - 2 * c(x, y) + c(x - 6, y)); assert.ok(k2 <= 0.02, sfx + ' Knick bei x ' + x + ',' + y + ': ' + k2.toFixed(3)); }
+    });
   });
 });
 
@@ -415,7 +420,12 @@ test('Kopfband: hinter dem Kopftext kaum Durchschein von darunter laufenden Reih
 test('Details: buildRows blendet Reihen ueber dem Kopf sofort aus (hideAbove(true)), hideAbove kennt das sofortige Ausblenden', function () {
   var src = fs.readFileSync(path.join(ROOT, 'src', 'views', 'details.js'), 'utf8');
   var m = /function buildRows\(\) \{([\s\S]*?)\n    \}/.exec(src);
-  assert.ok(m && /hideAbove\(true\);[^\n]*\s*$/.test(m[1]), 'buildRows endet mit hideAbove(true)');
+  assert.ok(m && /hideAbove\(true\);[^\n]*\n\s*syncUnder\(\);\s*$/.test(m[1]), 'buildRows endet mit hideAbove(true) und syncUnder()');
+  ['function applyMore', 'function simGrow'].forEach(function (f) {   // jeder Aufbau setzt den Zustand "unter dem Kopf" neu (Pruefbefund)
+    var i = src.indexOf(f); assert.ok(i >= 0, f);
+    var body = src.slice(i, src.indexOf('\n    }\n', i));
+    assert.ok(/hideAbove\(true\);[^\n]*\n\s*syncUnder\(\);/.test(body), f + ': hideAbove(true) + syncUnder()');
+  });
   assert.ok(/function hideAbove\(now\)[\s\S]*?if \(now\) \{[^}]*U\.show\(hide\[i\], false\)/.test(src), 'hideAbove(now) blendet sofort aus');
   assert.strictEqual((src.match(/buildRows\(\);/g) || []).length >= 2, true, 'Aufbau-Wege gefunden');
 });
@@ -429,6 +439,144 @@ test('Startseite: Kopf der naechsten Reihe aus, solange der Hinweis unten steht 
   assert.ok(/if \(on\) for \(var j = 0; j < SLOTS; j\+\+\) if \(slotRow\[j\] === R \+ 1\) nh = slots\[j\]\.head;/.test(m[1]), 'Kopf der Reihe R+1 waehrend des Hinweises');
   assert.ok(/if \(nh !== cueHead\)/.test(m[1]), 'nur bei Wechsel');
   assert.ok(/\.row-head\.hd-off \{ visibility: hidden !important; \}/.test(css), 'CSS-Klasse');
+});
+
+/* Detailseite: Reihen, die beim Schritt unter den Kopf fahren, blenden sofort aus (Deckkraft der festen Ebene .rclip, Uebergang nur
+ * nur waehrend des Schritts (Klasse fdo), nicht beim Staffelwechsel; ohne bei Tastenwiederholung/"Weniger Animationen"); zurueck zwei Frames spaeter
+ * (sonst im selben Stil-Durchlauf wie display -> kein Uebergang). Row.setUnder: nur bei Wechsel. */
+test('Row.setUnder: Karten-Bereich per Deckkraft, Kopf per visibility, nur bei Wechsel; setVisible und setUnder verbinden sich', function () {
+  var c = H.load(), RN = c.N;
+  function El() { this.style = {}; this.childNodes = []; this.className = ''; }
+  El.prototype.appendChild = function (x) { this.childNodes.push(x); x.parentNode = this; return x; };
+  El.prototype.setAttribute = function () {}; El.prototype.addEventListener = function () {};
+  c.document = { createElement: function () { return new El(); }, createTextNode: function (t) { return { nodeValue: t }; } };
+  var r = new RN.ui.Row(new El(), {});
+  assert.strictEqual(r.setUnder(true), true);
+  eq([r.clip.style.opacity, r.head.style.visibility], ['0', 'hidden']);
+  assert.strictEqual(r.setUnder(true), false, 'gleicher Wert: nichts');
+  r.setUnder(false);
+  eq([r.clip.style.opacity, r.head.style.visibility], ['', 'visible']);
+  r.setVisible(false); r.setUnder(false);
+  eq(r.clip.style.opacity, '0', 'verborgen bleibt verborgen');
+  r.setVisible(true); eq(r.clip.style.opacity, '');
+  var src = fs.readFileSync(path.join(ROOT, 'src', 'views', 'details.js'), 'utf8'), css = fs.readFileSync(path.join(ROOT, 'src', 'css', 'app.css'), 'utf8');
+  assert.ok(/U\.tf\(pg, 0, -o\); fadeUnder\(\); \}/.test(src), 'fadeUnder beim Schritt');
+  assert.ok(/function fadeUnder\(\)[\s\S]*?fdo\(r\); N\.fx\.move\(r\.clip\)[\s\S]*?U\.raf\(function \(\) \{ U\.raf\(/.test(src), 'Uebergang nur im Schritt, aus bei fast, Einblenden zwei Frames spaeter');
+  assert.ok(/function syncUnder\(\)/.test(src) && !/U\.cls\([^)]*'dfade'/.test(src), 'Neuaufbau ohne Uebergang, keine Dauer-Klasse');
+  assert.ok(/\.rclip\.fdo \{ -webkit-transition: opacity @mo\.base@ @mo\.ease@; \}/.test(css) && /\.rm \.rclip\.fdo \{ -webkit-transition: none; \}/.test(css) && !/\.dfade/.test(css), 'CSS: nur mit fdo, ohne bei Weniger Animationen');
+});
+
+/* Apple (flex.css) setzt die Hero-Abdunklung rechts von x 1280 mit der Bildspalte x 860 fort: dort je Zeile konstant (+-1) */
+test('Hero-Abdunklung fuer Apple: scrim, scrim-glass-rail, scrim-glass-mid-rail je Zeile ab x 860 konstant (+-1)', function () {
+  ['scrim.png', 'scrim-glass-rail.png', 'scrim-glass-mid-rail.png'].forEach(function (n) {
+    var I = load(n);
+    for (var y = 0; y < I.h; y++) { var r = I.px[(y * I.w + 860) * 4 + 3]; for (var x = 861; x < I.w; x++) assert.ok(Math.abs(I.px[(y * I.w + x) * 4 + 3] - r) <= 1, n + ' ' + x + ',' + y); }
+  });
+});
+
+/* Kopfband gerollt wie der erste Bildschirm (Nutzer am TV, 1.0.23): (a) unter der Seitenleiste legt es nichts dazu; (b) sonst nur, was der
+ * Kopftext braucht – wo scrim-det schon reicht, hoechstens 0,012 mehr; (c) nach rechts nie dunkler (Test "Kopfband Details" oben). */
+test('Kopfband gerollt: unter der Seitenleiste wie der erste Bildschirm, sonst nur das Noetige fuer den Kopftext', function () {
+  var HO = load('scrim-hdr.png'), SO = load('scrim-det.png');
+  var NEED2 = (function () { for (var a = 0; a < 1; a += 0.005) if (onWhiteC(a, TEXT2) >= 4.5) return a; return 1; })();
+  ['-glass', '-glass-mid'].forEach(function (sfx) {
+    var s = load('scrim-det' + sfx + '.png'), r = load('rail' + sfx + '.png'), h = load('scrim-hdr' + sfx + '.png');
+    function F(x, y) { return 1 - (1 - (x < r.w ? alpha(r, x, y) : 0)) * (1 - alpha(s, x, y)); }
+    function S(x, y) { var ha = 0.92 * alpha(h, 1279 - x, Math.max(0, Math.min(87, Math.floor((287 - y) * 88 / 288)))); return 1 - (1 - F(x, y)) * (1 - ha); }
+    for (var y = 0; y < 288; y += 3) for (var x = 0; x < 132; x += 3) assert.ok(Math.abs(S(x, y) - F(x, y)) <= 0.005, sfx + ' Seitenleiste ' + x + ',' + y + ': ' + F(x, y).toFixed(3) + ' -> ' + S(x, y).toFixed(3));
+    for (y = 0; y < 288; y += 4) for (x = 132; x < 1280; x += 4) {
+      var f = F(x, y), g = S(x, y);
+      if (f >= NEED2 + 0.02) assert.ok(g - f <= 0.012, sfx + ' ohne Bedarf dunkler ' + x + ',' + y + ': ' + f.toFixed(3) + ' -> ' + g.toFixed(3));
+      var big = y >= 72 && y <= 120;   // Titel (text-1, gross: 3:1) bis x 1008; kleine Schrift (Ueberzeile, Metazeile, Beschreibung, Chips: 4,5:1) bis zum tatsaechlichen Textende ~x 780 (Nutzer 09.11.: dahinter kein Boden, gerader Auslauf)
+      if (x >= 252 && x <= (big ? 1008 : 780) && y >= 48 && y <= 248) {
+        // (big oben gesetzt)
+        // rechts (x > 900) faellt schon das deckende Kopfband ab: dort hoechstens so dunkel wie Deckend (nie dunkler), Kontrast mindestens wie Deckend
+        var dk = 1 - (1 - 0.92 * alpha(HO, 1279 - x, Math.max(0, Math.min(87, Math.floor((287 - y) * 88 / 288))))) * (1 - alpha(SO, x, y));
+        var ok = big ? onWhiteC(g, hex(T.color("text-1"))) >= Math.min(3, onWhiteC(dk, hex(T.color("text-1")))) - 0.05 : onWhiteC(g, TEXT2) >= Math.min(4.5, onWhiteC(dk, TEXT2)) - 0.05;
+        assert.ok(ok, sfx + " Kopftext " + x + "," + y + ": " + onWhiteC(g, TEXT2).toFixed(2) + " (Deckend " + onWhiteC(dk, TEXT2).toFixed(2) + ")");
+      }
+    }
+  });
+});
+
+/* Deckendes Kopfband von Album, Kuenstler, fremden Titeln (top-band, 0,92 x Bild, gedreht) ueber der durchscheinenden Seitenleiste:
+ * oben links nicht dunkler als das Band daneben (Ecke = Band), Deckend unveraendert (= fade-bottom.png) */
+test('Kopfband Album/Kuenstler: Gesamtwirkung unter der Seitenleiste = Band daneben (+-0,01), Durchscheinend <= Leicht, Deckend = fade-bottom', function () {
+  var fb = load('fade-bottom.png');
+  ['top-band', 'top-band-np'].forEach(function (n) { var o = load(n + '.png'); for (var i = 0; i < o.px.length; i++) assert.strictEqual(o.px[i], fb.px[i], n + '.png = fade-bottom.png'); });
+  [['top-band', 'scrim-det'], ['top-band-np', 'scrim-np']].forEach(function (tb) {
+    var C = {};
+    ['-glass', '-glass-mid'].forEach(function (sfx) {
+      var s = load(tb[1] + sfx + '.png'), r = load('rail' + sfx + '.png'), t = load(tb[0] + sfx + '.png');
+      C[sfx] = function (x, y) { var ty = Math.max(0, Math.min(87, Math.floor((287 - y) * 88 / 288))), b = y < 288 ? 0.92 * alpha(t, 1279 - x, ty) : 0;
+        return 1 - (1 - (x < r.w ? alpha(r, x, y) : 0)) * (1 - b) * (1 - alpha(s, x, y)); };
+      for (var y = 0; y < 220; y += 3) {
+        var ref = C[sfx](r.w, y), mn = 1;
+        for (var x = 0; x < r.w; x += 2) assert.ok(Math.abs(C[sfx](x, y) - ref) <= 0.01, tb[0] + sfx + ' unter der Leiste ' + x + ',' + y + ': ' + C[sfx](x, y).toFixed(3) + ' statt ' + ref.toFixed(3));
+        for (x = 0; x < 1280; x += 2) { var v = C[sfx](x, y); assert.ok(v <= mn + 0.01, tb[0] + sfx + ' nach rechts dunkler ' + x + ',' + y); mn = Math.min(mn, v); }
+      }
+    });
+    for (var y = 0; y < 220; y += 3) for (var x = 0; x < 1280; x += 8) assert.ok(C['-glass'](x, y) <= C['-glass-mid'](x, y) + 0.005, tb[0] + ' Durchscheinend dunkler als Leicht ' + x + ',' + y);
+  });
+  var c = H.load(); eq(c.N.glass.file('top-band-np.png', 'mid'), 'top-band-np-glass-mid.png'); eq(c.N.glass.file('top-band.png', 'strong', 'rail'), 'top-band-glass.png');
+});
+
+/* Kopfband gerollt (Nutzer 09.11.: Auslauf "hart und seltsam geschwungen"): der Hub ueber dem ersten Bildschirm faellt getrennt in x
+ * und y ab – entlang jeder Zeile y 40..288 ab x 300 nach rechts nur fallend (ein Auslauf), entlang jeder Spalte ab y 150 nach unten nur
+ * fallend; und das Verhaeltnis Hub(x, y) / Hub(x, 100) ist in jeder Spalte gleich (keine gebogenen Hoehenlinien: w = wx(x) wy(y)). */
+test('Kopfband gerollt: Gewicht des Hubs = wx(x) * wy(y) (gerader Auslauf rechts ab x 980, unten ab y 198; keine gebogenen Hoehenlinien)', function () {
+  function sm(t) { t = Math.max(0, Math.min(1, t)); return t * t * t * (t * (t * 6 - 15) + 10); }
+  var NB = (function () { for (var a = 0; a < 1; a += 0.0025) if (onWhiteC(a, TEXT2) >= 4.5) return a + 0.02; return 1; })();
+  ['-glass', '-glass-mid'].forEach(function (sfx) {
+    var h = load('scrim-hdr' + sfx + '.png'), sd = load('scrim-det' + sfx + '.png'), r = load('rail' + sfx + '.png'), n = 0;
+    for (var y = 40; y < 288; y += 6) for (var x = 260; x < 1276; x += 8) {
+      var f = 1 - (1 - (x < r.w ? alpha(r, x, y) : 0)) * (1 - alpha(sd, x, y)), d = f - NB, full = Math.min(1, (f + NB + Math.sqrt(d * d + 0.0004)) / 2) - f;
+      if (full < 0.08) continue;   // Rundung (1/255 je Bild) wiegt bei kleinem Hub zu schwer
+      // wo das laufende Minimum greift (gerollt nach oben nie dunkler als weiter unten, Nutzer 09.11.), darf das Gewicht kleiner sein
+      var wantT = (1 - sm((x - 780) / 500)) * (1 - sm((y - 198) / 90)), minB = 1;
+      for (var yb = y + 1; yb <= 420; yb += 2) minB = Math.min(minB, 1 - (1 - (x < r.w ? alpha(r, x, yb) : 0)) * (1 - alpha(sd, x, yb)));
+      if (f + full * wantT > minB + 0.005) continue;
+      var ha = 0.92 * alpha(h, 1279 - x, Math.max(0, Math.min(87, Math.floor((287 - y) * 88 / 288)))), w = ((1 - (1 - f) * (1 - ha)) - f) / full;
+      var want = (1 - sm((x - 780) / 500)) * (1 - sm((y - 198) / 90));
+      assert.ok(Math.abs(w - want) <= 0.08, sfx + ' Gewicht bei ' + x + ',' + y + ': ' + w.toFixed(2) + ' statt ' + want.toFixed(2)); n++;
+    }
+    assert.ok(n > 250, sfx + ': zu wenige Messpunkte ' + n);   // rechts oben greift das laufende Minimum, dort zaehlt der Punkt nicht
+  });
+});
+
+
+
+/* Details rechts (Nutzer 09.11.: gerollt "dunklerer Fleck rechts" – Zunge von scrim-det rechts neben dem Info-Block; danach "Streifen"
+ * auf dem ersten Bildschirm; Pruefbefund 10.11.: EIN Bild fuer beide Zustaende, keine Ueberblendung): scrim-det-glass*.png ist nie
+ * dunkler als scrim-det.png; Spalten x 800..1280 fuer y 0..400 ohne Beule (nach unten nie heller) auf dem ersten Bildschirm und gerollt
+ * mit Kopfband; ohne Querstreifen (zweite Differenz entlang der Spalten <= 0,012, auch auf dem ersten Bildschirm samt Seitenleiste und
+ * Band); oben (y <= 120, darunter weich der Lese-Boden am Info-Block) rechts von x 860 getrennt in x und y: (T - Rand) / (T(860) - Rand) ist in allen Zeilen dasselbe Profil. */
+test('Details rechts: ein Bild ohne Zunge – Spalten ohne Beule und ohne Streifen (erster Bildschirm und gerollt), oben gerader Auslauf in x', function () {
+  var O = load('scrim-det.png');
+  ['-glass', '-glass-mid', '-glass-rail', '-glass-mid-rail'].forEach(function (sfx) {
+    var I = load('scrim-det' + sfx + '.png');
+    eq([I.w, I.h], [O.w, O.h], sfx);
+    for (var i = 3; i < O.px.length; i += 4) assert.ok(I.px[i] <= O.px[i], sfx + ' dunkler als scrim-det.png bei ' + ((i - 3) / 4 % O.w) + ',' + Math.floor((i - 3) / 4 / O.w));
+  });
+  ['-glass', '-glass-mid'].forEach(function (sfx) {
+    var cs = [[stackLv('scrim-det', sfx), 'erster Bildschirm', 0.012], [hdrStack(sfx), 'gerollt mit Kopfband', 0.02]];   // Kopfband: 88 Bildzeilen auf 288 px (3,3 px je Zeile) plus je Bild 1/255 Rundung
+    cs.forEach(function (c) {
+      for (var x = 800; x < 1280; x += 16) { var mx = 0; for (var y = 0; y <= 400; y += 2) { var v = c[0](x, y); assert.ok(v >= mx - c[2], sfx + ' ' + c[1] + ' Beule bei ' + x + ',' + y + ': ' + v.toFixed(3) + ' < ' + mx.toFixed(3)); mx = Math.max(mx, v); } }
+    });
+    var A2 = load('scrim-det' + sfx + '.png'), C1 = stackLv('scrim-det', sfx);
+    [[function (x, y) { return alpha(A2, x, y); }, 'Bild'], [C1, 'erster Bildschirm']].forEach(function (q) {
+      for (var x = 800; x < 1280; x += 8) for (var y = 12; y <= 470; y += 4) {   // Streifen: Kruemmung entlang der Spalte bis unter den Uebergang y 200..440 (Mittel ueber 8 px gegen Rundung; ab y 560 steigt das Band)
+        var m = function (yy) { var s = 0; for (var k = -4; k < 4; k++) s += q[0](x, yy + k); return s / 8; };
+        var d2 = m(y - 8) - 2 * m(y) + m(y + 8);
+        assert.ok(Math.abs(d2) <= 0.012, sfx + ' ' + q[1] + ' Streifen bei ' + x + ',' + y + ': ' + d2.toFixed(3));
+      }
+    });
+    var I = A2, ref = {};   // gleiches Profil in allen oberen Zeilen (getrennt in x und y)
+    for (var y = 0; y <= 120; y += 8) {   // ab y 124 kommt weich der Lese-Boden am Info-Block dazu
+      var a = alpha(I, 860, y), b = alpha(I, 1279, y); if (a - b < 0.1) continue;
+      for (var x = 880; x < 1270; x += 20) { var r = (alpha(I, x, y) - b) / (a - b); if (!ref[x]) ref[x] = r; assert.ok(Math.abs(r - ref[x]) <= 0.06, sfx + ' rechts gebogen bei ' + x + ',' + y + ': ' + r.toFixed(2) + ' statt ' + ref[x].toFixed(2)); }
+    }
+  });
 });
 
 /* ---------- Plattform: caps.glassBars 'all' (TV) | 'rail' (nur Seitenleiste) | false ---------- */
@@ -479,7 +627,7 @@ test('rail-Fassungen: gleich gross, nie dunkler als das Original, unten (ab y 66
   });
 });
 test('rail-Fassungen: links sichtbar heller, Text lesbar, keine Inseln (nach rechts/oben), Streifen neben der Leiste gleichmaessig', function () {
-  [['scrim', [[144, 72, 784, 310, HERO], [144, 556, 1272, 560]]], ['scrim-det', [[144, 224, 1000, 512], [144, 320, 1272, 560]]]].forEach(function (p) {
+  [['scrim', [[144, 72, 784, 310, HERO], [144, 556, 1272, 560]]], ['scrim-det', [[144, 224, 972, 512], [144, 320, 1272, 560]]]].forEach(function (p) {
     var off = railStack(p[0], ''), o = load(p[0] + '.png');
     ['-glass', '-glass-mid'].forEach(function (sfx) {
       var c = railStack(p[0], sfx), w = p[0] + sfx + '-rail';

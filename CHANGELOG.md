@@ -5,6 +5,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.0.23] - 2026-11-10
+
+### Changed
+- **Detail pages with see-through bars: a calm header when you scroll.** When you scroll down on a movie or show page,
+  the band behind the title at the top now follows "Bar transparency" evenly instead of showing a darker box behind the
+  text. It is only as dark as needed to keep the title readable, and it fades out softly and in a straight line towards
+  the right instead of ending in a hard or curved edge. Rows that slide up under the title fade out while they move, so
+  nothing shows through behind it. The first screen of a detail page looks exactly as before.
+- **Album, artist and "not on your server" pages:** the band at the top is now just as even, and with "Opaque" the
+  sidebar next to it no longer gets an extra dark stripe.
+- **Smoother bottom corners.** With the see-through levels, the darkening above the bottom band on detail pages rises in
+  one gentle curve, and the bottom left corner in the Library and Live TV is no longer noticeably darker than the rest,
+  so the area under the sidebar no longer looks like a second layer.
+- **Bar transparency on Mac, iPad and iPhone.** The setting is now offered there too and lets the picture shimmer through
+  the sidebar; where the window is too narrow for the sidebar (or a detail card covers it), nothing changes.
+
+If the detail pages now feel a little calmer, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) –
+entirely optional. ☕
+
 ## [1.0.22] - 2026-11-08
 
 ### Added

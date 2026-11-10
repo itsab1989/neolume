@@ -890,6 +890,7 @@ function makeSeeds(port) {
   seeds.glassMid = seed({}, { 'settings-aaaa1111.json': { glass: 'mid' } }); seeds.glassMidCorner = amb({ glass: 'mid', libBg: 'art', libBgStrength: 'strong' });
   seeds.glassRed = seed({}, { 'settings-aaaa1111.json': { glass: 'strong' } }); seeds.glassRedMid = seed({}, { 'settings-aaaa1111.json': { glass: 'mid' } }); seeds.glassRedOff = seed();
   seeds.glassCalmOff = seed(); seeds.glassCalmMid = seed({}, { 'settings-aaaa1111.json': { glass: 'mid' } }); seeds.glassCalm = seed({}, { 'settings-aaaa1111.json': { glass: 'strong' } });
+  seeds.glassPlay = seed({}, { 'settings-aaaa1111.json': { glass: 'strong' } }, cfgPlay); seeds.glassPlayMid = seed({}, { 'settings-aaaa1111.json': { glass: 'mid' } }, cfgPlay);
   seeds.glassAmb = amb({ glass: true, libBgStrength: 'strong' }); seeds.glassCorner = amb({ glass: true, libBg: 'art', libBgStrength: 'strong' });
   seeds.ambMood = amb({}); seeds.ambStrong = amb({ libBgStrength: 'strong' }); seeds.ambArt = amb({ libBg: 'art' });
   seeds.ambArtStrong = amb({ libBg: 'art', libBgStrength: 'strong' }); seeds.ambRandom = amb({ libBg: 'random' }); seeds.ambOff = amb({ libBg: 'off' });
@@ -1232,7 +1233,7 @@ var SCENES = [
   // Besetzung eingerastet: Punkt ueber dem ausgeblendeten Folgen-Abschnitt (frueher Sprung dorthin) bleibt ohne Wirkung; obere Randzone mit Pille
   { name: 'details-ptr-cast-hidden', seed: 'ptrHold', keys: 'LEFT,DOWN,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,DOWN,DOWN', mwait: 7800, moves: '600:420,600:440,600:200,601:202,700:300,701:301' },
   // Film: Klick in die untere Randzone unter den Knoepfen holt die Besetzung herein
-  { name: 'details-movie-ptr-cast', seed: 'ptrHold', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800', mwait: 6000, moves: '600:300,600:320,700:630,click@700:630' },
+  { name: 'details-movie-ptr-cast', seed: 'ptrHold', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800', mwait: 6500, hold: 13000, moves: '600:300,600:320,700:630,click@700:630' },   // unter Last (voller Lauf) kam der Klick spaet: mehr Luft (Pruefbefund 08.11.)
   { name: 'settings-play-end', seed: 'home', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,ENTER,RIGHT,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN,DOWN' },
   // M4 Musik (Bibliothek 3 "Musik"): quadratische Karten, Alben-Reiter, Album-/Kuenstlerseite, Jetzt laeuft, Mini-Player
   { name: 'music-artists', seed: 'play', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800' },
@@ -1373,6 +1374,9 @@ var SCENES = [
   { name: 'glass-calm-details-cast-mid', seed: 'glassCalmMid', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,wait600' },
   { name: 'glass-calm-details-cast', seed: 'glassCalm', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,wait600' },
   { name: 'glass-calm-details-extras-mid', seed: 'glassCalmMid', keys: 'LEFT,DOWN,ENTER,wait800,RIGHT,ENTER,wait800,DOWN,wait600,DOWN,wait600' },
+  // Kuenstlerseite gerollt (deckendes Kopfband ueber der durchscheinenden Seitenleiste, Pruefung 08.11.)
+  { name: 'glass-artist-albums', seed: 'glassPlay', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,ENTER,wait800,DOWN' },
+  { name: 'glass-artist-albums-mid', seed: 'glassPlayMid', keys: 'LEFT,DOWN,DOWN,DOWN,DOWN,ENTER,wait800,ENTER,wait800,DOWN' },
   { name: 'glass-red-off', seed: 'glassRedOff' },
   { name: 'glass-red-mid', seed: 'glassRedMid' },
   { name: 'glass-red', seed: 'glassRed' },

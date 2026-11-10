@@ -6,13 +6,14 @@
  * Fassungen der Stufe (tools/make_assets.js --glass). Die Bilder merken ihren Grundnamen im Attribut data-glass; ein Wechsel der
  * Einstellung tauscht nur deren src (einmal Dekodieren, nie im Tastenpfad). Ansichten im Stapel (display:none) sind im DOM und werden
  * mitgetauscht; zerstoerte Ansichten bauen sich mit dem aktuellen Wert neu auf – daher keine Liste, die Elemente festhaelt.
- * Kopfband der Detailseiten (scrim-hdr.png) folgt der Stufe: weggerollte Abschnitte sind in Ruhe ausgeblendet (details.js hideAbove).
+ * Kopfband der Detailseiten (scrim-hdr.png) folgt der Stufe; deckendes Kopfband von Album/Kuenstler/fremden Titeln (top-band[-np].png)
+ * bleibt deckend, nur unter der Seitenleiste angeglichen. Kopfband der Detailseiten: weggerollte Abschnitte sind in Ruhe ausgeblendet (details.js hideAbove).
  * Bewusst NICHT durchscheinend: Band der Suche
  * (einfarbiger Grund, darunter nur angeschnittene Karten) und Jetzt laeuft (ohne Seitenleiste).
  * caps.glassBars (src/platform/platform.js): 'all' = Seitenleiste + Band (TV), 'rail' = nur Seitenleiste und Abdunklung links daneben,
  * unten wie Deckend (Geraete ohne Band; Haken railShown fuer Layouts ohne Leiste), false = nicht angeboten. */
 (function (N) {
-  var ATTR = 'data-glass', ASSETS = ['rail.png', 'fade-bottom.png', 'fade-frame.png', 'scrim.png', 'scrim-det.png', 'scrim-np.png', 'scrim-hdr.png'];
+  var ATTR = 'data-glass', ASSETS = ['rail.png', 'fade-bottom.png', 'fade-frame.png', 'scrim.png', 'scrim-det.png', 'scrim-np.png', 'scrim-hdr.png', 'top-band.png', 'top-band-np.png'];
   var LEVELS = ['off', 'mid', 'strong'], SFX = { mid: '-glass-mid', strong: '-glass' };
   var cur = 'off', railVis = true;
   function has(name) { for (var i = 0; i < ASSETS.length; i++) if (ASSETS[i] === name) return true; return false; }
@@ -41,7 +42,7 @@
       if (lv === 'off' || !has(name) || !mode) return name;
       if (mode === 'rail') {
         if (!railVis || /^fade-/.test(name)) return name;
-        return name.replace(/\.png$/, SFX[lv] + (name === 'rail.png' || name === 'scrim-hdr.png' ? '' : '-rail') + '.png');
+        return name.replace(/\.png$/, SFX[lv] + (name === 'rail.png' || name === 'scrim-hdr.png' || /^top-band/.test(name) ? '' : '-rail') + '.png');
       }
       return name.replace(/\.png$/, SFX[lv] + '.png');
     },

@@ -374,6 +374,7 @@
       if (zone === 'row') for (i = 0; i < out.length; i++) if (rows[rk] && out[i] === rows[rk]) { rk = i; break; }
       rows = out;
       hideAbove(true);                                             // Aufbau: sofort (Kopfband kann durchscheinen, BG-2)
+      syncUnder();
       N.idle.add(updateHints, 'det-hints');
     }
     function sameItems(a, b) {
@@ -504,7 +505,7 @@
       /* TV-Befund 1.0.5: unter dem Reiter "Staffel 1" (nur im Katalog) standen bis zum Wechsel noch die Bilder der Staffel 2. Ist eine
        * Katalog-Staffel beteiligt (Ziel oder gerade gezeigt), verschwinden die alten Karten sofort (eine Deckkraft am Karten-Bereich,
        * Row.setVisible); die neuen kommen wie immer nach der Ruhe. Ohne Erweiterung gibt es keine Katalog-Staffeln: unveraendert. */
-      if (!now && epRow && seasons[i]) { var tv = !!seasons[i].virtual; epRow.setVisible(!(tv || shownV) || (seasons[i].index === shownS && tv === shownV)); }
+      if (!now && epRow && seasons[i]) { var tv = !!seasons[i].virtual; fdoOff(); epRow.setVisible(!(tv || shownV) || (seasons[i].index === shownS && tv === shownV)); }
       if (seasonT) clearTimeout(seasonT);
       var run = function () { seasonT = 0; if (!dead) loadSeason(i, focusEp); };
       if (now) run(); else seasonT = setTimeout(function wait() { if (N.idle.restFor() < REST) { seasonT = setTimeout(wait, REST); return; } run(); }, REST);
@@ -556,7 +557,7 @@
       var f = placeholders ? 0 : D.pickEpisode(eps, focusEp !== undefined ? focusEp : wishE);
       if (!placeholders) f = decorate(f);
       if (!placeholders) wishE = 0;
-      if (epRow.vis === false) epRow.setVisible(true);    // nach einem Wechsel mit Katalog-Staffel (selectSeason) wieder zeigen
+      if (epRow.vis === false) { fdoOff(); epRow.setVisible(true); }    // nach einem Wechsel mit Katalog-Staffel (selectSeason) wieder zeigen
       epRow.setModel({ id: 'eps', kind: 'land', tk: 'det.row.episodes', items: eps }, f);
       if (zone === 'eps') { epRow.setFocused(true); placeRing(epRing(epRow.ringPos())); infoLater(eps[epRow.f]); }
       else if (zone === 'tabs' && !placeholders && !tabInfo(seasons[sIdx]) && eps[epRow.f] && eps[epRow.f] !== infoFor) infoLater(eps[epRow.f]);   // Reiter: Info zur gewaehlten Staffel (auch zurueck von der Katalog-Staffel)
@@ -637,6 +638,7 @@
       var defs = rowDefs();
       for (i = 0; i < defs.length; i++) addRow(defs[i]);
       hideAbove(true);   // neu aufgebaut (Laden, nach der Wiedergabe): Reihen ueber dem Kopf sofort aus – das Kopfband kann durchscheinend sein
+      syncUnder();
     }
     function rowDefs() {
       var defs = [];
@@ -651,8 +653,9 @@
     /* Reihe unter dem Kopf. Poster-Reihen: Ausschnitt (.rclip, sonst 340) hoch genug fuer die Beschriftung unter der Karte
      * (Kopf 52 + capY 280 + CAPH 46 = 378 -> 384); vorher schnitt er sie nach 8 px ab (Befund 06.11.) */
     function newRow(def) {
-      return new N.ui.Row(pg, { captions: function () { return true; }, w: card ? cardW() : 0, free: RFREE,
+      var r = new N.ui.Row(pg, { captions: function () { return true; }, w: card ? cardW() : 0, free: RFREE,
         clipH: def.kind === 'poster' ? 384 : 0 });
+      return r;
     }
     function addRow(def) {
       var y = rows.length ? rows[rows.length - 1].top + PITCH[rows[rows.length - 1].row.model.kind] : isShow ? SEC + ANCHOR + PITCH.land : PEEK;
@@ -667,6 +670,7 @@
       if (!sim || !sim.length) return;
       addRow({ id: 'similar', kind: 'poster', tk: 'det.row.similar', items: sim });
       hideAbove(true);                                             // Aufbau: sofort (Kopfband kann durchscheinen, BG-2)
+      syncUnder();
     }
 
     /* ---------- Zonen & Fokus ---------- */
@@ -677,9 +681,52 @@
     function rowOff(i) { return rows[i].top - anchorOf(rows[i].row.model.kind); }
     function setOff(o) {
       if (card) { if (N.input.mode === 'key') cardTo(o, true); return; }   // Karte: Seite rollt zum Fokus (nur Tasten); off bleibt 0
-      if (o !== off) { off = o; N.fx.move(pg); U.tf(pg, 0, -o); }
+      if (o !== off) { off = o; N.fx.move(pg); U.tf(pg, 0, -o); fadeUnder(); }
       hideAbove();
     }
+    /* Reihen, die mit diesem Schritt unter den Kopf fahren, gleich beim Schritt ausblenden (Deckkraft der festen Ebene .rclip mit
+     * dem Uebergang der Seite, 150 ms; Kopf per visibility) – das Kopfband ist mit BG-2 durchscheinend, vorher liefen sie ~180 ms (bei
+     * gehaltener Taste dauerhaft) sichtbar darunter durch. Zurueckkommende Reihen blenden ebenso ein (einen Frame nach dem Einblenden
+     * per display, damit der Uebergang laeuft). Tastenwiederholung (N.fx fast) und "Weniger Animationen" (.rm): ohne Uebergang.
+     * Keine neue Ebene, kein Messen: nur Deckkraft-Werte an vorhandenen Ebenen, und nur bei Wechsel (Row.setUnder). */
+    function fadeUnder() {
+      if (card) return;
+      var back = [];
+      for (var i = 0; i < rows.length; i++) {
+        var r = rows[i].row, u = above(rows[i].top);
+        if (r.under === u) continue;
+        fdo(r); N.fx.move(r.clip);
+        if (u) r.setUnder(true); else back.push(r);
+      }
+      if (isShow && epRow) {                              // Folgenreihe im Staffel-Abschnitt (Oberkante wie hideAbove: SEC + 332)
+        var ue = above(SEC + 332);
+        if (epRow.under !== ue) { fdo(epRow); N.fx.move(epRow.clip); if (ue) epRow.setUnder(true); else back.push(epRow); }
+      }
+      // zwei Frames: die Reihe ist eben erst wieder per display sichtbar – im selben Stil-Durchlauf liefe kein Uebergang (WebKit 537, Pruefbefund)
+      if (back.length) U.raf(function () { U.raf(function () { if (!dead) for (var k = 0; k < back.length; k++) if (!above(rowTop(back[k]))) back[k].setUnder(false); }); });
+    }
+    /* Uebergang nur fuer das Aus-/Einblenden unter dem Kopf (Klasse fdo an der Reihen-Ebene, nach 320 ms wieder ab: Einblenden startet
+     * zwei Frames spaeter und dauert 150 ms – am TV kann ein Frame > 50 ms dauern, Pruefbefund) – nicht beim Staffelwechsel
+     * (epRow.setVisible) oder beim Neuaufbau (syncUnder): dort schaltet die Deckkraft sofort (fdoOff) */
+    var fdoL = [], fdoT = 0;
+    function fdo(r) {
+      if (fdoL.indexOf(r) < 0) { fdoL.push(r); U.cls(r.clip, 'fdo', true); }
+      if (fdoT) clearTimeout(fdoT);
+      fdoT = setTimeout(fdoOff, 320);
+    }
+    function fdoOff() {
+      if (fdoT) { clearTimeout(fdoT); fdoT = 0; }
+      for (var i = 0; i < fdoL.length; i++) U.cls(fdoL[i].clip, 'fdo', false);
+      fdoL = [];
+    }
+    /* Ausgangslage nach einem Aufbau (buildRows, applyMore, simGrow): unter dem Kopf = aus, sonst an – ohne Uebergang */
+    function syncUnder() {
+      if (card) return;
+      fdoOff();
+      for (var i = 0; i < rows.length; i++) rows[i].row.setUnder(above(rows[i].top));
+      if (isShow && epRow) epRow.setUnder(above(SEC + 332));
+    }
+    function rowTop(r) { if (r === epRow) return SEC + 332; for (var i = 0; i < rows.length; i++) if (rows[i].row === r) return rows[i].top; return 0; }
     /* Abschnitte, die nach oben unter den Kopf geschoben sind, ausblenden (nach der Bewegung): das Kopfband laeuft nach rechts
      * aus (TV-Befund 28.10.: Bild rechts sonst unnoetig dunkel), dort darf nichts Altes durchscheinen. Keine Messung (feste Positionen). */
     /* Abschnitt (Seiten-y seiner Oberkante) liegt beim aktuellen Versatz unter dem Kopf -> ausgeblendet, fuer den Zeiger nicht da */
@@ -972,7 +1019,7 @@
       if (xt && xt.close) xt.close();
       for (var i = 0; i < tasks.length; i++) if (tasks[i]) tasks[i].abort();
       N.evt.off('playback:stopped', onPlayed); N.evt.off('watched:changed', onWatched); N.evt.off('anime:changed', onAnime);
-      if (seasonT) clearTimeout(seasonT); if (tabHoldT) clearTimeout(tabHoldT); if (bubbleTm) clearTimeout(bubbleTm); if (jump.t) clearTimeout(jump.t);
+      if (seasonT) clearTimeout(seasonT); if (fdoT) clearTimeout(fdoT); if (tabHoldT) clearTimeout(tabHoldT); if (bubbleTm) clearTimeout(bubbleTm); if (jump.t) clearTimeout(jump.t);
       rowsStop(); if (epRow) epRow.clear();
       for (i = 0; i < rows.length; i++) rows[i].row.clear();
       N.theme.stop();

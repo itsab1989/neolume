@@ -64,6 +64,8 @@ body { color: @c.text-1@; font-family: @ty.family@;
 .hcue0 .hmore { -webkit-transform: none; }   /* Gegenprobe nur im Messlauf (hvar-cue0) */
 .hmore .more-dn { display: inline-block; width: 28px; height: 28px; margin-right: @sp.2@; vertical-align: top; text-align: center; font-size: 28px; line-height: 26px; font-weight: 600;
   -webkit-transform: rotate(90deg); }
+.rclip.fdo { -webkit-transition: opacity @mo.base@ @mo.ease@; }   /* Detailseite: Reihe unter dem Kopf aus-/einblenden (fadeUnder), nur waehrend des Schritts */
+.rm .rclip.fdo { -webkit-transition: none; }
 .rclip { position: absolute; left: 128px; top: 0; width: 1152px; height: 340px; overflow: hidden; -webkit-transform: translate3d(0,0,0); }   /* feste Ebene ohne Inhalt: Reihe verbergen = Deckkraft (Row.setVisible) */
 .strip { position: absolute; left: 16px; top: 52px; width: 10px; height: 10px;
   -webkit-transform: translate3d(0,0,0); -webkit-transition: -webkit-transform @mo.base@ @mo.ease@; }
