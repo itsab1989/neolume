@@ -51,7 +51,7 @@
     if (end - clip <= 0) return { set: base, sMax: 0, clip: clip, top: 0 };
     // rollt: eigene Baender fuer die Mehr-Pfeile ueber (0..TOP) und unter dem Ausschnitt (clip..set-8), nichts liegt unter ihnen
     clip = base - 8 - ARW;
-    return { set: base, sMax: Math.max(0, end - clip), clip: clip, top: ARW };
+    return { set: base, sMax: Math.max(0, end - clip), clip: clip, top: ARW_T };
   };
   /* linker Rand der Spalte in der Flaeche (flexibel: sicherer Rand, iPhone quer mit Notch; TV 0) */
   R.edge = function () { return N.screen && N.screen.flex ? N.screen.safe.l : 0; };
@@ -60,6 +60,9 @@
   function visH() { return N.screen.h - N.screen.safe.b - N.screen.safe.t; }
   R.sy = 0; R.sMax = 0; R.fl = null;
   var ARW = 40;                                     // Band eines Mehr-Pfeils (28 hoch + Luft; Befund K 03.11.: unten zu knapp ueber "Einstellungen")
+  /* oberes Band: Pfeil bei 0, 28 hoch = 28 – endet genau ueber dem Profil-Eintrag (y 28, Fokusrahmen 28..76, Bild ab 36).
+   * Nutzerbefunde Mac 24.11.2026: mit 40 schnitt der Ausschnitt im kleinen Fenster das Profilbild ab, mit 34 noch den Fokusrahmen */
+  var ARW_T = 28;
   R.clip = 0; R.ctop = 0;                           // flach: Ausschnitt der rollenden Eintraege ctop..clip (0 = keiner)
   function scrollSet(p) {
     var y = -Math.round(p * 100) / 100;
@@ -153,8 +156,8 @@
       R.clipI.style.top = R.clipP.style.top = ct; R.icons.style.top = R.pin.style.top = it;
       // Mehr-Pfeile: Icon-Spalte (Mitte x 72) dauerhaft, Panel (Mitte der Beschriftung) je Aufbau; nur flach sichtbar (edges)
       if (!R.mI) { R.mI = N.ui.more(R.el, '', ''); R.el.insertBefore(R.mI.up, R.dim); R.el.insertBefore(R.mI.dn, R.dim); }   // unter Abdunklung und Panel
-      R.mI.up.style.cssText = 'left:58px;top:2px'; R.mI.dn.style.cssText = 'left:58px;top:' + (gy.clip + 2) + 'px';   // Band clip..clip+40, Trennlinie bei clip+36, "Einstellungen" ab clip+48
-      R.mP = N.ui.more(PC, 'left:146px;top:2px', 'left:146px;top:' + (gy.clip + 2) + 'px');
+      R.mI.up.style.cssText = 'left:58px;top:0'; R.mI.dn.style.cssText = 'left:58px;top:' + (gy.clip + 2) + 'px';   // Band clip..clip+40, Trennlinie bei clip+36, "Einstellungen" ab clip+48
+      R.mP = N.ui.more(PC, 'left:146px;top:0', 'left:146px;top:' + (gy.clip + 2) + 'px');
       R.icons.setAttribute('data-scroll', gy.sMax > 0 ? '1' : ''); R.pin.setAttribute('data-scroll', gy.sMax > 0 ? '1' : '');
       if (!R.fl) R.fl = N.ui.freeList({ el: R.icons, set: scrollSet, max: function () { return R.sMax; }, dim: visH,
         hit: function (x) { return R.sMax > 0 && (R.open_ || !R.slim()) && x < (R.open_ ? NAV_W : 112) + R.edge(); } });

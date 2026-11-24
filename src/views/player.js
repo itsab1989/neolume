@@ -294,6 +294,7 @@
     }
     function shutdown() {
       closed = true;
+      N.pointer.playHide(false);
       nowPlaying(null);
       if (offerTm) { clearTimeout(offerTm); offerTm = 0; }
       if (endT) { clearTimeout(endT); endT = 0; }
@@ -600,6 +601,7 @@
       if (fadeT) clearTimeout(fadeT);
       fadeT = setTimeout(fadeEnd, FADE_MS);
       zone = 'btn'; fb = 'pp'; quick = false;                   // naechstes Einblenden: Fokus Play/Pause
+      N.pointer.playHide(true);                                 // Maus: Pfeil mit der Leiste weg (kommt mit der naechsten Bewegung)
       N.router.refreshHints();
     }
     function fadeEnd() {
@@ -723,6 +725,13 @@
      * Am Fernseher kommt das nie (keine Lader-Funktion). */
     s.onCmd = function (cmd, arg) {
       var A = arrows();
+      /* Esc (Nutzerbefund Mac 24.11.2026): zurueck ins vorige Menue wie in anderen Mediaplayern, auch bei sichtbarer Bedienleiste
+       * (RETURN der Fernbedienung blendet dort erst nur die Leiste aus). Offene Feinauswahl, Countdown-/Letzte-Folge-Karte,
+       * Verbindungs-/Fehler-Insel und Schnellspulen behalten ihre RETURN-Regel (false -> der Lader schickt RETURN). */
+      if (cmd === 'exit') {
+        if (lp.isOpen() || cdOn || lastOn || lost || errOn || trickOn() || acc.active()) return false;
+        close(); return true;
+      }
       if (cmd === 'seekto') { if (typeof arg === 'number' && arg >= 0 && dur()) { showOsd(); seekTo(Math.min(arg * 1000, dur()), false); } return true; }
       switch (cmd) {
         case 'toggle': if (pb) pb.toggle(); showOsd(); return true;
@@ -1582,6 +1591,7 @@
     };
     /* ---------- Zeiger: Bewegung zeigt das OSD (und haelt es), Hover fokussiert, alles anklickbar ---------- */
     s.pointer = function (x, y, kind) {
+      if (N.input.mode !== 'touch') N.pointer.playHide(false);   // Maus bewegt/geklickt: Pfeil wieder da (auch ueber Fehler-/Verbindungs-Insel)
       var sp = N.screen.fromStage(x, y), pt = full(sp.x, sp.y); x = pt.x; y = pt.y;   // Kasten- -> Bildschirm- -> Raster-Punkt (TV: gleich)
       if (lost) {                                            // Insel "Verbindung unterbrochen": Knoepfe x 424/616, y 388
         if (y >= G.LOY + 128 && y < G.LOY + 176 && x >= G.LOX + 24 && x < G.LOX + 408) { var li2 = x < G.LOX + 216 ? 0 : 1; if (li2 !== lostF) setLostF(li2); if (kind === 'click') lostAct(li2); }

@@ -20,6 +20,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   so the area under the sidebar no longer looks like a second layer.
 - **Bar transparency on Mac, iPad and iPhone.** The setting is now offered there too and lets the picture shimmer through
   the sidebar; where the window is too narrow for the sidebar (or a detail card covers it), nothing changes.
+- **Mac: detail card fills the window.** A title's detail card now reaches the right and bottom edge of the window
+  (with a small gap at the top), so the home screen no longer peeks out beside it and the card no longer looks too short.
+- **Mac: the mouse pointer hides during playback.** When the playback controls fade out, the pointer disappears with
+  them and comes back as soon as you move the mouse – like in other video players. This works for movies, shows and
+  Live TV.
+- **Mac: Esc takes you straight back.** In the player, one press of Esc now returns to the previous page, even while the
+  controls are showing. Esc no longer ends full screen; to leave full screen, press F in the player, Ctrl-Cmd-F, or use
+  the green window button.
+- **Mac: profile picture fully visible in a small window.** When the sidebar scrolls in a smaller window, the profile
+  picture and its highlight at the top are no longer cut off.
 
 If the detail pages now feel a little calmer, you're welcome to buy me a coffee on [Ko-fi](https://ko-fi.com/itsab1989) –
 entirely optional. ☕

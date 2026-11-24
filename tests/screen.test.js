@@ -235,9 +235,9 @@ test('Seitenleiste auf flachen Flaechen (Mac-Mindestfenster, iPhone quer; Nutzer
   assert.deepStrictEqual(J(R.flat()), { y0: 96, end: 424, h: 516 });
   assert.deepStrictEqual(J(R.layoutY(6)), { y0: 96, step: 56 });
   assert.deepStrictEqual(J(R.geo(5)), { set: 432, sMax: 0, clip: 424, top: 0 }, '5 Eintraege passen ueber die festen Einstellungen (432), kein Rollen');
-  assert.deepStrictEqual(J(R.geo(6)), { set: 432, sMax: 96 + 5 * 56 + 64 - 384, clip: 384, top: 40 }, 'Einstellungen fest bei 432 (Nutzerentscheidung 03.11.), Eintraege rollen im Ausschnitt 40..384, Pfeil-Baender (40) darueber/darunter');
+  assert.deepStrictEqual(J(R.geo(6)), { set: 432, sMax: 96 + 5 * 56 + 64 - 384, clip: 384, top: 28 }, 'Einstellungen fest bei 432 (Nutzerentscheidung 03.11.), Eintraege rollen im Ausschnitt 28..384 (Profil-Eintrag samt Fokusrahmen ab 28 ganz sichtbar, Befunde 24.11.), Pfeil-Baender darueber/darunter');
   assert.deepStrictEqual(J(R.layoutY(10)), { y0: 96, step: 56 });
-  assert.deepStrictEqual(J(R.geo(10)), { set: 432, sMax: 96 + 9 * 56 + 64 - 384, clip: 384, top: 40 }, '10 Eintraege: rollen ueber dem festen Eintrag');
+  assert.deepStrictEqual(J(R.geo(10)), { set: 432, sMax: 96 + 9 * 56 + 64 - 384, clip: 384, top: 28 }, '10 Eintraege: rollen ueber dem festen Eintrag');
   size = { w: 1272, h: 586, safe: { t: 0, r: 91, b: 31, l: 91 } }; N.evt.emit('screen:changed', size);   // iPhone quer: ohne unteren Rand
   assert.strictEqual(R.flat().h, 555); assert.ok(R.geo(10).sMax > 0); assert.strictEqual(R.edge(), 91);
   size = { w: 960, h: 1280, safe: { t: 0, r: 0, b: 19, l: 0 } }; N.evt.emit('screen:changed', size);

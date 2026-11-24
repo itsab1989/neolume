@@ -54,12 +54,15 @@ function drag(a, axis, x, y, dx, dy, ms) {
   return took;
 }
 
-test('Geometrie: Touch volle Breite mit Spalt oben, Mac mittiges Feld; schmaler als 1280 -> Inhalt verkleinert', function () {
+test('Geometrie: Touch und Mac volle Breite mit Spalt oben (Nutzerbefund 24.11.); schmaler als 1280 -> Inhalt verkleinert', function () {
   var G = setup('apple', true).N.ui.card.geom;
   assert.deepStrictEqual(JSON.parse(JSON.stringify(G(1280, 960, true))), { x: 0, y: 32, w: 1280, h: 928, round: 'top', k: 1, ch: 928, cw: 1280, cut: 0, narrow: false });
   var m = G(1280, 800, false);
-  assert.deepStrictEqual([m.x, m.y, m.w, m.h, m.round, m.k, m.ch, m.cw], [48, 40, 1184, 720, 'all', 0.925, 778, 1280]);
-  assert.strictEqual(G(1728, 960, false).w, 1280, 'breites Mac-Fenster: Feld hoechstens 1280, k = 1');
+  assert.deepStrictEqual([m.x, m.y, m.w, m.h, m.round, m.k, m.ch, m.cw], [0, 32, 1280, 768, 'top', 1, 768, 1280], 'Mac: bis an den rechten und unteren Rand');
+  var mw = G(1728, 960, false);
+  assert.deepStrictEqual([mw.w, mw.k, mw.cw], [1728, 1, 1728], 'breites Mac-Fenster: Karte ueber die ganze Breite, Reihen laufen weiter');
+  var ms = G(1100, 800, false);
+  assert.ok(Math.abs(ms.k - 1100 / 1280) < 1e-9, 'schmales Mac-Fenster: Inhalt verkleinert');
   assert.strictEqual(G(1561, 720, true).cw, 1561, 'iPhone quer: Reihen laufen weiter');
   var p = G(834, 1194, true);                                     // spaeteres Hochformat (Nr. 16): keine feste 1280er-Karte
   assert.strictEqual(p.w, 834); assert.ok(Math.abs(p.k - 834 / 1280) < 1e-9); assert.strictEqual(p.ch, Math.round((1194 - 32) / p.k));
@@ -175,14 +178,14 @@ test('Gesten: nach unten ziehen schliesst nur ganz oben; Mitte -> rechts erst ab
   assert.strictEqual(N.router.topName(), 'base');
 });
 
-test('Zeiger: Koordinaten der Karte, X/Pfeil und Flaeche daneben (Mac: mittiges Feld, verkleinert)', function () {
+test('Zeiger: Koordinaten der Karte, X/Pfeil und Flaeche darueber (Mac: volle Breite, Spalt oben)', function () {
   var a = setup('apple', false), N = a.N, C = N.ui.card;
   N.router.push('base'); N.router.push('det', { n: 1 }); N.router.push('det', { n: 2 });
-  var g = C.g;                                                   // TV-Flaeche 1280x720 in Tests: Feld 1184 breit, k 0.925
-  assert.deepStrictEqual([g.x, g.y, g.w, g.round], [48, 40, 1184, 'all']);
+  var g = C.g;                                                   // TV-Flaeche 1280x720 in Tests: volle Breite, k 1
+  assert.deepStrictEqual([g.x, g.y, g.w, g.round, g.k], [0, 32, 1280, 'top', 1]);
   assert.strictEqual(C.hit(g.x + 40, g.y + 40), 'btn');
   assert.strictEqual(C.hit(g.x + 400, g.y + 300), 'in');
-  assert.strictEqual(C.hit(10, 300), 'out');
+  assert.strictEqual(C.hit(600, 10), 'out', 'Spalt oben');
   assert.strictEqual(N.router.cardPointer(g.x + 400, g.y + 300, 'click'), false, 'Inhalt: Ansicht bedient');
   assert.strictEqual(N.router.cardPointer(g.x + 40, g.y + 40, 'move'), true);
   assert.strictEqual(N.router.cardDepth(), 2, 'Darueberfahren tut nichts');
@@ -195,7 +198,7 @@ test('Zeiger: Koordinaten der Karte, X/Pfeil und Flaeche daneben (Mac: mittiges 
   var s = N.router.top(), seen = null;
   s.pan = function (e) { seen = e; return true; };
   a.flags.top = false;
-  pan(N, 'start', 'y', g.x + 185, g.y + 92.5, 0, -18.5, a.T.now());
+  pan(N, 'start', 'y', g.x + 200, g.y + 100, 0, -20, a.T.now());
   assert.deepStrictEqual([Math.round(seen.x), Math.round(seen.y), Math.round(seen.dy)], [200, 100, -20]);
 });
 

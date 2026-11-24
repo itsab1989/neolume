@@ -5,17 +5,17 @@
  *   (.cardhost > .card-sheet > .card-body) ueber der abgedunkelten Ansicht darunter. Tiefere Ebenen (Serie -> Folge, Aehnliche
  *   Titel …) wechseln IN der Karte (von rechts herein), keine Karte auf der Karte. Knopf oben links: X (erste Ebene) bzw.
  *   Zurueck-Pfeil (tiefere Ebenen).
- * - Geometrie (rein, getestet: geom): Touch – volle Breite, oben ein Spalt, Ecken oben rund; Maus (Mac) – mittiges Feld mit Rand.
+ * - Geometrie (rein, getestet: geom): Touch und Maus (Mac) – volle Breite bis unten, oben ein Spalt, Ecken oben rund.
  *   Inhalt rechnet in App-px mit Breite 1280 und Hoehe h/k; ist die Karte schmaler als 1280 (Mac-Fenster, spaeter Hochformat),
  *   wird der Inhalt mit k = w/1280 verkleinert – keine feste 1280er-Flaeche fuer die Karte selbst.
  * - Gesten fuehrt N.router.pan (Ziehen nach unten, Mitte -> rechts); hier nur die Darstellung (drag/settle/ghost). */
 (function (N) {
-  var U = N.util, GAP = 32, MAC_X = 48, MAC_Y = 40, CW = 1280, BTN = 60, OPEN_MS = 280, LEVEL_MS = 240;
+  var U = N.util, GAP = 32, CW = 1280, BTN = 60, OPEN_MS = 280, LEVEL_MS = 240;
   /* Hoechstens so lange wartet eine frisch geoeffnete Karte unten auf ihr Hintergrundbild (scr.cardWait, SPEC DET-21 [T]): kurz
    * genug, dass der Tipp sofort wirkt, lang genug fuer ein Bild aus dem Zwischenspeicher bzw. einen schnellen Server im Heimnetz */
   var WAIT_MS = 150;
 
-  /* rein: Karte in einer Flaeche W x H. touch = Finger-Geraet (volle Breite), sonst Maus/Trackpad (mittiges Feld).
+  /* rein: Karte in einer Flaeche W x H (touch: Finger-Geraet; seit 24.11.2026 dieselbe Lage wie mit Maus/Trackpad).
    * cls (optional, Groessenklasse der Flaeche, 10-screens.md 6.3): M und K immer volle Breite (auch mit Maus), ohne Verkleinern –
    * der Inhalt rechnet in einer um cut breiteren Flaeche und ist um cut nach links verschoben (wie N.screen.view: Inhaltskante 80
    * bzw. 24 statt 144); M·N als Blatt von unten (oben 15 % frei), K als Vollbild-Blatt (oben 12 px); K = narrow (schmale Anordnung
@@ -31,10 +31,10 @@
       g.cw = W + g.cut - sr; g.ch = g.h; if (sl) g.bx = sl;   // rechter Rand: Inhalt endet davor; X/Pfeil neben dem linken
       return g;
     }
+    /* Maus (Mac) wie Touch: volle Breite bis an den unteren Rand, oben ein Spalt. Nutzerbefund 24.11.2026: das fruehere mittige
+     * Feld (Rand 48/40 ringsum) liess rechts und unten Kacheln der Startseite durchscheinen – die Karte wirkte zu kurz */
     var gt = Math.max(GAP, st ? st + 12 : 0);
-    g = touch ? { x: 0, y: gt, w: W, h: H - gt, round: 'top' }
-      : { w: Math.min(CW, W - 2 * MAC_X), y: MAC_Y, h: H - 2 * MAC_Y, round: 'all' };
-    if (!touch) g.x = Math.round((W - g.w) / 2);
+    g = { x: 0, y: gt, w: W, h: H - gt, round: 'top' };
     g.k = g.w >= CW ? 1 : g.w / CW;
     g.ch = Math.round(g.h / g.k);                   // Inhaltshoehe in App-px (Breite immer 1280)
     g.cw = g.w >= CW ? g.w : CW;                    // Inhaltsbreite: breitere Karte (Touch, breites Fenster) -> Reihen laufen weiter

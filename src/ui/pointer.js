@@ -522,6 +522,18 @@
     P.applyCursor();
   };
   P.enabled = function () { return P.on; };
+  /* Mauszeiger im Player verbergen (nur Geraete mit Maus/Trackpad, caps.pointer 'mouse'; am TV nie): wie andere Mediaplayer
+   * verschwindet der Pfeil mit der Bedienleiste und kommt mit der naechsten Mausbewegung wieder (Nutzerbefund Mac 24.11.2026:
+   * Leiste blendete aus, der Pfeil blieb stehen). CSS cursor:none (Klasse pl-nocur) plus Ereignis 'cursor:hide' fuer die
+   * Plattform (Apple-Lader: sys.cursor, der Pfeil des Systems bis zur naechsten Bewegung). */
+  P.playHide = function (on) {
+    if (!N.platform || !N.platform.caps || N.platform.caps.pointer !== 'mouse') return;
+    if (typeof document === 'undefined' || !document.body) return;
+    on = !!on;
+    if (U.hasCls(document.body, 'pl-nocur') === on) return;
+    U.cls(document.body, 'pl-nocur', on);
+    if (N.evt) N.evt.emit('cursor:hide', on);
+  };
   /* Zeiger-Darstellung A/B/system (siehe N.config.cursorMode) */
   P.mode = 'B';
   P.setCursorMode = function (m) {

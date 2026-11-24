@@ -162,6 +162,7 @@
     function shutdown() {
       closed = true; gen++;
       clearAll();
+      N.pointer.playHide(false);
       helperEnd();
       nowPlaying(null);
       N.platform.player.close();
@@ -336,6 +337,7 @@
       hideT = setTimeout(function () { hideT = 0; if (!osd) osdW.style.visibility = 'hidden'; }, FADE_MS);
       if (btnEl[fb]) U.cls(btnEl[fb], 'is-focus', false);
       fb = 'pp';
+      N.pointer.playHide(true);                                 // Maus: Pfeil mit der Leiste weg (wie im Video-Player)
       N.router.refreshHints();
     }
     function setFocus(id, force) {
@@ -498,6 +500,16 @@
       if (!osd) return [];
       return [{ k: 'blue', t: 'hint.sleep' }, { k: 'TOOLS', t: 'hint.options' }, { k: 'INFO', t: 'hint.info' }, { k: 'ret', t: 'hint.back' }];
     };
+    /* Computer-Tastatur (Apple, Nr. 10): Esc beendet direkt (Nutzerbefund Mac 24.11.2026, wie andere Mediaplayer), Leertaste/K
+     * schaltet Wiedergabe/Pause, M meldet den Ton-Stand. Am Fernseher kommt das nie. */
+    s.onCmd = function (cmd) {
+      switch (cmd) {
+        case 'exit': close(); return true;
+        case 'toggle': if (errOn) return false; toggle(); return true;
+        case 'muted': case 'unmuted': N.ui.toast.show(N.t(cmd === 'muted' ? 'pl.muted' : 'pl.unmuted')); return true;
+      }
+      return false;
+    };
     s.onKey = function (k) {
       if (errOn) {
         if (sb.onKey(k)) return true;
@@ -530,6 +542,7 @@
     /* Zeiger/Finger: Knoepfe der Bedien-Insel, Zurueck oben links; sonst blendet ein Tipp das OSD ein/aus. Punkte wie im Video-Player
      * (Kasten -> Bildschirm -> Lagen-Raster; am TV unveraendert), Finger: kein Zeigen, das Tippen kommt als Klick */
     s.pointer = function (x, y, kind) {
+      if (N.input.mode !== 'touch') N.pointer.playHide(false);   // Maus bewegt/geklickt: Pfeil wieder da
       var sp = N.screen.fromStage(x, y), pt = full(sp.x, sp.y); x = pt.x; y = pt.y;
       if (errOn) return sb.pointer(x, y, kind);
       dirSync();
